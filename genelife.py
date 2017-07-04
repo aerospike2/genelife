@@ -145,8 +145,8 @@ def mutate(s,prob):
         because only considering low rates """
     if np.random.random() < prob:
         pos = np.random.randint(0,LEN)
-        if gmp.bit_test(s,pos): gmp.bit_clear(s,pos)
-        else:                   gmp.bit_set(s,pos)
+        if gmp.bit_test(s,pos): s = gmp.bit_clear(s,pos)
+        else:                   s = gmp.bit_set(s,pos)
     return s
 
 def neighbors_np(g, i, j):

@@ -22,7 +22,7 @@ if datfile is not None:
 maxact = 5000                            # max number of activity traces in graph...
 Width = 700
 Height = 200
-ymax = 10000
+ymax = 1000
 ncount = 0                          # number of calls to trace
 
 def trace(screen, colvalvec):            # eachcolval = [key,activityvalue]

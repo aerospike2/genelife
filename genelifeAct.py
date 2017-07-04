@@ -52,7 +52,7 @@ NG = 2^LEN -1   # max genome sequence as nr
 NC = LEN+1      # number of colors
 p0 = 0.08        # max prob of flip: compare with p0 = 0.0 to see advantage of model
 alpha = 1       # exponential decay constant of flip prob with hamming distance
-mutprob = 0.3   # probability of single point mutation per replication
+mutprob = 0.05   # probability of single point mutation per replication
 colormethod = 1 # 1 color by gene leading bits, 0 color by 1 + hamming(nbgenes)
 
 # setup of color map : black for 0, colors for 1 to LEN+1 or 257 for colormethod 0 or 1
@@ -145,10 +145,11 @@ def rselect(slist):
 def mutate(s,prob):
     """ gmp mutation of s: currently at most one point mutation,
         because only considering low rates """
+    global totmut
     if np.random.random() < prob:
         pos = np.random.randint(0,LEN)
-        if gmp.bit_test(s,pos): gmp.bit_clear(s,pos)
-        else:                   gmp.bit_set(s,pos)
+        if gmp.bit_test(s,pos): s = gmp.bit_clear(s,pos)
+        else:                   s = gmp.bit_set(s,pos)
     return s
 
 def neighbors_np(g, i, j):
@@ -288,8 +289,6 @@ def update(data):
         strout = strout + str(x) + ' ' + str(idact[x]) + ' '
     print strout
     sys.stdout.flush()
-    msg = 'length(idact) = ' + str(len(idact)) + '\n'
-    sys.stderr.write(msg)
     ## end activity computation 
     ####################################################
 
