@@ -48,21 +48,21 @@ from copy import copy
 #%matplotlib notebook
 #%matplotlib inline
 N = 128                 # size of array
-LEN = 63                # length of genome: LEN > 8 for current color display
+LEN = 63                # length of genome: LEN > 8 for current color display                     (4)
 NG = 2^LEN -1           # max genome sequence as nr
 NC = LEN+1              # number of colors
-p0 = 0.1                # max prob of flip: compare with p0 = 0.0 to see advantage of model
-alpha = 1               # exponential decay constant of flip prob with hamming distance
-mutprob = 0.3           # probability of single point mutation per replication
+p0 = 0.2                # max prob of flip: compare with p0 = 0.0 to see advantage of model       (1)
+alpha = 1.0             # exponential decay constant of flip prob with hamming distance           (3)
+mutprob = 0.1           # probability of single point mutation per replication                    (2)
 colormethod = 1         # 1 color by gene leading bits, 0 color by 1 + hamming(nbgenes)
-initial1density = 0.5   # initial density of ones in randomly set initial GoL pattern
+initial1density = 0.8   # initial density of ones in randomly set initial GoL pattern             (5)
 niterations = 1000      # no of updates of grid in animation
-gradients = 0           # 1 add gradients in 2 key parameters, e.g. p0 in x and mutprob in y; 0 do not
+gradients = 1           # 1 add gradients in 2 key parameters, e.g. p0 in x and mutprob in y; 0 do not
 p0min = 0.0             # min value of p0 for gradient
 mutprobmin = 0.0        # minimum mutprob for gradient
-NGC = 100               # no of initial gene centres
-initmut = 0.3           # mutation prob for creating initial genes 
-neutral = 0             # whether to do neutral version or version with p0 determined by selected gene sequence (via nr 1s)
+NGC = 4                 # no of initial gene centres                                              (6)
+initmut = 0.2           # mutation prob for creating initial genes                                (7)
+neutral = 1             # whether to do neutral version or version with p0 determined by selected gene sequence (via nr 1s)  (8)
 
 
 # setup of color map : black for 0, colors for 1 to LEN+1 or 257 for colormethod 0 or 1
@@ -249,7 +249,7 @@ def update(data):
     global grid, cgrid
     global genegrid, newgenegrid
 
-    p0x = p0
+    p0i = p0
     mutproby = mutprob
      
     # copy grid since we need to update grid in parallel using old neighbors
@@ -275,13 +275,13 @@ def update(data):
                     d = hamming(nbgenes) 
                     gs = rselect(nbgenes)                                   # genetic difference measure
                     if gradients: 
-                        p0x = p0min + ((p0-p0min) * i) / float(N-1)
+                        p0i = p0min + ((p0-p0min) * i) / float(N-1)
                         mutproby = mutprobmin+((mutprob-mutprobmin) * j) / float(N-1)
                     if neutral:
-                        p = flipprob(d,p0x,alpha)
+                        p = flipprob(d,p0i,alpha)
                     else:
                         n1av=float(LEN)/2.
-                        p1 = p0x * max(0.,(gmp.popcount(gs)-n1av)/n1av)
+                        p1 = p0i * max(0.,(gmp.popcount(gs)-n1av)/n1av)
                         p = flipprob(d,p1,alpha)                    
                     if total == 3:                    
                         if np.random.random() > p:                              # turn on if no flip
@@ -321,7 +321,7 @@ def update(data):
 # populate grid with random integers and genes 
 seed = gmp.random_state(mpz(0x789abcdefedcba65))   # initialize seed for gmpy2 random operations
 # grid = np.random.randint(0, 2, N*N).reshape(N, N) # start with random grid of 0 or 1 values with equal probs
-grid = np.random.choice([0, 1], size=(N,N), p=[1-initial1density, initial1density]) # start with random grid of 0 or 1 values
+grid = np.random.choice([0, 1], size=(N,N), p=[1.0-initial1density, initial1density]) # start with random grid of 0 or 1 values
 cgrid = grid.copy()    
 if not neutral:
     startgenecentres = [gmp.mpz_urandomb(seed, LEN) for i in range(NGC)]
