@@ -34,22 +34,21 @@
 ################################################################################
 # execute with "./activity.py ./genelifeAct.py"  
 
-def genelife_sub(p0 = 0.1, mutprob = 0.1, alpha = 1.0, LEN = 63, initial1density = 0.8, NGC = 4, initmut = 0.2, neutral = 1):
+import sys
+import cProfile
+import numpy as np
+import gmpy2 as gmp     # use gmpy2 package to allow efficient bit string operations (also for LEN>63)
+from gmpy2 import mpz   # pip install gmpy2, doc see https://gmpy2.readthedocs.io/en/latest/mpz.html 
+from copy import copy
+
+def genelife_sub(args):
   """ returns value of simulaiton with these parameters (defn below)"""
-  import sys
-  import cProfile
-  import numpy as np
-  import matplotlib.pyplot as plt
-  import matplotlib.colors as mpcolors
-  import matplotlib.animation as animation
-  from matplotlib.colors import ListedColormap
-  import matplotlib
-  import gmpy2 as gmp     # use gmpy2 package to allow efficient bit string operations (also for LEN>63)
-  from gmpy2 import mpz   # pip install gmpy2, doc see https://gmpy2.readthedocs.io/en/latest/mpz.html 
-  from copy import copy
   #%matplotlib notebook
   #%matplotlib inline
 
+  p0 = float(args[0]); mutprob = float(args[1]); alpha = float(args[2]); LEN = int(args[3])
+  initial1density = float(args[4]); NGC = float(args[5]); initmut = float(args[6]); neutral = float(args[7])
+  
   #p0 = 0.1                # max prob of flip: compare with p0 = 0.0 to see advantage of model       (1)
   #mutprob = 0.1           # probability of single point mutation per replication                    (2)
   #alpha = 1.0             # exponential decay constant of flip prob with hamming distance           (3)
@@ -63,80 +62,16 @@ def genelife_sub(p0 = 0.1, mutprob = 0.1, alpha = 1.0, LEN = 63, initial1density
   NG = 2^LEN -1           # max genome sequence as nr
   NC = LEN+1              # number of colors
   colormethod = 1         # 1 color by gene leading bits, 0 color by 1 + hamming(nbgenes)
-  niterations = 1000      # no of updates of grid in animation
+  niterations = 100      # no of updates of grid in animation
   gradients = 0           # 1 add gradients in 2 key parameters, e.g. p0 in x and mutprob in y; 0 do not
   p0min = 0.0             # min value of p0 for gradient
   mutprobmin = 0.0        # minimum mutprob for gradient
   
   idact = {}              # initial list of ids for activity statistics
+  iddone = {}
 
   # setup of color map : black for 0, colors for 1 to LEN+1 or 257 for colormethod 0 or 1
   #-----------------------------------------------------------------------------------------------------------
-  def rand_cmap(nlabels, type='bright', first_color_black=True, last_color_black=False, verbose=True):
-      """
-      Creates a random colormap to be used together with matplotlib. Useful for segmentation tasks
-      :param nlabels: Number of labels (size of colormap)
-      :param type: 'bright' for strong colors, 'soft' for pastel colors
-      :param first_color_black: Option to use first color as black, True or False
-      :param last_color_black: Option to use last color as black, True or False
-      :param verbose: Prints the number of labels and shows the colormap. True or False
-      :return: colormap for matplotlib
-      Author of this color function: Delestro, stackoverflow or https://github.com/delestro/rand_cmap
-      """
-      from matplotlib.colors import LinearSegmentedColormap
-      import colorsys
-      import numpy as np
-  
-      if type not in ('bright', 'soft'):
-          print ('Please choose "bright" or "soft" for type')
-          return
-      if verbose:
-          print('Number of labels: ' + str(nlabels))
-  
-      # Generate color map for bright colors, based on hsv
-      if type == 'bright':
-          randHSVcolors = [(np.random.uniform(low=0.0, high=1),
-                        np.random.uniform(low=0.2, high=1),
-                        np.random.uniform(low=0.9, high=1)) for i in xrange(nlabels)]    
-          randRGBcolors = []  
-          for HSVcolor in randHSVcolors:  # Convert HSV list to RGB
-              randRGBcolors.append(colorsys.hsv_to_rgb(HSVcolor[0], HSVcolor[1], HSVcolor[2]))
-          if first_color_black:
-              randRGBcolors[0] = [0, 0, 0]
-          if last_color_black:
-              randRGBcolors[-1] = [0, 0, 0]
-          random_colormap = LinearSegmentedColormap.from_list('new_map', randRGBcolors, N=nlabels)
-  
-      # Generate soft pastel colors, by limiting the RGB spectrum
-      if type == 'soft':
-          low = 0.6
-          high = 0.95
-          randRGBcolors = [(np.random.uniform(low=low, high=high),
-                        np.random.uniform(low=low, high=high),
-                        np.random.uniform(low=low, high=high)) for i in xrange(nlabels)]
-          if first_color_black:
-              randRGBcolors[0] = [0, 0, 0]
-          if last_color_black:
-              randRGBcolors[-1] = [0, 0, 0]
-          random_colormap = LinearSegmentedColormap.from_list('new_map', randRGBcolors, N=nlabels)
-  
-      # Display colorbar
-      if verbose:
-          from matplotlib import colors, colorbar
-          from matplotlib import pyplot as plt
-          fig, ax = plt.subplots(1, 1, figsize=(15, 0.5))
-          bounds = np.linspace(0, nlabels, nlabels + 1)
-          norm = colors.BoundaryNorm(bounds, nlabels)
-          cb = colorbar.ColorbarBase(ax, cmap=random_colormap, norm=norm, spacing='proportional', ticks=None,
-                                 boundaries=bounds, format='%1i', orientation=u'horizontal')
-  
-      return random_colormap
-  #-----------------------------------------------------------------------------------------------------------
-  if colormethod == 1:
-      my_cmap = rand_cmap(257, type='bright', first_color_black=True, last_color_black=False, verbose=False)
-  else:
-      my_cmap = matplotlib.cm.get_cmap('rainbow')  #was brg or spring or rainbow or PuBuGn
-      my_cmap.set_under('black')  # use with vmin = 0.001 to set only the 0 integer state to black
   
   
   def hamming(slist):
@@ -227,30 +162,8 @@ def genelife_sub(p0 = 0.1, mutprob = 0.1, alpha = 1.0, LEN = 63, initial1density
           if nbs[k]: onenbs.append(gg[(i+1)%N][(j+1)%N])
       return onenbs
   
-  def colorgrid(N,LEN,colormethod):
-      """ colors array according to grid and genegrid using colormethod"""
-      global grid,cgrid,genegrid
-      if colormethod: # color by gene types            
-          for i in range(N):                 # make this simple array copy operation more efficient
-              for j in range(N): 
-                  if grid[i,j]:
-                      cgrid[i,j] = 1 + gmp.c_div_2exp(genegrid[i][j],LEN-8) 
-                  else:
-                      cgrid[i,j] = 0 
-      else:           # color by hamming distance of neighbor sites with grid one value
-          for i in range(N):                 # make this simple array copy operation more efficient
-              for j in range(N): 
-                  if grid[i,j]:     
-                      nbs = neighbors_np(grid, i, j)
-                      nbgenes = one_neighbors(genegrid,nbs,i,j)
-                      cgrid[i,j] = 1 + hamming(nbgenes) 
-                  else:
-                      cgrid[i,j] = 0 
-      return
   
-  def update(data):
-      global grid, cgrid
-      global genegrid, newgenegrid
+  def update(grid,genegrid,newgenegrid,idact,iddone):
   
       p0i = p0
       mutproby = mutprob
@@ -296,6 +209,7 @@ def genelife_sub(p0 = 0.1, mutprob = 0.1, alpha = 1.0, LEN = 63, initial1density
                               newgrid[i, j] = 1
       # update data
       grid = newgrid
+      iddone = {}
       for i in range(N):                 # make this simple array copy operation more efficient
           for j in range(N):
               genegrid[i][j] = newgenegrid[i][j]
@@ -306,20 +220,10 @@ def genelife_sub(p0 = 0.1, mutprob = 0.1, alpha = 1.0, LEN = 63, initial1density
                   idact[x] += 1
               else:
                   idact[x] = 1
+              iddone[x] = 1
+              ## end activity computation 
+              ####################################################
   
-      strout = ''
-      for x in idact:
-          strout = strout + str(x) + ' ' + str(idact[x]) + ' '
-      print strout
-      sys.stdout.flush()
-      ## end activity computation 
-      ####################################################
-  
-      colorgrid(N,LEN,colormethod)        
-      mat.set_data(cgrid)
-      # hist = np.histogram(cgrid, bins=257)
-      # print hist
-      return [mat]
   
   def runvalue1(grid):
       """ density of 1s"""
@@ -333,7 +237,9 @@ def genelife_sub(p0 = 0.1, mutprob = 0.1, alpha = 1.0, LEN = 63, initial1density
       """ integrated popoulation activity"""
       sum = 0
       for x in idact:
-                  sum = sum + idact[x]
+        if x != mpz(0):
+          if x not in iddone:   # only live genes in last generation
+            sum = sum + idact[x]
       return sum
   
   def runvalue4(grid):
@@ -351,18 +257,23 @@ def genelife_sub(p0 = 0.1, mutprob = 0.1, alpha = 1.0, LEN = 63, initial1density
   else:
       genegrid = [[(gmp.mpz_urandomb(seed, LEN) if grid[i,j] else mpz(0)) for i in range(N)] for j in range(N)]
   
-  colorgrid(N,LEN,colormethod)
+
   newgenegrid = [[genegrid[i][j] for i in range(N)] for j in range(N)]
   
-  # set up animation
-  fig, ax = plt.subplots()
-  mat = ax.matshow(cgrid, cmap=my_cmap, vmin=0.01, vmax=257)  # was vmax = LEN+1
-  ani = animation.FuncAnimation(fig, update, interval=10,
-                                save_count=None, frames=niterations, repeat = False)
-  plt.show()
-
-  return runvalue3(idact)
+  for i in range(niterations):
+    update(grid,genegrid,newgenegrid,idact,iddone)
   
-
+  args = [float(aa) for aa in args]
+  return args + [runvalue3(idact)]
+  
 if __name__ == '__main__':
-  genelife_sub(p0 = 0.1, mutprob = 0.1, alpha = 1.0, LEN = 63, initial1density = 0.8, NGC = 4, initmut = 0.2, neutral = 1)
+  args = sys.argv[1]
+  args = args.replace(","," ")
+  args = args.replace("\\"," ")
+  args = args.split()
+  if len(args) != 8:
+    sys.exit("Usage:  batch.py arg1 ... arg8")
+  foo = genelife_sub(args)
+  for x in foo:
+    print x,
+  print
