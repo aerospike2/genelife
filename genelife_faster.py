@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 
 ################################################################################
 # genelife.py
@@ -32,9 +31,7 @@
 # With the current parameters, no degeneration to a set of non-communicating local structures occurs
 # The model is likely to be more interesting still with recombination than point mutation NYI
 ################################################################################
-# execute with "./activity.py ./genelifeAct.py"  
 
-import sys
 import cProfile
 import numpy as np
 import matplotlib.pyplot as plt
@@ -51,14 +48,10 @@ N = 128         # size of array
 LEN = 63        # length of genome: LEN > 8 for current color display
 NG = 2^LEN -1   # max genome sequence as nr
 NC = LEN+1      # number of colors
-p0 = 0.08        # max prob of flip: compare with p0 = 0.0 to see advantage of model
+p0 = 0.02        # max prob of flip: compare with p0 = 0.0 to see advantage of model
 alpha = 1       # exponential decay constant of flip prob with hamming distance
-mutprob = 0.05   # probability of single point mutation per replication
+mutprob = 0.3   # probability of single point mutation per replication
 colormethod = 1 # 1 color by gene leading bits, 0 color by 1 + hamming(nbgenes)
-initial1density = 0.5
-niterations = 1000
-gradients = 1   # 1 add gradients in 2 key parameters, e.g. p0 in x and mutprob in y; 0 do not
-
 
 # setup of color map : black for 0, colors for 1 to LEN+1 or 257 for colormethod 0 or 1
 #-----------------------------------------------------------------------------------------------------------
@@ -150,69 +143,112 @@ def rselect(slist):
 def mutate(s,prob):
     """ gmp mutation of s: currently at most one point mutation,
         because only considering low rates """
-    global totmut
     if np.random.random() < prob:
         pos = np.random.randint(0,LEN)
-        if gmp.bit_test(s,pos): s = gmp.bit_clear(s,pos)
-        else:                   s = gmp.bit_set(s,pos)
+        if gmp.bit_test(s,pos): s=gmp.bit_clear(s,pos)
+        else:                   s=gmp.bit_set(s,pos)
     return s
 
-def neighbors_np(g, i, j):
-    """ make list of 8 g neighbors of a site (i,j) with periodic bcs
+def neighborvals(g, i, j):
+    """ make integer bitlist of 8 g neighbors of a site (i,j) with periodic bcs
+    central site is bit 0, next 8 bits of integer are neighbors
     for numpy 2d array """
-    if j > 1 and j < N-1:
-        if i > 1 and i < N-1:   # separate calculation without modulo for speed
-            return  [ g[i  , j-1], g[i  , j+1], 
-                      g[i-1, j  ], g[i+1, j  ], 
-                      g[i-1, j-1], g[i-1, j+1], 
-                      g[i+1, j-1], g[i+1, j+1]]
-        else:                   # modulo in i needed
-            return  [ g[i,    j-1], g[i,       j+1], 
-                      g[(i-1)%N, j  ], g[(i+1)%N, j  ], 
-                      g[(i-1)%N, j-1], g[(i-1)%N, j+1], 
-                      g[(i+1)%N, j-1], g[(i+1)%N, j+1]]
+    if j > 1 and j < N-1 and i > 1 and i < N-1:   # separate calculation without modulo for speed
+        return  (g[i  , j-1]<<7 + g[i  , j+1]<<6 + 
+                 g[i-1, j  ]<<5 + g[i+1, j  ]<<4 + 
+                 g[i-1, j-1]<<3 + g[i-1, j+1]<<2 +
+                 g[i+1, j-1]<<1 + g[i+1, j+1])<<1 + g[i,j]
+ 
     else:                       # general case
-        return  [ g[i,      (j-1)%N], g[i      ,(j+1)%N], 
-                  g[(i-1)%N, j     ], g[(i+1)%N,j      ], 
-                  g[(i-1)%N,(j-1)%N], g[(i-1)%N,(j+1)%N], 
-                  g[(i+1)%N,(j-1)%N], g[(i+1)%N,(j+1)%N]]
+        return  (g[i,      (j-1)%N]<<7 + g[i      ,(j+1)%N]<<6 + 
+                 g[(i-1)%N, j     ]<<5 + g[(i+1)%N,j      ]<<4 + 
+                 g[(i-1)%N,(j-1)%N]<<3 + g[(i-1)%N,(j+1)%N]<<2 + 
+                 g[(i+1)%N,(j-1)%N]<<1 + g[(i+1)%N,(j+1)%N])<<1 + g[i,j]
 
+def updatenbs0(g, i, j):
+    if j > 1 and j < N-1 and i > 1 and i < N-1: # separate calculation without modulo for speed
+        g[i,j+1] = g[i,j+1]&0xff
+        g[i,j-1] = g[i,j-1]&0x17f
+        g[i+1,j] = g[i+1,j]&0x1bf
+        g[i-1,j] = g[i-1,j]&0x1df
+        g[i+1,j+1] = g[i+1,j+1]&0x1ef
+        g[i+1,j-1] = g[i+1,j-1]&0x1f7
+        g[i-1,j+1] = g[i-1,j+1]&0x1fb
+        g[i-1,j-1] = g[i-1,j-1]&0x1fd
+    else:
+        jm1 = (j-1)%N
+        jp1 = (j+1)%N
+        im1 = (i-1)%N
+        ip1 = (i+1)%N
+        g[i,jp1] = g[i,jp1]&0xff
+        g[i,jm1] = g[i,jm1]&0x17f
+        g[ip1,j] = g[ip1,j]&0x1bf
+        g[im1,j] = g[im1,j]&0x1df
+        g[ip1,jp1] = g[ip1,jp1]&0x1ef
+        g[ip1,jm1] = g[ip1,jm1]&0x1f7
+        g[im1,jp1] = g[im1,jp1]&0x1fb
+        g[im1,jm1] = g[im1,jm1]&0x1fd
+
+def updatenbs1(g, i, j):
+    if j > 1 and j < N-1 and i > 1 and i < N-1: # separate calculation without modulo for speed
+        g[i,j+1] = g[i,j+1]|0x100
+        g[i,j-1] = g[i,j-1]|0x80
+        g[i+1,j] = g[i+1,j]|0x40
+        g[i-1,j] = g[i-1,j]|0x20
+        g[i+1,j+1] = g[i+1,j+1]|0x10
+        g[i+1,j-1] = g[i+1,j-1]|0x8
+        g[i-1,j+1] = g[i-1,j+1]|0x4
+        g[i-1,j-1] = g[i-1,j-1]|0x2
+    else:
+        jm1 = (j-1)%N
+        jp1 = (j+1)%N
+        im1 = (i-1)%N
+        ip1 = (i+1)%N
+        g[i,jp1] = g[i,jp1]|0x100
+        g[i,jm1] = g[i,jm1]|0x80
+        g[ip1,j] = g[ip1,j]|0x40
+        g[im1,j] = g[im1,j]|0x20
+        g[ip1,jp1] = g[ip1,jp1]|0x10
+        g[ip1,jm1] = g[ip1,jm1]|0x8
+        g[im1,jp1] = g[im1,jp1]|0x4
+        g[im1,jm1] = g[im1,jm1]|0x2
+ 
 def one_neighbors(gg, nbs, i, j):
     """" make list of gg neighbors of a site (i,j) at which grid value stored in nbs is True
         and for 1d array of 8 neighbors nbs"""
     onenbs = []
-    k=0
+    k=7
     if j > 1 and j < N-1 and i > 1 and i < N-1: # separate calculation without modulo for speed
         if nbs[k]: onenbs.append(gg[i][j-1])
-        k=k+1
+        k=k-1
         if nbs[k]: onenbs.append(gg[i][j+1])
-        k=k+1
+        k=k-1
         if nbs[k]: onenbs.append(gg[i-1][j])
-        k=k+1
+        k=k-1
         if nbs[k]: onenbs.append(gg[i+1][j] )
-        k=k+1
+        k=k-1
         if nbs[k]: onenbs.append(gg[i-1][j-1])
-        k=k+1
+        k=k-1
         if nbs[k]: onenbs.append(gg[i-1][j+1])
-        k=k+1
+        k=k-1
         if nbs[k]: onenbs.append(gg[i+1][j-1])
-        k=k+1
+        k=k-1
         if nbs[k]: onenbs.append(gg[i+1][j+1])
     else:                                       # general case with modulo
         if nbs[k]: onenbs.append(gg[i][(j-1)%N])
-        k=k+1
+        k=k-1
         if nbs[k]: onenbs.append(gg[i][(j+1)%N])
-        k=k+1
+        k=k-1
         if nbs[k]: onenbs.append(gg[(i-1)%N][j])
-        k=k+1
+        k=k-1
         if nbs[k]: onenbs.append(gg[(i+1)%N][j] )
-        k=k+1
+        k=k-1
         if nbs[k]: onenbs.append(gg[(i-1)%N][(j-1)%N])
-        k=k+1
+        k=k-1
         if nbs[k]: onenbs.append(gg[(i-1)%N][(j+1)%N])
-        k=k+1
+        k=k-1
         if nbs[k]: onenbs.append(gg[(i+1)%N][(j-1)%N])
-        k=k+1
+        k=k-1
         if nbs[k]: onenbs.append(gg[(i+1)%N][(j+1)%N])
     return onenbs
 
@@ -222,29 +258,26 @@ def colorgrid(N,LEN,colormethod):
     if colormethod: # color by gene types            
         for i in range(N):                 # make this simple array copy operation more efficient
             for j in range(N): 
-                if grid[i,j]:
+                if grid[i,j]&0x1:
                     cgrid[i,j] = 1 + gmp.c_div_2exp(genegrid[i][j],LEN-8) 
                 else:
                     cgrid[i,j] = 0 
     else:           # color by hamming distance of neighbor sites with grid one value
         for i in range(N):                 # make this simple array copy operation more efficient
             for j in range(N): 
-                if grid[i,j]:     
-                    nbs = neighbors_np(grid, i, j)
+                if grid[i,j]&0x1:  
+                    num = grid[i, j] >> 1
+                    nbs = [int(k) for k in np.binary_repr(num, 8)]                 
                     nbgenes = one_neighbors(genegrid,nbs,i,j)
                     cgrid[i,j] = 1 + hamming(nbgenes) 
                 else:
                     cgrid[i,j] = 0 
     return
 
-idact = {}
-
 def update(data):
-    global grid, cgrid
+    global grid, newgrid, cgrid
     global genegrid, newgenegrid
-
-    p0x = p0
-    mutproby = mutprob
+    global numones
      
     # copy grid since we need to update grid in parallel using old neighbors
     newgrid = grid.copy()
@@ -254,51 +287,40 @@ def update(data):
 
     for i in range(N):
         for j in range(N):
-            # compute 8-neighbor sum using toroidal boundary conditions
-            nbs = neighbors_np(grid, i, j)
-            total = sum(nbs)
+            # compute 8-neighbor sum
+            num = grid[i, j] >> 1
+            nbs=[int(k) for k in np.binary_repr(num, 8)]
+            total = nbs.count(1)
+            # total = numones[num]    # precalculated array with 256 positions 
+
             # apply Conway's rules with stochastic override for off sites with 2 or 3 neighbors
-            if grid[i, j]  == 1: # cell value is on, "live" site
+            if grid[i, j]&0x1  == 1: # cell value is on, "live" site
                 if (total < 2) or (total > 3): # value set to off (zero), gene "dies"
-                    newgrid[i, j] = 0
+                    newgrid[i, j] = grid[i,j] - 1
+                    updatenbs0(newgrid, i, j)
                     newgenegrid[i][j] = mpz(0)
                 # else:  total is two or three: value stays on (live), nothing to do, no replication
             else:              # cell value is off, "dead" site
-                if total == 2 or total == 3: # Conway's rule unless genetic neighborhood says otherwise
+                if total == 3 or total == 2: # Conway's rule unless genetic neighborhood says otherwise
                     nbgenes = one_neighbors(genegrid, nbs, i, j)
                     d = hamming(nbgenes)                                    # genetic difference measure
-                    if gradients: 
-                        p0x = p0x * i / (N-1)
-                        mutproby = mutproby * j / (N-1)
-                    p = flipprob(d,p0x,alpha)                                # probability of flip override
-                    if total == 3:                    
+                    p = flipprob(d,p0,alpha)                                # probability of flip override
+                    if total == 3:
                         if np.random.random() > p:                              # turn on if no flip
-                            newgenegrid[i][j] = mutate(rselect(nbgenes),mutproby)
-                            newgrid[i, j] = 1
+                            newgenegrid[i][j] = mutate(rselect(nbgenes),mutprob)
+                            newgrid[i, j] = grid[i,j]+1
+                            updatenbs1(newgrid, i, j)
+
                     elif total == 2: # genetic neighborhood overrules Conway's rule (to keep off)
                         if np.random.random() < p:                              # turn on if flip
-                            newgenegrid[i][j] = mutate(rselect(nbgenes),mutproby)
-                            newgrid[i, j] = 1
+                            newgenegrid[i][j] = mutate(rselect(nbgenes),mutprob)
+                            newgrid[i, j] = grid[i,j]+1
+                            updatenbs1(newgrid, i, j)
     # update data
     grid = newgrid
     for i in range(N):                 # make this simple array copy operation more efficient
         for j in range(N):
             genegrid[i][j] = newgenegrid[i][j]
-            ####################################################
-            ## here is the activity computation 
-            x = genegrid[i][j]
-            if x in idact:
-                idact[x] += 1
-            else:
-                idact[x] = 1
-
-    strout = ''
-    for x in idact:
-        strout = strout + str(x) + ' ' + str(idact[x]) + ' '
-    print strout
-    sys.stdout.flush()
-    ## end activity computation 
-    ####################################################
 
     colorgrid(N,LEN,colormethod)        
     mat.set_data(cgrid)
@@ -306,19 +328,28 @@ def update(data):
     # print hist
     return [mat]
 
-# populate grid with random integers and genes 
+# populate lattice with random integers (grid0) and genes (genegrid).
+# Construct integer grid condensing information about neighbor grid0 values as binary integer bits
+# Also define cgrid for colour values displayed for grid
 seed = gmp.random_state(mpz(0x789abcdefedcba65))   # initialize seed for gmpy2 random operations
-# grid = np.random.randint(0, 2, N*N).reshape(N, N) # start with random grid of 0 or 1 values with equal probs
-grid = np.random.choice([0, 1], size=(N,N), p=[1-initial1density, initial1density]) # start with random grid of 0 or 1 values
+grid0 = np.random.randint(0, 2, N*N).reshape(N, N) # start with random grid of 0 or 1 values
+
+grid = grid0.copy()
+for i in range(N):
+    for j in range(N):
+        # compute 8-neighbor sum using toroidal boundary conditions
+        grid[i,j] = neighborvals(grid0, i, j)
+# color grid
 cgrid = grid.copy()    
-genegrid = [[(gmp.mpz_urandomb(seed, LEN) if grid[i,j] else mpz(0)) for i in range(N)] for j in range(N)]
+genegrid = [[(gmp.mpz_urandomb(seed, LEN) if (grid[i,j]&0x1) else mpz(0)) for i in range(N)] for j in range(N)]
 colorgrid(N,LEN,colormethod)
+#  initialize global new grids for update with old values
+newgrid = grid.copy()
 newgenegrid = [[genegrid[i][j] for i in range(N)] for j in range(N)]
 
 # set up animation
 fig, ax = plt.subplots()
 mat = ax.matshow(cgrid, cmap=my_cmap, vmin=0.01, vmax=257)  # was vmax = LEN+1
 ani = animation.FuncAnimation(fig, update, interval=10,
-                              save_count=1, frames=niterations, repeat = False)
-
-plt.show()
+                              save_count=1, frames=100, repeat = False)
+cProfile.run('plt.show()')
