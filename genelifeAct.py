@@ -336,6 +336,6 @@ newgenegrid = [[genegrid[i][j] for i in range(N)] for j in range(N)]
 fig, ax = plt.subplots()
 mat = ax.matshow(cgrid, cmap=my_cmap, vmin=0.01, vmax=257)  # was vmax = LEN+1
 ani = animation.FuncAnimation(fig, update, interval=10,
-                              save_count=1, frames=niterations, repeat = False)
+                              save_count=None, frames=niterations, repeat = False)
 
 plt.show()
