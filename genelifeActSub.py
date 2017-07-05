@@ -47,22 +47,24 @@ from gmpy2 import mpz   # pip install gmpy2, doc see https://gmpy2.readthedocs.i
 from copy import copy
 #%matplotlib notebook
 #%matplotlib inline
-N = 128                 # size of array
-LEN = 63                # length of genome: LEN > 8 for current color display                     (4)
-NG = 2^LEN -1           # max genome sequence as nr
-NC = LEN+1              # number of colors
+
 p0 = 0.1                # max prob of flip: compare with p0 = 0.0 to see advantage of model       (1)
-alpha = 1.0             # exponential decay constant of flip prob with hamming distance           (3)
 mutprob = 0.1           # probability of single point mutation per replication                    (2)
-colormethod = 1         # 1 color by gene leading bits, 0 color by 1 + hamming(nbgenes)
+alpha = 1.0             # exponential decay constant of flip prob with hamming distance           (3)
+LEN = 63                # length of genome: LEN > 8 for current color display                     (4)
 initial1density = 0.8   # initial density of ones in randomly set initial GoL pattern             (5)
-niterations = 1000      # no of updates of grid in animation
-gradients = 1           # 1 add gradients in 2 key parameters, e.g. p0 in x and mutprob in y; 0 do not
-p0min = 0.0             # min value of p0 for gradient
-mutprobmin = 0.0        # minimum mutprob for gradient
 NGC = 4                 # no of initial gene centres                                              (6)
 initmut = 0.2           # mutation prob for creating initial genes                                (7)
-neutral = 1             # whether to do neutral version or version with p0 determined by selected gene sequence (via nr 1s)  (8)
+neutral = 1             # whether neutral or with p0 determined by select gene seq. (via nr 1s)   (8)
+
+N = 128                 # size of array
+NG = 2^LEN -1           # max genome sequence as nr
+NC = LEN+1              # number of colors
+colormethod = 1         # 1 color by gene leading bits, 0 color by 1 + hamming(nbgenes)
+niterations = 1000      # no of updates of grid in animation
+gradients = 0           # 1 add gradients in 2 key parameters, e.g. p0 in x and mutprob in y; 0 do not
+p0min = 0.0             # min value of p0 for gradient
+mutprobmin = 0.0        # minimum mutprob for gradient
 
 
 # setup of color map : black for 0, colors for 1 to LEN+1 or 257 for colormethod 0 or 1
