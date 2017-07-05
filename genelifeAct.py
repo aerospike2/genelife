@@ -47,7 +47,7 @@ from gmpy2 import mpz   # pip install gmpy2, doc see https://gmpy2.readthedocs.i
 from copy import copy
 #%matplotlib notebook
 #%matplotlib inline
-N = 256                 # size of array
+N = 128                 # size of array
 LEN = 63                # length of genome: LEN > 8 for current color display
 NG = 2^LEN -1           # max genome sequence as nr
 NC = LEN+1              # number of colors
@@ -57,7 +57,7 @@ mutprob = 0.3           # probability of single point mutation per replication
 colormethod = 1         # 1 color by gene leading bits, 0 color by 1 + hamming(nbgenes)
 initial1density = 0.5   # initial density of ones in randomly set initial GoL pattern
 niterations = 1000      # no of updates of grid in animation
-gradients = 1           # 1 add gradients in 2 key parameters, e.g. p0 in x and mutprob in y; 0 do not
+gradients = 0           # 1 add gradients in 2 key parameters, e.g. p0 in x and mutprob in y; 0 do not
 p0min = 0.0             # min value of p0 for gradient
 mutprobmin = 0.0        # minimum mutprob for gradient
 NGC = 100               # no of initial gene centres
@@ -278,14 +278,11 @@ def update(data):
                         p0x = p0min + ((p0-p0min) * i) / float(N-1)
                         mutproby = mutprobmin+((mutprob-mutprobmin) * j) / float(N-1)
                     if neutral:
-                        p = flipprob(d,p1,alpha)
+                        p = flipprob(d,p0x,alpha)
                     else:
                         n1av=float(LEN)/2.
-                        p1 = max(0.,(gmp.popcount(gs)-n1av)/n1av)
-                        p = flipprob(d,p1,alpha)
-                    if gradients: 
-                        p0x = p0min + ((p0-p0min) * i) / float(N-1)
-                        mutproby = mutprobmin+((mutprob-mutprobmin) * j) / float(N-1)                      
+                        p1 = p0x * max(0.,(gmp.popcount(gs)-n1av)/n1av)
+                        p = flipprob(d,p1,alpha)                    
                     if total == 3:                    
                         if np.random.random() > p:                              # turn on if no flip
                             newgenegrid[i][j] = mutate(gs,mutproby)
