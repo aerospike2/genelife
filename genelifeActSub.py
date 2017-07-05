@@ -68,7 +68,8 @@ def genelife_sub(p0 = 0.1, mutprob = 0.1, alpha = 1.0, LEN = 63, initial1density
   p0min = 0.0             # min value of p0 for gradient
   mutprobmin = 0.0        # minimum mutprob for gradient
   
-  
+  idact = {}              # initial list of ids for activity statistics
+
   # setup of color map : black for 0, colors for 1 to LEN+1 or 257 for colormethod 0 or 1
   #-----------------------------------------------------------------------------------------------------------
   def rand_cmap(nlabels, type='bright', first_color_black=True, last_color_black=False, verbose=True):
@@ -247,8 +248,6 @@ def genelife_sub(p0 = 0.1, mutprob = 0.1, alpha = 1.0, LEN = 63, initial1density
                       cgrid[i,j] = 0 
       return
   
-  idact = {}
-  
   def update(data):
       global grid, cgrid
       global genegrid, newgenegrid
@@ -322,7 +321,7 @@ def genelife_sub(p0 = 0.1, mutprob = 0.1, alpha = 1.0, LEN = 63, initial1density
       # print hist
       return [mat]
   
-  def runvalue1(grid, genegrid):
+  def runvalue1(grid):
       """ density of 1s"""
       return grid.count(1)
   
@@ -330,12 +329,15 @@ def genelife_sub(p0 = 0.1, mutprob = 0.1, alpha = 1.0, LEN = 63, initial1density
       """ overall or average local genetic diversity"""
       return 0
   
-  def runvalue3(grid, genegrid):
+  def runvalue3(idact):
       """ integrated popoulation activity"""
-      return 0
+      sum = 0
+      for x in idact:
+                  sum = sum + idact[x]
+      return sum
   
-  def runvalue4(grid, genegrid):
-      """ number of glider local patterns"""
+  def runvalue4(grid):
+      """ number of glider local patterns NYI"""
       return 0
   
   # populate grid with random integers and genes 
@@ -360,5 +362,5 @@ def genelife_sub(p0 = 0.1, mutprob = 0.1, alpha = 1.0, LEN = 63, initial1density
   
   plt.show()
 
-  return runvalue1(grid, genegrid)
+  return runvalue3(idact)
   
