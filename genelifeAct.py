@@ -47,17 +47,22 @@ from gmpy2 import mpz   # pip install gmpy2, doc see https://gmpy2.readthedocs.i
 from copy import copy
 #%matplotlib notebook
 #%matplotlib inline
-N = 128         # size of array
-LEN = 63        # length of genome: LEN > 8 for current color display
-NG = 2^LEN -1   # max genome sequence as nr
-NC = LEN+1      # number of colors
-p0 = 0.08        # max prob of flip: compare with p0 = 0.0 to see advantage of model
-alpha = 1       # exponential decay constant of flip prob with hamming distance
-mutprob = 0.05   # probability of single point mutation per replication
-colormethod = 1 # 1 color by gene leading bits, 0 color by 1 + hamming(nbgenes)
-initial1density = 0.5
-niterations = 1000
-gradients = 1   # 1 add gradients in 2 key parameters, e.g. p0 in x and mutprob in y; 0 do not
+N = 256                 # size of array
+LEN = 63                # length of genome: LEN > 8 for current color display
+NG = 2^LEN -1           # max genome sequence as nr
+NC = LEN+1              # number of colors
+p0 = 0.1                # max prob of flip: compare with p0 = 0.0 to see advantage of model
+alpha = 1               # exponential decay constant of flip prob with hamming distance
+mutprob = 0.3           # probability of single point mutation per replication
+colormethod = 1         # 1 color by gene leading bits, 0 color by 1 + hamming(nbgenes)
+initial1density = 0.5   # initial density of ones in randomly set initial GoL pattern
+niterations = 1000      # no of updates of grid in animation
+gradients = 1           # 1 add gradients in 2 key parameters, e.g. p0 in x and mutprob in y; 0 do not
+p0min = 0.0             # min value of p0 for gradient
+mutprobmin = 0.0        # minimum mutprob for gradient
+NGC = 100               # no of initial gene centres
+initmut = 0.3           # mutation prob for creating initial genes 
+neutral = 0             # whether to do neutral version or version with p0 determined by selected gene sequence (via nr 1s)
 
 
 # setup of color map : black for 0, colors for 1 to LEN+1 or 257 for colormethod 0 or 1
@@ -148,10 +153,11 @@ def rselect(slist):
     return slist[np.random.randint(0,len(slist)-1)]
     
 def mutate(s,prob):
-    """ gmp mutation of s: currently at most one point mutation,
-        because only considering low rates """
+    """ gmp mutation of s """
     global totmut
-    if np.random.random() < prob:
+    mcount = 0
+    while np.random.random() < prob and mcount < LEN/2:
+        mcount = mcount + 1
         pos = np.random.randint(0,LEN)
         if gmp.bit_test(s,pos): s = gmp.bit_clear(s,pos)
         else:                   s = gmp.bit_set(s,pos)
@@ -266,18 +272,27 @@ def update(data):
             else:              # cell value is off, "dead" site
                 if total == 2 or total == 3: # Conway's rule unless genetic neighborhood says otherwise
                     nbgenes = one_neighbors(genegrid, nbs, i, j)
-                    d = hamming(nbgenes)                                    # genetic difference measure
+                    d = hamming(nbgenes) 
+                    gs = rselect(nbgenes)                                   # genetic difference measure
                     if gradients: 
-                        p0x = p0x * i / (N-1)
-                        mutproby = mutproby * j / (N-1)
-                    p = flipprob(d,p0x,alpha)                                # probability of flip override
+                        p0x = p0min + ((p0-p0min) * i) / float(N-1)
+                        mutproby = mutprobmin+((mutprob-mutprobmin) * j) / float(N-1)
+                    if neutral:
+                        p = flipprob(d,p1,alpha)
+                    else:
+                        n1av=float(LEN)/2.
+                        p1 = max(0.,(gmp.popcount(gs)-n1av)/n1av)
+                        p = flipprob(d,p1,alpha)
+                    if gradients: 
+                        p0x = p0min + ((p0-p0min) * i) / float(N-1)
+                        mutproby = mutprobmin+((mutprob-mutprobmin) * j) / float(N-1)                      
                     if total == 3:                    
                         if np.random.random() > p:                              # turn on if no flip
-                            newgenegrid[i][j] = mutate(rselect(nbgenes),mutproby)
+                            newgenegrid[i][j] = mutate(gs,mutproby)
                             newgrid[i, j] = 1
                     elif total == 2: # genetic neighborhood overrules Conway's rule (to keep off)
                         if np.random.random() < p:                              # turn on if flip
-                            newgenegrid[i][j] = mutate(rselect(nbgenes),mutproby)
+                            newgenegrid[i][j] = mutate(gs,mutproby)
                             newgrid[i, j] = 1
     # update data
     grid = newgrid
@@ -311,7 +326,12 @@ seed = gmp.random_state(mpz(0x789abcdefedcba65))   # initialize seed for gmpy2 r
 # grid = np.random.randint(0, 2, N*N).reshape(N, N) # start with random grid of 0 or 1 values with equal probs
 grid = np.random.choice([0, 1], size=(N,N), p=[1-initial1density, initial1density]) # start with random grid of 0 or 1 values
 cgrid = grid.copy()    
-genegrid = [[(gmp.mpz_urandomb(seed, LEN) if grid[i,j] else mpz(0)) for i in range(N)] for j in range(N)]
+if not neutral:
+    startgenecentres = [gmp.mpz_urandomb(seed, LEN) for i in range(NGC)]
+    genegrid = [[(mutate(startgenecentres[np.random.choice([0, NGC-1])],initmut) if grid[i,j] else mpz(0)) for i in range(N)] for j in range(N)]
+else:
+    genegrid = [[(gmp.mpz_urandomb(seed, LEN) if grid[i,j] else mpz(0)) for i in range(N)] for j in range(N)]
+
 colorgrid(N,LEN,colormethod)
 newgenegrid = [[genegrid[i][j] for i in range(N)] for j in range(N)]
 
