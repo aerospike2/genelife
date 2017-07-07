@@ -46,8 +46,10 @@ def genelife_sub(args):
   #%matplotlib notebook
   #%matplotlib inline
 
-  p0 = float(args[0]); mutprob = float(args[1]); alpha = float(args[2]); LEN = int(args[3])
+  p0 = float(args[0]); mutprob = float(args[1]); alpha = float(args[2]); LEN = float(args[3])
   initial1density = float(args[4]); NGC = float(args[5]); initmut = float(args[6]); neutral = float(args[7])
+  LEN = int(LEN)
+  NGC = int(NGC)
   
   #p0 = 0.1                # max prob of flip: compare with p0 = 0.0 to see advantage of model       (1)
   #mutprob = 0.1           # probability of single point mutation per replication                    (2)
@@ -62,7 +64,7 @@ def genelife_sub(args):
   NG = 2^LEN -1           # max genome sequence as nr
   NC = LEN+1              # number of colors
   colormethod = 1         # 1 color by gene leading bits, 0 color by 1 + hamming(nbgenes)
-  niterations = 100      # no of updates of grid in animation
+  niterations = 400      # no of updates of grid in animation
   gradients = 0           # 1 add gradients in 2 key parameters, e.g. p0 in x and mutprob in y; 0 do not
   p0min = 0.0             # min value of p0 for gradient
   mutprobmin = 0.0        # minimum mutprob for gradient
