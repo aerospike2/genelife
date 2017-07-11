@@ -274,9 +274,9 @@ def genelife_sub(p0 = 0.1, mutprob = 0.1, alpha = 1.0, LEN = 63, initial1density
                   # else:  total is two or three: value stays on (live), nothing to do, no replication
               else:              # cell value is off, "dead" site
                   if total == 2 or total == 3: # Conway's rule unless genetic neighborhood says otherwise
-                      nbgenes = one_neighbors(genegrid, nbs, i, j)
-                      d = hamming(nbgenes) 
-                      gs = rselect(nbgenes)                                   # genetic difference measure
+                      nbgenes = one_neighbors(genegrid, nbs, i, j)             
+                      d = hamming(nbgenes)                                     # genetic difference measure
+                      gs = rselect(nbgenes)                                    # select one of neighbor genes at random  
                       if gradients: 
                           p0i = p0min + ((p0-p0min) * i) / float(N-1)
                           mutproby = mutprobmin+((mutprob-mutprobmin) * j) / float(N-1)
@@ -286,12 +286,12 @@ def genelife_sub(p0 = 0.1, mutprob = 0.1, alpha = 1.0, LEN = 63, initial1density
                           n1av=float(LEN)/2.
                           p1 = p0i * max(0.,(gmp.popcount(gs)-n1av)/n1av)
                           p = flipprob(d,p1,alpha)                    
-                      if total == 3:                    
-                          if np.random.random() > p:                              # turn on if no flip
+                      if total == 3:                                           # regular GoL rule only if no flip, otherwise override by keeping off                  
+                          if np.random.random() > p:                           # turn on if no flip
                               newgenegrid[i][j] = mutate(gs,mutproby)
                               newgrid[i, j] = 1
-                      elif total == 2: # genetic neighborhood overrules Conway's rule (to keep off)
-                          if np.random.random() < p:                              # turn on if flip
+                      elif total == 2:                                         # genetic neighborhood overrules Conway's rule (which was to keep off)
+                          if np.random.random() < p:                           # turn on if flip
                               newgenegrid[i][j] = mutate(gs,mutproby)
                               newgrid[i, j] = 1
       # update data
