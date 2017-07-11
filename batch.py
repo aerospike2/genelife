@@ -269,11 +269,14 @@ def genelife_sub(args):
   return args + [runvalue3(idact)]
   
 if __name__ == '__main__':
-  args = sys.argv[1]
-  args = args.replace(","," ")
-  args = args.replace("\\"," ")
-  args = args.split()
-  if len(args) != 8:
+  if len(sys.argv)==2:
+    args = sys.argv[1]
+    args = args.replace(","," ")
+    args = args.replace("\\"," ")
+    args = args.split()
+  elif len(sys.argv)==9:
+    args = sys.argv[1:]
+  else:
     sys.exit("Usage:  batch.py arg1 ... arg8")
   foo = genelife_sub(args)
   for x in foo:

@@ -20,8 +20,8 @@ if datfile is not None:
     datout = open(datfile,'w')
     
 maxact = 5000                            # max number of activity traces in graph...
-Width = 700
-Height = 200
+Width = 1000
+Height = 500
 ymax = 1000
 ncount = 0                          # number of calls to trace
 
