@@ -22,7 +22,7 @@ Conway's Game of Life is a two dimensional cellular automaton rule.
 States are configurations of ones and zeros on a two dimensional
 lattice.  States change in time according to a local rule applied
 simultaneously to all sites.  The local rule for a given site is a
-function of that site's value as well as the value of the nine nearest
+function of that site's value as well as the value of the eight nearest
 neighboring sites.  Using the convention that sites with value one are
 considered live, and sites with value zero are considered dead, the
 local rule may be stated as follows:
@@ -44,36 +44,34 @@ cell, as if by reproduction.
 Live sites are considered as an individual whose identity is
 determined by an associated genome consisting of a bit string.
 Individuals die and its genes are destroyed when the site dies.  When
-individuals replicate in step 4 of the Conway's rule, A parent is
+individuals replicate in step 4 of the Conway's rule, a parent is
 chosen randomly from the 3 live neighbors, and the genes copied from
 that parent to the new individuals genome.  The genome may change,
 with point mutation in current version (recombination to come in the
 future).
 
+In order to give a feedback between genes and the CA time development, 
 Conway's game of life rule is overridden stochastically only for empty
-sites with 2 or 3 neighbors present (on)
-
-The probability of rule override $p=p0*e^-d$ decays exponentially with
-increasing hamming distance d of neighbors
-  
+sites with 2 or 3 neighbors present (on):
 (i) In the case of three live neighbors, the central site remains dead
 and no replication happens
-
 (ii) In the case of two live neightbors, the central site comes alive
 and replication happens.
 
+The probability of rule override $p=p0*e^-alphha*d$ decays exponentially with
+increasing hamming distance d of neighbors.
 For p0 == 0, the occupied cells follow exactly Conway's game of life
 and the genes execute neutral selection from an initially random
 population
 
 For p0 >0, the probability of departures from Conway's rules are
 greatest with monoclonal neighbors and become negligible if neighbors
-are distantly related
+are distantly related.
 
-In this way, a feedback is created between pattern stagnation and innovation
+In this way, a feedback is created between pattern stagnation and innovation.
 
 With the current parameters, no degeneration to a set of
-non-communicating local structures occurs The model is likely to be
+non-communicating local structures occurs. The model is likely to be
 more interesting still with recombination than point mutation NYI
 
 ## Versions
