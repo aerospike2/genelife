@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-if [ "$#" -ne 3 ]; then
+if [ "$#" -ne 2 ]; then
     echo "Usage: $0 designfile responsefile"
     exit 1
 fi
