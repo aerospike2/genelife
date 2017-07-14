@@ -143,20 +143,18 @@ neutral,0,1,,,,,,,,,
 * when a design is produced, copy and paste into a file, e.g. `design-001`
 * run all the designs with parallel:
 ```
-cat design-001 | parallel batch.py {} > response-001.tmp
-```
-NB:  you can ssh to a compute server that has lots of cores to run
-the designs faster.
-* process the output of parallel to match response calculation with
-  correct designs:
-```
-process.py design.001 response-001.tmp > response-001
+launchParallel.sh design-001 response-001
 ```
 
-* paste the responses back into the PDT web page table.NB: to get just
-  the final response column you could say
-```
-cat response-001 | awk '{print $NF}'
-```
+> In this example, `launchParallel.sh` takes designs from each line of
+  design-001, runs `batch.py par1 ... parN` for each design, in
+  parallel, on as many cores as the host has.  The results of parallel
+  are then processed to match up to the respective designs.  At the
+  end, response-001 contains design-001 plus an extra column
+  containing the responses.  In addition, the responses alone are
+  printed to stdout.  User may paste either the responses alone as a
+  column into the PDT interface, or else paste the entire file
+  response-001, or else upload response-001 as a file.
+
 * Hit the button to produce the next generation of designs.
 * repeat.
