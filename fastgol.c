@@ -32,7 +32,8 @@ void update (int gol[]) {
 		ip1 = (i+1) & Nmask;
 		im1 = (i-1) & Nmask;
 		s = gol[jN+ip1]+gol[jN+im1]+gol[jp1+i]+gol[jp1+ip1]+gol[jp1+im1]+gol[jm1+i]+gol[jm1+ip1]+gol[jm1+im1];
-		newgol[ij] = (1 - ((s>>3 & 0x1) || (s>>2 & 0x1)))  * (s>>1 & 0x1) * ((s&0x1)||gol[ij]);
+		// newgol[ij] = (1 - ((s>>3 & 0x1) | (s>>2 & 0x1)))  * (s>>1 & 0x1) * ((s&0x1)||gol[ij]);
+        newgol[ij] = (1 - ((s>>3 & 0x1) | (s>>2 & 0x1)))  & (s>>1 & 0x1) & ((s&0x1)|gol[ij]);
 	}
 
 	for (ij=0; ij<N2; ij++) 
@@ -59,14 +60,15 @@ int main (int argc, char *argv[]) {
     int nsteps = 10000;
 
     if (argc>1) nsteps = atoi(argv[1]);
-	initialize (gol);
+	initialize (gol);            /* random initial pattern */
+    printf("initial pattern  .............................................................................................\n");
     print(gol);
-    printf("and after %d steps ......................................................................................\n",nsteps);
-	for (i=0; i<nsteps; i++) {
+	for (i=0; i<nsteps; i++) {   /* nsteps */
 		update (gol);
 	}
+    printf("and after %d steps ......................................................................................\n",nsteps);
 	print (gol);
-    update (gol);
+    update (gol);                /* one additional step */
     printf("and after %d steps ......................................................................................\n",nsteps+1);
     print (gol);
 }
