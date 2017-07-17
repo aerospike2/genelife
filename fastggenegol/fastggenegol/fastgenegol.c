@@ -5,6 +5,11 @@
 //  Created by John McCaskill on 14.07.17.
 //  Copyright © 2017 European Center for Living Technology. All rights reserved.
 //
+//  The simulation uses the terminal text output as a colour display for the GoL.
+//  In order to fit N=128 GoL display on cinema display, use terminal preferences to change font spacings column 1.3 and line 0.65 at 12 pt
+//  In order to fit N=128 GoL display on smaller displays, use terminal preferences to change font spacings column 1.0 and line 0.5 at 10 pt
+//  To allow escape codes to move cursor, in terminal profiles select "Allow Vt100 application keypad mode"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -87,12 +92,17 @@ void update (long unsigned int gol[], long unsigned int golg[]) {
     }
 }
 
-void print (long unsigned int gol[]) {   /* print the game of life configuration */
-	int	ij;
+void print (long unsigned int gol[], long unsigned int golg[]) {   /* print the game of life configuration */
+	int	ij, col;
+    // https://stackoverflow.com/questions/27159322/rgb-values-of-the-colors-in-the-ansi-extended-colors-index-17-255
+    printf("\e[38;5;255;48;5;238m");
 	for (ij=0; ij<N2; ij++) {
-		printf ("%c", gol[ij] ? '*' : ' ');
+        col = 32+((golg[ij]>>57)&0x7f);
+		printf ("\e[38;5;%dm%c", col, gol[ij] ? '*' : ' ');
 		if ((ij % N) == N -1) printf ("\n");
 	}
+    // printf("\e[m");
+    printf("\e[38;5;238;48;5;255m");
 }
 
 void initialize (long unsigned int gol[]) {
@@ -152,7 +162,7 @@ void countspecies(long unsigned int golg[]) {  /* counts numbers of all differen
     printf("The number of different non-zero species is %d\n",nspecies);
     
     for (k=0,ij=0;k<nspecies;k++) {     // now condense array to give only different genes with counts
-        // printf("species %d with gene %x has counts %d\n",k, golgs[ij],counts[k]);
+        // printf("species %4d with gene %x has counts %d\n",k, golgs[ij],counts[k]);
         golgs[k]=golgs[ij];
         ij = ij + counts[k];
     }
@@ -182,28 +192,26 @@ int main (int argc, char *argv[]) {
     
     state[0] = rand();state[1] = rand();
     
-    if (argc>1) nsteps = atoi(argv[1]);     /* if present update nsteps from command line */
-    if (argc>2) ndisp = atoi(argv[2]);      /* if present update ndisp from command line */
-    if (argc>3) tdisp = atoi(argv[3]);      /* if present update tdisp from command line */
+    if (argc>1) nsteps = atoi(argv[1]);         /* if present update nsteps from command line */
+    if (argc>2) ndisp = atoi(argv[2]);          /* if present update ndisp from command line */
+    if (argc>3) tdisp = atoi(argv[3]);          /* if present update tdisp from command line */
 
-	initialize (gol);                       /* random initial pattern */
-    initialize_genes (golg,gol);            /* random initial genes */
+	initialize (gol);                           /* random initial pattern */
+    initialize_genes (golg,gol);                /* random initial genes */
 
     printf("initial pattern  ..............................................................................................................\n");
-    print(gol);
-    // for (ij=0; ij<200; ij++) printf("gene at %d %x\n",ij,golg[ij]);   /* test first 200 */
-    for (i=0; i<nsteps; i++) {              /* nsteps */
+    print(gol,golg);
+    for (i=0; i<nsteps; i++) {                  /* nsteps */
 		update (gol, golg);
         if (i%ndisp == 0) {
-                                                /* in order to fit N=128 GoL display in large window, use terminal preferences to change font spacings column 1.3 and line 0.65 at 12 pt */
-            printf( "%c[%dA", ASCII_ESC, N+1 ); /* move cursor up N+1 lines on VT100 screen: in terminal profiles select "Allow Vt100 application keypad mode" */
+            printf( "%c[%dA", ASCII_ESC, N+1 ); /* move cursor up N+1 lines on VT100 screen */
             printf("after %d steps ..............................................................................................................\n",i);
-            print (gol);
+            print (gol,golg);
             delay(tdisp);
         }
 	}
     printf("and after %d steps ............................................................................................................\n",nsteps);
-	print (gol);
+	print (gol,golg);
     printf("sort and count of remaining genes ..............................................................................................\n");
     countspecies(golg);
 }
