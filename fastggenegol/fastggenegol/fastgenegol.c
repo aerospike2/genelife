@@ -28,6 +28,7 @@ const int nlog2pmut = 5;            // pmut = probmut = 2 to the power of - nlog
 int nsteps = 10000;                 // total number of steps to simulate GoL
 int ndisp = 10000;                  // display GoL every ndisp steps
 int tdisp = 0;                      // extra time delay in ms betwene displays
+static long unsigned int  emptysites = 0;  // cumulative number of empty sites during simulation updates
 
 long unsigned int state[2];                  // State for xorshift pseudorandom number generation. The state must be seeded so that it is not zero
                                     // Wikipedia "Xorshift" rewritten here as inline macro &
@@ -52,11 +53,12 @@ void update (long unsigned int gol[], long unsigned int golg[]) {
 	/* update GoL for toroidal field which has side length which is a binary power of 2 */
 	/* encode without if structures for optimal vector treatment */
 
-	int k, nmut, hamming, nb[8], ij, i, j , jp1, jm1, ip1, im1, ng;
-    long unsigned int s, s2or3, nb1i, randnr, randnr1, randnr2, r1, r2, nlog2p, pmask, genediff;
-    static long unsigned int  newgol[N2];
-	static long unsigned int  newgolg[N2], gene;
+	int k, nmut, hamming, nb[8], ij, i, j , jp1, jm1, ip1, im1;
+    long unsigned int s, s2or3, nb1i, randnr, randnr1, randnr2, ng, r1, r2, r3, nlog2p, pmask, genediff, birth, newgene;
+    static long unsigned int  newgol[N2],newgolg[N2];
     static long unsigned int  pmutmask = (0x1 << nlog2pmut) - 1;
+    static long unsigned int ngx = 0;
+
 
 	for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
 		i = ij & Nmask;  j = ij >> log2N;                                   // row & column
@@ -69,25 +71,32 @@ void update (long unsigned int gol[], long unsigned int golg[]) {
         genediff = s2or3 * (golg[nb[nb1i&0x7]]^golg[nb[(nb1i>>4)&0x7]]^golg[nb[(nb1i>>8)&0x7]]);  // gene difference sequence based on xor for 2 or 3 live nbs
         POPCOUNT64C(genediff, hamming);                                     // number of 1s in genediff is Hamming distance
 
+        // compute random events r1 and r2, neighbor selection ng and single mutation position nmut from one 64-bit random number
         RAND128P(randnr);                                                   // expansion inline so compiler recognizes auto-vectorization options
         nlog2p = nlog2p0 + hamming;                                         // need to calculate hamming distance
         pmask = (0x1<<nlog2p) - 1;                                          // probability mask for deviation from gol rules given local hamming
         randnr1 = randnr & pmask;                                           // extract bits from randnr for random trial for 0 on pmask
-        r1 = ((randnr1 | ((randnr1^pmask)+1)) >> nlog2p)&0x1;               // 1 if lowest nlog2p bits of randnr zero, else zero
+        r1 = ((randnr1 | ((randnr1^pmask)+1)) >> nlog2p)&0x1;               // 1 if lowest nlog2p bits of randnr zero, else zero : i.e. 1 with chance 1/2^nlog2p
         randnr2 = (randnr >> 16) & pmutmask;                                // extract bits from randnr for random trial for 0 on pmask
         r2 = ((randnr2 | ((randnr2^pmutmask)+1)) >> nlog2pmut)&0x1;         // 1 if lowest nlog2pmut bits of randnr zero, else zero
         nmut = (randnr >> 32) & 0x3f;                                       // choose mutation position for length 64 gene
-        ng = ((randnr >> 38) & 0x1)+(s&1)*((randnr >> 39) & 0x1);           // 0, 1 or 2 with probs 1/4,1/2,1/4   : should be 1/3,1/3,1/3
+        ng = (randnr >> 38) & 0x3;                                          // 0, 1, 2 or 3 with probs each 1/4 : next 4 lines converts this 0,1,2 with prob 1/3
+        r3 = ((ng+1) >> 2) & 0x1;                                           // 1 if ng == 3 (invalid value) otherwise zero : prob. is 1/4
+        ngx += r3;                                                          // increment external ng counter on such exceptions
+        ngx = (1-(((ngx+1)>> 2)&0x1))*ngx;                                  // modulo 3 counter without division for ng==3 exceptions
+        ng = (s&1)*((1-r3)*ng+r3*ngx)+(1-(s&1))*(ng&1);                     // use counter value mod 3 if exception, otherwise random 0,1,2 for s==3
         
-        gene = golg[nb[(nb1i>>(ng<<2))& 7]];                                // pick new gene as one of three neighbor live site genes
-        gene = gene ^ (r2*(0x1L<<nmut));                                    // introduce single mutation with probability pmut = probmut
+        newgene = golg[nb[(nb1i>>(ng<<2))& 7]];                             // pick new gene as one of three neighbor live site genes
+        newgene = newgene ^ (r2*(0x1L<<nmut));                              // introduce single mutation with probability pmut = probmut
+        birth = (1-gol[ij])&((s&1)^r1)&0x1;                                 // assuming 2or3 live nbs, birth (value 1) if empty and (s==3 xor r1)
+        newgol[ij]  = s2or3 * ( gol[ij] | birth );                          // new game of life cell value
+        newgolg[ij] = s2or3 * ( gol[ij]*golg[ij]+birth*newgene);            // dies if not 2or3, else old if alive, else new gene if 3 nbs
 
-        newgol[ij]  = s2or3 * ( (s&1&(1-r1)) | gol[ij] | (r1&(1-(s&1))) );  // new game of life cell value
-        newgolg[ij] = s2or3 * (gol[ij]*golg[ij]+(1-gol[ij])*((s&1&(1-r1))|((1-(s&1)&r1)))*gene); // dies if not 2or3, old if alive, else new gene if 3 nbs
-	}
+        emptysites = emptysites + newgol[ij];
+    }
 
 	for (ij=0; ij<N2; ij++) {
-		gol[ij] = newgol[ij];        // copy new gol config to old one
+        gol[ij] = newgol[ij];        // copy new gol config to old one
         golg[ij] = newgolg[ij];      // copy new genes to old genes
     }
 }
@@ -172,13 +181,14 @@ void countspecies(long unsigned int golg[]) {  /* counts numbers of all differen
     for (k=0; k<nspecies; k++) {
         printf("count species %d with gene %lx has counts %lu\n",k, golgsc[k][0],golgsc[k][1]);
     }
+    printf("cumulative activity = %lu\n",(N2 * (long unsigned int) nsteps) - emptysites);
 }
 
 void delay(int milliseconds)
 {
     long pause;
     clock_t now,then;
-
+    
     pause = milliseconds*(CLOCKS_PER_SEC/1000);
     now = then = clock();
     while( (now-then) < pause )
@@ -202,12 +212,12 @@ int main (int argc, char *argv[]) {
     printf("initial pattern  ..............................................................................................................\n");
     print(gol,golg);
     for (i=0; i<nsteps; i++) {                  /* nsteps */
-		update (gol, golg);
-        if (i%ndisp == 0) {
+		update (gol, golg);                     /* update game of life and gene array by one step */
+        if (i%ndisp == 0) {                     /* only display as required */
+            printf("%d steps\n",i);             /* display step counter */
+            print (gol,golg);                   /* print genetic game of life using colour coded genes for live states */
             printf( "%c[%dA", ASCII_ESC, N+1 ); /* move cursor up N+1 lines on VT100 screen */
-            printf("after %d steps ..............................................................................................................\n",i);
-            print (gol,golg);
-            delay(tdisp);
+            if (tdisp) delay(tdisp);            /* delay to allow display to keep up if desired */
         }
 	}
     printf("and after %d steps ............................................................................................................\n",nsteps);
