@@ -1,14 +1,19 @@
+// 
+// N Packard 18.07.17:
+// actgengol.c
+// complile:
+// cc -o actgengol actgengol.c
+// modify output to stdout to ouput population counts
+// to run with activity.py:
+// activity.py actgengol
 //
+// From:
 //  fastgol.c
 //  fastggenegol
 //
 //  Created by John McCaskill on 14.07.17.
 //  Copyright © 2017 European Center for Living Technology. All rights reserved.
 //
-//  The simulation uses the terminal text output as a colour display for the GoL.
-//  In order to fit N=128 GoL display on cinema display, use terminal preferences to change font spacings column 1.3 and line 0.65 at 12 pt
-//  In order to fit N=128 GoL display on smaller displays, use terminal preferences to change font spacings column 1.0 and line 0.5 at 10 pt
-//  To allow escape codes to move cursor, in terminal profiles select "Allow Vt100 application keypad mode"
 
 #include <stdio.h>
 #include <stdlib.h>
