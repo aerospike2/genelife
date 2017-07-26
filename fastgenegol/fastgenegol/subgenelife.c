@@ -1,6 +1,6 @@
 //
-//  fastgol.c
-//  fastggenegol
+//  subgenelife.c
+//  fastgenegol
 //
 //  Created by John McCaskill on 14.07.17.
 //  Copyright © 2017 European Center for Living Technology. All rights reserved.
@@ -22,16 +22,17 @@ const int N = 0x1 << log2N;
 const int N2 = N*N;                 // number of sites in toroidal array
 const int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
 
-const int nlog2p0 = 9;              // p0 = 2 to the power of - nlog2p0
-const int nlog2pmut = 6;            // pmut = probmut = 2 to the power of - nlog2pmut
+const int nlog2p0 = 5;              // p0 = 2 to the power of - nlog2p0
+const int nlog2pmut = 5;            // pmut = probmut = 2 to the power of - nlog2pmut
 
 int nsteps = 10000;                 // total number of steps to simulate GoL
 int ndisp  = 10000;                 // display GoL every ndisp steps
 int tdisp  = 0;                     // extra time delay in ms betwene displays
+int rule2mod = 1;                   // whether to modify two live nb rule as well or only three nb rule
 int selection = 1;                  // fitness model: 0 neutral 1 selected gene prob of rule departure 2 presence of replicase gene
+int initial1density = 16384;        // initial density of ones in gol : integer value divide by 2^15 for density
 static long unsigned int  emptysites = 0;  // cumulative number of empty sites during simulation updates
 
-long unsigned int state[2];                  // State for xorshift pseudorandom number generation. The state must be seeded so that it is not zero
                                     // Wikipedia "Xorshift" rewritten here as inline macro &
                                     // Vigna, Sebastiano. "xorshift*/xorshift+ generators and the PRNG shootout". Retrieved 2014-10-25.
 #define RAND128P(val) {                                                       \
@@ -43,7 +44,7 @@ const long unsigned int m1  = 0x5555555555555555; //binary: 0101...           Co
 const long unsigned int m2  = 0x3333333333333333; //binary: 00110011..
 const long unsigned int m4  = 0x0f0f0f0f0f0f0f0f; //binary:  4 zeros,  4 ones ...
 const long unsigned int h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,3...
-const long unsigned int m3  = 0x7777777777777777; // for cumcount64c selects counter relevant bits only
+const long unsigned int m3  = 0x0707070707070707; // for cumcount64c selects counter relevant bits only
 
 #define POPCOUNT64C(x, val) {       /* Wikipedia "Hamming Weight" popcount4c alg */  \
     x -= (x >> 1) & m1;             /* put count of each 2 bits into those 2 bits */ \
@@ -51,24 +52,34 @@ const long unsigned int m3  = 0x7777777777777777; // for cumcount64c selects cou
     x = (x + (x >> 4)) & m4;        /* put count of each 8 bits into those 8 bits */ \
     val = (x * h01) >> 56;}         /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
 
-#define CUMCOUNT64C(x, val) {       /* Wikipedia "Hamming Weight" popcount4c alg */  \
-    x = x & m3;                     /* only counter relevant bits for 4 bit counters with max value 7 */ \
-    x = (x + (x >> 4)) & m4;        /* put count of each 8 bits into those 8 bits */ \
-    val = (x * h01) >> 56;}         /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
+#define CUMCOUNT64C(x, val) {       /* Assumes gene specifies 8 8-bit counters each with max value 7 */  \
+    val = ((x & m3) * h01) >> 56;}  /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
 
-void update (long unsigned int gol[], long unsigned int golg[]) {
+void genelife_update (long unsigned int gol[], long unsigned int golg[], int log2N, int ndsteps, int params[], int N2c, int nparams) {
 	/* update GoL for toroidal field which has side length which is a binary power of 2 */
 	/* encode without if structures for optimal vector treatment */
-
-	int k, nmut, nones, nones1, nones2, nb[8], ij, i, j , jp1, jm1, ip1, im1;
+    int N = 0x1 << log2N;
+    int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
+	int t, k, nmut, nones, nones1, nones2, nb[8], ij, i, j , jp1, jm1, ip1, im1;
     long unsigned int s, s2or3, nb1i, randnr, randnr1, randnr2, ng, r1, r2, r3, nlog2p, pmask, genediff, birth, newgene;
     long unsigned int genef1,genef2,genef3;
+    int nlog2p0 = params[0];
+    int nlog2pmut = params[1];
+    int selection = params[2];
+    int rule2mod = params[3];
+    long unsigned int  pmutmask = (0x1 << nlog2pmut) - 1;
     static long unsigned int  newgol[N2],newgolg[N2];
-    static long unsigned int  pmutmask = (0x1 << nlog2pmut) - 1;
+
     static long unsigned int ngx = 0;
-
-
-	for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
+    static int first = 1;
+    static long unsigned int state[2]; // State for xorshift pseudorandom number generation. The state must be seeded so that it is not zero
+    
+    if (first) {
+        state[0] = rand();state[1] = rand();
+        first = 0;
+    }
+    for (t=0; t<ndsteps; t++) {
+	  for (ij=0; ij<N2c; ij++) {                                               // loop over all sites of 2D torus with side length N
 		i = ij & Nmask;  j = ij >> log2N;                                   // row & column
 		jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
 		ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                         // toroidal i+1, i-1
@@ -113,22 +124,24 @@ void update (long unsigned int gol[], long unsigned int golg[]) {
             nmut = (randnr >> 48) & 0x3f;                                       // choose mutation position for length 64 gene : from bits 32:37 of randnr
                                                                               // complete calculation of newgol and newgolg, including mutation
             newgene = newgene ^ (r2*(0x1L<<nmut));                              // introduce single mutation with probability pmut = probmut
-            birth = (0x1L-gol[ij])&((s&1L)^r1)&0x1;                                 // assuming 2or3 live nbs, birth (value 1) if empty and (s==3 xor r1)
+            birth = (0x1L-gol[ij])&((s&1L)^(r1&rule2mod))&0x1;                                 // assuming 2or3 live nbs, birth (value 1) if empty and (s==3 xor r1)
             newgol[ij]  =  gol[ij] | birth ;                                    // new game of life cell value
             newgolg[ij] =  gol[ij]*golg[ij]+birth*newgene;}                     // dies if not 2or3, else old if alive, else new gene if 3 nbs
         else {                                                              // else not 2 or 3 live neighbors, 0 values
             newgol[ij]  = 0;                                                    // new game of life cell value
             newgolg[ij] = 0;}                                                   // dies if not 2or3
         emptysites = emptysites + newgol[ij];                               // keep track of empty sites, same information as total activity of occupied sites
-    }
+      }
 
-	for (ij=0; ij<N2; ij++) {
+	  for (ij=0; ij<N2c; ij++) {
         gol[ij] = newgol[ij];        // copy new gol config to old one
         golg[ij] = newgolg[ij];      // copy new genes to old genes
+      }
+      // printf("t = %d nlog2p0=%d nlog2pmut=%d selection=%d rule2mod=%d\n",t,nlog2p0,nlog2pmut,selection,rule2mod);
     }
 }
 
-void printscreen (long unsigned int gol[], long unsigned int golg[]) {   /* print the game of life configuration */
+void printscreen (long unsigned int gol[], long unsigned int golg[], int N, int N2) {   /* print the game of life configuration */
 	int	ij, col;
     // https://stackoverflow.com/questions/27159322/rgb-values-of-the-colors-in-the-ansi-extended-colors-index-17-255
     printf("\e[38;5;255;48;5;238m");
@@ -140,7 +153,7 @@ void printscreen (long unsigned int gol[], long unsigned int golg[]) {   /* prin
     printf("\e[38;5;238;48;5;255m");
 }
 
-void print (long unsigned int gol[], long unsigned int golg[]) {   /* print the game of life configuration */
+void print_gol (long unsigned int gol[], int N, int N2) {   /* print the game of life configuration */
 	int	ij;
 	for (ij=0; ij<N2; ij++) {
 		printf ("%c", gol[ij] ? '*' : ' ');
@@ -148,16 +161,23 @@ void print (long unsigned int gol[], long unsigned int golg[]) {   /* print the 
 	}
 }
 
-void initialize (long unsigned int gol[]) {
+void initialize (long unsigned int gol[], int params[], int N2, int nparams) {
 	int ij;
+    int initial1density;
+    static unsigned int rmask = (1 << 15) - 1;
+    
+    if (nparams > 4) initial1density = params[4];
+    else initial1density = (1 << 14);
+    
+    printf("id = %d rmask = %d nparams = %d\n",initial1density, rmask, nparams);
 	for (ij=0; ij<N2; ij++) {
-		gol[ij] = rand() & 0x1;
+		gol[ij] = ((rand() & rmask) < initial1density)?1:0;
 	}	
 }
 
-void initialize_genes (long unsigned int golg[], long unsigned int gol[]) {
+void initialize_genes (long unsigned int golg[], long unsigned int gol[], int params[], int N2, int nparams) {
 	int ij,k;
-    uint64_t g;
+    long unsigned int g;
 	for (ij=0; ij<N2; ij++) {
         g = 0;
         if (gol[ij] != 0)
@@ -186,10 +206,12 @@ int cmpfunc2 ( const void *pa, const void *pb )
         return (int) (b[1] - a[1]);
 }
 
-void countspecies(long unsigned int golg[]) {  /* counts numbers of all different species using qsort first */
+void countspecies(long unsigned int golg[], int params[], int N2, int nparams) {  /* counts numbers of all different species using qsort first */
     int ij, k, ijlast, nspecies, counts[N2], nones, fitness;
     long unsigned int last, golgs[N2];
     long unsigned int golgsc[N2][2];
+    int selection = params[2];
+    int nlog2p0 = params[0];
     
     for (ij=0; ij<N2; ij++) { golgs[ij] = golg[ij];  counts[ij] = 0;}  // initialize sorted gene & count arrays to zero
 
@@ -238,35 +260,4 @@ void delay(int milliseconds)
     now = then = clock();
     while( (now-then) < pause )
         now = clock();
-}
-
-int main (int argc, char *argv[]) {
-    int	 i;
-    long unsigned int gol[N2];
-    long unsigned int golg[N2];
-    
-    state[0] = rand();state[1] = rand();
-    
-    if (argc>1) nsteps = atoi(argv[1]);         /* if present update nsteps from command line */
-    if (argc>2) ndisp = atoi(argv[2]);          /* if present update ndisp from command line */
-    if (argc>3) tdisp = atoi(argv[3]);          /* if present update tdisp from command line */
-
-	initialize (gol);                           /* random initial pattern */
-    initialize_genes (golg,gol);                /* random initial genes */
-
-    printf("initial pattern  ..............................................................................................................\n");
-    print(gol,golg);
-    for (i=0; i<nsteps; i++) {                  /* nsteps */
-		update (gol, golg);                     /* update game of life and gene array by one step */
-        if ((ndisp < nsteps) && (i%ndisp == 0)) {                     /* only display as required */
-            printf("%d steps\n",i);             /* display step counter */
-            printscreen (gol,golg);                   /* print genetic game of life using colour coded genes for live states */
-            printf( "%c[%dA", ASCII_ESC, N+1 ); /* move cursor up N+1 lines on VT100 screen */
-            if (tdisp) delay(tdisp);            /* delay to allow display to keep up if desired */
-        }
-	}
-    printf("and after %d steps ............................................................................................................\n",nsteps);
-	print (gol,golg);
-    printf("sort and count of remaining genes ..............................................................................................\n");
-    countspecies(golg);
 }
