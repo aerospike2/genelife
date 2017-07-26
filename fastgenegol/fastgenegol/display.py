@@ -1,11 +1,13 @@
 #!/usr/local/bin/python
 
-# simulator is assumed to give output on stdout, one line per timestep,
-# x1 y1 gene1 x2 y2 gene2
+# disp_simulator is assumed to give output on stdout, one line per timestep,
+# gene1 x1 y1 gene2 x2 y2 etc.
 # for all live cells in the population that generation.
-# if simulator has args sim_arg1, sim_arg2, ...
+# if disp_simulator has args sim_arg1, sim_arg2, ...
 # run with the following:
-# display.py simulator sim_arg1 sim_arg2 ...
+# display.py disp_simulator sim_arg1 sim_arg2 ...
+
+# currently hardwired to take data from a 256x256 lattice, display to a 512x512 window (zoom x2)
 
 
 from pygame import *

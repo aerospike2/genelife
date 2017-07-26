@@ -1,11 +1,22 @@
 // 
-// N Packard 18.07.17:
-// actgengol.c
+// N Packard 23.07.17:
+// dispgenegol.c
 // complile:
-// cc -o actgengol actgengol.c
-// modify output to stdout to ouput population counts
-// to run with activity.py:
-// activity.py actgengol
+// cc -o dispgenegol dispgenegol.c
+// modify output to ouput to stdout live cells each gen: "gene1 x1 y1 gene2 x2 y2 ..."
+// to run with display.py:
+// display.py dispgenegol
+//
+// displays ndisp steps, then simulates nskip steps without display, repeated for nsteps
+// 
+// currently hardwired to simulate 256x256 lattice,
+// which is what display.py is expecting.
+
+// relevant params:
+// nskip = number of steps simulated between display phase
+// ndisp = number of steps displayed in display phase
+// nstep = number of displayed+skipped time step blocks
+// total number of timesteps = nstep*(ndisp+nskip)
 //
 // From:
 //  fastgol.c
@@ -32,7 +43,7 @@ const int nlog2pmut = 5;            // pmut = probmut = 2 to the power of - nlog
 
 int nsteps = 200;                 // total number of steps to simulate GoL = nsteps*(nskip+ndisp)
 int nskip = 1000;
-int ndisp = 20;                  // display GoL every ndisp steps
+int ndisp = 200;                  // display GoL every step for ndisp steps
 int tdisp = 0;                      // extra time delay in ms betwene displays
 
 long unsigned int state[2];                  // State for xorshift pseudorandom number generation. The state must be seeded so that it is not zero
@@ -251,8 +262,8 @@ int main (int argc, char *argv[]) {
     
     for (i=0; i<nsteps; i++) {                  /* nsteps */
 	for(k=0; k< ndisp; k++){
-	    update (gol, golg);
 	    printxy(gol,golg);
+	    update (gol, golg);
 	}
 	for(k=0; k< nskip; k++){
 	    update (gol, golg);
