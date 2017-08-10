@@ -1,5 +1,38 @@
 
+
+_______________________________________________________________
+Python-C link:
+_______________________________________________________________
+Build genlife scheme with xcode using ../fastgenegol.xcodeproj/
+Then
+ln -s ../Build/Products/Debug/libgenelife.dylib libgenelife.dylib
+Then
+python genelife.py
+
+
+Variation by NP:
+display ndisp, run for nrun without display, repeat:
+|---ndisp---|------------------nrun---------------|
+e.g. ndisp=100, nrun = 1000
+
+python genelifeN.py
+
+
+
+_______________________________________________________________
+Older, pre-python C link:
+_______________________________________________________________
+Activity graph:
+
 cc -o actgenegol actgenegol.c
 
 acitivity.py actgenegol
 
+_______________________________________________________________
+Dynamics:
+_______________________________________________________________
+default: display 200; iterate 1000; repeat
+
+cc -o dispgenegol dispgenegol.c
+
+display.py dispgenegol
