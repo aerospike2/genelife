@@ -6,8 +6,11 @@ import matplotlib.animation as animation
 import matplotlib
 import genelife_update_module as genelife
 
-N=128
+log2N = 7                       #  log2N=7 => N=128
+N = 2**log2N
 N2 = N*N
+Nmask = N-1
+
 gol = np.zeros(N2,np.uint64)
 golg = np.zeros(N2,np.uint64)
 simparams = np.zeros(5,np.int32)    # 5 parameters passed to C
@@ -90,20 +93,16 @@ def colorgrid(N):
     return
 
 
-log2N = 7
-N = 2**log2N
-N2=N*N
-Nmask = N-1
 
-nsteps = 100000
+nsteps = 500000
 
-ndisp = 20
+ndisp = 100
 nrun = 1000
 niter = nsteps / (nrun + ndisp)
 cnt = 0
 
 # trying for:
-#     |------------nrun-----------|---nisp---|  repeated niter times
+#     |------------nrun-----------|---ndisp---|  repeated niter times
 
 
 def update(data):
@@ -122,8 +121,8 @@ def update(data):
     return [mat]
 
 
-nlog2p0   = simparams[0] = 5
-nlog2pmut = simparams[1] = 5
+nlog2p0   = simparams[0] = 8
+nlog2pmut = simparams[1] = 8
 selection = simparams[2] =  1            # values 0,1,2 allowed
 rule2mod  = simparams[3] =  1            # values 0,1 allowed
 initial1density = simparams[4] = 16384   # nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
