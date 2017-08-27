@@ -58,7 +58,8 @@ static int combi2[256], combi3[256];
 void setcombin(int combin[], int n) {
     long unsigned int i,k, cnt;
     for (i=0;k=0,i<256;i++) {
-        if (popcount8c(i, &cnt) == n) combin[i] = k++;
+	popcount8c(i, &cnt);
+        if (cnt == n) combin[i] = k++;
         else combin[i] = 64;
     }
 }
@@ -70,6 +71,7 @@ void genelife_update (long unsigned int gol[], long unsigned int golg[], int log
     int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
 	int t, k, nmut, nones1, nones2, nones3, nb[8], ij, i, j , jp1, jm1, ip1, im1, p2, p3;
     long unsigned int s2or3;
+    long unsigned int repage;
     long unsigned int s, nb1i, nbv8, randnr, ng0, ng, ng23, birth, newgene;
     long unsigned int genef1,genef2,genef3;
     static float a2=1., a3=1.;
@@ -97,7 +99,7 @@ void genelife_update (long unsigned int gol[], long unsigned int golg[], int log
 		s = gol[nb[0]]+gol[nb[1]]+gol[nb[2]]+gol[nb[3]]+gol[nb[4]]+gol[nb[5]]+gol[nb[6]]+gol[nb[7]]; // number of live nbs
         if ((s == 2) || (s == 3)) {                                         // if 2 or 3 neighbors alive
             ng0 = golg[ij] & 0x7;                                             // 0-5 value from local rotation counter
-            ng = ((ng0+1) == 6)) ? 0 : (ng0+1);                               // increment local rotation counter mod 6
+            ng = ((ng0+1) == 6) ? 0 : (ng0+1);                               // increment local rotation counter mod 6
             if (s==2)   ng23 = ng & 0x1;                                      // mod 2 counter for two neighbor case
             else        ng23 = ng >> 1;                                       // mod 3 counter for three neighbor case
             if (gol[ij] == 1) {                                                 // question of survival
