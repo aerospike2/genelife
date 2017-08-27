@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <time.h>
+#include <math.h>
 
 #define ASCII_ESC 27                // escape for printing terminal commands, such as cursor repositioning
 
