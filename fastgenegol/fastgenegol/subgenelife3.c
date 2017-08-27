@@ -47,16 +47,17 @@ inline void popcount8c(long unsigned x, int *cnt1p) {
     x -= (x >> 1) & m1;             /* put count of each 2 bits into those 2 bits */
     x = (x & m2) + ((x >> 2) & m2); /* put count of each 4 bits into those 4 bits */
     *cnt1p = (x + (x >> 4)) & m4;        /* put count of each 8 bits into those 8 bits */
+}
 inline void popcountc(long unsigned x, long unsigned h, int *cnt1p) {
     x -= (x >> 1) & m1;             /* put count of each 2 bits into those 2 bits */
     x = (x & m2) + ((x >> 2) & m2); /* put count of each 4 bits into those 4 bits */
     x = (x + (x >> 4)) & m4;        /* put count of each 8 bits into those 8 bits */
     *cnt1p = (x* h) >> 56;          /* left 8 bits of relevant portion of x + (x<<8) + (x<<16) + (x<<24) + ... */
-                                                    // LUT to
+}                                                   // LUT to
 static int combi2[256], combi3[256];
 void setcombin(int combin[], int n) {
     long unsigned int i,k, cnt;
-    for (i=0;k=0,i<256,i++) {
+    for (i=0;k=0,i<256;i++) {
         if (popcount8c(i, &cnt) == n) combin[i] = k++;
         else combin[i] = 64;
     }
@@ -68,7 +69,7 @@ void genelife_update (long unsigned int gol[], long unsigned int golg[], int log
     int N = 0x1 << log2N;
     int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
 	int t, k, nmut, nones1, nones2, nones3, nb[8], ij, i, j , jp1, jm1, ip1, im1, p2, p3;
-    bool s2or3;
+    long unsigned int s2or3;
     long unsigned int s, nb1i, nbv8, randnr, ng0, ng, ng23, birth, newgene;
     long unsigned int genef1,genef2,genef3;
     static float a2=1., a3=1.;
