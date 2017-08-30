@@ -10,6 +10,7 @@
 //  In order to fit N=128 GoL display on smaller displays, use terminal preferences to change font spacings column 1.0 and line 0.5 at 10 pt
 //  To allow escape codes to move cursor, in terminal profiles select "Allow Vt100 application keypad mode"
 
+// From subgenelife2.c
 // Modified by Norman Packard Aug 29, 2017
 // create ring buffer of planes to accumulate statistics.
 
@@ -39,6 +40,7 @@ int initial1density = 16384;        // initial density of ones in gol : integer 
 static long unsigned int  emptysites = 0;  // cumulative number of empty sites during simulation updates
 
 long unsigned int **planes;
+long unsigned int **planesg;
 int curPlane = 0;
 int newPlane = 1;
 int numPlane = 2;
@@ -88,9 +90,12 @@ void genelife_update (long unsigned int outgol[], long unsigned int outgolg[], i
     int selection = params[2];
     int rule2mod = params[3];
     long unsigned int  pmutmask = (0x1 << nlog2pmut) - 1;
+    long unsigned int *gol, *newgol, *golg, *newgolg;
 
     gol = planes[curPlane];
     newgol = planes[newPlane];
+    golg = planesg[curPlane];
+    newgolg = planesg[newPlane];
 
     static long unsigned int ngx = 0;
     static int first = 1;
@@ -206,11 +211,16 @@ void initialize_planes(long unsigned int offsets[], int params[], int Noff, int 
     planes = (long unsigned int **) calloc(numPlane,sizeof(long unsigned int *));
     for(i=0; i<numPlane; i++)
 	planes[i] = (long unsigned int *) calloc(N2,sizeof(long unsigned int));
+    planesg = (long unsigned int **) calloc(numPlane,sizeof(long unsigned int *));
+    for(i=0; i<numPlane; i++)
+    planesg[i] = (long unsigned int *) calloc(N2,sizeof(long unsigned int));
 }
 
-void initialize (long unsigned int gol[], int params[], int N2, int nparams) {
+void initialize (int params[], int nparams) {
 	int ij;
     int initial1density;
+    long unsigned int *gol;
+    gol = planes[curPlane];
     static unsigned int rmask = (1 << 15) - 1;
 
     if (nparams > 4) initial1density = params[4];
@@ -222,18 +232,22 @@ void initialize (long unsigned int gol[], int params[], int N2, int nparams) {
 	}
 }
 
-void initialize_genes (long unsigned int golg[], long unsigned int gol[], int params[], int N2, int nparams) {
-	int ij,k;
+void initialize_genes (int params[], int nparams) {
+    int ij,k;
     long unsigned int g;
-	for (ij=0; ij<N2; ij++) {
-        g = 0;
-        if (gol[ij] != 0)
-            for (k=0; k<64; k++) {
-                g = (g << 1) | (rand() & 0x1);
-            }
-        golg[ij] = g;
-        if (golg[ij] == 0 && gol[ij] != 0) printf("zero gene at %d",ij);
-	}
+    long unsigned int *gol;
+    long unsigned int *golg;
+    gol = planes[curPlane];
+    golg = planesg[curPlane];
+    for (ij=0; ij<N2; ij++) {
+	g = 0;
+	if (gol[ij] != 0)
+	    for (k=0; k<64; k++) {
+		g = (g << 1) | (rand() & 0x1);
+	    }
+	golg[ij] = g;
+	if (golg[ij] == 0 && gol[ij] != 0) printf("zero gene at %d",ij);
+    }
     // for (ij=0; ij<20; ij++) printf("gene at %d %u\n",ij,golg[ij]);   // test first 20
 }
 

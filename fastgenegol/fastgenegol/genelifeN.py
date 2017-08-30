@@ -14,6 +14,7 @@ Nmask = N-1
 gol = np.zeros(N2,np.uint64)
 golg = np.zeros(N2,np.uint64)
 simparams = np.zeros(5,np.int32)    # 5 parameters passed to C
+planeparams = np.zeros(1,np.int32)  # start with 1, but use array for future params
 cgrid = np.zeros((N,N),np.uint)
 
 # setup of color map : black for 0, colors for 1 to LEN+1 or 257 for colormethod 0 or 1
@@ -121,7 +122,7 @@ def update(data):
     return [mat]
 
 
-tDepth = planeparams[0] = 2
+tDepth = planeparams[0] = 4
 offsets = [[0,0,0],
            [-1, 0, 0],
            [-1, 1, 0],
@@ -131,7 +132,9 @@ offsets = [[0,0,0],
            [1, -1, 0],
            [0, -1, 0],
            [-1, -1, 0]]
-npoffsets = np.zeros(len(offsets),np.uint64)
+flatoff =  [x for sublist in offsets for x in sublist]
+npoffsets = np.array(flatoff,np.uint64)
+
 genelife.initialize_planes(npoffsets,planeparams)
 
 nlog2p0   = simparams[0] = 8
@@ -142,8 +145,8 @@ initial1density = simparams[4] = 16384   # nearest to half of guaranteed C rand 
 
 fig, ax = plt.subplots()
 
-genelife.initialize(gol, simparams)
-genelife.initialize_genes(golg, gol, simparams)
+genelife.initialize(simparams)
+genelife.initialize_genes(simparams)
 
 
 colorgrid(N)
