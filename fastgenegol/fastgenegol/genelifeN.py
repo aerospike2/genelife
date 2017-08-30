@@ -43,8 +43,8 @@ def rand_cmap(nlabels, type='bright', first_color_black=True, last_color_black=F
     if type == 'bright':
         randHSVcolors = [(np.random.uniform(low=0.0, high=1),
                       np.random.uniform(low=0.2, high=1),
-                      np.random.uniform(low=0.9, high=1)) for i in xrange(nlabels)]    
-        randRGBcolors = []  
+                      np.random.uniform(low=0.9, high=1)) for i in xrange(nlabels)]
+        randRGBcolors = []
         for HSVcolor in randHSVcolors:  # Convert HSV list to RGB
             randRGBcolors.append(colorsys.hsv_to_rgb(HSVcolor[0], HSVcolor[1], HSVcolor[2]))
         if first_color_black:
@@ -120,6 +120,19 @@ def update(data):
     mat.set_data(cgrid)
     return [mat]
 
+
+tDepth = planeparams[0] = 2
+offsets = [[0,0,0],
+           [-1, 0, 0],
+           [-1, 1, 0],
+           [0, 1, 0],
+           [1, 1, 0],
+           [1, 0, 0],
+           [1, -1, 0],
+           [0, -1, 0],
+           [-1, -1, 0]]
+npoffsets = np.zeros(len(offsets),np.uint64)
+genelife.initialize_planes(npoffsets,planeparams)
 
 nlog2p0   = simparams[0] = 8
 nlog2pmut = simparams[1] = 8

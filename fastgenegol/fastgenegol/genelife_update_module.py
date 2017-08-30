@@ -20,6 +20,8 @@ libcd.initialize.restype = None
 libcd.initialize.argtypes = [uint64_array, int_array, c_int, c_int]
 libcd.initialize_genes.restype = None
 libcd.initialize_genes.argtypes = [uint64_array, uint64_array, int_array, c_int, c_int]
+libcd.initialize_planes.restype = None
+libcd.initialize_planes.argtypes = [uint64_array, int_array, c_int, c_int]
 libcd.countspecies.restype = None
 libcd.countspecies.argtypes = [uint64_array, int_array, c_int, c_int]
 libcd.print_gol.restype = None
@@ -35,6 +37,9 @@ def initialize(gol,simparams):
 
 def initialize_genes(golg, gol, simparams):
     return libcd.initialize_genes(golg, gol, simparams, len(golg), len(simparams))
+
+def initialize_planes(planeparams):
+    return libcd.initialize_planes(offsets, planeparams,len(offsets), len(planeparams))
 
 def countspecies(golg, simparams):
     return libcd.countspecies(golg,  simparams, len(golg), len(simparams))
