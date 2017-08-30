@@ -122,7 +122,6 @@ def update(data):
     return [mat]
 
 
-tDepth = planeparams[0] = 4
 offsets = [[0,0,0],
            [-1, 0, 0],
            [-1, 1, 0],
@@ -133,9 +132,9 @@ offsets = [[0,0,0],
            [0, -1, 0],
            [-1, -1, 0]]
 flatoff =  [x for sublist in offsets for x in sublist]
-npoffsets = np.array(flatoff,np.uint64)
+npoffsets = np.array(flatoff,np.int32)
 
-genelife.initialize_planes(npoffsets,planeparams)
+genelife.initialize_planes(npoffsets)
 
 nlog2p0   = simparams[0] = 8
 nlog2pmut = simparams[1] = 8

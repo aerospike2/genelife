@@ -120,7 +120,6 @@ initial1density = simparams[4] = 16384   # nearest to half of guaranteed C rand 
 fig, ax = plt.subplots()
 
 # for plane initialization:
-tDepth = planeparams[0] = 4
 offsets = [[0,0,0],
            [-1, 0, 0],
            [-1, 1, 0],
@@ -131,9 +130,9 @@ offsets = [[0,0,0],
            [0, -1, 0],
            [-1, -1, 0]]
 flatoff =  [x for sublist in offsets for x in sublist]
-npoffsets = np.array(flatoff,np.uint64)
+npoffsets = np.array(flatoff,np.int32)
 
-genelife.initialize_planes(npoffsets,planeparams)
+genelife.initialize_planes(npoffsets)
 genelife.initialize(simparams)
 genelife.initialize_genes(simparams)
 

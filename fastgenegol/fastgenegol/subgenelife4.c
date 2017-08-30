@@ -41,6 +41,7 @@ static long unsigned int  emptysites = 0;  // cumulative number of empty sites d
 
 long unsigned int **planes;
 long unsigned int **planesg;
+int **offsets;
 int curPlane = 0;
 int newPlane = 1;
 int numPlane = 2;
@@ -177,8 +178,8 @@ void genelife_update (long unsigned int outgol[], long unsigned int outgolg[], i
 	// printf("t = %d nlog2p0=%d nlog2pmut=%d selection=%d rule2mod=%d\n",t,nlog2p0,nlog2pmut,selection,rule2mod);
     }
     for (ij=0; ij<N2c; ij++) {
-	outgol[ij] = newgol[ij];        // copy new gol config to old one
-	outgolg[ij] = newgolg[ij];      // copy new genes to old genes
+	outgol[ij] = newgol[ij];        // copy new gol config to output
+	outgolg[ij] = newgolg[ij];      // copy new genes to output
     }
 }
 
@@ -205,15 +206,43 @@ void print_gol (long unsigned int gol[], int N, int N2) {   /* print the game of
 
 
 
-void initialize_planes(long unsigned int offsets[], int params[], int Noff, int nparams) {
-    int i;
-    numPlane = params[0];
+void initialize_planes(int offs[],  int Noff) {
+    int i,j,idx;
+
+    // install offsets:
+    if(Noff%3 !=0)
+	fprintf(stderr,"Ouch!  Size of offsets array not a multiple of 3 as expected.");
+    Npt = Noff/3;
+    offsets = (int **) calloc(Npt,sizeof(int *));
+    for(i=0; i<Npt; i++)
+	offsets[i] = (int *) calloc(3,sizeof(int)); // each containing xoff, yoff, toff.
+    for(idx=0,i=0; i<Npt; i++){
+	for(j=0; j<3; j++){
+	    offsets[i,j] = offs[idx];
+	    idx++;
+	}
+    }
+
+    // compute number of planes from toff = 3rd element of each offest vec:
+    integer tmx = 0;
+    integer tmn = N;
+    for(i=0; i<Npt; i++){
+	toff = offsets[i,2];
+	if(toff>tmx) tmx = toff;
+	if(toff<tmn) tmn = toff;
+    }
+    fprintf(stderr,"----------------- txm = %d, tmn = %d",tmx,tmn);
+    tall = tmx-tmn;
+    numPlane = tall + 2;	// numPlane >= 2
+
+    // initialize planes:
     planes = (long unsigned int **) calloc(numPlane,sizeof(long unsigned int *));
     for(i=0; i<numPlane; i++)
 	planes[i] = (long unsigned int *) calloc(N2,sizeof(long unsigned int));
     planesg = (long unsigned int **) calloc(numPlane,sizeof(long unsigned int *));
     for(i=0; i<numPlane; i++)
     planesg[i] = (long unsigned int *) calloc(N2,sizeof(long unsigned int));
+    
 }
 
 void initialize (int params[], int nparams) {
