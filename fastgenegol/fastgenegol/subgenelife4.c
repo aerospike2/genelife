@@ -92,10 +92,6 @@ void genelife_update (long unsigned int outgol[], long unsigned int outgolg[], i
     long unsigned int  pmutmask = (0x1 << nlog2pmut) - 1;
     long unsigned int *gol, *newgol, *golg, *newgolg;
 
-    gol = planes[curPlane];
-    newgol = planes[newPlane];
-    golg = planesg[curPlane];
-    newgolg = planesg[newPlane];
 
     static long unsigned int ngx = 0;
     static int first = 1;
@@ -106,6 +102,10 @@ void genelife_update (long unsigned int outgol[], long unsigned int outgolg[], i
         first = 0;
     }
     for (t=0; t<ndsteps; t++) {
+	gol = planes[curPlane];
+	newgol = planes[newPlane];
+	golg = planesg[curPlane];
+	newgolg = planesg[newPlane];
 	for (ij=0; ij<N2c; ij++) {                                               // loop over all sites of 2D torus with side length N
 	    i = ij & Nmask;  j = ij >> log2N;                                   // row & column
 	    jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
@@ -171,14 +171,14 @@ void genelife_update (long unsigned int outgol[], long unsigned int outgolg[], i
 		newgolg[ij] = 0;}                                                   // dies if not 2or3
 	    emptysites = emptysites + newgol[ij];                               // keep track of empty sites, same information as total activity of occupied sites
 	}
-
-	for (ij=0; ij<N2c; ij++) {
-	    outgol[ij] = newgol[ij];        // copy new gol config to old one
-	    outgolg[ij] = newgolg[ij];      // copy new genes to old genes
-	}
 	curPlane = (curPlane +1) % numPlane;
 	newPlane = (newPlane +1) % numPlane;
+
 	// printf("t = %d nlog2p0=%d nlog2pmut=%d selection=%d rule2mod=%d\n",t,nlog2p0,nlog2pmut,selection,rule2mod);
+    }
+    for (ij=0; ij<N2c; ij++) {
+	outgol[ij] = newgol[ij];        // copy new gol config to old one
+	outgolg[ij] = newgolg[ij];      // copy new genes to old genes
     }
 }
 

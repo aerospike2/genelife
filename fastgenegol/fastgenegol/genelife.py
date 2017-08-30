@@ -11,6 +11,7 @@ N2 = N*N
 gol = np.zeros(N2,np.uint64)
 golg = np.zeros(N2,np.uint64)
 simparams = np.zeros(5,np.int32)    # 5 parameters passed to C
+planeparams = np.zeros(1,np.int32)  # start with 1, but use array for future params
 cgrid = np.zeros((N,N),np.uint)
 
 # setup of color map : black for 0, colors for 1 to LEN+1 or 257 for colormethod 0 or 1
@@ -118,8 +119,23 @@ initial1density = simparams[4] = 16384   # nearest to half of guaranteed C rand 
 
 fig, ax = plt.subplots()
 
-genelife.initialize(gol, simparams)
-genelife.initialize_genes(golg, gol, simparams)
+# for plane initialization:
+tDepth = planeparams[0] = 4
+offsets = [[0,0,0],
+           [-1, 0, 0],
+           [-1, 1, 0],
+           [0, 1, 0],
+           [1, 1, 0],
+           [1, 0, 0],
+           [1, -1, 0],
+           [0, -1, 0],
+           [-1, -1, 0]]
+flatoff =  [x for sublist in offsets for x in sublist]
+npoffsets = np.array(flatoff,np.uint64)
+
+genelife.initialize_planes(npoffsets,planeparams)
+genelife.initialize(simparams)
+genelife.initialize_genes(simparams)
 
 #for i in range(int(nsteps//ndisp)):
 #    genelife.genelife_update(gol, golg, log2N, ndisp, simparams)
