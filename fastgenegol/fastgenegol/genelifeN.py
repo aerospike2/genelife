@@ -6,16 +6,16 @@ import matplotlib.animation as animation
 import matplotlib
 import genelife_update_module as genelife
 
+
 log2N = 7                       #  log2N=7 => N=128
 N = 2**log2N
 N2 = N*N
 Nmask = N-1
-
 gol = np.zeros(N2,np.uint64)
 golg = np.zeros(N2,np.uint64)
-simparams = np.zeros(5,np.int32)    # 5 parameters passed to C
-planeparams = np.zeros(1,np.int32)  # start with 1, but use array for future params
 cgrid = np.zeros((N,N),np.uint)
+
+
 
 # setup of color map : black for 0, colors for 1 to LEN+1 or 257 for colormethod 0 or 1
 #-----------------------------------------------------------------------------------------------------------
@@ -95,34 +95,45 @@ def colorgrid(N):
 
 
 
-nsteps = 500000
 
-ndisp = 100
-nrun = 1000
-niter = nsteps / (nrun + ndisp)
-cnt = 0
+
+def update(N=1000,dohisto=1):                   # update without animation.
+    global gol, golg
+    global log2N
+    global simparams
+    genelife.genelife_update(gol, golg, log2N, N, simparams,dohisto)
+
 
 # trying for:
 #     |------------nrun-----------|---ndisp---|  repeated niter times
 
 
-def update(data):
-    global gol, cgrid
-    global golg
-    global log2N, ndisp
-    global simparams
-    global cnt, ndisp, nrun
-
-    cnt = cnt+1
-    if cnt % ndisp == 0:  # insert the non-displayed iterations
-        genelife.genelife_update(gol, golg, log2N, nrun, simparams)
-    genelife.genelife_update(gol, golg, log2N, 1, simparams)
+cnt = 0
+def doanimation(nrun=1000,ndisp=100,niter=10):    
+    fig, ax = plt.subplots()
     colorgrid(N)
-    mat.set_data(cgrid)
-    return [mat]
+    def update_anim(data):
+        global gol, cgrid
+        global golg
+        global log2N
+        global simparams
+        global cnt
+        cnt = cnt+1
+        if cnt % ndisp == 0:  # insert the non-displayed iterations
+            genelife.genelife_update(gol, golg, log2N, nrun, simparams,0)
+        genelife.genelife_update(gol, golg, log2N, 1, simparams,0)
+        colorgrid(N)
+        mat.set_data(cgrid)
+        return [mat]
+
+    mat = ax.matshow(cgrid, cmap=my_cmap, vmin=0.01, vmax=257)  # was vmax = LEN+1
+    ani = animation.FuncAnimation(fig, update_anim, interval=1,
+                                  save_count=0, frames=niter*ndisp, repeat = False)
+    plt.show()
 
 
-offsets = [[0,0,0],
+if __name__ == '__main__':
+    offsets = [[0,0,0],
            [-1, 0, 0],
            [-1, 1, 0],
            [0, 1, 0],
@@ -131,31 +142,23 @@ offsets = [[0,0,0],
            [1, -1, 0],
            [0, -1, 0],
            [-1, -1, 0]]
-flatoff =  [x for sublist in offsets for x in sublist]
-npoffsets = np.array(flatoff,np.int32)
+    simparams = np.zeros(5,np.int32)    # 5 parameters passed to C
+    cgrid = np.zeros((N,N),np.uint)
 
-genelife.initialize_planes(npoffsets)
+    flatoff =  [x for sublist in offsets for x in sublist]
+    npoffsets = np.array(flatoff,np.int32)
+    numHis = pow(2,len(offsets))
+    histo=np.zeros(numHis,np.uint64)
+    genelife.initialize_planes(npoffsets)
 
-nlog2p0   = simparams[0] = 8
-nlog2pmut = simparams[1] = 8
-selection = simparams[2] =  1            # values 0,1,2 allowed
-rule2mod  = simparams[3] =  1            # values 0,1 allowed
-initial1density = simparams[4] = 16384   # nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
+    nlog2p0   = simparams[0] = 8
+    nlog2pmut = simparams[1] = 8
+    selection = simparams[2] =  1            # values 0,1,2 allowed
+    rule2mod  = simparams[3] =  1            # values 0,1 allowed
+    initial1density = simparams[4] = 16384   # nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
 
-fig, ax = plt.subplots()
-
-genelife.initialize(simparams)
-genelife.initialize_genes(simparams)
-
-
-colorgrid(N)
-
-mat = ax.matshow(cgrid, cmap=my_cmap, vmin=0.01, vmax=257)  # was vmax = LEN+1
-ani = animation.FuncAnimation(fig, update, interval=1,
-                              save_count=0, frames=niter, repeat = False)
-plt.show()
-
-genelife.countspecies(golg, simparams)
-
-
-
+    genelife.initialize(simparams)
+    genelife.initialize_genes(simparams)
+    doanimation()
+    genelife.countspecies(golg, simparams)
+    

@@ -42,11 +42,13 @@ static long unsigned int  emptysites = 0;  // cumulative number of empty sites d
 long unsigned int **planes;
 long unsigned int **planesg;
 int **offsets;
+int Noff;
 int curPlane = 0;
 int newPlane = 1;
 int numPlane = 2;
-
-
+int xL=0,xR=0,yU=0,yD=0;	// offsets for border of stats
+long unsigned int *histo;
+int numHisto;
                                     // Wikipedia "Xorshift" rewritten here as inline macro &
                                     // Vigna, Sebastiano. "xorshift*/xorshift+ generators and the PRNG shootout". Retrieved 2014-10-25.
 #define RAND128P(val) {                                                       \
@@ -77,7 +79,52 @@ const long unsigned int m3  = 0x0707070707070707; //for cumcount64c selects coun
 #define CUMCOUNT64C(x, val) {       /* Assumes gene specifies 8 8-bit counters each with max value 7 */  \
     val = ((x & m3) * h01) >> 56;}  /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
 
-void genelife_update (long unsigned int outgol[], long unsigned int outgolg[], int log2N, int ndsteps, int params[], int N2c, int nparams) {
+void countconfigs(){		// count configs specified by offset array
+    // each row of the offset array becomes a bit in an address for the histo array.
+    int i,j,k,t,x,y,adr,bit;
+    unsigned long int *pl;
+
+    for(i=0; i<N; i++){		// rows
+	if(i<xL) continue;
+	if(i>xR) continue;
+	for(j=0; j<N; j++){	// columns
+	    if(j<yD) continue;
+	    if(j>yU) continue;
+	    adr = 0;
+	    for(k=0; k<Noff; k++){
+		x = j+offsets[k][0];
+		y = i+offsets[k][1];
+		t = (curPlane+offsets[k][2]) % numPlane;
+		pl = planes[t];
+		bit = *(pl + y*N +x);
+		if(bit>1 || bit <0){
+		    fprintf(stderr,"Ack! bit = %d != 0 or 1\n",bit);
+		    exit(1);
+		}
+		adr = (adr<<1) | bit;
+	    }
+	    histo[adr]++;
+	}
+    }
+}
+
+void get_histo(long unsigned int outhisto[],int numHistoC){
+    int i;
+    if(numHistoC != numHisto){
+	fprintf(stderr,"Ack! numHisto = %d  != numHistoC = %d\n",numHisto,numHistoC);
+	exit(1);
+    }
+    for(i=0; i<numHisto; i++)
+	outhisto[i] = histo[i];
+}
+		    
+void init_histo(){
+    int i;
+    for(i=0; i<numHisto; i++)
+	histo[i] = 0;
+}
+
+void genelife_update (long unsigned int outgol[], long unsigned int outgolg[], int log2N, int ndsteps, int params[], int N2c, int nparams, int histoflag) {
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
     int N = 0x1 << log2N;
@@ -174,7 +221,8 @@ void genelife_update (long unsigned int outgol[], long unsigned int outgolg[], i
 	}
 	curPlane = (curPlane +1) % numPlane;
 	newPlane = (newPlane +1) % numPlane;
-
+	if(histoflag)
+	    countconfigs();
 	// printf("t = %d nlog2p0=%d nlog2pmut=%d selection=%d rule2mod=%d\n",t,nlog2p0,nlog2pmut,selection,rule2mod);
     }
     for (ij=0; ij<N2c; ij++) {
@@ -206,34 +254,63 @@ void print_gol (long unsigned int gol[], int N, int N2) {   /* print the game of
 
 
 
-void initialize_planes(int offs[],  int Noff) {
-    int i,j,idx;
+void initialize_planes(int offs[],  int N) {
+    int i,j,idx,Npt;
+
+    if(N%3 !=0)
+	fprintf(stderr,"Ouch!  Size of offsets array not a multiple of 3 as expected.");
+    Noff = N/3;		// Noff global
+    if(Noff>24){
+	fprintf(stderr,"Too many offsets!  Max=24");
+	exit(1);
+    }
+    numHisto = 1<<Noff;
+    histo = (int *) calloc(numHisto,sizeof(int));
 
     // install offsets:
-    if(Noff%3 !=0)
-	fprintf(stderr,"Ouch!  Size of offsets array not a multiple of 3 as expected.");
-    Npt = Noff/3;
-    offsets = (int **) calloc(Npt,sizeof(int *));
-    for(i=0; i<Npt; i++)
+    offsets = (int **) calloc(Noff,sizeof(int *));
+    for(i=0; i<Noff; i++)
 	offsets[i] = (int *) calloc(3,sizeof(int)); // each containing xoff, yoff, toff.
-    for(idx=0,i=0; i<Npt; i++){
+    for(idx=0,i=0; i<Noff; i++){
 	for(j=0; j<3; j++){
-	    offsets[i,j] = offs[idx];
+	    offsets[i][j] = offs[idx];
 	    idx++;
 	}
     }
-
     // compute number of planes from toff = 3rd element of each offest vec:
-    integer tmx = 0;
-    integer tmn = N;
-    for(i=0; i<Npt; i++){
-	toff = offsets[i,2];
+    int tmx = 0;
+    int tmn = N;
+    int toff,tall;
+    for(i=0; i<Noff; i++){
+	toff = offsets[i][2];
 	if(toff>tmx) tmx = toff;
 	if(toff<tmn) tmn = toff;
     }
-    fprintf(stderr,"----------------- txm = %d, tmn = %d",tmx,tmn);
+//    fprintf(stderr,"----------------- txm = %d, tmn = %d",tmx,tmn);
     tall = tmx-tmn;
     numPlane = tall + 2;	// numPlane >= 2
+
+    // compute xR, xL, yU, yD border offsets from offsets matrix
+    int mx;
+    int mn;
+    int off;
+    mn=N; mx=0;
+    for(i=0; i<Noff; i++){
+	off = offsets[i][0];	// X
+	if(off>mx) mx = off;
+	if(off<mn) mn = off;
+    }
+    if(mn<0) xL = -mn; else xL=0;
+    if(mx>0) xR = N-mx; else xR=N;
+    mn=N; mx=0;
+    for(i=0; i<Noff; i++){
+	off = offsets[i][1];	// Y
+	if(off>mx) mx = off;
+	if(off<mn) mn = off;
+    }
+    if(mn<0) yD = -mn; else yD = 0;
+    if(mx>0) yU = N-mx; else yU = N;
+    
 
     // initialize planes:
     planes = (long unsigned int **) calloc(numPlane,sizeof(long unsigned int *));
@@ -326,7 +403,6 @@ void countspecies(long unsigned int golg[], int params[], int N2, int nparams) {
     qsort(golgsc, nspecies, sizeof(golgsc[0]), cmpfunc2);                   // sort in decreasing count order
     for (k=0; k<nspecies; k++) {
         last = golgsc[k][0];
-
         if (selection == 0) {                                               // neutral model : GoL rule departures depend only on seq diversity
                 POPCOUNT64C(last, nones);
                 fitness = nlog2p0;}
@@ -351,3 +427,4 @@ void delay(int milliseconds)
     while( (now-then) < pause )
         now = clock();
 }
+

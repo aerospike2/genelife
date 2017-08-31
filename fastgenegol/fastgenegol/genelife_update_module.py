@@ -15,7 +15,7 @@ libcd = npct.load_library("libgenelife", ".")
 
 # setup the return types and argument types
 libcd.genelife_update.restype = None
-libcd.genelife_update.argtypes = [uint64_array, uint64_array, c_int, c_int, int_array, c_int, c_int]
+libcd.genelife_update.argtypes = [uint64_array, uint64_array, c_int, c_int, int_array, c_int, c_int, c_int]
 libcd.initialize.restype = None
 libcd.initialize.argtypes = [int_array, c_int]
 libcd.initialize_genes.restype = None
@@ -28,9 +28,14 @@ libcd.print_gol.restype = None
 libcd.print_gol.argtypes = [uint64_array, c_int, c_int]
 libcd.printscreen.restype = None
 libcd.printscreen.argtypes = [uint64_array, uint64_array, c_int, c_int]
+libcd.get_histo.restype = None
+libcd.get_histo.argtypes = [uint64_array, c_int]
+libcd.init_histo.restype = None
+libcd.init_histo.argtypes = None
 
-def genelife_update(gol, golg, log2N, ndsteps, simparams):
-    return libcd.genelife_update(gol, golg, log2N, ndsteps, simparams, len(gol), len(simparams) )
+
+def genelife_update(gol, golg, log2N, ndsteps, simparams, histoflag):
+    return libcd.genelife_update(gol, golg, log2N, ndsteps, simparams, len(gol), len(simparams), histoflag )
 
 def initialize(simparams):
     return libcd.initialize(simparams, len(simparams))
@@ -38,8 +43,8 @@ def initialize(simparams):
 def initialize_genes(simparams):
     return libcd.initialize_genes(simparams, len(simparams))
 
-def initialize_planes(offsets,planeparams):
-    return libcd.initialize_planes(offsets, planeparams,len(offsets), len(planeparams))
+def initialize_planes(offsets):
+    return libcd.initialize_planes(offsets, len(offsets))
 
 def countspecies(golg, simparams):
     return libcd.countspecies(golg,  simparams, len(golg), len(simparams))
@@ -49,3 +54,6 @@ def print_gol( gol, N):
 
 def printscreen( gol, golg, N):
     return libcd.printscreen( gol, golg, N, len(gol))
+
+def getconfigs( histo ):
+    return libcd.getconfigs( histo, len(histo))
