@@ -13,6 +13,7 @@
 		5275A1351F2930E90062765F /* cos_doubles.h in Headers */ = {isa = PBXBuildFile; fileRef = 5275A1311F2930E90062765F /* cos_doubles.h */; };
 		5275A1371F2A38C60062765F /* subgenelife2.c in Sources */ = {isa = PBXBuildFile; fileRef = 5275A1361F2A38C60062765F /* subgenelife2.c */; };
 		528F919D1F31E30E008DD596 /* probtestdispatch.c in Sources */ = {isa = PBXBuildFile; fileRef = 528F91941F2F9895008DD596 /* probtestdispatch.c */; };
+		528F91A81F3DDA3D008DD596 /* subgenelife3.c in Sources */ = {isa = PBXBuildFile; fileRef = 528F91A71F3DDA3C008DD596 /* subgenelife3.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -71,6 +72,7 @@
 		528F91A11F33306A008DD596 /* libswiftDispatch.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libswiftDispatch.tbd; path = System/Library/PrivateFrameworks/Swift/libswiftDispatch.tbd; sourceTree = SDKROOT; };
 		528F91A31F333095008DD596 /* SyncServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SyncServices.framework; path = System/Library/Frameworks/SyncServices.framework; sourceTree = SDKROOT; };
 		528F91A51F333143008DD596 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
+		528F91A71F3DDA3C008DD596 /* subgenelife3.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = subgenelife3.c; path = fastgenegol/subgenelife3.c; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -129,6 +131,7 @@
 			children = (
 				521FDCEA1F287DEE00F08FFB /* subgenelife.c */,
 				5275A1361F2A38C60062765F /* subgenelife2.c */,
+				528F91A71F3DDA3C008DD596 /* subgenelife3.c */,
 				521FDCEB1F287DEE00F08FFB /* genelife.py */,
 				521FDCEC1F287DEE00F08FFB /* genelife_update_module.py */,
 			);
@@ -383,6 +386,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5275A1371F2A38C60062765F /* subgenelife2.c in Sources */,
+				528F91A81F3DDA3D008DD596 /* subgenelife3.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

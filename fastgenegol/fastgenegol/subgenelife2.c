@@ -1,5 +1,5 @@
 //
-//  subgenelife.c
+//  subgenelife2.c
 //  fastgenegol
 //
 //  Created by John McCaskill on 14.07.17.
