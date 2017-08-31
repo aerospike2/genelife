@@ -46,18 +46,21 @@ const long unsigned int h03 = 0x0101010100000000; //the sum of 256 to the power 
 inline void popcount8c(long unsigned x, int *cnt1p) {
     x -= (x >> 1) & m1;             /* put count of each 2 bits into those 2 bits */
     x = (x & m2) + ((x >> 2) & m2); /* put count of each 4 bits into those 4 bits */
-    *cnt1p = (x + (x >> 4)) & m4;        /* put count of each 8 bits into those 8 bits */
+    *cnt1p = (int) ((x + (x >> 4)) & m4);        /* put count of each 8 bits into those 8 bits */
+}
 inline void popcountc(long unsigned x, long unsigned h, int *cnt1p) {
     x -= (x >> 1) & m1;             /* put count of each 2 bits into those 2 bits */
     x = (x & m2) + ((x >> 2) & m2); /* put count of each 4 bits into those 4 bits */
     x = (x + (x >> 4)) & m4;        /* put count of each 8 bits into those 8 bits */
     *cnt1p = (x* h) >> 56;          /* left 8 bits of relevant portion of x + (x<<8) + (x<<16) + (x<<24) + ... */
-                                                    // LUT to
+}                                                    // LUT to
 static int combi2[256], combi3[256];
+
 void setcombin(int combin[], int n) {
-    long unsigned int i,k, cnt;
-    for (i=0;k=0,i<256,i++) {
-        if (popcount8c(i, &cnt) == n) combin[i] = k++;
+    int i,cnt,k;
+    for (i=0,k=0;i<256;i++) {
+        popcount8c((long unsigned int) i, &cnt);
+        if ( cnt == n) combin[i] = k++;
         else combin[i] = 64;
     }
 }
@@ -67,16 +70,9 @@ void genelife_update (long unsigned int gol[], long unsigned int golg[], int log
 	/* encode with minimal use of if structures for optimal vector treatment, code optimized with profile */
     int N = 0x1 << log2N;
     int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
-	int t, k, nmut, nones1, nones2, nones3, nb[8], ij, i, j , jp1, jm1, ip1, im1, p2, p3;
-    bool s2or3;
-    long unsigned int s, nb1i, nbv8, randnr, ng0, ng, ng23, birth, newgene;
-    long unsigned int genef1,genef2,genef3;
-    static float a2=1., a3=1.;
-    int nlog2p0 = params[0];
-    int nlog2pmut = params[1];
-    int selection = params[2];
-    int rule2mod = params[3];
-    long unsigned int  pmutmask = (0x1 << nlog2pmut) - 1;
+	int t, k, nones1, nb[8], ij, i, j , jp1, jm1, ip1, im1;
+    int repage;
+    long unsigned int s, nb1i, nbv8, ng0, ng, ng23, newgene;
     static long unsigned int  newgol[N2],newgolg[N2];
 
     static int first = 1;
@@ -96,7 +92,7 @@ void genelife_update (long unsigned int gol[], long unsigned int golg[], int log
 		s = gol[nb[0]]+gol[nb[1]]+gol[nb[2]]+gol[nb[3]]+gol[nb[4]]+gol[nb[5]]+gol[nb[6]]+gol[nb[7]]; // number of live nbs
         if ((s == 2) || (s == 3)) {                                         // if 2 or 3 neighbors alive
             ng0 = golg[ij] & 0x7;                                             // 0-5 value from local rotation counter
-            ng = ((ng0+1) == 6) ? 0 : (ng0+1));                               // increment local rotation counter mod 6
+            ng = ((ng0+1) == 6 ? 0 : (ng0+1));                               // increment local rotation counter mod 6
             if (s==2)   ng23 = ng & 0x1;                                      // mod 2 counter for two neighbor case
             else        ng23 = ng >> 1;                                       // mod 3 counter for three neighbor case
             if (gol[ij] == 1) {                                                 // question of survival
@@ -114,7 +110,7 @@ void genelife_update (long unsigned int gol[], long unsigned int golg[], int log
                 popcountc(newgene,h03,&nones1);                                   // ones count of replication gene
                 repage = (newgene >> 3) & 0x1f;                                   // age of rep gene
                 if (s==3)  {                                                      // certain reproduction for 3 nbs 1
-                    if (t&0xf == 0) {                                               // mutation deterministic once every 16 cycles
+                    if ((t&0xf) == 0) {                                               // mutation deterministic once every 16 cycles
                         for (k=0,nbv8=0;k<8;k++) nbv8 = (nbv8 << 1) + gol[nb[k]];     // extracts nb values in first 8 bits for mutation
                         newgene = newgene ^ (0x1LU << combi3[nbv8]);                  // mutated gene
                     }
@@ -165,7 +161,7 @@ void initialize_genes (long unsigned int golg[], long unsigned int gol[], int pa
             for (k=0; k<56; k++) {
                 g = (g << 1) | (rand() & 0x1);
             }
-        golg[ij] = g<<8 + (rand() % 6);    // not optimal uniformity in lowest three bits counter part but this is not critical for initial phase
+        golg[ij] = (g<<8) + (rand() % 6);    // not optimal uniformity in lowest three bits counter part but this is not critical for initial phase
 	}
 }
 
@@ -189,8 +185,7 @@ void countspecies(long unsigned int golg[], int params[], int N2, int nparams) {
     int ij, k, ijlast, nspecies, counts[N2], nones, fitness;
     long unsigned int last, golgs[N2];
     long unsigned int golgsc[N2][2];
-    int selection = params[2];
-    int nlog2p0 = params[0];
+    int nlog2p0 = params[0];                 // no longer used
     
     for (ij=0; ij<N2; ij++) { golgs[ij] = golg[ij]>>8;  counts[ij] = 0;}  // initialize sorted gene & count arrays, former to gene part, latter to zero
 
@@ -215,16 +210,9 @@ void countspecies(long unsigned int golg[], int params[], int N2, int nparams) {
     qsort(golgsc, nspecies, sizeof(golgsc[0]), cmpfunc2);                   // sort in decreasing count order
     for (k=0; k<nspecies; k++) {
         last = golgsc[k][0];
-        
-        if (selection == 0) {                                               // neutral model : GoL rule departures depend only on seq diversity
-                POPCOUNT64C(last, nones);
-                fitness = nlog2p0;}
-        else if (selection == 1) {                                          // non-neutral model with selection for rule departure probability
-                POPCOUNT64C(last, nones);                                     // number of ones in new gene determines fitness
-                fitness = nlog2p0 + ((nones < 16) ? 0 : (nones - 23));}       // 0 if < 16 otherwise nones-23
-        else {                                                              // non-neutral model based on presence of replicase gene
-                POPCOUNT64C(last, nones);                                     // number of ones in new gene determines fitness
-                fitness = nlog2p0 + ((nones < 16) ? 0 : (nones - 23));}       // 0 if < 16 otherwise nones-23
+        popcountc(last, h01, &nones);                                    // check use of h01 here, this is not fitness relevant
+        // fitness = nlog2p0 + ((nones < 16) ? 0 : (nones - 23));}       // 0 if < 16 otherwise nones-23
+        fitness = nlog2p0;    // needs to be fixed !!!!!!!!!!!!!!
         printf("count species %d with gene %lx has counts %lu and %d ones, fitness %d\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
     }
     printf("cumulative activity = %lu\n",(N2 * (long unsigned int) nsteps) - emptysites);
