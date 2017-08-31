@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <time.h>
+#include <math.h>
 
 #define ASCII_ESC 27                // escape for printing terminal commands, such as cursor repositioning
 
@@ -82,7 +83,7 @@ void genelife_update (long unsigned int gol[], long unsigned int golg[], int log
     static long unsigned int ngx = 0;
     static int first = 1;
     static long unsigned int state[2]; // State for xorshift pseudorandom number generation. The state must be seeded so that it is not zero
-    
+
     if (first) {
         state[0] = rand();state[1] = rand();
         first = 0;
@@ -186,14 +187,14 @@ void initialize (long unsigned int gol[], int params[], int N2, int nparams) {
 	int ij;
     int initial1density;
     static unsigned int rmask = (1 << 15) - 1;
-    
+
     if (nparams > 4) initial1density = params[4];
     else initial1density = (1 << 14);
-    
+
     printf("id = %d rmask = %d nparams = %d\n",initial1density, rmask, nparams);
 	for (ij=0; ij<N2; ij++) {
 		gol[ij] = ((rand() & rmask) < initial1density)?1:0;
-	}	
+	}
 }
 
 void initialize_genes (long unsigned int golg[], long unsigned int gol[], int params[], int N2, int nparams) {
@@ -233,7 +234,7 @@ void countspecies(long unsigned int golg[], int params[], int N2, int nparams) {
     long unsigned int golgsc[N2][2];
     int selection = params[2];
     int nlog2p0 = params[0];
-    
+
     for (ij=0; ij<N2; ij++) { golgs[ij] = golg[ij];  counts[ij] = 0;}  // initialize sorted gene & count arrays to zero
 
     qsort(golgs, N2, sizeof(long unsigned int), cmpfunc);              // sort in increasing gene order
@@ -246,18 +247,18 @@ void countspecies(long unsigned int golg[], int params[], int N2, int nparams) {
     }
     nspecies = k;  // print excluding 0 since this is most likely an empty site not a true gene
     printf("The number of different non-zero species is %d\n",nspecies);
-    
+
     for (k=0,ij=0;k<nspecies;k++) {     // now condense array to give only different genes with counts
         // printf("species %4d with gene %x has counts %d\n",k, golgs[ij],counts[k]);
         golgs[k]=golgs[ij];
         ij = ij + counts[k];
     }
-    
+
     for (k=0; k<nspecies; k++) { golgsc[k][0] = golgs[k];  golgsc[k][1] = counts[k];}  // initialize joint gene & count array
     qsort(golgsc, nspecies, sizeof(golgsc[0]), cmpfunc2);                   // sort in decreasing count order
     for (k=0; k<nspecies; k++) {
         last = golgsc[k][0];
-        
+
         if (selection == 0) {                                               // neutral model : GoL rule departures depend only on seq diversity
                 POPCOUNT64C(last, nones);
                 fitness = nlog2p0;}
@@ -276,7 +277,7 @@ void delay(int milliseconds)
 {
     long pause;
     clock_t now,then;
-    
+
     pause = milliseconds*(CLOCKS_PER_SEC/1000);
     now = then = clock();
     while( (now-then) < pause )

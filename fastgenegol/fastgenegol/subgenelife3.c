@@ -96,7 +96,7 @@ void genelife_update (long unsigned int gol[], long unsigned int golg[], int log
 		s = gol[nb[0]]+gol[nb[1]]+gol[nb[2]]+gol[nb[3]]+gol[nb[4]]+gol[nb[5]]+gol[nb[6]]+gol[nb[7]]; // number of live nbs
         if ((s == 2) || (s == 3)) {                                         // if 2 or 3 neighbors alive
             ng0 = golg[ij] & 0x7;                                             // 0-5 value from local rotation counter
-            ng = ((ng0+1) == 6)) ? 0 : (ng0+1);                               // increment local rotation counter mod 6
+            ng = ((ng0+1) == 6) ? 0 : (ng0+1));                               // increment local rotation counter mod 6
             if (s==2)   ng23 = ng & 0x1;                                      // mod 2 counter for two neighbor case
             else        ng23 = ng >> 1;                                       // mod 3 counter for three neighbor case
             if (gol[ij] == 1) {                                                 // question of survival
