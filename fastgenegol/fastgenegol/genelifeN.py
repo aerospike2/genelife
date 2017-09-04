@@ -109,8 +109,10 @@ def update(N=1000,dohisto=1):                   # update without animation.
 
 
 cnt = 0
+framenr = 0
 def doanimation(nrun=1000,ndisp=100,niter=10):    
     fig, ax = plt.subplots()
+    time_text = ax.text(0.05, 0.95,'',horizontalalignment='left',verticalalignment='top', transform=ax.transAxes)
     colorgrid(N)
     def update_anim(data):
         global gol, cgrid
@@ -118,13 +120,18 @@ def doanimation(nrun=1000,ndisp=100,niter=10):
         global log2N
         global simparams
         global cnt
+        global framenr
         cnt = cnt+1
         if cnt % ndisp == 0:  # insert the non-displayed iterations
             genelife.genelife_update(gol, golg, log2N, nrun, simparams,0)
+            framenr = framenr+nrun
         genelife.genelife_update(gol, golg, log2N, 1, simparams,0)
+        framenr = framenr+1
         colorgrid(N)
         mat.set_data(cgrid)
-        return [mat]
+        time_text.set_text('cnt = %.1d' % framenr)
+        time_text.set_color('w')
+        return mat, time_text
 
     mat = ax.matshow(cgrid, cmap=my_cmap, vmin=0.01, vmax=257)  # was vmax = LEN+1
     ani = animation.FuncAnimation(fig, update_anim, interval=1,
@@ -133,15 +140,15 @@ def doanimation(nrun=1000,ndisp=100,niter=10):
 
 
 if __name__ == '__main__':
-    offsets = [[0,0,0],
-           [-1, 0, 0],
-           [-1, 1, 0],
-           [0, 1, 0],
-           [1, 1, 0],
-           [1, 0, 0],
-           [1, -1, 0],
-           [0, -1, 0],
-           [-1, -1, 0]]
+    offsets =  [[ 0, 0, 0],
+                [-1, 0, 0],
+                [-1, 1, 0],
+                [ 0, 1, 0],
+                [ 1, 1, 0],
+                [ 1, 0, 0],
+                [ 1,-1, 0],
+                [ 0,-1, 0],
+                [-1,-1, 0]]
     simparams = np.zeros(5,np.int32)    # 5 parameters passed to C
     cgrid = np.zeros((N,N),np.uint)
 

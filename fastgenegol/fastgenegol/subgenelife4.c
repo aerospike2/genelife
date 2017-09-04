@@ -115,10 +115,10 @@ void get_histo(long unsigned int outhisto[],int numHistoC){
 	outhisto[i] = histo[i];
 }
 		    
-void init_histo(){
+void init_histo(){     // initialize the history array to zero
     int i;
     for(i=0; i<numHisto; i++)
-	histo[i] = 0;
+        histo[i] = 0;
 }
 
 void genelife_update (long unsigned int outgol[], long unsigned int outgolg[], int log2N, int ndsteps, int params[], int N2c, int nparams, int histoflag) {
@@ -319,11 +319,12 @@ void initialize (int params[], int nparams) {
 	int ij;
     int initial1density;
     long unsigned int *gol;
+    static unsigned int rmask = (1 << 15) - 1;         // check why 15 bits used here, related to rand()?
+    
     gol = planes[curPlane];
-    static unsigned int rmask = (1 << 15) - 1;
 
     if (nparams > 4) initial1density = params[4];
-    else initial1density = (1 << 14);
+    else initial1density = (1 << 14);                  // default is best approx to 0.5 with 15 bit unsigned int i.e. 2^14/(2^15-1)
 
     printf("id = %d rmask = %d nparams = %d\n",initial1density, rmask, nparams);
 	for (ij=0; ij<N2; ij++) {
@@ -336,16 +337,15 @@ void initialize_genes (int params[], int nparams) {
     long unsigned int g;
     long unsigned int *gol;
     long unsigned int *golg;
+    
     gol = planes[curPlane];
     golg = planesg[curPlane];
+    
     for (ij=0; ij<N2; ij++) {
-	g = 0;
-	if (gol[ij] != 0)
-	    for (k=0; k<64; k++) {
-		g = (g << 1) | (rand() & 0x1);
-	    }
-	golg[ij] = g;
-	if (golg[ij] == 0 && gol[ij] != 0) printf("zero gene at %d",ij);
+        g = 0;
+        if (gol[ij] != 0) for (k=0; k<64; k++) g = (g << 1) | (rand() & 0x1);
+        golg[ij] = g;
+        if (golg[ij] == 0 && gol[ij] != 0) printf("zero gene at %d",ij);
     }
     // for (ij=0; ij<20; ij++) printf("gene at %d %u\n",ij,golg[ij]);   // test first 20
 }
