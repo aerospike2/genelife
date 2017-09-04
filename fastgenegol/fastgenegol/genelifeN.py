@@ -101,7 +101,7 @@ def update(N=1000,dohisto=1):                   # update without animation.
     global gol, golg
     global log2N
     global simparams
-    genelife.genelife_update(gol, golg, log2N, N, simparams,dohisto)
+    genelife.genelife_update(gol, golg, log2N, N, simparams, dohisto)
 
 
 # trying for:

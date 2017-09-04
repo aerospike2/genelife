@@ -1,5 +1,7 @@
 """ Wrapping a C library function that does update of long unsigned int arrays gol, golg
-    input using the numpy.ctypeslib. """
+    input using the numpy.ctypeslib.
+    Method gleaned from 
+    http://www.scipy-lectures.org/advanced/interfacing_with_c/interfacing_with_c.html"""
 
 import numpy as np
 import numpy.ctypeslib as npct
