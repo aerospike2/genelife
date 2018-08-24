@@ -86,12 +86,12 @@ by Takashi Ikegami.
 ### Development of graphics and efficient gene representation
 
 Following the initial simple python code, optimized versions in C were written
-(i) with long integer representation of genes, executable target and directory name fastgenegol
-(ii) fast video display was done initially with VT100 terminal using control of colors and cursor position
-(iii) genes of arbitrary length were implemented efficiently using gmpy2 arbitrary precision integers,
+1.  with long integer representation of genes, executable target and directory name fastgenegol
+2.  fast video display was done initially with VT100 terminal using control of colors and cursor position
+3.  genes of arbitrary length were implemented efficiently using gmpy2 arbitrary precision integers,
 following initial 64 bit integer implementation
-(iv) Norman then piped the display to a pygame python display to take advantage of high qual graphics: dispgenegol
-(v) John then integrated python (matplotlib) animate display with C subroutine subgenelife for genelife.py
+4.  Norman then piped the display to a pygame python display to take advantage of high qual graphics: dispgenegol
+5.  John then integrated python (matplotlib) animate display with C subroutine subgenelife for genelife.py
 
 ### Evolutionary Activity
 
