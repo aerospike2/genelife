@@ -51,18 +51,19 @@ with point mutation in current version (recombination to come in the
 future).
 
 In order to give a feedback between genes and the CA time development, 
-Conway's game of life rule is overridden stochastically only for empty
-sites with 2 or 3 neighbors present (on):
+Conway's game of life rule is overridden stochastically and infrequently 
+for the two rules that represent survival and replication of live sites 
+i.e. only for empty sites with 2 or 3 neighbors present (on):
 (i) In the case of three live neighbors, the central site remains dead
 and no replication happens
 (ii) In the case of two live neightbors, the central site comes alive
-and replication happens.
+as a replicate of one of the two neighbors (chosen at random with 50:50 prob).
 
 The probability of rule override $p=p0*e^-alphha*d$ decays exponentially with
 increasing hamming distance d of neighbors.
 For p0 == 0, the occupied cells follow exactly Conway's game of life
 and the genes execute neutral selection from an initially random
-population
+population.
 
 For p0 >0, the probability of departures from Conway's rules are
 greatest with monoclonal neighbors and become negligible if neighbors
@@ -72,7 +73,7 @@ In this way, a feedback is created between pattern stagnation and innovation.
 
 With the current parameters, no degeneration to a set of
 non-communicating local structures occurs. The model is likely to be
-more interesting still with recombination than point mutation NYI
+more interesting still with recombination than point mutation NYI.
 
 ## Versions
 
@@ -81,6 +82,16 @@ by Takashi Ikegami.
 
 * genelife.ipynb:  ipython notebook.
 * genelife.py: version run at the command line with "python genelife.py"
+
+### Development of graphics and efficient gene representation
+
+Following the initial simple python code, optimized versions in C were written
+1.  with long integer representation of genes, executable target and directory name fastgenegol
+2.  fast video display was done initially with VT100 terminal using control of colors and cursor position
+3.  genes of arbitrary length were implemented efficiently using gmpy2 arbitrary precision integers,
+following initial 64 bit integer implementation
+4.  Norman then piped the display to a pygame python display to take advantage of high qual graphics: dispgenegol
+5.  John then integrated python (matplotlib) animate display with C subroutine subgenelife for genelife.py
 
 ### Evolutionary Activity
 
