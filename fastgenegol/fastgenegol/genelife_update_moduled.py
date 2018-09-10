@@ -38,8 +38,8 @@ libcd.init_histo.restype = None
 libcd.init_histo.argtypes = None
 
 
-def genelife_update(gol, golg, log2N, ndsteps, simparams, histoflag):
-    return libcd.genelife_update(gol, golg, log2N, ndsteps, simparams, len(gol), len(simparams), histoflag )
+def genelife_update(log2N, ndsteps, simparams, histoflag):
+    return libcd.genelife_update(log2N, ndsteps, simparams, len(simparams), histoflag )
 
 def initialize(simparams):
     return libcd.initialize(simparams, len(simparams))

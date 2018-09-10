@@ -143,15 +143,15 @@ void genelife_update (long unsigned int outgol[], long unsigned int outgolg[], i
     static long unsigned int state[2]; // State for xorshift pseudorandom number generation. The state must be seeded so that it is not zero
 
     if (first) {
-        state[0] = rand();state[1] = rand();
-        first = 0;
+	state[0] = rand();state[1] = rand();
+	first = 0;
     }
     for (t=0; t<ndsteps; t++) {
-	  gol = planes[curPlane];
-	  newgol = planes[newPlane];
-	  golg = planesg[curPlane];
-	  newgolg = planesg[newPlane];
-	  for (ij=0; ij<N2c; ij++) {                                               // loop over all sites of 2D torus with side length N
+	gol = planes[curPlane];
+	newgol = planes[newPlane];
+	golg = planesg[curPlane];
+	newgolg = planesg[newPlane];
+	for (ij=0; ij<N2c; ij++) {                                               // loop over all sites of 2D torus with side length N
 	    i = ij & Nmask;  j = ij >> log2N;                                   // row & column
 	    jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
 	    ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                         // toroidal i+1, i-1
@@ -160,23 +160,23 @@ void genelife_update (long unsigned int outgol[], long unsigned int outgolg[], i
 	    s = gol[nb[0]]+gol[nb[1]]+gol[nb[2]]+gol[nb[3]]+gol[nb[4]]+gol[nb[5]]+gol[nb[6]]+gol[nb[7]]; // number of live nbs
 	    s2or3 = (1 - (((s>>3)&1) | ((s>>2)&1))) * (s>>1 & 1);               // 1 if 2 or 3 neighbors are alive
 	    if (s2or3 == 1) {                                                   // if 2 or 3 neighbors alive
-		  RAND128P(randnr);                                                   // expansion inline so compiler recognizes auto-vectorization options
-                                                                              // compute random neighbor selection ng from one 64-bit random number
-		  ng = (randnr >> 54) & 0x3;                                          // 0, 1, 2 or 3 with probs each 1/4 : next 4 lines converts this 0,1,2 with prob 1/3
-		  r3 = (ng == 3 ? 1: 0);                                              // 1 if ng == 3 (invalid value) otherwise zero : prob. is 1/4
-		  ngx += r3;                                                          // increment external ng counter on such exceptions
-		  ngx = (ngx == 3 ? 0 : ngx);                                         // modulo 3 counter without division for ng==3 exceptions
-		  ng = (s&1)?(r3?ngx:ng):(ng&1);                                      // for s==3 use counter value mod 3 if exception, else rand 0,1,2; for s=2 rand 0,1
-		  newgene = golg[nb[(nb1i>>(ng<<2))& 7]];                             // pick new gene as one of three neighbor
-		  // compute nones for different selection models
-		  if (selection == 0) {                                               // neutral model : GoL rule departures depend only on seq diversity
+		RAND128P(randnr);                                                   // expansion inline so compiler recognizes auto-vectorization options
+		// compute random neighbor selection ng from one 64-bit random number
+		ng = (randnr >> 54) & 0x3;                                          // 0, 1, 2 or 3 with probs each 1/4 : next 4 lines converts this 0,1,2 with prob 1/3
+		r3 = (ng == 3 ? 1: 0);                                              // 1 if ng == 3 (invalid value) otherwise zero : prob. is 1/4
+		ngx += r3;                                                          // increment external ng counter on such exceptions
+		ngx = (ngx == 3 ? 0 : ngx);                                         // modulo 3 counter without division for ng==3 exceptions
+		ng = (s&1)?(r3?ngx:ng):(ng&1);                                      // for s==3 use counter value mod 3 if exception, else rand 0,1,2; for s=2 rand 0,1
+		newgene = golg[nb[(nb1i>>(ng<<2))& 7]];                             // pick new gene as one of three neighbor
+		// compute nones for different selection models
+		if (selection == 0) {                                               // neutral model : GoL rule departures depend only on seq diversity
 		    genediff = golg[nb[nb1i&0x7]]^golg[nb[(nb1i>>4)&0x7]]^golg[nb[(nb1i>>8)&0x7]];  // gene difference seq based on xor
 		    POPCOUNT64C(genediff, nones);}                                    // number of 1s in genediff is Hamming distance
-		  else if (selection == 1) {                                          // non-neutral model with selection for rule departure probability
+		else if (selection == 1) {                                          // non-neutral model with selection for rule departure probability
 		    genediff = newgene;                                               // place the new gene in genediff for count of number of ones
 		    POPCOUNT64C(genediff, nones);                                     // number of ones in new gene determines fitness
 		    nones = (nones < 16) ? 0 : (nones - 23);}                           // 0 if < 16 otherwise nones-23
-		  else if (selection == 2) {                                          // non-neutral model based on presence of replicase gene
+		else if (selection == 2) {                                          // non-neutral model based on presence of replicase gene
 		    genef1 = golg[nb[nb1i&0x7]];                                      // gene of first neighbor
 		    CUMCOUNT64C(genef1, nones);                                       // count of gene determines fitness
 		    genef2 = golg[nb[(nb1i>>4)&0x7]];                                 // gene of second neighbor
@@ -186,7 +186,7 @@ void genelife_update (long unsigned int outgol[], long unsigned int outgolg[], i
 		    nones = nones < nones1 ? nones : nones1;
 		    nones = nones < nones2 ? nones : nones2;
 		    nones = nones < 16 ? 0 : (nones - 23);}                           // 0 if < 16 otherwise nones-23
-		  else  {                                                             // full model based on two 32-bit genes for 3nb and 2nb birth
+		else  {                                                             // full model based on two 32-bit genes for 3nb and 2nb birth
 		    genef1 = golg[nb[nb1i&0x7]];                                      // gene of first neighbor
 		    POPCOUNT2X32(genef1, nones2, nones3);                             // count of gene ones for 2 32bit words for 3nb and 2nb birth
 		    genef2 = golg[nb[(nb1i>>4)&0x7]];                                 // gene of second neighbor
@@ -197,32 +197,32 @@ void genelife_update (long unsigned int outgol[], long unsigned int outgolg[], i
 		    nones2 += nones; nones3 += nones1;
 		    p2=exp(-a2*nones2);
 		    p3=exp(-a3*nones3);}
-		  // compute departure and mutation events, mutation position nmut
-		  nlog2p = nlog2p0 + nones;                                           // real factor alpha not possible here, could do integer conversion
-		  pmask = (0x1<<nlog2p) - 1L;                                         // probability mask for deviation from gol rules given local hamming
-		  randnr1 = randnr & pmask;                                           // extract bits from randnr for random trial for 0 on pmask
-		  r1 = randnr1?0L:1L;                                                   // 1 if lowest nlog2p bits of randnr zero, else zero : i.e. 1 with chance 1/2^nlog2p
-		  randnr2 = (randnr >> 24) & pmutmask;                                // extract bits from randnr for random trial for 0 on pmask
-		  r2 = randnr2?0:1;                                                   // 1 if lowest nlog2pmut bits of randnr zero, else zero
-		  nmut = (randnr >> 48) & 0x3f;                                       // choose mutation position for length 64 gene : from bits 32:37 of randnr
-		  // complete calculation of newgol and newgolg, including mutation
-		  newgene = newgene ^ (r2*(0x1L<<nmut));                              // introduce single mutation with probability pmut = probmut
-		  birth = (0x1L-gol[ij])&((s&1L)^(r1&rule2mod))&0x1;                                 // assuming 2or3 live nbs, birth (value 1) if empty and (s==3 xor r1)
-		  newgol[ij]  =  gol[ij] | birth ;                                    // new game of life cell value
-		  newgolg[ij] =  gol[ij]*golg[ij]+birth*newgene;}                     // dies if not 2or3, else old if alive, else new gene if 3 nbs
+		// compute departure and mutation events, mutation position nmut
+		nlog2p = nlog2p0 + nones;                                           // real factor alpha not possible here, could do integer conversion
+		pmask = (0x1<<nlog2p) - 1L;                                         // probability mask for deviation from gol rules given local hamming
+		randnr1 = randnr & pmask;                                           // extract bits from randnr for random trial for 0 on pmask
+		r1 = randnr1?0L:1L;                                                   // 1 if lowest nlog2p bits of randnr zero, else zero : i.e. 1 with chance 1/2^nlog2p
+		randnr2 = (randnr >> 24) & pmutmask;                                // extract bits from randnr for random trial for 0 on pmask
+		r2 = randnr2?0:1;                                                   // 1 if lowest nlog2pmut bits of randnr zero, else zero
+		nmut = (randnr >> 48) & 0x3f;                                       // choose mutation position for length 64 gene : from bits 32:37 of randnr
+		// complete calculation of newgol and newgolg, including mutation
+		newgene = newgene ^ (r2*(0x1L<<nmut));                              // introduce single mutation with probability pmut = probmut
+		birth = (0x1L-gol[ij])&((s&1L)^(r1&rule2mod))&0x1;                                 // assuming 2or3 live nbs, birth (value 1) if empty and (s==3 xor r1)
+		newgol[ij]  =  gol[ij] | birth ;                                    // new game of life cell value
+		newgolg[ij] =  gol[ij]*golg[ij]+birth*newgene;}                     // dies if not 2or3, else old if alive, else new gene if 3 nbs
 	    else {                                                              // else not 2 or 3 live neighbors, 0 values
-		  newgol[ij]  = 0;                                                    // new game of life cell value
-		  newgolg[ij] = 0;}                                                   // dies if not 2or3
-        emptysites = emptysites + newgol[ij];                                 // keep track of empty sites, same information as total activity of occupied sites
-      } /* for ij ... */
-	  curPlane = (curPlane +1) % numPlane;
-	  newPlane = (newPlane +1) % numPlane;
-	  if(histoflag) countconfigs();
-      // printf("t = %d nlog2p0=%d nlog2pmut=%d selection=%d rule2mod=%d\n",t,nlog2p0,nlog2pmut,selection,rule2mod);
-      for (ij=0; ij<N2c; ij++) {
-        outgol[ij]  = newgol[ij];       // copy new gol config to output
-        outgolg[ij] = newgolg[ij];      // copy new genes to output
-      }
+		newgol[ij]  = 0;                                                    // new game of life cell value
+		newgolg[ij] = 0;}                                                   // dies if not 2or3
+	    emptysites = emptysites + newgol[ij];                                 // keep track of empty sites, same information as total activity of occupied sites
+	} /* for ij ... */
+	curPlane = (curPlane +1) % numPlane;
+	newPlane = (newPlane +1) % numPlane;
+	if(histoflag) countconfigs();
+	// printf("t = %d nlog2p0=%d nlog2pmut=%d selection=%d rule2mod=%d\n",t,nlog2p0,nlog2pmut,selection,rule2mod);
+	for (ij=0; ij<N2c; ij++) {
+	    outgol[ij]  = newgol[ij];       // copy new gol config to output
+	    outgolg[ij] = newgolg[ij];      // copy new genes to output
+	}
     } /* for t ... */
 } /* genelife_update */
 
