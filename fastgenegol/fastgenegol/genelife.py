@@ -4,7 +4,7 @@ import matplotlib.colors as mpcolors
 from matplotlib.colors import ListedColormap
 import matplotlib.animation as animation
 import matplotlib
-import genelifed_update_module as genelife
+import genelife_update_module as genelife
 
 
 log2N = 8                       #  log2N=7 => N=128
@@ -93,10 +93,6 @@ def colorgrid(N):
                 cgrid[i,j] = 0
     return
 
-
-
-
-
 def update(N=1000,dohisto=1):                   # update without animation.
     global gol, golg
     global log2N
@@ -161,7 +157,7 @@ if __name__ == '__main__':
     nlog2p0   = simparams[0] = 8
     nlog2pmut = simparams[1] = 8
     selection = simparams[2] =  1            # values 0,1,2 allowed
-    rule2mod  = simparams[3] =  1            # values 0,1 allowed
+    rulemod  =  simparams[3] =  1            # values 0,1 allowed
     initial1density = simparams[4] = 16384   # nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
 
     genelife.initialize(simparams)
