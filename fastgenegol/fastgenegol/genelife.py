@@ -8,6 +8,7 @@ import genelife_update_module as genelife
 
 N=128
 N2 = N*N
+
 gol = np.zeros(N2,np.uint64)
 golg = np.zeros(N2,np.uint64)
 simparams = np.zeros(5,np.int32)    # 5 parameters passed to C
