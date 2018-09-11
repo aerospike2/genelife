@@ -15,7 +15,7 @@ uint64_array = npct.ndpointer(dtype=np.uint64, ndim=1, flags='CONTIGUOUS')
 int_array = npct.ndpointer(dtype=np.int32, ndim=1, flags='CONTIGUOUS')
 
 # load the library, using numpy mechanisms
-libcd = npct.load_library("libgenelifed", ".")
+libcd = npct.load_library("libgenelife", ".")
 
 # setup the return types and argument types
 libcd.genelife_update.restype = None
@@ -37,9 +37,8 @@ libcd.get_histo.argtypes = [uint64_array, c_int]
 libcd.init_histo.restype = None
 libcd.init_histo.argtypes = None
 
-
-def genelife_update(log2N, ndsteps, simparams, histoflag):
-    return libcd.genelife_update(log2N, ndsteps, simparams, len(simparams), histoflag )
+def genelife_update(gol, golg, log2N, ndsteps, simparams, histoflag):
+    return libcd.genelife_update(gol, golg, log2N, ndsteps, simparams, len(gol), len(simparams), histoflag )
 
 def initialize(simparams):
     return libcd.initialize(simparams, len(simparams))
