@@ -7,14 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0DA8D9C22143570800B4B324 /* subgenelife4d.c in Sources */ = {isa = PBXBuildFile; fileRef = 0DA8D9C12143570800B4B324 /* subgenelife4d.c */; };
-		0DA8D9C6214357B600B4B324 /* subgenelife4d.c in Sources */ = {isa = PBXBuildFile; fileRef = 0DA8D9C12143570800B4B324 /* subgenelife4d.c */; };
-		521D1DBA1F59B3CE00F948EF /* subgenelife4.c in Sources */ = {isa = PBXBuildFile; fileRef = 0D2CB7311F568DC90013B2E4 /* subgenelife4.c */; };
 		521FDCF71F287EE800F08FFB /* fastgenelife.c in Sources */ = {isa = PBXBuildFile; fileRef = 521FDCF11F287E7100F08FFB /* fastgenelife.c */; };
 		5275A12F1F292FA90062765F /* dispgenegol.c in Sources */ = {isa = PBXBuildFile; fileRef = 521FDCFE1F288F4F00F08FFB /* dispgenegol.c */; };
 		5275A1341F2930E90062765F /* cos_doubles.c in Sources */ = {isa = PBXBuildFile; fileRef = 5275A1301F2930E90062765F /* cos_doubles.c */; };
 		5275A1351F2930E90062765F /* cos_doubles.h in Headers */ = {isa = PBXBuildFile; fileRef = 5275A1311F2930E90062765F /* cos_doubles.h */; };
 		528F919D1F31E30E008DD596 /* probtestdispatch.c in Sources */ = {isa = PBXBuildFile; fileRef = 528F91941F2F9895008DD596 /* probtestdispatch.c */; };
+		52E469042147D3FB00975C4A /* subgenelife.c in Sources */ = {isa = PBXBuildFile; fileRef = 521FDCEA1F287DEE00F08FFB /* subgenelife.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -48,15 +46,11 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		0D2CB72C1F53620A0013B2E4 /* subgenelife3.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = subgenelife3.c; path = fastgenegol/subgenelife3.c; sourceTree = SOURCE_ROOT; };
-		0D2CB7311F568DC90013B2E4 /* subgenelife4.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = subgenelife4.c; path = fastgenegol/subgenelife4.c; sourceTree = SOURCE_ROOT; };
 		0D2CB73A1F569D280013B2E4 /* libgene.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = libgene.h; sourceTree = "<group>"; };
 		0D2CB73C1F569D280013B2E4 /* libgene.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = libgene.m; sourceTree = "<group>"; };
 		0D2CB7481F569D9A0013B2E4 /* gene.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = gene.h; sourceTree = "<group>"; };
 		0D2CB74A1F569D9A0013B2E4 /* gene.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = gene.m; sourceTree = "<group>"; };
-		0DA8D9C12143570800B4B324 /* subgenelife4d.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = subgenelife4d.c; path = fastgenegol/subgenelife4d.c; sourceTree = SOURCE_ROOT; };
 		0DA8D9CD214357B600B4B324 /* libgenelifed.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libgenelifed.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
-		521D1DB91F59B3CB00F948EF /* genelifeN.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = genelifeN.py; path = fastgenegol/genelifeN.py; sourceTree = SOURCE_ROOT; };
 		521FDCE21F287A6100F08FFB /* fastgenegol */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = fastgenegol; sourceTree = BUILT_PRODUCTS_DIR; };
 		521FDCEA1F287DEE00F08FFB /* subgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = subgenelife.c; path = fastgenegol/subgenelife.c; sourceTree = SOURCE_ROOT; };
 		521FDCEB1F287DEE00F08FFB /* genelife.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = genelife.py; path = fastgenegol/genelife.py; sourceTree = SOURCE_ROOT; };
@@ -74,7 +68,6 @@
 		5275A1311F2930E90062765F /* cos_doubles.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = cos_doubles.h; path = fastgenegol/cos_doubles.h; sourceTree = SOURCE_ROOT; };
 		5275A1321F2930E90062765F /* cos.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = cos.py; path = fastgenegol/cos.py; sourceTree = SOURCE_ROOT; };
 		5275A1331F2930E90062765F /* cos_doubles.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = cos_doubles.py; path = fastgenegol/cos_doubles.py; sourceTree = SOURCE_ROOT; };
-		5275A1361F2A38C60062765F /* subgenelife2.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = subgenelife2.c; path = fastgenegol/subgenelife2.c; sourceTree = SOURCE_ROOT; };
 		528F91921F2F9895008DD596 /* probtest */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = probtest; sourceTree = BUILT_PRODUCTS_DIR; };
 		528F91941F2F9895008DD596 /* probtestdispatch.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.objc; path = probtestdispatch.c; sourceTree = "<group>"; };
 		528F919B1F31E05B008DD596 /* probtest.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = probtest.c; sourceTree = "<group>"; };
@@ -163,12 +156,7 @@
 		52416DAF1F274AB000721D17 /* genelifepy */ = {
 			isa = PBXGroup;
 			children = (
-				0D2CB7311F568DC90013B2E4 /* subgenelife4.c */,
-				0DA8D9C12143570800B4B324 /* subgenelife4d.c */,
-				521D1DB91F59B3CB00F948EF /* genelifeN.py */,
-				0D2CB72C1F53620A0013B2E4 /* subgenelife3.c */,
 				521FDCEA1F287DEE00F08FFB /* subgenelife.c */,
-				5275A1361F2A38C60062765F /* subgenelife2.c */,
 				521FDCEB1F287DEE00F08FFB /* genelife.py */,
 				521FDCEC1F287DEE00F08FFB /* genelife_update_module.py */,
 			);
@@ -382,7 +370,7 @@
 		525EB7A11F18DCE4004078F1 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 0830;
+				LastUpgradeCheck = 0940;
 				ORGANIZATIONNAME = "Ruhr Universität Bochum";
 				TargetAttributes = {
 					521FDCE11F287A6100F08FFB = {
@@ -434,7 +422,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0DA8D9C6214357B600B4B324 /* subgenelife4d.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -451,7 +438,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				5275A1341F2930E90062765F /* cos_doubles.c in Sources */,
-				0DA8D9C22143570800B4B324 /* subgenelife4d.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -459,7 +445,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				521D1DBA1F59B3CE00F948EF /* subgenelife4.c in Sources */,
+				52E469042147D3FB00975C4A /* subgenelife.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -578,15 +564,23 @@
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
 				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
 				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CLANG_WARN_EMPTY_BODY = YES;
 				CLANG_WARN_ENUM_CONVERSION = YES;
 				CLANG_WARN_INFINITE_RECURSION = YES;
 				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
@@ -626,15 +620,23 @@
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
 				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
 				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CLANG_WARN_EMPTY_BODY = YES;
 				CLANG_WARN_ENUM_CONVERSION = YES;
 				CLANG_WARN_INFINITE_RECURSION = YES;
 				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
