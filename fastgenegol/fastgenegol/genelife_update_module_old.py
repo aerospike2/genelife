@@ -36,19 +36,11 @@ libcd.get_histo.restype = None
 libcd.get_histo.argtypes = [uint64_array, c_int]
 libcd.init_histo.restype = None
 libcd.init_histo.argtypes = None
-libcd.get_curgol.restype = None
-libcd.get_curgol.argtypes = [uint64_array,c_int]
-libcd.get_curgolg.restype = None
-libcd.get_curgolg.argtypes = [uint64_array,c_int]
-
 
 
 def genelife_update(gol, golg, log2N, ndsteps, simparams, histoflag):
     return libcd.genelife_update(gol, golg, log2N, ndsteps, simparams, len(gol), len(simparams), histoflag )
-def get_curgol(gol):
-    return libcd.get_curgol(gol, int(len(gol)))
-def get_curgolg(golg):
-    return libcd.get_curgolg(golg, int(len(golg)))
+
 def initialize(simparams):
     return libcd.initialize(simparams, len(simparams))
 
