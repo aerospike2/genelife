@@ -20,7 +20,7 @@
 
 #define ASCII_ESC 27                // escape for printing terminal commands, such as cursor repositioning
 
-const int log2N = 8;                // toroidal array of side length N = 2 to the power of log2N
+const int log2N = 7;                // toroidal array of side length N = 2 to the power of log2N
 const int N = 0x1 << log2N;
 const int N2 = N*N;                 // number of sites in toroidal array
 const int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
@@ -29,8 +29,8 @@ const int Nmask = N - 1;            // bit mask for side length, used instead of
                                     // integer negative log 2 of max prob p0 for rule departure and prob pmut of mutation
                                     // the maximum prob is further reduced by a sequence-specific prob p1 (p=p0*p1)
                                     // p1 goes from 1 down to 2^-32 depending on genetic differences
-const int nlog2p0 = 8;              // p0 = 2^(-nlog2p0), minimum value allowed is 1, max allowed is 31  i.e. in [1:31]
-const int nloglog2p1 = 2;           // in [0:5] determines random background (32 ones in 64 bit seq) min prob p1 = 2^(-2^(5-nloglog2p1))
+int nlog2p0 = 8;              // p0 = 2^(-nlog2p0), minimum value allowed is 1, max allowed is 31  i.e. in [1:31]
+int nloglog2p1 = 2;           // in [0:5] determines random background (32 ones in 64 bit seq) min prob p1 = 2^(-2^(5-nloglog2p1))
 const int nlog2pmut = 5;            // pmut (prob of mutation) = 2^(-nlog2pmut), minimum
 
 //const int nlog2p0 = 5;              // p0 = 2 to the power of - nlog2p0
@@ -126,7 +126,7 @@ void get_histo(long unsigned int outhisto[],int numHistoC){
     for(i=0; i<numHisto; i++)
 	outhisto[i] = histo[i];
 }
-		    
+
 void init_histo(){     // initialize the history array to zero
     int i;
     for(i=0; i<numHisto; i++)
@@ -324,7 +324,7 @@ void update_nondet(long unsigned int gol[], long unsigned int golg[],long unsign
 	    nmut = (randnr >> 48) & 0x3f;                                       // choose mutation position for length 64 gene : from bits 32:37 of randnr
 	    // complete calculation of newgol and newgolg, including mutation
 	    newgene = newgene ^ (r2*(0x1L<<nmut));                              // introduce single mutation with probability pmut = probmut
-	    birth = (0x1L-gol[ij])&((s&1L)^(r1&rule2mod))&0x1;                                 // assuming 2or3 live nbs, birth (value 1) if empty and (s==3 xor r1)
+	    birth = (0x1L-gol[ij])&((s&1L)^(r1&rule2mod))&0x1;                  // assuming 2or3 live nbs, birth (value 1) if empty and (s==3 xor r1)
 	    newgol[ij]  =  gol[ij] | birth ;                                    // new game of life cell value
 	    newgolg[ij] =  gol[ij]*golg[ij]+birth*newgene;}                     // dies if not 2or3, else old if alive, else new gene if 3 nbs
 	else {                                                              // else not 2 or 3 live neighbors, 0 values
@@ -442,7 +442,7 @@ void initialize_planes(int offs[],  int N) {
     }
     if(mn<0) yD = -mn; else yD = 0;
     if(mx>0) yU = N-mx; else yU = N;
-    
+
 
     // initialize planes:
     planes = (long unsigned int **) calloc(numPlane,sizeof(long unsigned int *));
@@ -451,7 +451,7 @@ void initialize_planes(int offs[],  int N) {
     planesg = (long unsigned int **) calloc(numPlane,sizeof(long unsigned int *));
     for(i=0; i<numPlane; i++)
     planesg[i] = (long unsigned int *) calloc(N2,sizeof(long unsigned int));
-    
+
 }
 
 void initialize (int params[], int nparams) {
@@ -459,7 +459,7 @@ void initialize (int params[], int nparams) {
     int initial1density;
     long unsigned int *gol;
     static unsigned int rmask = (1 << 15) - 1;         // check why 15 bits used here, related to rand()?
-    
+
     gol = planes[curPlane];
 
     if (nparams > 4) initial1density = params[4];
@@ -476,10 +476,10 @@ void initialize_genes (int params[], int nparams) {
     long unsigned int g;
     long unsigned int *gol;
     long unsigned int *golg;
-    
+
     gol = planes[curPlane];
     golg = planesg[curPlane];
-    
+
     for (ij=0; ij<N2; ij++) {
         g = 0;
         if (gol[ij] != 0)	// if live cell, fill with random genome g
