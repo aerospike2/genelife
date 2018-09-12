@@ -41,7 +41,6 @@ int nsteps = 10000;                 // total number of steps to simulate GoL
 int ndisp  = 10000;                 // display GoL every ndisp steps
 int tdisp  = 0;                     // extra time delay in ms betwene displays
 int rulemod = 1;                    // det: whether to modify GoL rule for 2 and 3 live neighbours : opposite outcome with small probability p0
-//int rule2mod = 1;                 // was not correct whether to modify two live nb rule as well or only three nb rule
 int selection = 1;                  // fitness model: 0 neutral 1 selected gene prob of rule departure 2 presence of replicase gene
 int repscheme = 1;                  // replication scheme: 0 random choice , 1 XOR of all 3, 2 consensus, 3 unique det choice, 4 most different
 
@@ -145,7 +144,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
     static long unsigned int ngx = 0;
 
     randnr = 0x0123456789abcdef;                                            // initialize random nr
-    rulemodl = rulemod ? 1L : 0L;                                           // convert integer rule2mod binary to long unsigned integer for use in long logic
+    rulemodl = rulemod ? 1L : 0L;                                           // convert integer rulemod binary to long unsigned integer for use in long logic
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
 	    i = ij & Nmask;  j = ij >> log2N;                                   // row & column
 	    jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
