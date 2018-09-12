@@ -127,7 +127,7 @@ void get_histo(long unsigned int outhisto[],int numHistoC){
     for(i=0; i<numHisto; i++)
 	outhisto[i] = histo[i];
 }
-		    
+
 void init_histo(){     // initialize the history array to zero
     int i;
     for(i=0; i<numHisto; i++)
@@ -147,45 +147,46 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
     randnr = 0x0123456789abcdef;                                            // initialize random nr
     rulemodl = rulemod ? 1L : 0L;                                           // convert integer rule2mod binary to long unsigned integer for use in long logic
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
-	    i = ij & Nmask;  j = ij >> log2N;                                   // row & column
-	    jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
-	    ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                         // toroidal i+1, i-1
+	i = ij & Nmask;  j = ij >> log2N;                                   // row & column
+	jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
+	ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                         // toroidal i+1, i-1
         // nb[0]=j*N+ip1; nb[1]=j*N+im1; nb[2]=jp1+i; nb[3]=jp1+ip1; nb[4]=jp1+im1; nb[5]=jm1+i; nb[6]=jm1+ip1; nb[7]=jm1+im1; //old order of nbs
         nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1; nb[4]=jp1+ip1; nb[5]=jp1+i; nb[6]=jp1+im1; nb[7]=j*N+im1;  //new order of nbs
-        for (k=0,nb1i=0;k<8;k++) nb1i = (nb1i << (gol[nb[k]]<<2)) + (gol[nb[k]]*k);   // packs non-zero nb indices in first up to 8*4 bits
-	    s = gol[nb[0]]+gol[nb[1]]+gol[nb[2]]+gol[nb[3]]+gol[nb[4]]+gol[nb[5]]+gol[nb[6]]+gol[nb[7]]; // number of live nbs
+        for (k=0,nb1i=0;k<8;k++)   // packs non-zero nb indices in first up to 8*4 bits
+	    nb1i = (nb1i << (gol[nb[k]]<<2)) + (gol[nb[k]]*k);
+	s = gol[nb[0]]+gol[nb[1]]+gol[nb[2]]+gol[nb[3]]+gol[nb[4]]+gol[nb[5]]+gol[nb[6]]+gol[nb[7]]; // number of live nbs
         s2or3 = (1 - (((s>>3)&1) | ((s>>2)&1))) * (s>>1 & 1);               // 1 if 2 or 3 neighbors are alive : more efficient version of logical (s == 2) || (s == 3)
         if (s2or3 == 1) {                                                   // if 2 or 3 neighbors alive
-          RAND128P(randnr);                                                   // inline exp so compiler recognizes auto-vec, random nb selection ng from 1 64-bit rand nr
-                                                                              // randnr bit usage: 54-55 random ancestor, 48-53 mut pos, 24-47 mut prob, 0-23 rule departure prob
-          if (s==3) {                                                         // 3 live nbs
-            if (repscheme == 0) {                                               // 0. random choice of live neighbour for replication
-                ng = (randnr >> 54) & 0x3;                                        // 0, 1, 2 or 3 with probs each 1/4 : next 4 lines converts this 0,1,2 with prob 1/3
-                r3 = (ng == 3 ? 1: 0);                                            // 1 if ng == 3 (invalid value) otherwise zero : prob. is 1/4
-                ngx += r3;                                                        // increment external ng counter on such exceptions
-                ngx = (ngx == 3 ? 0 : ngx);                                       // modulo 3 counter without division for ng==3 exceptions
-                ng = r3?ngx:ng;                                                   // use counter value mod 3 if exception, else rand 0,1,2
-                newgene = golg[nb[(nb1i>>(ng<<2))& 7]];                           // pick new gene as one of three neighbours
-            }
-            else if (repscheme == 1) {                                         // 1. deterministic bitwise XOR : replication of most different sequence
-                newgene = golg[nb[nb1i&0x7]]^golg[nb[(nb1i>>4)&0x7]]^golg[nb[(nb1i>>8)&0x7]]; // gene difference seq based on bitwise xor for 3 live nbs
-            }
-            else if (repscheme == 2) {                                         // 2. deterministic consensus sequence: replication of master sequence
-                newgene = (golg[nb[(nb1i>>8)&0x7]]&(golg[nb[nb1i&0x7]]|golg[nb[(nb1i>>4)&0x7]]))|(golg[nb[nb1i&0x7]]&golg[nb[(nb1i>>4)&0x7]]); // (C&(A|B)) | (A&B)
-            }
-            else {                                                             // 3,4 deterministic choice of ancestor: replication of live neigbour in unique pos
-                for (k=7,nbmask=0;k>=0;k--) nbmask = (nbmask << 1) + gol[nb[k]];   // compute 8-bit mask of GoL states of 8 neighbours, clockwise starting top left
-                for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {                 // compute canonical rotation (minimum) of this mask
-                    nbmaskr = ((nbmaskr & 0x1)<<7) + (nbmaskr>>1);                      // 8 bit rotate right
-                    if (nbmaskr < nbmaskrm) {                                          // choose minimal value of mask rotation
-                        nbmaskrm = nbmaskr;
-                        kmin = k;                                                      // no of times rotated to right
-                    }
-                }
-                if (repscheme == 3)                                                // 3. deterministic choice of ancestor: replication of live neigbour in most different pos
-                    newgene = golg[nb[kmin]];
-                else if (repscheme == 4) {                                         // 4. deterministic choice of ancestor: replication of live neigbour in most different pos
-                    switch (nbmaskrm) {
+	    RAND128P(randnr);                                                   // inline exp so compiler recognizes auto-vec, random nb selection ng from 1 64-bit rand nr
+	    // randnr bit usage: 54-55 random ancestor, 48-53 mut pos, 24-47 mut prob, 0-23 rule departure prob
+	    if (s==3) {                                                         // 3 live nbs
+		if (repscheme == 0) {                                               // 0. random choice of live neighbour for replication
+		    ng = (randnr >> 54) & 0x3;                                        // 0, 1, 2 or 3 with probs each 1/4 : next 4 lines converts this 0,1,2 with prob 1/3
+		    r3 = (ng == 3 ? 1: 0);                                            // 1 if ng == 3 (invalid value) otherwise zero : prob. is 1/4
+		    ngx += r3;                                                        // increment external ng counter on such exceptions
+		    ngx = (ngx == 3 ? 0 : ngx);                                       // modulo 3 counter without division for ng==3 exceptions
+		    ng = r3?ngx:ng;                                                   // use counter value mod 3 if exception, else rand 0,1,2
+		    newgene = golg[nb[(nb1i>>(ng<<2))& 7]];                           // pick new gene as one of three neighbours
+		}
+		else if (repscheme == 1) {                                         // 1. deterministic bitwise XOR : replication of most different sequence
+		    newgene = golg[nb[nb1i&0x7]]^golg[nb[(nb1i>>4)&0x7]]^golg[nb[(nb1i>>8)&0x7]]; // gene difference seq based on bitwise xor for 3 live nbs
+		}
+		else if (repscheme == 2) {                                         // 2. deterministic consensus sequence: replication of master sequence
+		    newgene = (golg[nb[(nb1i>>8)&0x7]]&(golg[nb[nb1i&0x7]]|golg[nb[(nb1i>>4)&0x7]]))|(golg[nb[nb1i&0x7]]&golg[nb[(nb1i>>4)&0x7]]); // (C&(A|B)) | (A&B)
+		}
+		else {                                                             // 3,4 deterministic choice of ancestor: replication of live neigbour in unique pos
+		    for (k=7,nbmask=0;k>=0;k--) nbmask = (nbmask << 1) + gol[nb[k]];   // compute 8-bit mask of GoL states of 8 neighbours, clockwise starting top left
+		    for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {                 // compute canonical rotation (minimum) of this mask
+			nbmaskr = ((nbmaskr & 0x1)<<7) + (nbmaskr>>1);                      // 8 bit rotate right
+			if (nbmaskr < nbmaskrm) {                                          // choose minimal value of mask rotation
+			    nbmaskrm = nbmaskr;
+			    kmin = k;                                                      // no of times rotated to right
+			}
+		    }
+		    if (repscheme == 3)                                                // 3. deterministic choice of ancestor: replication of live neigbour in most different pos
+			newgene = golg[nb[kmin]];
+		    else if (repscheme == 4) {                                         // 4. deterministic choice of ancestor: replication of live neigbour in most different pos
+			switch (nbmaskrm) {
                         case 0x7 : k = 1; break;                                   // 00000111
                         case 0xb : k = 0; break;                                   // 00001011
                         case 0x13: k = 1; break;                                   // 00010011
@@ -194,30 +195,30 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                         case 0x15: k = 2; break;                                   // 00010101
                         case 0x85: k = 3; break;                                   // 00100101
                         default  : printf("Error in canocal rotation for three live neighbours \n"); k = 0;
-                    }
-                    newgene = golg[nb[(kmin+k)&0x7]];                               // rotate unique nb k left (kmin) back to orig nb pat
-                }
-                else {                                                              // >4 Error, repscheme out of bounds
-                    newgene = 0;
-                    printf("Error: undefined repscheme %d\n",repscheme);
-                }
-            } // end repscheme options
-          } // end if (s==3)
-          else {                                                              // 2 live nbs, random choice for rare exception case of birth with 2 live nbs
+			}
+			newgene = golg[nb[(kmin+k)&0x7]];                               // rotate unique nb k left (kmin) back to orig nb pat
+		    }
+		    else {                                                              // >4 Error, repscheme out of bounds
+			newgene = 0;
+			printf("Error: undefined repscheme %d\n",repscheme);
+		    }
+		} // end repscheme options
+	    } // end if (s==3)
+	    else {                                                              // 2 live nbs, random choice for rare exception case of birth with 2 live nbs
                 ng = (randnr >> 54) & 0x1;                                        // random 0 or 1
                 newgene = ng ? golg[nb[(nb1i>>4)&0x7]] : golg[nb[nb1i&0x7]] ;     // random choice of one of two parents if s == 2
-          } // end else (i.e. s == 2)
+	    } // end else (i.e. s == 2)
 
 	    // compute nones for different selection models
-          if (selection == 0) {                                               // 0.neutral model : GoL rule departures depend only on seq diversity
+	    if (selection == 0) {                                               // 0.neutral model : GoL rule departures depend only on seq diversity
                 genediff = (golg[nb[nb1i&0x7]]^golg[nb[(nb1i>>4)&0x7]])|(golg[nb[nb1i&0x7]]^golg[nb[(nb1i>>8)&0x7]]);  // # nr non-identical pos's
                 POPCOUNT64C(genediff, nones);}                                    // number of 1s in genediff is mutual Hamming distance
-          else if (selection == 1) {                                          // 1.non-neutral model with selection for rule departure probability
-                                                                              //
+	    else if (selection == 1) {                                          // 1.non-neutral model with selection for rule departure probability
+		//
                 genediff = newgene;                                               // place the new gene in genediff for count of number of ones
                 POPCOUNT64C(genediff, nones);}                                    // number of ones in new gene determines fitness
-          else {                                                              // 2.non-neutral model based on presence of replicase gene
-                                                                              //   the minimum nones in 3 live seqs determines rep prob
+	    else {                                                              // 2.non-neutral model based on presence of replicase gene
+		//   the minimum nones in 3 live seqs determines rep prob
                 genef1 = golg[nb[nb1i&0x7]];                                      // gene difference seq based on xor
                 CUMCOUNT64C(genef1, nones);                                       // number of ones determines replicase function
                 genef2 = golg[nb[(nb1i>>4)&0x7]];
@@ -227,31 +228,31 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                 nones = nones < nones1 ? nones : nones1;
                 nones = nones < nones2 ? nones : nones2;}                         // min number of ones determines prob of replic'n
  	    // compute random events for a) departure from GoL rules and b) single bit mutation, as well as mutation position nmut
-          nlog2p = nlog2p0 + (((nones < 32) ? nones : 64 - nones)>>nloglog2p1);      // randomly expected value nones is 32 -> min prob
-          pmask = (0x1<<nlog2p) - 1L;                                         // probability mask for deviation from gol rules given local hamming
-          randnr1 = randnr & pmask;                                           // extract bits from randnr for random trial for 0 on pmask
-          r1 = randnr1?0L:1L;                                                 // 1 if lowest nlog2p bits of randnr zero, else zero : i.e. 1 with chance 1/2^nlog2p
-          randnr2 = (randnr >> 24) & pmutmask;                                // extract bits from randnr for random trial for 0 on pmutmask
-          r2 = randnr2?0:1;                                                   // 1 if lowest nlog2pmut bits of randnr zero, else zero
-          nmut = (randnr >> 48) & 0x3f;                                       // choose mutation position for length 64 gene : from bits 48:53 of randnr
+	    nlog2p = nlog2p0 + (((nones < 32) ? nones : 64 - nones)>>nloglog2p1);      // randomly expected value nones is 32 -> min prob
+	    pmask = (0x1<<nlog2p) - 1L;                                         // probability mask for deviation from gol rules given local hamming
+	    randnr1 = randnr & pmask;                                           // extract bits from randnr for random trial for 0 on pmask
+	    r1 = randnr1?0L:1L;                                                 // 1 if lowest nlog2p bits of randnr zero, else zero : i.e. 1 with chance 1/2^nlog2p
+	    randnr2 = (randnr >> 24) & pmutmask;                                // extract bits from randnr for random trial for 0 on pmutmask
+	    r2 = randnr2?0:1;                                                   // 1 if lowest nlog2pmut bits of randnr zero, else zero
+	    nmut = (randnr >> 48) & 0x3f;                                       // choose mutation position for length 64 gene : from bits 48:53 of randnr
 	    // complete calculation of newgol and newgolg, including mutation
-          newgene = newgene ^ (r2*(0x1L<<nmut));                              // introduce single mutation with probability pmut = probmut
-          //birth = (0x1L-gol[ij])&((s&1L)^(r1&rulemodl));                    // birth (value 1) if empty and ((s==3 and not r1mod) or (s==2 and r1mod)) where r1mod=r1&rulemodl
-          birth = (0x1L-gol[ij])&((s&1L)|(r1&rulemodl)) & 0x1;                 // birth (value 1) if empty and ((s==3) or (s==2 and r1mod)) where r1mod=r1&rulemodl ! CHANGED
-          newgol[ij]  =  gol[ij] | birth ;                                    // new game of life cell value: stays same or set to one from zero if birth
-          newgolg[ij] =  gol[ij]*golg[ij]+birth*newgene;                      // if alive stay alive with old gene, if birth (implies empty) then newgene
+	    newgene = newgene ^ (r2*(0x1L<<nmut));                              // introduce single mutation with probability pmut = probmut
+	    //birth = (0x1L-gol[ij])&((s&1L)^(r1&rulemodl));                    // birth (value 1) if empty and ((s==3 and not r1mod) or (s==2 and r1mod)) where r1mod=r1&rulemodl
+	    birth = (0x1L-gol[ij])&((s&1L)|(r1&rulemodl)) & 0x1;                 // birth (value 1) if empty and ((s==3) or (s==2 and r1mod)) where r1mod=r1&rulemodl ! CHANGED
+	    newgol[ij]  =  gol[ij] | birth ;                                    // new game of life cell value: stays same or set to one from zero if birth
+	    newgolg[ij] =  gol[ij]*golg[ij]+birth*newgene;                      // if alive stay alive with old gene, if birth (implies empty) then newgene
         }  // end if s2or3
         else {                                                              // else not 2 or 3 live neighbors, 0 values
-          newgol[ij]  = 0;                                                    // new game of life cell value
-          newgolg[ij] = 0;                                                    // gene dies
+	    newgol[ij]  = 0;                                                    // new game of life cell value
+	    newgolg[ij] = 0;                                                    // gene dies
         }
         emptysites = emptysites + newgol[ij];                               // keep track of empty sites, same information as total activity of occupied sites
 
     }  // end for ij
 
     for (ij=0; ij<N2; ij++) {
-	    gol[ij] = newgol[ij];        // copy new gol config to old one
-	    golg[ij] = newgolg[ij];      // copy new genes to old genes
+	gol[ij] = newgol[ij];        // copy new gol config to old one
+	golg[ij] = newgolg[ij];      // copy new genes to old genes
     }
 }
 
@@ -361,7 +362,7 @@ void initialize_planes(int offs[],  int N) {
     }
     if(mn<0) yD = -mn; else yD = 0;
     if(mx>0) yU = N-mx; else yU = N;
-    
+
 
     // initialize planes:
     planes = (long unsigned int **) calloc(numPlane,sizeof(long unsigned int *));
@@ -370,7 +371,7 @@ void initialize_planes(int offs[],  int N) {
     planesg = (long unsigned int **) calloc(numPlane,sizeof(long unsigned int *));
     for(i=0; i<numPlane; i++)
     planesg[i] = (long unsigned int *) calloc(N2,sizeof(long unsigned int));
-    
+
 }
 
 void initialize (int params[], int nparams) {
@@ -395,10 +396,10 @@ void initialize_genes (int params[], int nparams) {
     long unsigned int g;
     long unsigned int *gol;
     long unsigned int *golg;
-    
+
     gol = planes[curPlane];
     golg = planesg[curPlane];
-    
+
     for (ij=0; ij<N2; ij++) {
         g = 0;
         if (gol[ij] != 0)	// if live cell, fill with random genome g
