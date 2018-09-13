@@ -48,8 +48,6 @@ int repscheme = 1;                  // replication scheme: 0 random choice , 1 X
 int initial1density = N2>>1;        // initial density of ones in gol : integer value divide by 2^15 for density
 static long unsigned int  emptysites = 0;  // cumulative number of empty sites during simulation updates
 
-long unsigned int **planes;         // ring buffer planes of gol array states
-long unsigned int **planesg;        // ring buffer planes of golg genes
 int **offsets;                      // array of offsets (2D + time) for planes
 int Noff;                           // number of offsets
 int curPlane = 0;
@@ -58,6 +56,38 @@ int numPlane = 2;
 int xL=0,xR=0,yU=0,yD=0;            // offsets for border of stats
 long unsigned int *histo;
 int numHisto;
+
+    // initialize planes:
+long unsigned int *planes[numPlane];         // ring buffer planes of gol array states
+long unsigned int *planesg[numPlane];        // ring buffer planes of golg genes
+long unsigned int plane0[N2];
+long unsigned int plane1[N2];
+long unsigned int plane2[N2];
+long unsigned int plane3[N2];
+long unsigned int plane4[N2];
+long unsigned int plane5[N2];
+long unsigned int plane6[N2];
+long unsigned int plane7[N2];
+long unsigned int planeg0[N2];
+long unsigned int planeg1[N2];
+long unsigned int planeg2[N2];
+long unsigned int planeg3[N2];
+long unsigned int planeg4[N2];
+long unsigned int planeg5[N2];
+long unsigned int planeg6[N2];
+long unsigned int planeg7[N2];
+
+
+
+    planes =
+(long unsigned int **) calloc(numPlane,sizeof(long unsigned int *));
+    for(i=0; i<numPlane; i++)
+	planes[i] = (long unsigned int *) calloc(N2,sizeof(long unsigned int));
+    planesg = (long unsigned int **) calloc(numPlane,sizeof(long unsigned int *));
+    for(i=0; i<numPlane; i++)
+    planesg[i] = (long unsigned int *) calloc(N2,sizeof(long unsigned int));
+
+
                                     // Wikipedia "Xorshift" rewritten here as inline macro &
                                     // Vigna, Sebastiano. "xorshift*/xorshift+ generators and the PRNG shootout". Retrieved 2014-10-25.
 static long unsigned int state[2]; // State for xorshift pseudorandom number generation. The state must be seeded so that it is not zero
