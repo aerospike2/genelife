@@ -40,7 +40,7 @@ long unsigned int pmutmask;         // binary mask so that prob of choosing zero
 int nsteps = 10000;                 // total number of steps to simulate GoL
 int ndisp  = 10000;                 // display GoL every ndisp steps
 int tdisp  = 0;                     // extra time delay in ms betwene displays
-int rulemod = 1;                    // det: whether to modify GoL rule for 2 and 3 live neighbours : opposite outcome with small probability p0
+pint rulemod = 1;                    // det: whether to modify GoL rule for 2 and 3 live neighbours : opposite outcome with small probability p0
 //int rule2mod = 1;                 // was not correct whether to modify two live nb rule as well or only three nb rule
 int selection = 1;                  // fitness model: 0 neutral 1 selected gene prob of rule departure 2 presence of replicase gene
 int repscheme = 1;                  // replication scheme: 0 random choice , 1 XOR of all 3, 2 consensus, 3 unique det choice, 4 most different
@@ -153,7 +153,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
         // nb[0]=j*N+ip1; nb[1]=j*N+im1; nb[2]=jp1+i; nb[3]=jp1+ip1; nb[4]=jp1+im1; nb[5]=jm1+i; nb[6]=jm1+ip1; nb[7]=jm1+im1; //old order of nbs
         nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1; nb[4]=jp1+ip1; nb[5]=jp1+i; nb[6]=jp1+im1; nb[7]=j*N+im1;  //new order of nbs
         for (k=0,nb1i=0;k<8;k++)   // packs non-zero nb indices in first up to 8*4 bits
-	    nb1i = (nb1i << (gol[nb[k]]<<2)) + (gol[nb[k]]*k);
+            nb1i = (nb1i << (gol[nb[k]]<<2)) + (gol[nb[k]]*k);
 	s = gol[nb[0]]+gol[nb[1]]+gol[nb[2]]+gol[nb[3]]+gol[nb[4]]+gol[nb[5]]+gol[nb[6]]+gol[nb[7]]; // number of live nbs
         s2or3 = (1 - (((s>>3)&1) | ((s>>2)&1))) * (s>>1 & 1);               // 1 if 2 or 3 neighbors are alive : more efficient version of logical (s == 2) || (s == 3)
         if (s2or3 == 1) {                                                   // if 2 or 3 neighbors alive
@@ -211,7 +211,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
 
 	    // compute nones for different selection models
 	    if (selection == 0) {                                               // 0.neutral model : GoL rule departures depend only on seq diversity
-                genediff = (golg[nb[nb1i&0x7]]^golg[nb[(nb1i>>4)&0x7]])|(golg[nb[nb1i&0x7]]^golg[nb[(nb1i>>8)&0x7]]);  // # nr non-identical pos's
+                genediff = (golg[nb[nb1i&0x7]]^golg[nb[(nb1i>>4)&0x7]])|(golg[nb[nb1i&0x7]]^golg[nb[(nb1i>>8)&0x7]]);  // # num of non-identical pos's
                 POPCOUNT64C(genediff, nones);}                                    // number of 1s in genediff is mutual Hamming distance
 	    else if (selection == 1) {                                          // 1.non-neutral model with selection for rule departure probability
 		//
@@ -220,11 +220,11 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
 	    else {                                                              // 2.non-neutral model based on presence of replicase gene
 		//   the minimum nones in 3 live seqs determines rep prob
                 genef1 = golg[nb[nb1i&0x7]];                                      // gene difference seq based on xor
-                CUMCOUNT64C(genef1, nones);                                       // number of ones determines replicase function
+                POPCOUNT64C(genef1, nones);                                       // number of ones determines replicase function
                 genef2 = golg[nb[(nb1i>>4)&0x7]];
-                CUMCOUNT64C(genef2, nones1);                                      // number of ones determines replicase function
+                POPCOUNT64C(genef2, nones1);                                      // number of ones determines replicase function
                 genef3 = golg[nb[(nb1i>>8)&0x7]];
-                CUMCOUNT64C(genef3, nones2);                                      // number of ones determines replicase function
+                POPCOUNT64C(genef3, nones2);                                      // number of ones determines replicase function
                 nones = nones < nones1 ? nones : nones1;
                 nones = nones < nones2 ? nones : nones2;}                         // min number of ones determines prob of replic'n
  	    // compute random events for a) departure from GoL rules and b) single bit mutation, as well as mutation position nmut
@@ -233,12 +233,12 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
 	    randnr1 = randnr & pmask;                                           // extract bits from randnr for random trial for 0 on pmask
 	    r1 = randnr1?0L:1L;                                                 // 1 if lowest nlog2p bits of randnr zero, else zero : i.e. 1 with chance 1/2^nlog2p
 	    randnr2 = (randnr >> 24) & pmutmask;                                // extract bits from randnr for random trial for 0 on pmutmask
-	    r2 = randnr2?0:1;                                                   // 1 if lowest nlog2pmut bits of randnr zero, else zero
+	    r2 = randnr2?0:1;                                                   // 1 if lowest nlog2pmut bits of (bits 24-47 of randnr) are zero, else zero
 	    nmut = (randnr >> 48) & 0x3f;                                       // choose mutation position for length 64 gene : from bits 48:53 of randnr
 	    // complete calculation of newgol and newgolg, including mutation
 	    newgene = newgene ^ (r2*(0x1L<<nmut));                              // introduce single mutation with probability pmut = probmut
 	    //birth = (0x1L-gol[ij])&((s&1L)^(r1&rulemodl));                    // birth (value 1) if empty and ((s==3 and not r1mod) or (s==2 and r1mod)) where r1mod=r1&rulemodl
-	    birth = (0x1L-gol[ij])&((s&1L)|(r1&rulemodl)) & 0x1;                 // birth (value 1) if empty and ((s==3) or (s==2 and r1mod)) where r1mod=r1&rulemodl ! CHANGED
+	    birth = (0x1L-gol[ij])&((s&1L)|(r1&rulemodl)) & 0x1;                // birth (value 1) if empty and ((s==3) or (s==2 and r1mod)) where r1mod=r1&rulemodl ! CHANGED
 	    newgol[ij]  =  gol[ij] | birth ;                                    // new game of life cell value: stays same or set to one from zero if birth
 	    newgolg[ij] =  gol[ij]*golg[ij]+birth*newgene;                      // if alive stay alive with old gene, if birth (implies empty) then newgene
         }  // end if s2or3
@@ -364,13 +364,6 @@ void initialize_planes(int offs[],  int N) {
     if(mx>0) yU = N-mx; else yU = N;
 
 
-    // initialize planes:
-    planes = (long unsigned int **) calloc(numPlane,sizeof(long unsigned int *));
-    for(i=0; i<numPlane; i++)
-	planes[i] = (long unsigned int *) calloc(N2,sizeof(long unsigned int));
-    planesg = (long unsigned int **) calloc(numPlane,sizeof(long unsigned int *));
-    for(i=0; i<numPlane; i++)
-    planesg[i] = (long unsigned int *) calloc(N2,sizeof(long unsigned int));
 
 }
 
