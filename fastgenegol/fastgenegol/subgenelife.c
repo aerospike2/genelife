@@ -52,12 +52,12 @@ int **offsets;                      // array of offsets (2D + time) for planes
 int Noff;                           // number of offsets
 int curPlane = 0;
 int newPlane = 1;
-int numPlane = 2;
 int xL=0,xR=0,yU=0,yD=0;            // offsets for border of stats
 long unsigned int *histo;
 int numHisto;
 
 // initialize planes:
+int numPlane = 8;
 long unsigned int *planes[8];         // ring buffer planes of gol array states
 long unsigned int *planesg[8];        // ring buffer planes of golg genes
 long unsigned int plane0[N2];
