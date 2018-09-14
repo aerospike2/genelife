@@ -37,9 +37,7 @@ long unsigned int pmutmask;         // binary mask so that prob of choosing zero
 //const int nlog2p0 = 5;              // p0 = 2 to the power of - nlog2p0
 //const int nlog2pmut = 5;            // pmut = probmut = 2 to the power of - nlog2pmut
 
-int nsteps = 10000;                 // total number of steps to simulate GoL
-int ndisp  = 10000;                 // display GoL every ndisp steps
-int tdisp  = 0;                     // extra time delay in ms betwene displays
+int totsteps=0;
 int rulemod = 1;                    // det: whether to modify GoL rule for 2 and 3 live neighbours : opposite outcome with small probability p0
 //int rule2mod = 1;                 // was not correct whether to modify two live nb rule as well or only three nb rule
 int selection = 1;                  // fitness model: 0 neutral 1 selected gene prob of rule departure 2 presence of replicase gene
@@ -48,8 +46,8 @@ int repscheme = 1;                  // replication scheme: 0 random choice , 1 X
 int initial1density = N2>>1;        // initial density of ones in gol : integer value divide by 2^15 for density
 static long unsigned int  emptysites = 0;  // cumulative number of empty sites during simulation updates
 
+int Noff = 9;                           // number of offsets
 int **offsets;                      // array of offsets (2D + time) for planes
-int Noff;                           // number of offsets
 int curPlane = 0;
 int newPlane = 1;
 int xL=0,xR=0,yU=0,yD=0;            // offsets for border of stats
@@ -163,6 +161,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
     long unsigned int genef1,genef2,genef3;
     static long unsigned int ngx = 0;
 
+    totsteps++;
     randnr = 0x0123456789abcdef;                                            // initialize random nr
     rulemodl = rulemod ? 1L : 0L;                                           // convert integer rule2mod binary to long unsigned integer for use in long logic
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
@@ -213,7 +212,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                         case 0xd : k = 3; break;                                   // 00001101
                         case 0x15: k = 2; break;                                   // 00010101
                         case 0x85: k = 3; break;                                   // 00100101
-                        default  : printf("Error in canocal rotation for three live neighbours \n"); k = 0;
+                        default  : printf("Error in canocal rotation for three live neighbours \nnbmaskrm = %ldx\n",nbmaskrm); k = 0;
 			}
 			newgene = golg[nb[(kmin+k)&0x7]];                               // rotate unique nb k left (kmin) back to orig nb pat
 		    }
@@ -275,7 +274,6 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
     }
 }
 
-//void genelife_update (long unsigned int outgol[], long unsigned int outgolg[], int log2N, int ndsteps, int params[], int NN, int nparams, int histoflag) {
 void genelife_update (int nsteps, int histoflag) {
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
@@ -504,7 +502,7 @@ void countspecies(long unsigned int golg[], int params[], int N2, int nparams) {
 	    fitness = nlog2p0 + ((nones < 16) ? 0 : (nones - 23));}       // 0 if < 16 otherwise nones-23
         printf("count species %d with gene %lx has counts %lu and %d ones, fitness %d\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
     }
-    printf("cumulative activity = %lu\n",(N2 * (long unsigned int) nsteps) - emptysites);
+    printf("cumulative activity = %lu\n",(N2 * (long unsigned int) totsteps) - emptysites);
 }
 
 void delay(int milliseconds)
@@ -516,5 +514,20 @@ void delay(int milliseconds)
     now = then = clock();
     while( (now-then) < pause )
         now = clock();
+}
+
+
+void printxy (long unsigned int gol[],long unsigned int golg[]) {   /* print the game of life configuration */
+    int	ij, col, X, Y;
+    // https://stackoverflow.com/questions/27159322/rgb-values-of-the-colors-in-the-ansi-extended-colors-index-17-255
+    for (ij=0; ij<N2; ij++) {
+      if(gol[ij]>0){
+	col = 32+((golg[ij]>>57)&0x7f);
+	X = ij % N;
+	Y = ij / N;
+	printf("%d %d %d ",col,X,Y);
+      }
+    }
+    printf("\n");
 }
 
