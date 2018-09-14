@@ -218,11 +218,11 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
           else {                                                              // 2.non-neutral model based on presence of replicase gene
                                                                               //   the minimum nones in 3 live seqs determines rep prob
                 genef1 = golg[nb[nb1i&0x7]];                                      // gene difference seq based on xor
-                CUMCOUNT64C(genef1, nones);                                       // number of ones determines replicase function
+                POPCOUNT64C(genef1, nones);                                       // number of ones determines replicase function
                 genef2 = golg[nb[(nb1i>>4)&0x7]];
-                CUMCOUNT64C(genef2, nones1);                                      // number of ones determines replicase function
+                POPCOUNT64C(genef2, nones1);                                      // number of ones determines replicase function
                 genef3 = golg[nb[(nb1i>>8)&0x7]];
-                CUMCOUNT64C(genef3, nones2);                                      // number of ones determines replicase function
+                POPCOUNT64C(genef3, nones2);                                      // number of ones determines replicase function
                 nones = nones < nones1 ? nones : nones1;
                 nones = nones < nones2 ? nones : nones2;}                         // min number of ones determines prob of replic'n
  	    // compute random events for a) departure from GoL rules and b) single bit mutation, as well as mutation position nmut
