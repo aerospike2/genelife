@@ -275,10 +275,11 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
     }
 }
 
-void genelife_update (long unsigned int outgol[], long unsigned int outgolg[], int log2N, int ndsteps, int params[], int NN, int nparams, int histoflag) {
+//void genelife_update (long unsigned int outgol[], long unsigned int outgolg[], int log2N, int ndsteps, int params[], int NN, int nparams, int histoflag) {
+void genelife_update (int nsteps, int histoflag) {
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
-    int t,  ij;
+    int t;
     long unsigned int *gol, *newgol, *golg, *newgolg;
 
     static int first = 1;
@@ -288,7 +289,7 @@ void genelife_update (long unsigned int outgol[], long unsigned int outgolg[], i
         pmutmask = (0x1 << nlog2pmut) - 1;
         first = 0;
     }
-    for (t=0; t<ndsteps; t++) {
+    for (t=0; t<nsteps; t++) {
 	    gol = planes[curPlane];
 	    newgol = planes[newPlane];
 	    golg = planesg[curPlane];
@@ -296,11 +297,12 @@ void genelife_update (long unsigned int outgol[], long unsigned int outgolg[], i
 
 	    update(gol,golg,newgol,newgolg);
 	    if(histoflag) countconfigs();
-	    // printf("t = %d nlog2p0=%d nlog2pmut=%d selection=%d rulemod=%d\n",t,nlog2p0,nlog2pmut,selection,rulemod);
-	    for (ij=0; ij<N2; ij++) {
-	        outgol[ij]  = newgol[ij];       // copy new gol config to output
-	        outgolg[ij] = newgolg[ij];      // copy new genes to output
-	    }
+
+	    // // printf("t = %d nlog2p0=%d nlog2pmut=%d selection=%d rulemod=%d\n",t,nlog2p0,nlog2pmut,selection,rulemod);
+	    // for (ij=0; ij<N2; ij++) {
+	    //     outgol[ij]  = newgol[ij];       // copy new gol config to output
+	    //     outgolg[ij] = newgolg[ij];      // copy new genes to output
+	    // }
 	    curPlane = (curPlane +1) % numPlane;
 	    newPlane = (newPlane +1) % numPlane;
     } /* for t ... */
