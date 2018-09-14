@@ -40,7 +40,7 @@ long unsigned int pmutmask;         // binary mask so that prob of choosing zero
 int nsteps = 10000;                 // total number of steps to simulate GoL
 int ndisp  = 10000;                 // display GoL every ndisp steps
 int tdisp  = 0;                     // extra time delay in ms betwene displays
-pint rulemod = 1;                    // det: whether to modify GoL rule for 2 and 3 live neighbours : opposite outcome with small probability p0
+int rulemod = 1;                    // det: whether to modify GoL rule for 2 and 3 live neighbours : opposite outcome with small probability p0
 //int rule2mod = 1;                 // was not correct whether to modify two live nb rule as well or only three nb rule
 int selection = 1;                  // fitness model: 0 neutral 1 selected gene prob of rule departure 2 presence of replicase gene
 int repscheme = 1;                  // replication scheme: 0 random choice , 1 XOR of all 3, 2 consensus, 3 unique det choice, 4 most different
@@ -57,9 +57,9 @@ int xL=0,xR=0,yU=0,yD=0;            // offsets for border of stats
 long unsigned int *histo;
 int numHisto;
 
-    // initialize planes:
-long unsigned int *planes[numPlane];         // ring buffer planes of gol array states
-long unsigned int *planesg[numPlane];        // ring buffer planes of golg genes
+// initialize planes:
+long unsigned int *planes[8];         // ring buffer planes of gol array states
+long unsigned int *planesg[8];        // ring buffer planes of golg genes
 long unsigned int plane0[N2];
 long unsigned int plane1[N2];
 long unsigned int plane2[N2];
@@ -76,17 +76,6 @@ long unsigned int planeg4[N2];
 long unsigned int planeg5[N2];
 long unsigned int planeg6[N2];
 long unsigned int planeg7[N2];
-
-
-
-    planes =
-(long unsigned int **) calloc(numPlane,sizeof(long unsigned int *));
-    for(i=0; i<numPlane; i++)
-	planes[i] = (long unsigned int *) calloc(N2,sizeof(long unsigned int));
-    planesg = (long unsigned int **) calloc(numPlane,sizeof(long unsigned int *));
-    for(i=0; i<numPlane; i++)
-    planesg[i] = (long unsigned int *) calloc(N2,sizeof(long unsigned int));
-
 
                                     // Wikipedia "Xorshift" rewritten here as inline macro &
                                     // Vigna, Sebastiano. "xorshift*/xorshift+ generators and the PRNG shootout". Retrieved 2014-10-25.
@@ -393,28 +382,37 @@ void initialize_planes(int offs[],  int N) {
     if(mn<0) yD = -mn; else yD = 0;
     if(mx>0) yU = N-mx; else yU = N;
 
+    // initialize plane pointers:
+    planes[0] = plane0;planes[1] = plane1;planes[2] = plane2;planes[3] = plane3;
+    planes[4] = plane4;planes[5] = plane5;planes[6] = plane6;planes[7] = plane7;
+    planesg[0] = planeg0;planesg[1] = planeg1;planesg[2] = planeg2;planesg[3] = planeg3;
+    planesg[4] = planeg4;planesg[5] = planeg5;planesg[6] = planeg6;planesg[7] = planeg7;
 
 
 }
 
-void initialize (int params[], int nparams) {
+void initialize (int runparams[], int nrunparams, int simparams[], int nsimparams) {
 	int ij;
     int initial1density;
     long unsigned int *gol;
     static unsigned int rmask = (1 << 15) - 1;         // Why 15 bits used here, related to rand(), see next line
     // Range: rand returns numbers in the range of [0, RAND_MAX ), and RAND_MAX is specified with a minimum value of 32,767. i.e. 15 bit
+
+    rulemod = runparams[0];
+    repscheme = runparams[1];
+    selection = runparams[2];
+
+    nlog2p0 = simparams[0];
+    nlog2pmut = simparams[1];
+    initial1density = simparams[2];
+
     gol = planes[curPlane];
-
-    if (nparams > 4) initial1density = params[4];
-    else initial1density = (1 << 14);                  // default is best approx to 0.5 with 15 bit unsigned int i.e. 2^14/(2^15-1)
-
-    printf("id = %d rmask = %d nparams = %d\n",initial1density, rmask, nparams);
 	for (ij=0; ij<N2; ij++) {
 		gol[ij] = ((rand() & rmask) < initial1density)?1:0;
 	}
 }
 
-void initialize_genes (int params[], int nparams) {
+void initialize_genes (int params[], int nparams) { // params included for possible future use
     int ij,k;
     long unsigned int g;
     long unsigned int *gol;

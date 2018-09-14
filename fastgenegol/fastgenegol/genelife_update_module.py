@@ -21,7 +21,7 @@ libcd = npct.load_library("libgenelife", ".")
 libcd.genelife_update.restype = None
 libcd.genelife_update.argtypes = [uint64_array, uint64_array, c_int, c_int, int_array, c_int, c_int, c_int]
 libcd.initialize.restype = None
-libcd.initialize.argtypes = [int_array, c_int]
+libcd.initialize.argtypes = [int_array, c_int, int_array, c_int]
 libcd.initialize_genes.restype = None
 libcd.initialize_genes.argtypes = [int_array, c_int]
 libcd.initialize_planes.restype = None
@@ -50,8 +50,8 @@ def get_curgol(gol):
 def get_curgolg(golg):
     return libcd.get_curgolg(golg, int(len(golg)))
 
-def initialize(simparams):
-    return libcd.initialize(simparams, len(simparams))
+def initialize(runparams,simparams):
+    return libcd.initialize(runparams, len(runparams), simparams, len(simparams))
 
 def initialize_genes(simparams):
     return libcd.initialize_genes(simparams, len(simparams))
