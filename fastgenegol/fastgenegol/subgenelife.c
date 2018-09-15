@@ -1,3 +1,8 @@
+// Subsequent fix of new integer types and error in {} structure John McCaskill, Sep 4, 2017
+// 
+// From subgenelife2.c
+// Modified by Norman Packard Aug 29, 2017
+// create ring buffer of planes to accumulate statistics.
 //
 //  subgenelife.c
 //  fastgenegol
@@ -6,10 +11,6 @@
 //  Copyright © 2017 European Center for Living Technology. All rights reserved.
 //
 
-// From subgenelife2.c
-// Modified by Norman Packard Aug 29, 2017
-// Subsequent fix of new integer types and error in {} structure John McCaskill, Sep 4, 2017
-// create ring buffer of planes to accumulate statistics.
 
 
 #include <stdio.h>
@@ -212,7 +213,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                         case 0xd : k = 3; break;                                   // 00001101
                         case 0x15: k = 2; break;                                   // 00010101
                         case 0x85: k = 3; break;                                   // 00100101
-                        default  : printf("Error in canocal rotation for three live neighbours \nnbmaskrm = %ldx\n",nbmaskrm); k = 0;
+                        default  : fprintf(stderr,"Error in canonical rotation for three live neighbours \nnbmaskrm = %ldx\n",nbmaskrm); k = 0;
 			}
 			newgene = golg[nb[(kmin+k)&0x7]];                               // rotate unique nb k left (kmin) back to orig nb pat
 		    }
