@@ -109,9 +109,9 @@ int main (int argc, char *argv[]) {
     initialize_genes(simparams,nsimparams);
     fprintf(stderr,"finished initialize.\n");
     for (i=0; i<nsteps; i++) {                  /* nsteps */
-	golg = planesg[curPlane];
-	printspecies(golg);
-	genelife_update(1,0);
+	    golg = planesg[curPlane];
+	    printspecies(golg);
+	    genelife_update(1,0);
     }    
 }
 

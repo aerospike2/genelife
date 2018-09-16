@@ -71,14 +71,14 @@ int main (int argc, char *argv[]) {
     initialize(runparams,nrunparams,simparams,nsimparams);
     initialize_genes(simparams,nsimparams);
     for (i=0; i<nsteps; i++) {                  /* nsteps */
-	for(k=0; k< ndisp; k++){
-	    gol = planes[curPlane];
-	    golg = planesg[curPlane];
-	    printxy(gol,golg);
-	    genelife_update(1,0);
-	}
-	fprintf(stderr,"finished step %d.\n",i);
-	genelife_update(nskip,0);
-	fprintf(stderr,"step %d\n",i);
+	    for(k=0; k< ndisp; k++){
+	        gol = planes[curPlane];
+	        golg = planesg[curPlane];
+	        printxy(gol,golg);
+	        genelife_update(1,0);
+	    }
+	    fprintf(stderr,"finished step %d.\n",i);
+	    genelife_update(nskip,0);
+	    fprintf(stderr,"step %d\n",i);
     }
 }
