@@ -151,12 +151,12 @@ if __name__ == '__main__':
                 [-1,-1, 0]]
     cgrid = np.zeros((N,N),np.uint)
 
-    runparams = np.zeros(3,np.int32)
+    runparams = np.zeros(3,np.int32)    # 3 parameters passed to C
     rulemod = runparams[0] = 1          # 0,1
     repscheme = runparams[1] = 4        # 0-4
     selection = runparams[2] = 1        # 0-2
     
-    simparams = np.zeros(3,np.int32)    # 5 parameters passed to C
+    simparams = np.zeros(3,np.int32)    # 3 parameters passed to C
     nlog2p0   = simparams[0] = 8        # base prob of GOL departure 1/2^nlog2p0
     nlog2pmut = simparams[1] = 8        # gene mutation probability
     initial1density = simparams[2] = 16384   # nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
