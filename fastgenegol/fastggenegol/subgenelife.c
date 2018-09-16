@@ -191,7 +191,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
 		            newgene = (golg[nb[(nb1i>>8)&0x7]]&(golg[nb[nb1i&0x7]]|golg[nb[(nb1i>>4)&0x7]]))|(golg[nb[nb1i&0x7]]&golg[nb[(nb1i>>4)&0x7]]); // (C&(A|B)) | (A&B)
 		        }
 		        else {                                                             // 3,4 deterministic choice of ancestor: replication of live neigbour in unique pos
-		            for (k=7,nbmask=0;k>=0;k--) nbmask = (nbmask << 1) + gol[nb[k]];   // compute 8-bit mask of GoL states of 8 neighbours, clockwise starting top left
+		            for (k=7,nbmask=0L;k>=0;k--) nbmask = (nbmask << 1) + gol[nb[k]];   // compute 8-bit mask of GoL states of 8 neighbours, clockwise starting top left
                     for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {                 // compute canonical rotation (minimum) of this mask
                         nbmaskr = ((nbmaskr & 0x1L)<<7) + (nbmaskr>>1);                      // 8 bit rotate right
                         if (nbmaskr < nbmaskrm) {                                          // choose minimal value of mask rotation
@@ -201,15 +201,20 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
 		            }
 		            if (repscheme == 3) newgene = golg[nb[kmin]];                      // 3. deterministic choice of ancestor: replication of live neigbour in most different pos
                     else if (repscheme == 4) {                                         // 4. deterministic choice of ancestor: replication of live neigbour in most different pos
-			            switch (nbmaskrm) {
+                        switch (nbmaskrm) {
                             case 0x7 : k = 1; break;                                   // 00000111
                             case 0xb : k = 0; break;                                   // 00001011
                             case 0x13: k = 1; break;                                   // 00010011
                             case 0x19: k = 0; break;                                   // 00011001
                             case 0xd : k = 3; break;                                   // 00001101
                             case 0x15: k = 2; break;                                   // 00010101
-                            case 0x85: k = 3; break;                                   // 00100101
-                            default  : fprintf(stderr,"Error in canonical rotation for three live neighbours \nnbmaskrm = %ldx\n",nbmaskrm); k = 0;
+                            case 0x25: k = 3; break;                                   // 00100101
+                            default  : {
+                                fprintf(stderr,"Error in canonical rotation for three live neighbours \nnbmaskrm = %lx\n",nbmaskrm); k = 0;
+                                fprintf(stderr,"Raw Neighbor Pattern: %lx No neighbors %lx\n",
+                                    nbmask, gol[nb[0]]+gol[nb[1]]+gol[nb[2]]+gol[nb[3]]+gol[nb[4]]+gol[nb[5]]+gol[nb[6]]+gol[nb[7]]);
+                                fprintf(stderr,"\n");
+                            }
 			            }
 			            newgene = golg[nb[(kmin+k)&0x7]];                               // rotate unique nb k left (kmin) back to orig nb pat
 		            }
