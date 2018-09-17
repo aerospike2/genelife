@@ -93,47 +93,51 @@ def colorgrid(N):
                 cgrid[i,j] = 0
     return
 
-def update(N=1000,dohisto=1):                   # update without animation.
-    global gol, golg
-    global log2N
-    global simparams
-    genelife.genelife_update(gol, golg, log2N, N, simparams, dohisto)
-
-
-# trying for:
-#     |------------nrun-----------|---ndisp---|  repeated niter times
 
 
 cnt = 0
 framenr = 0
-def doanimation(nrun=1,ndisp=1000,niter=1):    
-    fig, ax = plt.subplots()
-    # time_text = ax.text(0.05, 0.95,'',horizontalalignment='left',verticalalignment='top', transform=ax.transAxes)
+
+# doanimation configured for:
+#     |--ndisp--|--------nskip-------|  repeated niter times
+
+
+mat = []
+ndisp = 100
+def doanimation(nrun=1,         # number of CA iterations per animation time step
+                ndisp=100,      # number of display steps
+                nskip = 500,    # CA iterations to skip between display
+                niter=8):       # number of ndisp-nskip steps
+    # use my_dpi for your monitor's dpi, to get cells to line up on pixel boundaries.
+    # for my_dpi go to http://www.infobyip.com/detectmonitordpi.php
+    my_dpi=96
+    #fig, ax = plt.subplots(figsize=(10,10))
+    fig, ax = plt.subplots(figsize=((3*256)/my_dpi, (3*256)/my_dpi), dpi=my_dpi, frameon=False)
+    ax.axis('off')
+    cnt=0
+    framenr = 0
+    time_text = ax.text(0.05, 0.95,'',horizontalalignment='left',verticalalignment='top', transform=ax.transAxes)
     colorgrid(N)
     def update_anim(data):
         global gol, cgrid
-        global golg
-        global log2N
-        global simparams
         global cnt
         global framenr
         cnt = cnt+1
         if cnt % ndisp == 0:  # insert the non-displayed iterations
-            genelife.genelife_update(gol, golg, log2N, nrun, simparams,0)
-            framenr = framenr+nrun
-        genelife.genelife_update(gol, golg, log2N, 1, simparams,0)
-        framenr = framenr+1
-        colorgrid(N)
+            genelife.genelife_update(nskip, 0)
+        genelife.genelife_update(1, 0) # 1 should be nrun
+        genelife.get_curgol(gol)
+        genelife.get_curgolg(golg)
+        framenr = framenr+1         # 1 should be nrun
+        colorgrid(N)                # sets cgrid from gol, golg
         mat.set_data(cgrid)
         time_text.set_text('cnt = %.1d' % framenr)
         time_text.set_color('w')
-        return mat
 
     mat = ax.matshow(cgrid, cmap=my_cmap, vmin=0.01, vmax=257)  # was vmax = LEN+1
-    ani = animation.FuncAnimation(fig, update_anim, interval=1,
-                                  save_count=0, frames=niter*ndisp, repeat = False)
+    ani = animation.FuncAnimation(fig, update_anim, interval=1, # ~40 ms to see every time step
+                                      save_count=0, frames=niter*ndisp, repeat = False)
     plt.show()
-
 
 if __name__ == '__main__':
     offsets =  [[ 0, 0, 0],
@@ -145,23 +149,26 @@ if __name__ == '__main__':
                 [ 1,-1, 0],
                 [ 0,-1, 0],
                 [-1,-1, 0]]
-    simparams = np.zeros(5,np.int32)    # 5 parameters passed to C
     cgrid = np.zeros((N,N),np.uint)
+
+    runparams = np.zeros(3,np.int32)    # 3 parameters passed to C
+    rulemod = runparams[0] = 1          # 0,1
+    repscheme = runparams[1] = 4        # 0-4
+    selection = runparams[2] = 1        # 0-2
+    
+    simparams = np.zeros(3,np.int32)    # 3 parameters passed to C
+    nlog2p0   = simparams[0] = 8        # base prob of GOL departure 1/2^nlog2p0
+    nlog2pmut = simparams[1] = 8        # gene mutation probability
+    initial1density = simparams[2] = 16384   # nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
 
     flatoff =  [x for sublist in offsets for x in sublist]
     npoffsets = np.array(flatoff,np.int32)
-    numHis = pow(2,len(offsets))
-    histo=np.zeros(numHis,np.uint64)
     genelife.initialize_planes(npoffsets)
-
-    nlog2p0   = simparams[0] = 8
-    nlog2pmut = simparams[1] = 8
-    selection = simparams[2] =  1            # values 0,1,2 allowed
-    rulemod  =  simparams[3] =  1            # values 0,1 allowed
-    initial1density = simparams[4] = 16384   # nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
-
-    genelife.initialize(simparams)
+    genelife.initialize(runparams,simparams)
     genelife.initialize_genes(simparams)
-    doanimation()
-    genelife.countspecies(golg, simparams)
+
+    doanimation(nrun=1,ndisp=100,nskip=1000,niter=10)
+
+#    genelife.get_curgolg(golg)
+#    genelife.countspecies(golg, simparams)
     
