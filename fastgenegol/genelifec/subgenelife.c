@@ -43,7 +43,8 @@ int rulemod = 1;                    // det: whether to modify GoL rule for 2 and
 int selection = 1;                  // fitness model: 0 neutral 1 selected gene prob of rule departure 2 presence of replicase gene
 int repscheme = 1;                  // replication scheme: 0 random choice , 1 XOR of all 3, 2 consensus, 3 unique det choice, 4 most different
 
-int initial1density = N2>>1;        // initial density of ones in gol : integer value divide by 2^15 for density
+int initial1density = (1<<15)>>1;        // initial density of ones in gol as integer value, divide by 2^15 for true density
+int initialrdensity = (1<<15)>>1;        // initial density of random genes in live sites, divide by 2^15 for true density
 static long unsigned int  emptysites = 0;  // cumulative number of empty sites during simulation updates
 
 int Noff = 9;                           // number of offsets
@@ -395,7 +396,7 @@ void initialize_planes(int offs[],  int N) {
 
 void initialize (int runparams[], int nrunparams, int simparams[], int nsimparams) {
 	int ij;
-    int initial1density;
+
     long unsigned int *gol;
     static unsigned int rmask = (1 << 15) - 1;         // Why 15 bits used here, related to rand(), see next line
     // Range: rand returns numbers in the range of [0, RAND_MAX ), and RAND_MAX is specified with a minimum value of 32,767. i.e. 15 bit
@@ -406,8 +407,10 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
 
     nlog2p0 = simparams[0];
     nlog2pmut = simparams[1];
-    initial1density = simparams[2];
-
+    nloglog2p1 = simparams[2];
+    initial1density = simparams[3];
+    initialrdensity = simparams[4];
+    
     gol = planes[curPlane];
 	for (ij=0; ij<N2; ij++) {
 		gol[ij] = ((rand() & rmask) < initial1density)?1:0;
@@ -419,14 +422,17 @@ void initialize_genes (int params[], int nparams) { // params included for possi
     long unsigned int g;
     long unsigned int *gol;
     long unsigned int *golg;
+    static unsigned int rmask = (1 << 15) - 1;
 
     gol = planes[curPlane];
     golg = planesg[curPlane];
 
     for (ij=0; ij<N2; ij++) {
         g = 0;
-        if (gol[ij] != 0)	// if live cell, fill with random genome g
-	    for (k=0; k<64; k++) g = (g << 1) | (rand() & 0x1L);
+        if (gol[ij] != 0)	{ // if live cell, fill with random genome g or all 1s depending on initialrdensity
+            if ((rand() & rmask) < initialrdensity) for (k=0; k<64; k++) g = (g << 1) | (rand() & 0x1L);
+            else g = 0xffffffffffffffff;
+        }
         golg[ij] = g;
         if (golg[ij] == 0 && gol[ij] != 0) printf("zero gene at %d",ij);
     }

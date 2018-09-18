@@ -156,16 +156,17 @@ if __name__ == '__main__':
     repscheme = runparams[1] = 4        # 0-4
     selection = runparams[2] = 1        # 0-2
     
-    simparams = np.zeros(3,np.int32)    # 3 parameters passed to C
+    simparams = np.zeros(5,np.int32)    # 5 parameters passed to C
     nlog2p0   = simparams[0] = 8        # base prob of GOL departure 1/2^nlog2p0
     nlog2pmut = simparams[1] = 8        # gene mutation probability
-    initial1density = simparams[2] = 16384   # nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
-
+    nloglog2p1 = simparams[2] = 2       # power of 2 reduction in influence of nr of 1s in seq on prob
+    initial1density = simparams[3] = 16384   # nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
+    initialrdensity = simparams[4] = 16384   # nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
     flatoff =  [x for sublist in offsets for x in sublist]
     npoffsets = np.array(flatoff,np.int32)
     genelife.initialize_planes(npoffsets)
     genelife.initialize(runparams,simparams)
-    genelife.initialize_genes(simparams)
+    genelife.initialize_genes(runparams)              // correction by John, but mistake had no effect
 
     doanimation(nrun=1,ndisp=100,nskip=1000,niter=10)
 
