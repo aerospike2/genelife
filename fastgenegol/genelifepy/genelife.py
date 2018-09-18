@@ -166,7 +166,7 @@ if __name__ == '__main__':
     npoffsets = np.array(flatoff,np.int32)
     genelife.initialize_planes(npoffsets)
     genelife.initialize(runparams,simparams)
-    genelife.initialize_genes(runparams)              // correction by John, but mistake had no effect
+    genelife.initialize_genes(runparams)              # correction by John, but mistake had no effect
 
     doanimation(nrun=1,ndisp=100,nskip=1000,niter=10)
 

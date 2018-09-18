@@ -12,3 +12,5 @@ probtest.xcscheme
 dispgenegoltest
 libgenelife.dylib
 dispgenegol
+*.xcuserstate
+
