@@ -2,12 +2,6 @@
 <Workspace
    version = "1.0">
    <FileRef
-      location = "group:../fastgenegol/actgenelife.c">
-   </FileRef>
-   <FileRef
-      location = "group:../fastgenegol/subgenelife.c">
-   </FileRef>
-   <FileRef
       location = "self:">
    </FileRef>
 </Workspace>

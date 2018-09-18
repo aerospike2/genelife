@@ -4,45 +4,50 @@
 <dict>
 	<key>SchemeUserState</key>
 	<dict>
-		<key>cos_doubles.xcscheme</key>
-		<dict>
-			<key>orderHint</key>
-			<integer>4</integer>
-		</dict>
-		<key>dispgenegol.xcscheme</key>
-		<dict>
-			<key>orderHint</key>
-			<integer>5</integer>
-		</dict>
-		<key>fastgenegol.xcscheme</key>
-		<dict>
-			<key>orderHint</key>
-			<integer>3</integer>
-		</dict>
-		<key>genelife copy.xcscheme</key>
+		<key>actgenelife.xcscheme</key>
 		<dict>
 			<key>orderHint</key>
 			<integer>8</integer>
 		</dict>
-		<key>genelife.xcscheme</key>
+		<key>cos_doubles.xcscheme</key>
 		<dict>
 			<key>orderHint</key>
-			<integer>0</integer>
+			<integer>3</integer>
 		</dict>
-		<key>genelifed.xcscheme</key>
+		<key>dispgenegol.xcscheme</key>
 		<dict>
 			<key>orderHint</key>
-			<integer>1</integer>
+			<integer>4</integer>
 		</dict>
-		<key>libgene.xcscheme</key>
+		<key>dispgenelife.xcscheme</key>
 		<dict>
 			<key>orderHint</key>
 			<integer>7</integer>
 		</dict>
-		<key>probtest.xcscheme</key>
+		<key>fastgenegol.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>2</integer>
+		</dict>
+		<key>genelife.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>1</integer>
+		</dict>
+		<key>genelifed.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>0</integer>
+		</dict>
+		<key>libgene.xcscheme</key>
 		<dict>
 			<key>orderHint</key>
 			<integer>6</integer>
+		</dict>
+		<key>probtest.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>5</integer>
 		</dict>
 	</dict>
 	<key>SuppressBuildableAutocreation</key>
@@ -58,6 +63,16 @@
 			<true/>
 		</dict>
 		<key>0DA8D9C4214357B600B4B324</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>521C1455214DDE9400E17A8F</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>521C1463214DDF0400E17A8F</key>
 		<dict>
 			<key>primary</key>
 			<true/>
