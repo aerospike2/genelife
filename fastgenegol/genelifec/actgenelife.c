@@ -55,7 +55,7 @@ void printspecies(long unsigned int golg[]) {  /* counts numbers of all differen
 }
 
 int main (int argc, char *argv[]) {
-    int	 i,k;
+    int	 i;
     long unsigned int *golg;
     int nsteps = 10000;                 // total number of steps to simulate GoL
     

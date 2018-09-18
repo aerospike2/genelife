@@ -267,6 +267,7 @@ void countspecies(long unsigned int golg[], long unsigned int gol[]) {  /* count
         }
     }
     nspecies = k+1;
+    nones = -1;
     printf("The number of different non-zero species is %d\n",nspecies);
     
     for (k=0,ij=0;k<nspecies;k++) {     // now condense array to give only different genes with counts
@@ -286,6 +287,7 @@ void countspecies(long unsigned int golg[], long unsigned int gol[]) {  /* count
                 fitness = nlog2p0 + (((nones < 32) ? nones : 64 - nones)>>nloglog2p1);}
         else {                                                              // non-neutral model based on presence of replicase gene
                 fitness = nlog2p0;}                                         // fitness a function of 3 live sequences, not individual
+
         printf("count species %d with gene %lx has counts %lu and %d ones, fitness %d\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
     }
     printf("cumulative activity = %lu\n",(N2 * (long unsigned int) nsteps) - emptysites);

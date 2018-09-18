@@ -7,15 +7,51 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		521FDCF71F287EE800F08FFB /* fastgenelife.c in Sources */ = {isa = PBXBuildFile; fileRef = 521FDCF11F287E7100F08FFB /* fastgenelife.c */; };
-		5275A12F1F292FA90062765F /* dispgenegol.c in Sources */ = {isa = PBXBuildFile; fileRef = 521FDCFE1F288F4F00F08FFB /* dispgenegol.c */; };
+		5206B81B2150835D00394209 /* fastgolstat.c in Sources */ = {isa = PBXBuildFile; fileRef = 5206B81A2150835C00394209 /* fastgolstat.c */; };
+		5206B822215088E300394209 /* actgenelife.c in Sources */ = {isa = PBXBuildFile; fileRef = 5206B81121507E2200394209 /* actgenelife.c */; };
+		521C1471214E1B5C00E17A8F /* fastgenelife.c in Sources */ = {isa = PBXBuildFile; fileRef = 521FDCF11F287E7100F08FFB /* fastgenelife.c */; };
 		5275A1341F2930E90062765F /* cos_doubles.c in Sources */ = {isa = PBXBuildFile; fileRef = 5275A1301F2930E90062765F /* cos_doubles.c */; };
 		5275A1351F2930E90062765F /* cos_doubles.h in Headers */ = {isa = PBXBuildFile; fileRef = 5275A1311F2930E90062765F /* cos_doubles.h */; };
 		528F919D1F31E30E008DD596 /* probtestdispatch.c in Sources */ = {isa = PBXBuildFile; fileRef = 528F91941F2F9895008DD596 /* probtestdispatch.c */; };
-		52E469042147D3FB00975C4A /* subgenelife.c in Sources */ = {isa = PBXBuildFile; fileRef = 521FDCEA1F287DEE00F08FFB /* subgenelife.c */; };
+		52DB372021507BD00087F098 /* subgenelife.c in Sources */ = {isa = PBXBuildFile; fileRef = 52DB371F21507BCF0087F098 /* subgenelife.c */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		5206B81E215088B100394209 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 525EB7A11F18DCE4004078F1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 521C1455214DDE9400E17A8F;
+			remoteInfo = dispgenelife;
+		};
+		5206B820215088B600394209 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 525EB7A11F18DCE4004078F1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 521C1463214DDF0400E17A8F;
+			remoteInfo = actgenelife;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXCopyFilesBuildPhase section */
+		521C1454214DDE9400E17A8F /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+		521C1462214DDF0400E17A8F /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
 		521FDCE01F287A6100F08FFB /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -46,28 +82,26 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		0D2CB73A1F569D280013B2E4 /* libgene.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = libgene.h; sourceTree = "<group>"; };
-		0D2CB73C1F569D280013B2E4 /* libgene.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = libgene.m; sourceTree = "<group>"; };
-		0D2CB7481F569D9A0013B2E4 /* gene.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = gene.h; sourceTree = "<group>"; };
-		0D2CB74A1F569D9A0013B2E4 /* gene.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = gene.m; sourceTree = "<group>"; };
-		0DA8D9CD214357B600B4B324 /* libgenelifed.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libgenelifed.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
+		5206B80F21507E0B00394209 /* dispgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = dispgenelife.c; path = genelifec/dispgenelife.c; sourceTree = SOURCE_ROOT; };
+		5206B81121507E2200394209 /* actgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = actgenelife.c; path = genelifec/actgenelife.c; sourceTree = SOURCE_ROOT; };
+		5206B81321507EF500394209 /* display.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; name = display.py; path = genelifepy/display.py; sourceTree = SOURCE_ROOT; };
+		5206B81421507F2E00394209 /* activity.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; name = activity.py; path = genelifepy/activity.py; sourceTree = SOURCE_ROOT; };
+		5206B81A2150835C00394209 /* fastgolstat.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = fastgolstat.c; sourceTree = "<group>"; };
+		521C1456214DDE9400E17A8F /* dispgenelife */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = dispgenelife; sourceTree = BUILT_PRODUCTS_DIR; };
+		521C1464214DDF0400E17A8F /* actgenelife */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = actgenelife; sourceTree = BUILT_PRODUCTS_DIR; };
 		521FDCE21F287A6100F08FFB /* fastgenegol */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = fastgenegol; sourceTree = BUILT_PRODUCTS_DIR; };
-		521FDCEA1F287DEE00F08FFB /* subgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = subgenelife.c; path = fastgenegol/subgenelife.c; sourceTree = SOURCE_ROOT; };
-		521FDCEB1F287DEE00F08FFB /* genelife.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = genelife.py; path = fastgenegol/genelife.py; sourceTree = SOURCE_ROOT; };
-		521FDCEC1F287DEE00F08FFB /* genelife_update_module.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = genelife_update_module.py; path = fastgenegol/genelife_update_module.py; sourceTree = SOURCE_ROOT; };
-		521FDCF01F287E7100F08FFB /* fastgenegol.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgenegol.c; path = fastgenegol/fastgenegol.c; sourceTree = SOURCE_ROOT; };
-		521FDCF11F287E7100F08FFB /* fastgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgenelife.c; path = fastgenegol/fastgenelife.c; sourceTree = SOURCE_ROOT; };
-		521FDCF41F287ECE00F08FFB /* fastgol.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgol.c; path = fastgenegol/fastgol.c; sourceTree = SOURCE_ROOT; };
-		521FDCF51F287ECE00F08FFB /* batch.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = batch.py; path = fastgenegol/batch.py; sourceTree = SOURCE_ROOT; };
-		521FDCFE1F288F4F00F08FFB /* dispgenegol.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = dispgenegol.c; path = fastgenegol/dispgenegol.c; sourceTree = SOURCE_ROOT; };
-		521FDCFF1F288F4F00F08FFB /* display.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = display.py; path = fastgenegol/display.py; sourceTree = SOURCE_ROOT; };
+		521FDCEB1F287DEE00F08FFB /* genelife.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = genelife.py; path = genelifepy/genelife.py; sourceTree = SOURCE_ROOT; };
+		521FDCEC1F287DEE00F08FFB /* genelife_update_module.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = genelife_update_module.py; path = genelifepy/genelife_update_module.py; sourceTree = SOURCE_ROOT; };
+		521FDCF01F287E7100F08FFB /* fastgenegol.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgenegol.c; path = genelifec/fastgenegol.c; sourceTree = SOURCE_ROOT; };
+		521FDCF11F287E7100F08FFB /* fastgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgenelife.c; path = genelifec/fastgenelife.c; sourceTree = SOURCE_ROOT; };
+		521FDCF41F287ECE00F08FFB /* fastgol.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgol.c; path = genelifec/fastgol.c; sourceTree = SOURCE_ROOT; };
 		52416DA51F27425C00721D17 /* libcos_doubles.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libcos_doubles.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		52416DB61F27771500721D17 /* libgenelife.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libgenelife.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		5275A1281F292FA40062765F /* dispgenegol */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = dispgenegol; sourceTree = BUILT_PRODUCTS_DIR; };
-		5275A1301F2930E90062765F /* cos_doubles.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = cos_doubles.c; path = fastgenegol/cos_doubles.c; sourceTree = SOURCE_ROOT; };
-		5275A1311F2930E90062765F /* cos_doubles.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = cos_doubles.h; path = fastgenegol/cos_doubles.h; sourceTree = SOURCE_ROOT; };
-		5275A1321F2930E90062765F /* cos.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = cos.py; path = fastgenegol/cos.py; sourceTree = SOURCE_ROOT; };
-		5275A1331F2930E90062765F /* cos_doubles.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = cos_doubles.py; path = fastgenegol/cos_doubles.py; sourceTree = SOURCE_ROOT; };
+		5275A1301F2930E90062765F /* cos_doubles.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = cos_doubles.c; path = cos/cos_doubles.c; sourceTree = SOURCE_ROOT; };
+		5275A1311F2930E90062765F /* cos_doubles.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = cos_doubles.h; path = cos/cos_doubles.h; sourceTree = SOURCE_ROOT; };
+		5275A1321F2930E90062765F /* cos.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = cos.py; path = cos/cos.py; sourceTree = SOURCE_ROOT; };
+		5275A1331F2930E90062765F /* cos_doubles.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = cos_doubles.py; path = cos/cos_doubles.py; sourceTree = SOURCE_ROOT; };
 		528F91921F2F9895008DD596 /* probtest */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = probtest; sourceTree = BUILT_PRODUCTS_DIR; };
 		528F91941F2F9895008DD596 /* probtestdispatch.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.objc; path = probtestdispatch.c; sourceTree = "<group>"; };
 		528F919B1F31E05B008DD596 /* probtest.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = probtest.c; sourceTree = "<group>"; };
@@ -75,10 +109,18 @@
 		528F91A11F33306A008DD596 /* libswiftDispatch.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libswiftDispatch.tbd; path = System/Library/PrivateFrameworks/Swift/libswiftDispatch.tbd; sourceTree = SDKROOT; };
 		528F91A31F333095008DD596 /* SyncServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SyncServices.framework; path = System/Library/Frameworks/SyncServices.framework; sourceTree = SDKROOT; };
 		528F91A51F333143008DD596 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
+		52DB371F21507BCF0087F098 /* subgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = subgenelife.c; path = genelifec/subgenelife.c; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		0DA8D9C8214357B600B4B324 /* Frameworks */ = {
+		521C1453214DDE9400E17A8F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		521C1461214DDF0400E17A8F /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -123,25 +165,32 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		0D2CB7391F569D280013B2E4 /* libgene */ = {
+		5206B8162150815C00394209 /* genelifepy */ = {
 			isa = PBXGroup;
 			children = (
-				0D2CB73A1F569D280013B2E4 /* libgene.h */,
-				0D2CB73C1F569D280013B2E4 /* libgene.m */,
+				5206B81421507F2E00394209 /* activity.py */,
+				5206B81321507EF500394209 /* display.py */,
+				521FDCEB1F287DEE00F08FFB /* genelife.py */,
+				521FDCEC1F287DEE00F08FFB /* genelife_update_module.py */,
 			);
-			path = libgene;
+			path = genelifepy;
 			sourceTree = "<group>";
 		};
-		0D2CB7471F569D9A0013B2E4 /* gene */ = {
+		5206B818215081EB00394209 /* genelifec */ = {
 			isa = PBXGroup;
 			children = (
-				0D2CB7481F569D9A0013B2E4 /* gene.h */,
-				0D2CB74A1F569D9A0013B2E4 /* gene.m */,
+				521FDCF41F287ECE00F08FFB /* fastgol.c */,
+				521FDCF01F287E7100F08FFB /* fastgenegol.c */,
+				5206B81A2150835C00394209 /* fastgolstat.c */,
+				521FDCF11F287E7100F08FFB /* fastgenelife.c */,
+				5206B81121507E2200394209 /* actgenelife.c */,
+				5206B80F21507E0B00394209 /* dispgenelife.c */,
+				52DB371F21507BCF0087F098 /* subgenelife.c */,
 			);
-			path = gene;
+			path = genelifec;
 			sourceTree = "<group>";
 		};
-		52416DAE1F274A7100721D17 /* cos */ = {
+		5206B8192150823000394209 /* cos */ = {
 			isa = PBXGroup;
 			children = (
 				5275A1301F2930E90062765F /* cos_doubles.c */,
@@ -149,31 +198,16 @@
 				5275A1321F2930E90062765F /* cos.py */,
 				5275A1331F2930E90062765F /* cos_doubles.py */,
 			);
-			name = cos;
-			path = fastggenegol;
-			sourceTree = "<group>";
-		};
-		52416DAF1F274AB000721D17 /* genelifepy */ = {
-			isa = PBXGroup;
-			children = (
-				521FDCEA1F287DEE00F08FFB /* subgenelife.c */,
-				521FDCEB1F287DEE00F08FFB /* genelife.py */,
-				521FDCEC1F287DEE00F08FFB /* genelife_update_module.py */,
-			);
-			name = genelifepy;
-			path = fastggenegol;
+			path = cos;
 			sourceTree = "<group>";
 		};
 		525EB7A01F18DCE4004078F1 = {
 			isa = PBXGroup;
 			children = (
-				52416DAF1F274AB000721D17 /* genelifepy */,
-				5275A1231F292F5B0062765F /* genelifepipedc */,
-				525EB7AB1F18DCE4004078F1 /* genelifec */,
-				52416DAE1F274A7100721D17 /* cos */,
+				5206B818215081EB00394209 /* genelifec */,
+				5206B8162150815C00394209 /* genelifepy */,
+				5206B8192150823000394209 /* cos */,
 				528F91931F2F9895008DD596 /* probtest */,
-				0D2CB7391F569D280013B2E4 /* libgene */,
-				0D2CB7471F569D9A0013B2E4 /* gene */,
 				525EB7AA1F18DCE4004078F1 /* Products */,
 				528F919E1F33303D008DD596 /* Frameworks */,
 			);
@@ -187,31 +221,10 @@
 				521FDCE21F287A6100F08FFB /* fastgenegol */,
 				5275A1281F292FA40062765F /* dispgenegol */,
 				528F91921F2F9895008DD596 /* probtest */,
-				0DA8D9CD214357B600B4B324 /* libgenelifed.dylib */,
+				521C1456214DDE9400E17A8F /* dispgenelife */,
+				521C1464214DDF0400E17A8F /* actgenelife */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		525EB7AB1F18DCE4004078F1 /* genelifec */ = {
-			isa = PBXGroup;
-			children = (
-				521FDCF41F287ECE00F08FFB /* fastgol.c */,
-				521FDCF51F287ECE00F08FFB /* batch.py */,
-				521FDCF01F287E7100F08FFB /* fastgenegol.c */,
-				521FDCF11F287E7100F08FFB /* fastgenelife.c */,
-			);
-			name = genelifec;
-			path = fastggenegol;
-			sourceTree = "<group>";
-		};
-		5275A1231F292F5B0062765F /* genelifepipedc */ = {
-			isa = PBXGroup;
-			children = (
-				521FDCFE1F288F4F00F08FFB /* dispgenegol.c */,
-				521FDCFF1F288F4F00F08FFB /* display.py */,
-			);
-			name = genelifepipedc;
-			path = fastggenegol;
 			sourceTree = "<group>";
 		};
 		528F91931F2F9895008DD596 /* probtest */ = {
@@ -237,13 +250,6 @@
 /* End PBXGroup section */
 
 /* Begin PBXHeadersBuildPhase section */
-		0DA8D9C9214357B600B4B324 /* Headers */ = {
-			isa = PBXHeadersBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		52416DA31F27425C00721D17 /* Headers */ = {
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
@@ -262,22 +268,39 @@
 /* End PBXHeadersBuildPhase section */
 
 /* Begin PBXNativeTarget section */
-		0DA8D9C4214357B600B4B324 /* genelifed */ = {
+		521C1455214DDE9400E17A8F /* dispgenelife */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 0DA8D9CA214357B600B4B324 /* Build configuration list for PBXNativeTarget "genelifed" */;
+			buildConfigurationList = 521C145A214DDE9400E17A8F /* Build configuration list for PBXNativeTarget "dispgenelife" */;
 			buildPhases = (
-				0DA8D9C5214357B600B4B324 /* Sources */,
-				0DA8D9C8214357B600B4B324 /* Frameworks */,
-				0DA8D9C9214357B600B4B324 /* Headers */,
+				521C1452214DDE9400E17A8F /* Sources */,
+				521C1453214DDE9400E17A8F /* Frameworks */,
+				521C1454214DDE9400E17A8F /* CopyFiles */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = genelifed;
-			productName = genelife;
-			productReference = 0DA8D9CD214357B600B4B324 /* libgenelifed.dylib */;
-			productType = "com.apple.product-type.library.dynamic";
+			name = dispgenelife;
+			productName = dispgenelife;
+			productReference = 521C1456214DDE9400E17A8F /* dispgenelife */;
+			productType = "com.apple.product-type.tool";
+		};
+		521C1463214DDF0400E17A8F /* actgenelife */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 521C1468214DDF0400E17A8F /* Build configuration list for PBXNativeTarget "actgenelife" */;
+			buildPhases = (
+				521C1460214DDF0400E17A8F /* Sources */,
+				521C1461214DDF0400E17A8F /* Frameworks */,
+				521C1462214DDF0400E17A8F /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = actgenelife;
+			productName = actgenelife;
+			productReference = 521C1464214DDF0400E17A8F /* actgenelife */;
+			productType = "com.apple.product-type.tool";
 		};
 		521FDCE11F287A6100F08FFB /* fastgenegol */ = {
 			isa = PBXNativeTarget;
@@ -324,6 +347,8 @@
 			buildRules = (
 			);
 			dependencies = (
+				5206B821215088B600394209 /* PBXTargetDependency */,
+				5206B81F215088B100394209 /* PBXTargetDependency */,
 			);
 			name = genelife;
 			productName = genelife;
@@ -373,6 +398,14 @@
 				LastUpgradeCheck = 0940;
 				ORGANIZATIONNAME = "Ruhr Universität Bochum";
 				TargetAttributes = {
+					521C1455214DDE9400E17A8F = {
+						CreatedOnToolsVersion = 9.4.1;
+						ProvisioningStyle = Automatic;
+					};
+					521C1463214DDF0400E17A8F = {
+						CreatedOnToolsVersion = 9.4.1;
+						ProvisioningStyle = Automatic;
+					};
 					521FDCE11F287A6100F08FFB = {
 						CreatedOnToolsVersion = 8.3.3;
 						ProvisioningStyle = Automatic;
@@ -412,16 +445,26 @@
 				521FDCE11F287A6100F08FFB /* fastgenegol */,
 				5275A1271F292FA40062765F /* dispgenegol */,
 				528F91911F2F9895008DD596 /* probtest */,
-				0DA8D9C4214357B600B4B324 /* genelifed */,
+				521C1455214DDE9400E17A8F /* dispgenelife */,
+				521C1463214DDF0400E17A8F /* actgenelife */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXSourcesBuildPhase section */
-		0DA8D9C5214357B600B4B324 /* Sources */ = {
+		521C1452214DDE9400E17A8F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				521C1471214E1B5C00E17A8F /* fastgenelife.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		521C1460214DDF0400E17A8F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5206B822215088E300394209 /* actgenelife.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -429,7 +472,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				521FDCF71F287EE800F08FFB /* fastgenelife.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -437,6 +479,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5206B81B2150835D00394209 /* fastgolstat.c in Sources */,
 				5275A1341F2930E90062765F /* cos_doubles.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -445,7 +488,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				52E469042147D3FB00975C4A /* subgenelife.c in Sources */,
+				52DB372021507BD00087F098 /* subgenelife.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -453,7 +496,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				5275A12F1F292FA90062765F /* dispgenegol.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -467,24 +509,72 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		5206B81F215088B100394209 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 521C1455214DDE9400E17A8F /* dispgenelife */;
+			targetProxy = 5206B81E215088B100394209 /* PBXContainerItemProxy */;
+		};
+		5206B821215088B600394209 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 521C1463214DDF0400E17A8F /* actgenelife */;
+			targetProxy = 5206B820215088B600394209 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
-		0DA8D9CB214357B600B4B324 /* Debug */ = {
+		521C145B214DDE9400E17A8F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				DYLIB_COMPATIBILITY_VERSION = 1;
-				DYLIB_CURRENT_VERSION = 1;
-				EXECUTABLE_PREFIX = lib;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
 		};
-		0DA8D9CC214357B600B4B324 /* Release */ = {
+		521C145C214DDE9400E17A8F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				DYLIB_COMPATIBILITY_VERSION = 1;
-				DYLIB_CURRENT_VERSION = 1;
-				EXECUTABLE_PREFIX = lib;
-				"INSTALL_PATH[sdk=*]" = /usr/local/lib;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+		521C1469214DDF0400E17A8F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		521C146A214DDF0400E17A8F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -539,6 +629,7 @@
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				EXECUTABLE_PREFIX = lib;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -550,6 +641,7 @@
 				DYLIB_CURRENT_VERSION = 1;
 				EXECUTABLE_PREFIX = lib;
 				"INSTALL_PATH[sdk=*]" = /usr/local/lib;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -721,11 +813,20 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		0DA8D9CA214357B600B4B324 /* Build configuration list for PBXNativeTarget "genelifed" */ = {
+		521C145A214DDE9400E17A8F /* Build configuration list for PBXNativeTarget "dispgenelife" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				0DA8D9CB214357B600B4B324 /* Debug */,
-				0DA8D9CC214357B600B4B324 /* Release */,
+				521C145B214DDE9400E17A8F /* Debug */,
+				521C145C214DDE9400E17A8F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		521C1468214DDF0400E17A8F /* Build configuration list for PBXNativeTarget "actgenelife" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				521C1469214DDF0400E17A8F /* Debug */,
+				521C146A214DDF0400E17A8F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
