@@ -60,7 +60,8 @@ int main (int argc, char *argv[]) {
 
     if (argc>1) runparams[0] = atoi(argv[1]); // if present update rulemod from command line 
     if (argc>2) runparams[1] = atoi(argv[2]); // if present update repscheme from command line 
-    if (argc>3) runparams[2] = atoi(argv[3]); // if present update selection from command line 
+    if (argc>3) runparams[2] = atoi(argv[3]); // if present update selection from command line
+    
     if (argc>4) simparams[0] = atoi(argv[4]); // if present update nlog2p0 from command line 
     if (argc>5) simparams[1] = atoi(argv[5]); // if present update nlog2pmut from command line 
     if (argc>6) simparams[2] = atoi(argv[6]); // if present update nloglog2p1 from command line
@@ -72,7 +73,7 @@ int main (int argc, char *argv[]) {
 
     initialize_planes(myoffs,Noff);
     initialize(runparams,nrunparams,simparams,nsimparams);
-    initialize_genes(runparams,nrunparams);
+    initialize_genes(simparams,nsimparams);
     for (i=0; i<nsteps; i++) {                  /* nsteps */
 	    for(k=0; k< ndisp; k++){
 	        gol = planes[curPlane];

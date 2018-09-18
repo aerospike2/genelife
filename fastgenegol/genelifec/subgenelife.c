@@ -431,7 +431,7 @@ void initialize_genes (int params[], int nparams) { // params included for possi
         g=0L;
         if (gol[ij] != 0)	{ // if live cell, fill with random genome g or all 1s depending on initialrdensity
             if ((rand() & rmask) < initialrdensity) {
-                    for (k=0; k<64; k++) g = (g << 1) | (rand() & 0x1L);
+                    for (k=0; k<64; k++) g = (g << 1) | (rand() & 0x1);
             }
             else g = 0xffffffffffffffff;
         }
@@ -439,6 +439,7 @@ void initialize_genes (int params[], int nparams) { // params included for possi
         if (golg[ij] == 0L && gol[ij] != 0L) printf("zero gene at %d",ij);
     }
     for (ij=0; ij<20; ij++) printf("gene at %d %lu\n",ij,golg[ij]);   // test first 20
+    printf("initialrdensity %d rmask %x",initialrdensity,rmask);
 }
 
 void get_curgol(long unsigned int outgol[], int NN){

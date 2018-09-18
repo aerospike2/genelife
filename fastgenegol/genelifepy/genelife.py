@@ -162,11 +162,12 @@ if __name__ == '__main__':
     nloglog2p1 = simparams[2] = 2       # power of 2 reduction in influence of nr of 1s in seq on prob
     initial1density = simparams[3] = 16384   # nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
     initialrdensity = simparams[4] = 16384   # nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
+    
     flatoff =  [x for sublist in offsets for x in sublist]
     npoffsets = np.array(flatoff,np.int32)
     genelife.initialize_planes(npoffsets)
     genelife.initialize(runparams,simparams)
-    genelife.initialize_genes(runparams)              # correction by John, but mistake had no effect
+    genelife.initialize_genes(simparams)              # correction by John, but mistake had no effect
 
     doanimation(nrun=1,ndisp=100,nskip=1000,niter=10)
 

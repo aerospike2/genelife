@@ -53,8 +53,8 @@ def get_curgolg(golg):
 def initialize(runparams,simparams):
     return libcd.initialize(runparams, len(runparams), simparams, len(simparams))
 
-def initialize_genes(runparams):
-    return libcd.initialize_genes(runparams, len(runparams))
+def initialize_genes(simparams):
+    return libcd.initialize_genes(simparams, len(simparams))
 
 def initialize_planes(offsets):
     return libcd.initialize_planes(offsets, len(offsets))
