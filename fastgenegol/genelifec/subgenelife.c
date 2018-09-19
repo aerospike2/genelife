@@ -430,13 +430,13 @@ void initialize_genes (int params[], int nparams) { // params included for possi
     for (ij=0; ij<N2; ij++) {
         g = 0;
         if (gol[ij] != 0)	{ // if live cell, fill with random genome g or all 1s depending on initialrdensity
-            if ((rand() & rmask) < initialrdensity) for (k=0; k<64; k++) g = (g << 1) | (rand() & 0x1L);
+            if ((rand() & rmask) < initialrdensity) for (k=0; k<64; k++) g = (g << 1) | (rand() & 0x1);
             else g = 0xffffffffffffffff;
         }
         golg[ij] = g;
-        if (golg[ij] == 0 && gol[ij] != 0) printf("zero gene at %d",ij);
+        if (golg[ij] == 0 && gol[ij] != 0) fprintf(stderr,"zero gene at %d",ij);
     }
-    // for (ij=0; ij<20; ij++) printf("gene at %d %u\n",ij,golg[ij]);   // test first 20
+    // for (ij=0; ij<40; ij++) fprintf(stderr,"gene at %d %lx\n",ij,golg[ij]);   // test first 40
 }
 
 void get_curgol(long unsigned int outgol[], int NN){
@@ -507,7 +507,7 @@ void countspecies(long unsigned int golg[], int params[], int N2, int nparams) {
         else {                                                              // non-neutral model based on presence of replicase gene
 	    POPCOUNT64C(last, nones);                                     // number of ones in new gene determines fitness
 	    fitness = nlog2p0 + ((nones < 16) ? 0 : (nones - 23));}       // 0 if < 16 otherwise nones-23
-        printf("count species %d with gene %lx has counts %lu and %d ones, fitness %d\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
+        fprintf(stderr,"count species %d with gene %lx has counts %lu and %d ones, fitness %d\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
     }
     printf("cumulative activity = %lu\n",(N2 * (long unsigned int) totsteps) - emptysites);
 }
