@@ -1,4 +1,4 @@
-*.pyc
+**/*.pyc
 project (N).pbxproj
 projectJ.pbxproj
 fastgenegol.profdata
@@ -12,5 +12,5 @@ probtest.xcscheme
 dispgenegoltest
 libgenelife.dylib
 dispgenegol
-*.xcuserstate
+**/*.xcuserstate
 
