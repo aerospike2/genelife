@@ -438,7 +438,7 @@ void initialize_genes (int params[], int nparams) { // params included for possi
         golg[ij] = g;
         if (golg[ij] == 0L && gol[ij] != 0L) printf("zero gene at %d",ij);
     }
-    for (ij=0; ij<20; ij++) printf("gene at %d %lu\n",ij,golg[ij]);   // test first 20
+    for (ij=0; ij<40; ij++) printf("gene at %d %lx\n",ij,golg[ij]);   // test first 20
     printf("initialrdensity %d rmask %x",initialrdensity,rmask);
 }
 
