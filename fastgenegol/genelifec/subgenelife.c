@@ -381,11 +381,10 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     repscheme = runparams[1];
     selection = runparams[2];
 
-    foo = simparams[0];
-    nlog2pmut = simparams[1];
-    nloglog2p1 = simparams[2];
-    initial1density = simparams[3];
-    initialrdensity = simparams[4];
+    nlog2pmut = simparams[0];
+    nloglog2p1 = simparams[1];
+    initial1density = simparams[2];
+    initialrdensity = simparams[3];
     
     gol = planes[curPlane];
 	for (ij=0; ij<N2; ij++) {
