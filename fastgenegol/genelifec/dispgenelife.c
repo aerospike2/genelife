@@ -55,7 +55,7 @@ int main (int argc, char *argv[]) {
     simparams[0] = 8;        // nlog2pmut: gene mutation probability
     simparams[1] = 2;        // nloglog2p1: power of two of reduction in p1 prob reduction by sequence
     simparams[2] = 16384;    // initial1density: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
-    simparams[3] = 32768;    // initialrdensity: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
+    simparams[3] = 16384;    // initialrdensity: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
 
     if (argc>1) runparams[0] = atoi(argv[1]); // if present update rulemod from command line
     if (argc>2) runparams[1] = atoi(argv[2]); // if present update repscheme from command line
@@ -66,8 +66,8 @@ int main (int argc, char *argv[]) {
     if (argc>7) simparams[3] = atoi(argv[7]); // if present update init rand density from command line
 
     fprintf(stderr,"Parameters:\n");
-    fprintf(stderr,"rulemod-0-1\trepscheme=0-4\tselection=0-2\tnlog2p0\t\tnlog2pmut\tnloglog2p1\tinitial1density\tinitialrdensity\n");
-    fprintf(stderr,"%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\n",runparams[0],runparams[1],runparams[2],simparams[0],simparams[1],simparams[2],simparams[3],simparams[4]);
+    fprintf(stderr,"rulemod-0-1\trepscheme=0-4\tselection=0-2\tnlog2pmut\tnloglog2p1\tinitial1density\tinitialrdensity\n");
+    fprintf(stderr,"%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\n",runparams[0],runparams[1],runparams[2],simparams[0],simparams[1],simparams[2],simparams[3]);
 
     initialize_planes(myoffs,Noff);
     initialize(runparams,nrunparams,simparams,nsimparams);
