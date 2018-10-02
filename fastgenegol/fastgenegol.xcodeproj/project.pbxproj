@@ -110,7 +110,6 @@
 		528F91A31F333095008DD596 /* SyncServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SyncServices.framework; path = System/Library/Frameworks/SyncServices.framework; sourceTree = SDKROOT; };
 		528F91A51F333143008DD596 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		52DB371F21507BCF0087F098 /* subgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = subgenelife.c; path = genelifec/subgenelife.c; sourceTree = SOURCE_ROOT; };
-		52F416F92154D366005CF49B /* subgenelife_codedep.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = subgenelife_codedep.c; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -187,7 +186,6 @@
 				5206B81121507E2200394209 /* actgenelife.c */,
 				5206B80F21507E0B00394209 /* dispgenelife.c */,
 				52DB371F21507BCF0087F098 /* subgenelife.c */,
-				52F416F92154D366005CF49B /* subgenelife_codedep.c */,
 			);
 			path = genelifec;
 			sourceTree = "<group>";

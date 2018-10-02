@@ -191,7 +191,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                 newgol[ij]=survive;
                 newgolg[ij]=survive*golg[ij];
             }
-            else {      // potential birth rule depending on ancestor gene
+            else {      // potential birth rule depending on ancestor genes
                 birth = (s==3) ? 1L : 0L;
                 gene = golg[ij]>>32;
                 for (k=0;k<8;k++) {
@@ -406,7 +406,7 @@ void initialize_genes (int params[], int nparams) { // params included for possi
         g = 0;
         if (gol[ij] != 0)	{ // if live cell, fill with random genome g or all 1s depending on initialrdensity
             if ((rand() & rmask) < initialrdensity) for (k=0; k<64; k++) g = (g << 1) | (rand() & 0x1);
-            else g = 0xffffffffffffffff;
+            else g = 0xf0f0f0f0f0f0f0f0;
         }
         golg[ij] = g;
         if (golg[ij] == 0 && gol[ij] != 0) fprintf(stderr,"zero gene at %d",ij);
