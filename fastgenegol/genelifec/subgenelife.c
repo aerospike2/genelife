@@ -29,7 +29,6 @@ const int Nmask = N - 1;            // bit mask for side length, used instead of
                                     // integer negative log 2 of max prob p0 for rule departure and prob pmut of mutation
                                     // the maximum prob is further reduced by a sequence-specific prob p1 (p=p0*p1)
                                     // p1 goes from 1 down to 2^-32 depending on genetic differences
-int nloglog2p1 = 2;                 // in [0:5] determines random background (32 ones in 64 bit seq) min prob p1 = 2^(-2^(5-nloglog2p1))
 int nlog2pmut = 5;                  // pmut (prob of mutation) = 2^(-nlog2pmut), minimum
 long unsigned int pmutmask;         // binary mask so that prob of choosing zero is pmut, assigned
 
@@ -382,9 +381,8 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     selection = runparams[2];
 
     nlog2pmut = simparams[0];
-    nloglog2p1 = simparams[1];
-    initial1density = simparams[2];
-    initialrdensity = simparams[3];
+    initial1density = simparams[1];
+    initialrdensity = simparams[2];
     
     gol = planes[curPlane];
 	for (ij=0; ij<N2; ij++) {

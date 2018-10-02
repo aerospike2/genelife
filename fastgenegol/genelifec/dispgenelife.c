@@ -31,10 +31,10 @@ int main (int argc, char *argv[]) {
 		  0, -1, 0,
 		  -1, -1, 0};
     int runparams[3];
-    int simparams[5];
-    int nrunparams=3; int nsimparams=4;
+    int simparams[3];
+    int nrunparams=3; int nsimparams=3;
     int nsteps = 10;	      // total number of steps to simulate GoL
-    int ndisp  = 100;	      // display GoL ndisp steps
+    int ndisp  = 200;	      // display GoL ndisp steps
     int nskip = 1000;	      // skip this many
 
     int opt;
@@ -42,7 +42,7 @@ int main (int argc, char *argv[]) {
         switch (opt) {
 	case 'h':
         default:
-	    fprintf(stderr,"Usage: %s  [rulemod=0-1 [repscheme=0-4 [selection=0-2 [nlog2p0 [nlog2pmut [initialdensity]]]]]]\n", argv[0]);
+	    fprintf(stderr,"Usage: %s  [rulemod=0-1 [repscheme=0-4 [selection=0-2 [nlog2pmut [initial1density [initialrdensity [nstep [nskip]]]]]]]\n", argv[0]);
             exit(EXIT_FAILURE);
         }
     }
@@ -53,22 +53,23 @@ int main (int argc, char *argv[]) {
     runparams[2] = 1;        // 0-2 selection 
 
     simparams[0] = 8;        // nlog2pmut: gene mutation probability
-    simparams[1] = 2;        // nloglog2p1: power of two of reduction in p1 prob reduction by sequence
-    simparams[2] = 16384;    // initial1density: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
-    simparams[3] = 16384;    // initialrdensity: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
+    simparams[1] = 16384;    // initial1density: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
+    simparams[2] = 32768;    // initialrdensity: 32768 makes all genomes active 16384 makes half active, etc.
 
     if (argc>1) runparams[0] = atoi(argv[1]); // if present update rulemod from command line
     if (argc>2) runparams[1] = atoi(argv[2]); // if present update repscheme from command line
     if (argc>3) runparams[2] = atoi(argv[3]); // if present update selection from command line
     if (argc>4) simparams[0] = atoi(argv[4]); // if present update nlog2pmut from command line
-    if (argc>5) simparams[1] = atoi(argv[5]); // if present update nloglog2p1 from command line
-    if (argc>6) simparams[2] = atoi(argv[6]); // if present update initial density from command line
-    if (argc>7) simparams[3] = atoi(argv[7]); // if present update init rand density from command line
+    if (argc>5) simparams[1] = atoi(argv[5]); // if present update initial density from command line
+    if (argc>6) simparams[2] = atoi(argv[6]); // if present update init rand density from command line
+    if (argc>7) ndisp = atoi(argv[7]); // if present update init rand density from command line
+    if (argc>8) nskip = atoi(argv[8]); // if present update init rand density from command line
 
     fprintf(stderr,"Parameters:\n");
-    fprintf(stderr,"rulemod-0-1\trepscheme=0-4\tselection=0-2\tnlog2pmut\tnloglog2p1\tinitial1density\tinitialrdensity\n");
-    fprintf(stderr,"%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\n",runparams[0],runparams[1],runparams[2],simparams[0],simparams[1],simparams[2],simparams[3]);
-
+    fprintf(stderr,"rulemod-0-1\trepscheme=0-4\tselection=0-2\tnlog2pmut\tinitial1density\tinitialrdensity\n");
+    fprintf(stderr,"%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\n",runparams[0],runparams[1],runparams[2],simparams[0],simparams[1],simparams[2]);
+    fprintf(stderr,"ndisp\tnskip\n");
+    fprintf(stderr,"%d\t\t%d\n",ndisp,nskip);
     initialize_planes(myoffs,Noff);
     initialize(runparams,nrunparams,simparams,nsimparams);
     initialize_genes(runparams,nrunparams);
