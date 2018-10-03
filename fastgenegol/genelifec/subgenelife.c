@@ -161,6 +161,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
     // int nones;
     long unsigned int survive, birth;
     unsigned int cmask;
+    int s2cnt=0;
 
     totsteps++;
     randnr = 0x0123456789abcdef;                                            // initialize random nr
@@ -215,9 +216,10 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                         } // if
                         if (sl&0x2) kanc = k;   // neighbour contributing 2 or 3 live next shell neighbours serves as ancestor, only works for repscheme==2
                     } // for
-                    if(s2==3) {                 // 3 live neighbours in 2nd shell pointed to by live first shell neighbours
+                    if(s2>0) {                 // 3 live neighbours in 2nd shell pointed to by live first shell neighbours
                         birth = 1L;
                         newgene = golg[nb[(nb1i>>(kanc<<2))&0x7]];
+                        s2cnt++;
                     }
                 }  // if
                 else if (s==3) {                                                             // 3 deterministic choice of ancestor: replication of live neigbour in unique pos
@@ -272,6 +274,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
 	    gol[ij] = newgol[ij];        // copy new gol config to old one
 	    golg[ij] = newgolg[ij];      // copy new genes to old genes
     }
+    fprintf(stderr,"%d\n",s2cnt);
 }
 
 void genelife_update (int nsteps, int histoflag) {
