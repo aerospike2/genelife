@@ -216,10 +216,9 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                         } // if
                         if (sl&0x2) kanc = k;   // neighbour contributing 2 or 3 live next shell neighbours serves as ancestor, only works for repscheme==2
                     } // for
-                    if(s2>0) {                 // 3 live neighbours in 2nd shell pointed to by live first shell neighbours
+                    if(s2==3) {                 // 3 live neighbours in 2nd shell pointed to by live first shell neighbours
                         birth = 1L;
                         newgene = golg[nb[(nb1i>>(kanc<<2))&0x7]];
-                        // newgene = 0xfff0fff0fff0fff0
                         s2cnt++;
                     }
                 }  // if
@@ -275,7 +274,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
 	    gol[ij] = newgol[ij];        // copy new gol config to old one
 	    golg[ij] = newgolg[ij];      // copy new genes to old genes
     }
-    fprintf(stderr,"%d\n",s2cnt);
+    // fprintf(stderr,"s2cnt %d, repscheme %d, initialrdensity %d\n",s2cnt,repscheme,initialrdensity);
 }
 
 void genelife_update (int nsteps, int histoflag) {
@@ -415,15 +414,25 @@ void initialize_genes (int params[], int nparams) { // params included for possi
     long unsigned int *gol;
     long unsigned int *golg;
     static unsigned int rmask = (1 << 15) - 1;
+    long unsigned int startgenes[8];
 
     gol = planes[curPlane];
     golg = planesg[curPlane];
 
+    startgenes[0] = 0x000000000000aaaa;
+    startgenes[1] = 0x00000000ffffaaaa;
+    startgenes[2] = 0x0000ffff0000aaaa;
+    startgenes[3] = 0x0000ffffffffaaaa;
+    startgenes[4] = 0xffff00000000aaaa;
+    startgenes[5] = 0xffff0000ffffaaaa;
+    startgenes[6] = 0xffffffff0000aaaa;
+    startgenes[7] = 0xffffffffffffaaaa;
+    
     for (ij=0; ij<N2; ij++) {
         g = 0;
-        if (gol[ij] != 0)	{ // if live cell, fill with random genome g or all 1s depending on initialrdensity
+        if (gol[ij] != 0)	{ // if live cell, fill with random genome g or randomly chosen startgene depending on initialrdensity
             if ((rand() & rmask) < initialrdensity) for (k=0; k<64; k++) g = (g << 1) | (rand() & 0x1);
-            else g = 0xffffffffffffffff;
+            else g = startgenes[rand() & 0x7];
         }
         golg[ij] = g;
         if (golg[ij] == 0 && gol[ij] != 0) fprintf(stderr,"zero gene at %d",ij);
@@ -527,3 +536,23 @@ void printxy (long unsigned int gol[],long unsigned int golg[]) {   /* print the
     }
     printf("\n");
 }
+
+void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], int N2) {
+    long unsigned int gene, mask;
+    int ij,k;
+    for (ij=0; ij<N2; ij++) {
+        if (gol[ij]) {
+            gene = golg[ij];
+            // mask = 0xff & gene;
+            mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
+            //for (k=1;k<8;k++) {
+            //    gene = gene>>8;
+            //    mask = (gene & 0xff) ^ mask;
+            //}
+            // mask = ij & 0xff;               // debug to make sure that values are being set
+            cgolg[ij] = 1 + (int) mask;
+        }
+        else cgolg[ij] = 0;
+    }
+}
+

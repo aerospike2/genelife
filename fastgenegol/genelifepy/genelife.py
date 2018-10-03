@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mpcolors
-from matplotlib.colors import ListedColormap
+from   matplotlib.colors import ListedColormap
 import matplotlib.animation as animation
 import matplotlib
 import genelife_update_module as genelife
@@ -14,8 +14,7 @@ Nmask = N-1
 gol = np.zeros(N2,np.uint64)
 golg = np.zeros(N2,np.uint64)
 cgrid = np.zeros((N,N),np.uint)
-
-
+cgolg =np.zeros(N2,np.int32)
 
 # setup of color map : black for 0, colors for 1 to LEN+1 or 257 for colormethod 0 or 1
 #-----------------------------------------------------------------------------------------------------------
@@ -84,16 +83,15 @@ my_cmap = rand_cmap(257, type='bright', first_color_black=True, last_color_black
 
 def colorgrid(N):
     """ colors array according to grid and genegrid using colormethod"""
-    global gol,cgrid,golg
-    for i in range(N):                 # make this simple array copy operation more efficient
-        for j in range(N):
-            if gol[i+j*N]:
-                cgrid[i,j] = 1 + (int(golg[i+j*N]//0x100000000000000))
-            else:
-                cgrid[i,j] = 0
+    global gol,cgrid,golg,cgolg
+    
+    genelife.colorgenes(gol,golg,cgolg)
+    for i in xrange(N):
+        for j in xrange(N):
+            ij = i+j*N
+            cgrid[i,j] = cgolg[ij]
+            # cgrid=np.reshape(cgolg,(N,N))   does not work, why ???????
     return
-
-
 
 cnt = 0
 framenr = 0
@@ -119,7 +117,7 @@ def doanimation(nrun=1,         # number of CA iterations per animation time ste
     time_text = ax.text(0.05, 0.95,'',horizontalalignment='left',verticalalignment='top', transform=ax.transAxes)
     colorgrid(N)
     def update_anim(data):
-        global gol, cgrid
+        global gol, golg, cgrid
         global cnt
         global framenr
         cnt = cnt+1
@@ -149,7 +147,7 @@ if __name__ == '__main__':
                 [ 1,-1, 0],
                 [ 0,-1, 0],
                 [-1,-1, 0]]
-    cgrid = np.zeros((N,N),np.uint)
+    cgrid = np.zeros((N,N),np.int32)    #  used to be np.uint
 
     runparams = np.zeros(3,np.int32)    # 3 parameters passed to C
     rulemod = runparams[0] = 1          # 0,1
