@@ -148,19 +148,16 @@ if __name__ == '__main__':
                 [ 0,-1, 0],
                 [-1,-1, 0]]
     cgrid = np.zeros((N,N),np.int32)    #  used to be np.uint
-
     runparams = np.zeros(3,np.int32)    # 3 parameters passed to C
-    rulemod = runparams[0] = 1          # 0,1
-    repscheme = runparams[1] = 4        # 0-4
-    selection = runparams[2] = 1        # 0-2
-    
+    rulemod = runparams[0] = 1          # 0,1 whether to allow modification of GoL rules
+    repscheme = runparams[1] = 4        # 0-8 number of live neighbour rule to defer to second shell
+    selection = runparams[2] = 1        # 0-8 initial startgene for non random genes (8 = rand choice of 0-7)
     simparams = np.zeros(5,np.int32)    # 5 parameters passed to C
-    nlog2p0   = simparams[0] = 8        # base prob of GOL departure 1/2^nlog2p0
-    nlog2pmut = simparams[1] = 8        # gene mutation probability
-    nloglog2p1 = simparams[2] = 2       # power of 2 reduction in influence of nr of 1s in seq on prob
-    initial1density = simparams[3] = 16384   # nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
-    initialrdensity = simparams[4] = 16384   # nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
-    
+    nlog2pmut = simparams[0] = 8        # gene mutation probability
+    initial1density = simparams[1] = 16384   # nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
+    initialrdensity = simparams[2] = 16384   # nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
+    ncoding = simparams[3] = 16         # number of bits used to determine connection coding 1-16
+
     flatoff =  [x for sublist in offsets for x in sublist]
     npoffsets = np.array(flatoff,np.int32)
     genelife.initialize_planes(npoffsets)

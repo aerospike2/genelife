@@ -38,9 +38,10 @@ int totsteps=0;
 int rulemod = 1;                    // det: whether to modify GoL rule for 2 and 3 live neighbours : opposite outcome with small probability p0
 int selection = 1;                  // fitness model: 0 neutral 1 selected gene prob of rule departure 2 presence of replicase gene
 int repscheme = 1;                  // replication scheme: 0 random choice , 1 XOR of all 3, 2 consensus, 3 unique det choice, 4 most different
-
+int ncoding = 16;                   // number of bits used to encode valid neighbour connection in gene 1-16
 int initial1density = (1<<15)>>1;        // initial density of ones in gol as integer value, divide by 2^15 for true density
 int initialrdensity = (1<<15)>>1;        // initial density of random genes in live sites, divide by 2^15 for true density
+long unsigned int codingmask;           // mask for ncoding bits
 static long unsigned int  emptysites = 0;  // cumulative number of empty sites during simulation updates
 
 int Noff = 9;                           // number of offsets
@@ -161,6 +162,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
     // int nones;
     long unsigned int survive, birth;
     unsigned int cmask;
+
     int s2cnt=0;
 
     totsteps++;
@@ -193,8 +195,8 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                         cmask = 0;                                          // connection mask initialized to 0
                         sl = 0;                                             // initialize number of connected live neighbours of this neighbour
                         for(l=1;l<4;l++) {                                  // 3 possible connections encoded in 3 16-bit gene words
-                            genelink = (gene >> (l<<4)) & 0xffff;           // 16 bit sequences describing possible links
-                            if (genelink == 0xffff) cmask = cmask|(1<<(l-1));// set mask only if connection encoded (all ones), later use probs
+                            genelink = (gene >> (l<<4)) & codingmask;           // ncoding bit sequences describing possible links: ncoding <=16
+                            if (genelink == codingmask) cmask = cmask|(1<<(l-1));// set mask only if connection encoded (all ones), later use probs
                         }
                         if(cmask) {                                                  // only if there are some connections
                             i1 = ij1 & Nmask;  j1 = ij1 >> log2N;                                   // row & column
@@ -215,7 +217,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                         } // if
                         if (sl&0x2) kanc = k;   // neighbour contributing 2 or 3 live next shell neighbours serves as ancestor, only works for repscheme==2
                     } // for
-                    if(s2==4) {                 // 3 live neighbours in 2nd shell pointed to by live first shell neighbours
+                    if(s2==3) {                 // 3 live neighbours in 2nd shell pointed to by live first shell neighbours
                         birth = 1L;
                         newgene = golg[nb[(nb1i>>(kanc<<2))&0x7]];
                         s2cnt++;
@@ -400,6 +402,8 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     nlog2pmut = simparams[0];
     initial1density = simparams[1];
     initialrdensity = simparams[2];
+    ncoding = simparams[3];
+    codingmask = (0x1L<<ncoding)-1;
     
     gol = planes[curPlane];
 	for (ij=0; ij<N2; ij++) {
