@@ -218,6 +218,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                     if(s2==3) {                 // 3 live neighbours in 2nd shell pointed to by live first shell neighbours
                         birth = 1L;
                         newgene = golg[nb[(nb1i>>(kanc<<2))&0x7]];
+                        // newgene = 0xfff0fff0fff0fff0
                     }
                 }  // if
                 else if (s==3) {                                                             // 3 deterministic choice of ancestor: replication of live neigbour in unique pos
@@ -419,7 +420,7 @@ void initialize_genes (int params[], int nparams) { // params included for possi
         g = 0;
         if (gol[ij] != 0)	{ // if live cell, fill with random genome g or all 1s depending on initialrdensity
             if ((rand() & rmask) < initialrdensity) for (k=0; k<64; k++) g = (g << 1) | (rand() & 0x1);
-            else g = 0xf0f0f0f0f0f0f0f0;
+            else g = 0xffffffffffffffff;
         }
         golg[ij] = g;
         if (golg[ij] == 0 && gol[ij] != 0) fprintf(stderr,"zero gene at %d",ij);
