@@ -155,7 +155,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
     int nb[8], ij, i, j, jp1, jm1, ip1, im1;
     int nb1[8], ij1, i1, j1, j1p1, j1m1, i1p1, i1m1;
     long unsigned int s, gs, s2, sl, nbi, nb1i, nbil, randnr, randnr2, r2;
-    long unsigned int nbmask, nbmaskr, nbmaskrm,rulemodl;
+    long unsigned int nbmask, nbmaskr, nbmaskrm;
     long unsigned int gene, newgene, genelink;
     // long unsigned int andgene, orgene;
     // int nones;
@@ -165,7 +165,6 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
 
     totsteps++;
     randnr = 0x0123456789abcdef;                                            // initialize random nr
-    rulemodl = rulemod ? 1L : 0L;                                           // convert integer rulemod binary to long unsigned integer for use in long logic
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
 	    i = ij & Nmask;  j = ij >> log2N;                                   // row & column
 	    jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
@@ -185,7 +184,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
             }
             else {                                                          // potential birth rule depending on ancestor genes
                 birth = 0L; newgene = 0L;
-                if (s==repscheme) {                                         // special rule, repscheme=2 or 4, check next coded nbs & proceed if 3 matching live nbs
+                if ((s==repscheme) && rulemod) {                            // special rule, repscheme=2 or 4, check next coded nbs & proceed if 3 matching live nbs
                     for (k=kanc=0,s2=0;k<s;k++) {                           // loop only over live neigbours, s2 is number of live nbs in connected 2nd ring
                         nbi = (nb1i>>(k<<2))&0x7;                           // kth live neighbour index
                         ij1 = nb[nbi];                                      // neighbour site ij index
@@ -216,7 +215,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                         } // if
                         if (sl&0x2) kanc = k;   // neighbour contributing 2 or 3 live next shell neighbours serves as ancestor, only works for repscheme==2
                     } // for
-                    if(s2==3) {                 // 3 live neighbours in 2nd shell pointed to by live first shell neighbours
+                    if(s2==4) {                 // 3 live neighbours in 2nd shell pointed to by live first shell neighbours
                         birth = 1L;
                         newgene = golg[nb[(nb1i>>(kanc<<2))&0x7]];
                         s2cnt++;
@@ -254,10 +253,10 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                     RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
                     // compute random events for single bit mutation, as well as mutation position nmut
 	                randnr2 = (randnr >> 24) & pmutmask;                                // extract bits from randnr for random trial for 0 on pmutmask
-	                r2 = randnr2?0:1;                                                   // 1 if lowest nlog2pmut bits of (bits 24-47 of randnr) are zero, else zero
+	                r2 = randnr2?0L:1L;                                                   // 1 if lowest nlog2pmut bits of (bits 24-47 of randnr) are zero, else zero
 	                nmut = (randnr >> 48) & 0x3f;                                       // choose mutation position for length 64 gene : from bits 48:53 of randnr
 	                // complete calculation of newgol and newgolg, including mutation
-	                newgene = newgene ^ (r2*(0x1L<<nmut));                              // introduce single mutation with probability pmut = probmut
+	                newgene = newgene ^ (r2<<nmut);                              // introduce single mutation with probability pmut = probmut
                  }
                  newgol[ij]  =  gol[ij] | birth ;                                    // new game of life cell value: stays same or set to one from zero if birth
                  newgolg[ij] =  birth*newgene;                                       // if birth (implies empty) then newgene
@@ -432,7 +431,8 @@ void initialize_genes (int params[], int nparams) { // params included for possi
         g = 0;
         if (gol[ij] != 0)	{ // if live cell, fill with random genome g or randomly chosen startgene depending on initialrdensity
             if ((rand() & rmask) < initialrdensity) for (k=0; k<64; k++) g = (g << 1) | (rand() & 0x1);
-            else g = startgenes[rand() & 0x7];
+            else if (selection == 8) g = startgenes[rand() & 0x7];
+            else g = startgenes[selection & 0x7];
         }
         golg[ij] = g;
         if (golg[ij] == 0 && gol[ij] != 0) fprintf(stderr,"zero gene at %d",ij);
