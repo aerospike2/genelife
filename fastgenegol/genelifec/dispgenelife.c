@@ -72,7 +72,6 @@ int main (int argc, char *argv[]) {
     fprintf(stderr,"%d\t\t%d\n",ndisp,nskip);
     initialize_planes(myoffs,Noff);
     initialize(runparams,nrunparams,simparams,nsimparams);
-    initialize_genes(runparams,nrunparams);
     for (i=0; i<nsteps; i++) {                  /* nsteps */
 	    for(k=0; k< ndisp; k++){
 	        gol = planes[curPlane];

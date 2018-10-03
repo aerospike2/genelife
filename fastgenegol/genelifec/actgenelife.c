@@ -105,7 +105,6 @@ int main (int argc, char *argv[]) {
 
     initialize_planes(myoffs,Noff);
     initialize(runparams,nrunparams,simparams,nsimparams);
-    initialize_genes(simparams,nsimparams);
     fprintf(stderr,"finished initialize.\n");
     for (i=0; i<nsteps; i++) {                  /* nsteps */
 	    golg = planesg[curPlane];

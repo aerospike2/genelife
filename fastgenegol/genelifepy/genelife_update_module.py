@@ -22,8 +22,6 @@ libcd.genelife_update.restype = None
 libcd.genelife_update.argtypes = [ c_int, c_int]
 libcd.initialize.restype = None
 libcd.initialize.argtypes = [int_array, c_int, int_array, c_int]
-libcd.initialize_genes.restype = None
-libcd.initialize_genes.argtypes = [int_array, c_int]
 libcd.initialize_planes.restype = None
 libcd.initialize_planes.argtypes = [int_array, c_int]
 libcd.countspecies.restype = None
@@ -53,9 +51,6 @@ def get_curgolg(golg):
 
 def initialize(runparams,simparams):
     return libcd.initialize(runparams, len(runparams), simparams, len(simparams))
-
-def initialize_genes(simparams):
-    return libcd.initialize_genes(simparams, len(simparams))
 
 def initialize_planes(offsets):
     return libcd.initialize_planes(offsets, len(offsets))

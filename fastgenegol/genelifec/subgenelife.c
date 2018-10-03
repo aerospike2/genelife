@@ -388,12 +388,48 @@ void initialize_planes(int offs[],  int N) {
     planesg[4] = planeg4;planesg[5] = planeg5;planesg[6] = planeg6;planesg[7] = planeg7;
 }
 
-void initialize (int runparams[], int nrunparams, int simparams[], int nsimparams) {
-	int ij;
+char *readFile(char *fileName)
+{
+  FILE *file;
+  char *code = malloc(32* 32 * sizeof(char));
+  file = fopen(fileName, "r");
+  do
+  {
+    *code++ = (char)fgetc(file);
 
+  } while(*code != EOF);
+  fclose(file);
+  return code;
+}
+
+int writeFile(char *fileName)
+{
+    FILE *file;
+    int ij,error;
+    file = fopen(fileName, "w");
+    error = 0;
+    for(ij=0;ij<32*32;ij++) {
+        error=fputc(0,file);
+        if (error) break;
+    }
+    fclose(file);
+    return error;
+}
+
+void initialize (int runparams[], int nrunparams, int simparams[], int nsimparams) {
+    int ij,ij1,k;
+    long unsigned int g;
     long unsigned int *gol;
-    static unsigned int rmask = (1 << 15) - 1;         // Why 15 bits used here, related to rand(), see next line
+    long unsigned int *golg;
+    static unsigned int rmask = (1 << 15) - 1;
     // Range: rand returns numbers in the range of [0, RAND_MAX ), and RAND_MAX is specified with a minimum value of 32,767. i.e. 15 bit
+
+    long unsigned int startgenes[8];
+    
+    static int Nf = 1;
+    char *golgin;
+    
+    // writeFile("genepat.dat");
 
     rulemod = runparams[0];
     repscheme = runparams[1];
@@ -405,23 +441,6 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     ncoding = simparams[3];
     codingmask = (0x1L<<ncoding)-1;
     
-    gol = planes[curPlane];
-	for (ij=0; ij<N2; ij++) {
-		gol[ij] = ((rand() & rmask) < initial1density)?1:0;
-	}
-}
-
-void initialize_genes (int params[], int nparams) { // params included for possible future use
-    int ij,k;
-    long unsigned int g;
-    long unsigned int *gol;
-    long unsigned int *golg;
-    static unsigned int rmask = (1 << 15) - 1;
-    long unsigned int startgenes[8];
-
-    gol = planes[curPlane];
-    golg = planesg[curPlane];
-
     startgenes[0] = 0x000000000000aaaa;
     startgenes[1] = 0x00000000ffffaaaa;
     startgenes[2] = 0x0000ffff0000aaaa;
@@ -431,17 +450,46 @@ void initialize_genes (int params[], int nparams) { // params included for possi
     startgenes[6] = 0xffffffff0000aaaa;
     startgenes[7] = 0xffffffffffffaaaa;
     
-    for (ij=0; ij<N2; ij++) {
-        g = 0;
-        if (gol[ij] != 0)	{ // if live cell, fill with random genome g or randomly chosen startgene depending on initialrdensity
-            if ((rand() & rmask) < initialrdensity) for (k=0; k<64; k++) g = (g << 1) | (rand() & 0x1);
-            else if (selection == 8) g = startgenes[rand() & 0x7];
-            else g = startgenes[selection & 0x7];
+    gol = planes[curPlane];
+    golg = planesg[curPlane];
+ 
+    if (Nf) {           // input from file
+        golgin=readFile("genepat.dat");
+        for (ij=0; ij<N2; ij++) {
+            gol[ij] = 0;
+            golg[ij] = 0;
         }
-        golg[ij] = g;
-        if (golg[ij] == 0 && gol[ij] != 0) fprintf(stderr,"zero gene at %d",ij);
+        for (ij1=0; ij1<32*32; ij1++) {
+            ij=(N>>1)-16+(ij1&0x1f)+ N*((N>>1)-16+(ij1>>5));
+            if (golgin[ij1] > 0)    {                   // if live cell
+                gol[ij] = 1L;
+                if(golgin[ij1] <= 8 ) golg[ij] = startgenes[golgin[ij1]-1];
+                else golg[ij] = 0;
+            }
+            else {
+                gol[ij] = 0;
+                golg[ij] = 0;
+            }
+            if (golg[ij] == 0 && gol[ij] != 0) fprintf(stderr,"zero gene at %d",ij);
+        }
+
     }
-    // for (ij=0; ij<40; ij++) fprintf(stderr,"gene at %d %lx\n",ij,golg[ij]);   // test first 40
+    else {
+        for (ij=0; ij<N2; ij++) {
+            gol[ij] = ((rand() & rmask) < initial1density)?1:0;
+        }
+        for (ij=0; ij<N2; ij++) {
+            g = 0;
+            if (gol[ij] != 0)    { // if live cell, fill with random genome g or randomly chosen startgene depending on initialrdensity
+                if ((rand() & rmask) < initialrdensity) for (k=0; k<64; k++) g = (g << 1) | (rand() & 0x1);
+                else if (selection == 8) g = startgenes[rand() & 0x7];
+                else g = startgenes[selection & 0x7];
+            }
+            golg[ij] = g;
+            if (golg[ij] == 0 && gol[ij] != 0) fprintf(stderr,"zero gene at %d",ij);
+        }
+        // for (ij=0; ij<40; ij++) fprintf(stderr,"gene at %d %lx\n",ij,golg[ij]);   // test first 40
+    }
 }
 
 void get_curgol(long unsigned int outgol[], int NN){
@@ -543,7 +591,7 @@ void printxy (long unsigned int gol[],long unsigned int golg[]) {   /* print the
 
 void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], int N2) {
     long unsigned int gene, mask;
-    int ij,k;
+    int ij;
     for (ij=0; ij<N2; ij++) {
         if (gol[ij]) {
             gene = golg[ij];
