@@ -287,6 +287,7 @@ void genelife_update (int nsteps, int histoflag) {
     static int first = 1;
 
     if (first) {
+        srand(1234567);
         state[0] = rand();state[1] = rand();
         pmutmask = (0x1 << nlog2pmut) - 1;
         first = 0;
@@ -426,7 +427,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
 
     long unsigned int startgenes[8];
     
-    static int Nf = 1;
+    static int Nf = 0;
     char *golgin;
     
     // writeFile("genepat.dat");
@@ -464,13 +465,13 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
             if (golgin[ij1] > 0)    {                   // if live cell
                 gol[ij] = 1L;
                 if(golgin[ij1] <= 8 ) golg[ij] = startgenes[golgin[ij1]-1];
-                else golg[ij] = 0;
+                else golg[ij] = startgenes[7];
             }
             else {
                 gol[ij] = 0;
                 golg[ij] = 0;
             }
-            if (golg[ij] == 0 && gol[ij] != 0) fprintf(stderr,"zero gene at %d",ij);
+            if (golg[ij] == 0 && gol[ij] != 0) fprintf(stderr,"zero gene at %d\n",ij);
         }
 
     }
@@ -486,7 +487,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
                 else g = startgenes[selection & 0x7];
             }
             golg[ij] = g;
-            if (golg[ij] == 0 && gol[ij] != 0) fprintf(stderr,"zero gene at %d",ij);
+            if (golg[ij] == 0 && gol[ij] != 0) fprintf(stderr,"zero gene at %d\n",ij);
         }
         // for (ij=0; ij<40; ij++) fprintf(stderr,"gene at %d %lx\n",ij,golg[ij]);   // test first 40
     }
@@ -590,19 +591,22 @@ void printxy (long unsigned int gol[],long unsigned int golg[]) {   /* print the
 }
 
 void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], int N2) {
-    long unsigned int gene, mask;
-    int ij;
+    long unsigned int gene, genelink;
+    int ij,l;
+    unsigned int cmask;
+    
     for (ij=0; ij<N2; ij++) {
         if (gol[ij]) {
             gene = golg[ij];
-            // mask = 0xff & gene;
-            mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
-            //for (k=1;k<8;k++) {
-            //    gene = gene>>8;
-            //    mask = (gene & 0xff) ^ mask;
-            //}
-            // mask = ij & 0xff;               // debug to make sure that values are being set
-            cgolg[ij] = 1 + (int) mask;
+            
+            cmask = 0;                                          // connection mask initialized to 0
+            for(l=1;l<4;l++) {                                  // 3 possible connections encoded in 3 16-bit gene words
+                genelink = (gene >> (l<<4)) & codingmask;           // ncoding bit sequences describing possible links: ncoding <=16
+                if (genelink == codingmask) cmask = cmask|(1<<(l-1));// set mask only if connection encoded (all ones), later use probs
+            }
+            // cmask = (gene * 11400714819323198549ul) >> (64 - 8);   // alternatively hash with optimal prime multiplicator down to 8 bits
+
+            cgolg[ij] = 1 + (int) cmask;
         }
         else cgolg[ij] = 0;
     }
