@@ -178,61 +178,63 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                 newgolg[ij]=golg[ij];
             }
             else if (s&0x1L) {                                              // s == 3 and central site empty, i.e. possible birth
+                birth = 1;
+                for (k=7,nbmask=0L;k>=0;k--) nbmask = (nbmask << 1) + gol[nb[k]];  // compute 8-bit mask of GoL states of 8 neighbours, clockwise starting top left
+                for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {                 // compute canonical rotation (minimum) of this mask
+                    nbmaskr = ((nbmaskr & 0x1L)<<7) + (nbmaskr>>1);                // 8 bit rotate right
+                    if (nbmaskr < nbmaskrm) {                                      // choose minimal value of mask rotation
+                        nbmaskrm = nbmaskr;
+                        kmin = k;                                                  // no of times rotated to right
+                    }
+                }
+
+                if (repscheme == 3) newgene = golg[nb[kmin]];                      // 3. deterministic choice of ancestor: replication of live neigbour in bit 0 of canonical pos
+                else {
+                    switch (nbmaskrm) {
+                        case 0x07 : k = 1; break;                                  // 00000111
+                        case 0x0b : k = 0; break;                                  // 00001011
+                        case 0x13 : k = 1; break;                                  // 00010011
+                        case 0x19 : k = 0; break;                                  // 00011001
+                        case 0x0d : k = 3; break;                                  // 00001101
+                        case 0x15 : k = 2; break;                                  // 00010101
+                        case 0x25 : k = 5; break;                                  // 00100101
+                        default  : {
+                            fprintf(stderr,"Error in canonical rotation for three live neighbours \nnbmaskrm = %lx\n",nbmaskrm); k = 0;
+                            fprintf(stderr,"Raw Neighbor Pattern: %lx No neighbors %lx\n",
+                                nbmask, gol[nb[0]]+gol[nb[1]]+gol[nb[2]]+gol[nb[3]]+gol[nb[4]]+gol[nb[5]]+gol[nb[6]]+gol[nb[7]]);
+                            fprintf(stderr,"\n");
+                        }
+                    }
+                    newgene = golg[nb[(kmin+k)&0x7]];                               // rotate unique nb k left (kmin) back to orig nb pat
+                }
+                if (newgene == 0L) {
+                    fprintf(stderr,"step %d Error with new gene zero: nbmask %lu nbmaskrm %lu kmin %d gol %lu golg %lx newgene %lx ij %d\n",totsteps,nbmask,nbmaskrm,kmin,gol[nb[kmin]],golg[nb[kmin]],newgene,ij);
+                }
+            }  // end else if s==3
+            else {  // s==2 and gol[ij]==0L
                 if (rulemod) {                                              // special rule allowed if rulemod==1, no birth if all sequences same
                     for (k=0;k<s;k++)                                       // loop only over live neigbours
                         livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];        // live gene at neighbour site
-                    birth = (livegenes[0]^livegenes[1]) ? 1L: 0L;           // birth first condition is first two genes differ
-                    birth = birth & (livegenes[0]^livegenes[2]) ? 1L: 0L;   // birth if first condition and genes one and three differ
+                    birth = (livegenes[0]^livegenes[1]) ? 1L: 0L;           // birth first condition is two genes different
+                    newgene= livegenes[0]>livegenes[1] ?  livegenes[0] : livegenes[1]; // choose one with more 1s to replicate
                 }
-                else birth = 1L;                                            // birth always for s==3 if rulemod=0
-                if(birth){
-                    for (k=7,nbmask=0L;k>=0;k--) nbmask = (nbmask << 1) + gol[nb[k]];  // compute 8-bit mask of GoL states of 8 neighbours, clockwise starting top left
-                    for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {                 // compute canonical rotation (minimum) of this mask
-                        nbmaskr = ((nbmaskr & 0x1L)<<7) + (nbmaskr>>1);                // 8 bit rotate right
-                        if (nbmaskr < nbmaskrm) {                                      // choose minimal value of mask rotation
-                            nbmaskrm = nbmaskr;
-                            kmin = k;                                                  // no of times rotated to right
-                        }
-                    }
-
-                    if (repscheme == 3) newgene = golg[nb[kmin]];                      // 3. deterministic choice of ancestor: replication of live neigbour in bit 0 of canonical pos
-                    else {
-                        switch (nbmaskrm) {
-                            case 0x07 : k = 1; break;                                  // 00000111
-                            case 0x0b : k = 0; break;                                  // 00001011
-                            case 0x13 : k = 1; break;                                  // 00010011
-                            case 0x19 : k = 0; break;                                  // 00011001
-                            case 0x0d : k = 3; break;                                  // 00001101
-                            case 0x15 : k = 2; break;                                  // 00010101
-                            case 0x25 : k = 5; break;                                  // 00100101
-                            default  : {
-                                fprintf(stderr,"Error in canonical rotation for three live neighbours \nnbmaskrm = %lx\n",nbmaskrm); k = 0;
-                                fprintf(stderr,"Raw Neighbor Pattern: %lx No neighbors %lx\n",
-                                    nbmask, gol[nb[0]]+gol[nb[1]]+gol[nb[2]]+gol[nb[3]]+gol[nb[4]]+gol[nb[5]]+gol[nb[6]]+gol[nb[7]]);
-                                fprintf(stderr,"\n");
-                            }
-                        }
-                        newgene = golg[nb[(kmin+k)&0x7]];                               // rotate unique nb k left (kmin) back to orig nb pat
-                    }
-                    if (newgene == 0L) {
-                        fprintf(stderr,"step %d Error with new gene zero: nbmask %lu nbmaskrm %lu kmin %d gol %lu golg %lx newgene %lx ij %d\n",totsteps,nbmask,nbmaskrm,kmin,gol[nb[kmin]],golg[nb[kmin]],newgene,ij);
-                    }
-                    RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
-                    // compute random events for single bit mutation, as well as mutation position nmut
-	                randnr2 = (randnr >> 24) & pmutmask;                                // extract bits from randnr for random trial for 0 on pmutmask
-	                r2 = randnr2?0L:1L;                                                   // 1 if lowest nlog2pmut bits of (bits 24-47 of randnr) are zero, else zero
-	                nmut = (randnr >> 48) & 0x3f;                                       // choose mutation position for length 64 gene : from bits 48:53 of randnr
-	                // complete calculation of newgol and newgolg, including mutation
-	                // newgene = newgene ^ (r2<<nmut);                              // introduce single mutation with probability pmut = probmut
-                    newgol[ij]  =  1L;                                      // new game of life cell value: stays same or set to one from zero if birth
-                    newgolg[ij] =  newgene;                                      // if birth then newgene
-                 } // end if birth
-                 else {
-                    newgol[ij]  = 0L;                                                    // new game of life cell value
-                    newgolg[ij] = 0L;                                                    // gene stays dead
-                 }
-            }  // end else if s==3
-            else {  // s==2 and gol[ij]==0L
+                else {
+                    birth = 0L;                                            // birth always for s==3 if rulemod=0
+                    newgene = 0L;
+                }
+            }
+            if(birth){
+                RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
+                // compute random events for single bit mutation, as well as mutation position nmut
+                randnr2 = (randnr >> 24) & pmutmask;                                // extract bits from randnr for random trial for 0 on pmutmask
+                r2 = randnr2?0L:1L;                                                   // 1 if lowest nlog2pmut bits of (bits 24-47 of randnr) are zero, else zero
+                nmut = (randnr >> 48) & 0x3f;                                       // choose mutation position for length 64 gene : from bits 48:53 of randnr
+                // complete calculation of newgol and newgolg, including mutation
+                // newgene = newgene ^ (r2<<nmut);                              // introduce single mutation with probability pmut = probmut
+                newgol[ij]  =  1L;                                      // new game of life cell value: stays same or set to one from zero if birth
+                newgolg[ij] =  newgene;                                      // if birth then newgene
+            }
+            else {
                 newgol[ij]  = 0L;                                                    // new game of life cell value
                 newgolg[ij] = 0L;                                                    // gene stays dead
             }
@@ -572,7 +574,7 @@ void printxy (long unsigned int gol[],long unsigned int golg[]) {   /* print the
     printf("\n");
 }
 
-int colorFunction = 1;
+int colorFunction = 0;
 
 void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], int N2) {
     long unsigned int gene, genelink, mask;
@@ -580,32 +582,30 @@ void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], i
     unsigned int cmask;
     
     if(colorFunction){
-	for (ij=0; ij<N2; ij++) {
+	  for (ij=0; ij<N2; ij++) {
 	    if (gol[ij]) {
-		gene = golg[ij];
-		cmask = 0;                                          // connection mask initialized to 0
-		for(l=1;l<4;l++) {                                  // 3 possible connections encoded in 3 16-bit gene words
-		    genelink = (gene >> (l<<4)) & codingmask;           // ncoding bit sequences describing possible links: ncoding <=16
-		    if (genelink == codingmask) cmask = cmask|(1<<(l-1));// set mask only if connection encoded (all ones), later use probs
-		}
-		// cmask = (gene * 11400714819323198549ul) >> (64 - 8);   // alternatively hash with optimal prime multiplicator down to 8 bits
+		    gene = golg[ij];
+		    cmask = 0;                                          // connection mask initialized to 0
+		    for(l=1;l<4;l++) {                                  // 3 possible connections encoded in 3 16-bit gene words
+		        genelink = (gene >> (l<<4)) & codingmask;           // ncoding bit sequences describing possible links: ncoding <=16
+		        if (genelink == codingmask) cmask = cmask|(1<<(l-1));// set mask only if connection encoded (all ones), later use probs
+            }
+		    // cmask = (gene * 11400714819323198549ul) >> (64 - 8);   // alternatively hash with optimal prime multiplicator down to 8 bits
 
-		cgolg[ij] = 1 + (int) cmask;
+		    cgolg[ij] = 1 + (int) cmask;
+	        }
+	        else cgolg[ij] = 0;
 	    }
-	    else cgolg[ij] = 0;
-	}
-    }
-
-
-    else{
-	for (ij=0; ij<N2; ij++) {
-	    if (gol[ij]) {
-		gene = golg[ij];
-		mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
-		cgolg[ij] = 1 + (int) mask;
+      }
+      else{
+	    for (ij=0; ij<N2; ij++) {
+	        if (gol[ij]) {
+		    gene = golg[ij];
+		    mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
+		    cgolg[ij] = 1 + (int) mask;
 	    }		
 	    else cgolg[ij] = 0;
-	}
+	  }
     }
 }
 
