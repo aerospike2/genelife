@@ -230,7 +230,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                 r2 = randnr2?0L:1L;                                                   // 1 if lowest nlog2pmut bits of (bits 24-47 of randnr) are zero, else zero
                 nmut = (randnr >> 48) & 0x3f;                                       // choose mutation position for length 64 gene : from bits 48:53 of randnr
                 // complete calculation of newgol and newgolg, including mutation
-                // newgene = newgene ^ (r2<<nmut);                              // introduce single mutation with probability pmut = probmut
+                newgene = newgene ^ (r2<<nmut);                              // introduce single mutation with probability pmut = probmut
                 newgol[ij]  =  1L;                                      // new game of life cell value: stays same or set to one from zero if birth
                 newgolg[ij] =  newgene;                                      // if birth then newgene
             }
@@ -524,7 +524,7 @@ void countspecies(long unsigned int golg[], int params[], int N2, int nparams) {
         }
     }
     nspecies = k;  // print excluding 0 since this is most likely an empty site not a true gene
-    printf("The number of different non-zero species is %d\n",nspecies);
+    fprintf(stdout,"The number of different non-zero species is %d\n",nspecies);
 
     for (k=0,ij=0;k<nspecies;k++) {     // now condense array to give only different genes with counts
         // printf("species %4d with gene %x has counts %d\n",k, golgs[ij],counts[k]);
@@ -545,9 +545,9 @@ void countspecies(long unsigned int golg[], int params[], int N2, int nparams) {
         else {                                                              // non-neutral model based on presence of replicase gene
 	    POPCOUNT64C(last, nones);                                     // number of ones in new gene determines fitness
 	    fitness = ((nones < 16) ? 0 : (nones - 23));}       // 0 if < 16 otherwise nones-23
-        fprintf(stderr,"count species %d with gene %lx has counts %lu and %d ones, fitness %d\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
+        fprintf(stdout,"count species %d with gene %lx has counts %lu and %d ones, fitness %d\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
     }
-    printf("cumulative activity = %lu\n",(N2 * (long unsigned int) totsteps) - emptysites);
+    fprintf(stdout,"cumulative activity = %lu\n",(N2 * (long unsigned int) totsteps) - emptysites);
 }
 
 void delay(int milliseconds)
