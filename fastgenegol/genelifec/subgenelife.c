@@ -205,11 +205,9 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                             nb1[4]=j1p1+i1p1; nb1[5]=j1p1+i1; nb1[6]=j1p1+i1m1; nb1[7]=j1*N+i1m1;   //next nbs  4 to 7
                             for(l=0;l<2;l++) {
                                 if ((cmask>>l)&0x1) {
-                                    nbil = (nbi+l)&0x7; // on the 2nd ring, wrt nb in same direction as k,  the 2 nbs at and after (l=0,1)
+                                    nbil = (nbi+l)&0x7; // on the 2nd ring, wrt nb in direction k,the 2 nbs at & after (l=0,1)
                                     if(gol[nb1[nbil]]) {
-//                                        if(genematch == (golg[nb1[nbil]] & 0xffff)) {               // only if next nb genes match
                                             s2++;sl++;
-//                                        }
                                     } // if
                                 }  // if
                             }  // for
