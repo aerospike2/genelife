@@ -191,12 +191,11 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                         nbi = (nb1i>>(k<<2))&0x7;                           // kth live neighbour index
                         ij1 = nb[nbi];                                      // neighbour site ij index
                         gene = golg[ij1];                                   // gene at neighbour site
-//                        genematch = gene & 0xffff;                            // 16 bit trailing match subsequence from gene
                         cmask = 0;                                          // connection mask initialized to 0
                         sl = 0;                                             // initialize number of connected live neighbours of this neighbour
-                        for(l=1;l<4;l++) {                                  // 3 possible connections encoded in 3 16-bit gene words
-                            genelink = (gene >> (l<<4)) & codingmask;           // ncoding bit sequences describing possible links: ncoding <=16
-                            if (genelink == codingmask) cmask = cmask|(1<<(l-1));// set mask only if connection encoded (all ones), later use probs
+                        for(l=0;l<2;l++) {                                  // 2 possible connections encoded in 2 16-bit gene words
+                            genelink = (gene >> ((l+1)<<4)) & codingmask;   // ncoding bit sequences describing possible links: ncoding <=16
+                            if (genelink == codingmask) cmask = cmask|(1<<l);// set mask only if connection encoded (all ones), later use probs
                         }
                         if(cmask) {                                                  // only if there are some connections
                             i1 = ij1 & Nmask;  j1 = ij1 >> log2N;                                   // row & column
@@ -204,9 +203,9 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                             i1p1 =  (i1+1) & Nmask; i1m1 =  (i1-1) & Nmask;                         // toroidal i+1, i-1
                             nb1[0]=j1m1+i1m1; nb1[1]=j1m1+i1; nb1[2]=j1m1+i1p1; nb1[3]=j1*N+i1p1;   //next nbs  0 to 3
                             nb1[4]=j1p1+i1p1; nb1[5]=j1p1+i1; nb1[6]=j1p1+i1m1; nb1[7]=j1*N+i1m1;   //next nbs  4 to 7
-                            for(l=1;l<4;l++) {
+                            for(l=0;l<2;l++) {
                                 if ((cmask>>l)&0x1) {
-                                    nbil = ((nbi+6)+l)&0x7; // on the 2nd ring, wrt nb in same direction as k,  the 3 nbs before, at and after (l=1,2,3)
+                                    nbil = (nbi+l)&0x7; // on the 2nd ring, wrt nb in same direction as k,  the 2 nbs at and after (l=0,1)
                                     if(gol[nb1[nbil]]) {
 //                                        if(genematch == (golg[nb1[nbil]] & 0xffff)) {               // only if next nb genes match
                                             s2++;sl++;
@@ -215,7 +214,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                                 }  // if
                             }  // for
                         } // if
-                        if (sl&0x2) kanc = k;   // neighbour contributing 2 or 3 live next shell neighbours serves as ancestor, only works for repscheme==2
+                        if (sl&0x2) kanc = k;   // neighbour contributing 2 live next shell neighbours serves as ancestor, only works for repscheme==2
                     } // for
                     if(s2==3) {                 // 3 live neighbours in 2nd shell pointed to by live first shell neighbours
                         birth = 1L;
@@ -441,15 +440,25 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     initialrdensity = simparams[2];
     ncoding = simparams[3];
     codingmask = (0x1L<<ncoding)-1;
-    
-    startgenes[0] = 0x000000000000aaaa;
-    startgenes[1] = 0x00000000ffffaaaa;
-    startgenes[2] = 0x0000ffff0000aaaa;
-    startgenes[3] = 0x0000ffffffffaaaa;
-    startgenes[4] = 0xffff00000000aaaa;
-    startgenes[5] = 0xffff0000ffffaaaa;
-    startgenes[6] = 0xffffffff0000aaaa;
-    startgenes[7] = 0xffffffffffffaaaa;
+
+
+//    startgenes[0] = 0x000000000000aaaa;
+//    startgenes[1] = 0x00000000ffffaaaa;
+//    startgenes[2] = 0x0000ffff0000aaaa;
+//    startgenes[3] = 0x0000ffffffffaaaa;
+//    startgenes[4] = 0xffff00000000aaaa;
+//    startgenes[5] = 0xffff0000ffffaaaa;
+//    startgenes[6] = 0xffffffff0000aaaa;
+//    startgenes[7] = 0xffffffffffffaaaa;
+
+    startgenes[0] = 0xaaaa000000000000;
+    startgenes[1] = 0xaaaa00000000ffff;
+    startgenes[2] = 0xaaaa0000ffff0000;
+    startgenes[3] = 0xaaaa0000ffffffff;
+    startgenes[4] = 0xaaaaffff00000000;         // should have same functionality as 0
+    startgenes[5] = 0xaaaaffff0000ffff;         //   ... as 1
+    startgenes[6] = 0xaaaaffffffff0000;         //   ... as 2
+    startgenes[7] = 0xaaaaffffffffffff;         //   ... as 3
     
     gol = planes[curPlane];
     golg = planesg[curPlane];
