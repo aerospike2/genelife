@@ -590,25 +590,40 @@ void printxy (long unsigned int gol[],long unsigned int golg[]) {   /* print the
     printf("\n");
 }
 
+int colorFunction = 1;
+
 void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], int N2) {
-    long unsigned int gene, genelink;
+    long unsigned int gene, genelink, mask;
     int ij,l;
     unsigned int cmask;
     
-    for (ij=0; ij<N2; ij++) {
-        if (gol[ij]) {
-            gene = golg[ij];
-            
-            cmask = 0;                                          // connection mask initialized to 0
-            for(l=1;l<4;l++) {                                  // 3 possible connections encoded in 3 16-bit gene words
-                genelink = (gene >> (l<<4)) & codingmask;           // ncoding bit sequences describing possible links: ncoding <=16
-                if (genelink == codingmask) cmask = cmask|(1<<(l-1));// set mask only if connection encoded (all ones), later use probs
-            }
-            // cmask = (gene * 11400714819323198549ul) >> (64 - 8);   // alternatively hash with optimal prime multiplicator down to 8 bits
+    if(colorFunction){
+	for (ij=0; ij<N2; ij++) {
+	    if (gol[ij]) {
+		gene = golg[ij];
+		cmask = 0;                                          // connection mask initialized to 0
+		for(l=1;l<4;l++) {                                  // 3 possible connections encoded in 3 16-bit gene words
+		    genelink = (gene >> (l<<4)) & codingmask;           // ncoding bit sequences describing possible links: ncoding <=16
+		    if (genelink == codingmask) cmask = cmask|(1<<(l-1));// set mask only if connection encoded (all ones), later use probs
+		}
+		// cmask = (gene * 11400714819323198549ul) >> (64 - 8);   // alternatively hash with optimal prime multiplicator down to 8 bits
 
-            cgolg[ij] = 1 + (int) cmask;
-        }
-        else cgolg[ij] = 0;
+		cgolg[ij] = 1 + (int) cmask;
+	    }
+	    else cgolg[ij] = 0;
+	}
+    }
+
+
+    else{
+	for (ij=0; ij<N2; ij++) {
+	    if (gol[ij]) {
+		gene = golg[ij];
+		mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
+		cgolg[ij] = 1 + (int) mask;
+	    }		
+	    else cgolg[ij] = 0;
+	}
     }
 }
 
