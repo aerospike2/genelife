@@ -174,6 +174,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
         if (s2or3) {                                                        // if 2 or 3 neighbours alive
             // if ((s<2)||(s>3)) fprintf(stderr,"s2or3 error s == %lu\n",s);
             if (gol[ij]) {                                                  // survival rule in this version just GoL rule
+                birth = 0L;
                 newgol[ij]=gol[ij];
                 newgolg[ij]=golg[ij];
             }
