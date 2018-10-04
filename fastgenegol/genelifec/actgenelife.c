@@ -69,8 +69,8 @@ int main (int argc, char *argv[]) {
 		  0, -1, 0,
 		  -1, -1, 0};
     int runparams[3];
-    int simparams[3];
-    int nrunparams=3; int nsimparams=3;
+    int simparams[4];
+    int nrunparams=3; int nsimparams=4;
 
     int opt;
     while ((opt = getopt(argc, argv, "h")) != -1) {
@@ -91,6 +91,7 @@ int main (int argc, char *argv[]) {
     simparams[0] = 8;        // nlog2pmut: gene mutation probability
     simparams[1] = 16384;    // initial1density: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
     simparams[2] = 32768 ;    // initialrdensity: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
+    simparams[3]= 12;
 
     if (argc>1) runparams[0] = atoi(argv[1]); // if present update rulemod from command line
     if (argc>2) runparams[1] = atoi(argv[2]); // if present update repscheme from command line
@@ -98,10 +99,11 @@ int main (int argc, char *argv[]) {
     if (argc>4) simparams[0] = atoi(argv[4]); // if present update nlog2pmut from command line
     if (argc>5) simparams[1] = atoi(argv[5]); // if present update initial density from command line
     if (argc>6) simparams[2] = atoi(argv[6]); // if present update init rand density from command line
+    if (argc>7) simparams[3] = atoi(argv[7]); // if present update ncoding no of bits used to encode valid connection functions 1-16
  
     fprintf(stderr,"Parameters:\n");
-    fprintf(stderr,"rulemod-0-1\trepscheme=0-4\tselection=0-2\tnlog2pmut\tinitial1density\tinitialrdensity\n");
-    fprintf(stderr,"%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\n",runparams[0],runparams[1],runparams[2],simparams[0],simparams[1],simparams[2]);
+    fprintf(stderr,"rulemod-0-1\trepscheme=0-4\tselection=0-2\tnlog2pmut\tinitial1density\tinitialrdensity\tncoding\n");
+    fprintf(stderr,"%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\n",runparams[0],runparams[1],runparams[2],simparams[0],simparams[1],simparams[2],simparams[3]);
 
     initialize_planes(myoffs,Noff);
     initialize(runparams,nrunparams,simparams,nsimparams);
