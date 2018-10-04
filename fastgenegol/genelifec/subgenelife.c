@@ -224,7 +224,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
 	                nmut = (randnr >> 48) & 0x3f;                                       // choose mutation position for length 64 gene : from bits 48:53 of randnr
 	                // complete calculation of newgol and newgolg, including mutation
 	                // newgene = newgene ^ (r2<<nmut);                              // introduce single mutation with probability pmut = probmut
-                    newgol[ij]  =  gol[ij];                                      // new game of life cell value: stays same or set to one from zero if birth
+                    newgol[ij]  =  1L;                                      // new game of life cell value: stays same or set to one from zero if birth
                     newgolg[ij] =  newgene;                                      // if birth then newgene
                  } // end if birth
                  else {
