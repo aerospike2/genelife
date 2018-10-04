@@ -150,83 +150,48 @@ void init_histo(){     // initialize the history array to zero
 void update(long unsigned int gol[], long unsigned int golg[],long unsigned int newgol[], long unsigned int newgolg[]){
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
-    /* use only with repscheme == 2 until further notice, later repscheme == 4 and others will be supported */
 
-    int k, kmin, kanc, nmut, l;
+    int k, kmin, nmut;
     int nb[8], ij, i, j, jp1, jm1, ip1, im1;
-    int nb1[8], ij1, i1, j1, j1p1, j1m1, i1p1, i1m1;
-    long unsigned int s, gs, s2, sl, nbi, nb1i, nbil, randnr, randnr2, r2;
+    long unsigned int s, gs, nb1i, randnr, randnr2, r2;
     long unsigned int nbmask, nbmaskr, nbmaskrm;
-    long unsigned int gene, newgene, genelink;
-    // long unsigned int andgene, orgene;
-    // int nones;
-    long unsigned int survive, birth;
-    unsigned int cmask;
-
-    int s2cnt=0;
+    long unsigned int newgene, livegenes[3];
+    long unsigned int s2or3, birth;
 
     totsteps++;
-    randnr = 0x0123456789abcdef;                                            // initialize random nr
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
 	    i = ij & Nmask;  j = ij >> log2N;                                   // row & column
 	    jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
 	    ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                         // toroidal i+1, i-1
         nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1;           // new order of nbs
         nb[4]=jp1+ip1; nb[5]=jp1+i; nb[6]=jp1+im1; nb[7]=j*N+im1;
-        for (s=0,k=0,nb1i=0;k<8;k++) {                                      // packs non-zero nb indices in first up to 8*4 bits
+        for (s=0L,k=0,nb1i=0;k<8;k++) {                                     // packs non-zero nb indices in first up to 8*4 bits
             gs=gol[nb[k]];                                                  // whether neighbor is alive
             s += gs;                                                        // s is number of live nbs
             nb1i = (nb1i << (gs<<2)) + (gs*k);                              // nb1i is packed list of live neighbour indices
         }
-        if (s>1) {                                                          // if at least 2 neighbours alive
+        s2or3 = (s>>2) ? 0L :(s>>1)&1L;
+        
+        if (s2or3) {                                                        // if 2 or 3 neighbours alive
             if (gol[ij]) {                                                  // survival rule in this version just GoL rule
-                survive = (s>>2) ? 0L :(s>>1)&1L;                           // 1 if 2 or 3 neighbours are alive : more efficient version of logical (s == 2) || (s == 3)
-                newgol[ij]=survive;
-                newgolg[ij]=survive*golg[ij];
+                newgol[ij]=1L;
+                newgolg[ij]=golg[ij];
             }
-            else {                                                          // potential birth rule depending on ancestor genes
-                birth = 0L; newgene = 0L;
-                if ((s==repscheme) && rulemod) {                            // special rule, repscheme=2 or 4, check next coded nbs & proceed if 3 matching live nbs
-                    for (k=kanc=0,s2=0;k<s;k++) {                           // loop only over live neigbours, s2 is number of live nbs in connected 2nd ring
-                        nbi = (nb1i>>(k<<2))&0x7;                           // kth live neighbour index
-                        ij1 = nb[nbi];                                      // neighbour site ij index
-                        gene = golg[ij1];                                   // gene at neighbour site
-                        cmask = 0;                                          // connection mask initialized to 0
-                        sl = 0;                                             // initialize number of connected live neighbours of this neighbour
-                        for(l=0;l<2;l++) {                                  // 2 possible connections encoded in 2 16-bit gene words
-                            genelink = (gene >> ((l+1)<<4)) & codingmask;   // ncoding bit sequences describing possible links: ncoding <=16
-                            if (genelink == codingmask) cmask = cmask|(1<<l);// set mask only if connection encoded (all ones), later use probs
-                        }
-                        if(cmask) {                                                  // only if there are some connections
-                            i1 = ij1 & Nmask;  j1 = ij1 >> log2N;                                   // row & column
-                            j1p1 = ((j1+1) & Nmask)*N; j1m1 = ((j1-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
-                            i1p1 =  (i1+1) & Nmask; i1m1 =  (i1-1) & Nmask;                         // toroidal i+1, i-1
-                            nb1[0]=j1m1+i1m1; nb1[1]=j1m1+i1; nb1[2]=j1m1+i1p1; nb1[3]=j1*N+i1p1;   //next nbs  0 to 3
-                            nb1[4]=j1p1+i1p1; nb1[5]=j1p1+i1; nb1[6]=j1p1+i1m1; nb1[7]=j1*N+i1m1;   //next nbs  4 to 7
-                            for(l=0;l<2;l++) {
-                                if ((cmask>>l)&0x1) {
-                                    nbil = (nbi+l)&0x7; // on the 2nd ring, wrt nb in direction k,the 2 nbs at & after (l=0,1)
-                                    if(gol[nb1[nbil]]) {
-                                            s2++;sl++;
-                                    } // if
-                                }  // if
-                            }  // for
-                        } // if
-                        if (sl&0x2) kanc = k;   // neighbour contributing 2 live next shell neighbours serves as ancestor, only works for repscheme==2
-                    } // for
-                    if(s2==3) {                 // 3 live neighbours in 2nd shell pointed to by live first shell neighbours
-                        birth = 1L;
-                        newgene = golg[nb[(nb1i>>(kanc<<2))&0x7]];
-                        s2cnt++;
-                    }
-                }  // if
-                else if (s==3) {                                                             // 3 deterministic choice of ancestor: replication of live neigbour in unique pos
-                    for (k=7,nbmask=0L;k>=0;k--) nbmask = (nbmask << 1) + gol[nb[k]];   // compute 8-bit mask of GoL states of 8 neighbours, clockwise starting top left
+            else if (s&0x1L) {                                              // s == 3 and central site empty, i.e. possible birth
+                if (rulemod) {                                              // special rule allowed if rulemod==1, no birth if all sequences same
+                    for (k=0;k<s;k++)                                       // loop only over live neigbours
+                        livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];        // live gene at neighbour site
+                    birth = (livegenes[0]^livegenes[1]) ? 1L: 0L;           // birth first condition is first two genes differ
+                    birth = birth & (livegenes[0]^livegenes[2]) ? 1L: 0L;   // birth if first condition and genes one and three differ
+                }
+                else birth = 1L;                                            // birth always for s==3 if rulemod=0
+                if(birth){
+                    for (k=7,nbmask=0L;k>=0;k--) nbmask = (nbmask << 1) + gol[nb[k]];  // compute 8-bit mask of GoL states of 8 neighbours, clockwise starting top left
                     for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {                 // compute canonical rotation (minimum) of this mask
-                        nbmaskr = ((nbmaskr & 0x1L)<<7) + (nbmaskr>>1);                      // 8 bit rotate right
-                        if (nbmaskr < nbmaskrm) {                                          // choose minimal value of mask rotation
+                        nbmaskr = ((nbmaskr & 0x1L)<<7) + (nbmaskr>>1);                // 8 bit rotate right
+                        if (nbmaskr < nbmaskrm) {                                      // choose minimal value of mask rotation
                             nbmaskrm = nbmaskr;
-                            kmin = k;                                                      // no of times rotated to right
+                            kmin = k;                                                  // no of times rotated to right
                         }
                     }
                     switch (nbmaskrm) {
@@ -240,15 +205,14 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                         default  : {
                             fprintf(stderr,"Error in canonical rotation for three live neighbours \nnbmaskrm = %lx\n",nbmaskrm); k = 0;
                             fprintf(stderr,"Raw Neighbor Pattern: %lx No neighbors %lx\n",
-                                    nbmask, gol[nb[0]]+gol[nb[1]]+gol[nb[2]]+gol[nb[3]]+gol[nb[4]]+gol[nb[5]]+gol[nb[6]]+gol[nb[7]]);
+                                nbmask, gol[nb[0]]+gol[nb[1]]+gol[nb[2]]+gol[nb[3]]+gol[nb[4]]+gol[nb[5]]+gol[nb[6]]+gol[nb[7]]);
                             fprintf(stderr,"\n");
                         }
                     }
-                    birth = 1L;
                     newgene = golg[nb[(kmin+k)&0x7]];                               // rotate unique nb k left (kmin) back to orig nb pat
-                } // end if (s==3)
-
-                if (birth) {
+                    if (newgene == 0L) {
+                        fprintf(stderr,"Error with new gene zero\n");
+                    }
                     RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
                     // compute random events for single bit mutation, as well as mutation position nmut
 	                randnr2 = (randnr >> 24) & pmutmask;                                // extract bits from randnr for random trial for 0 on pmutmask
@@ -256,11 +220,19 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
 	                nmut = (randnr >> 48) & 0x3f;                                       // choose mutation position for length 64 gene : from bits 48:53 of randnr
 	                // complete calculation of newgol and newgolg, including mutation
 	                newgene = newgene ^ (r2<<nmut);                              // introduce single mutation with probability pmut = probmut
+                    newgol[ij]  =  gol[ij];                                      // new game of life cell value: stays same or set to one from zero if birth
+                    newgolg[ij] =  newgene;                                      // if birth then newgene
+                 } // end if birth
+                 else {
+                    newgol[ij]  = 0L;                                                    // new game of life cell value
+                    newgolg[ij] = 0L;                                                    // gene dies
                  }
-                 newgol[ij]  =  gol[ij] | birth ;                                    // new game of life cell value: stays same or set to one from zero if birth
-                 newgolg[ij] =  birth*newgene;                                       // if birth (implies empty) then newgene
-            }  // end else
-        }  // end if s>1
+            }  // end else if s==3
+            else {
+                newgol[ij]  = 0L;                                                    // new game of life cell value
+                newgolg[ij] = 0L;                                                    // gene dies
+            }
+        }  // end if s2or3
         else {                                                              // else not birth or survival, 0 values
 	        newgol[ij]  = 0L;                                                    // new game of life cell value
 	        newgolg[ij] = 0L;                                                    // gene dies
@@ -272,7 +244,6 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
 	    gol[ij] = newgol[ij];        // copy new gol config to old one
 	    golg[ij] = newgolg[ij];      // copy new genes to old genes
     }
-    // fprintf(stderr,"s2cnt %d, repscheme %d, initialrdensity %d\n",s2cnt,repscheme,initialrdensity);
 }
 
 void genelife_update (int nsteps, int histoflag) {
