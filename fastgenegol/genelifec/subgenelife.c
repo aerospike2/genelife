@@ -170,11 +170,11 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
             s += gs;                                                        // s is number of live nbs
             nb1i = (nb1i << (gs<<2)) + (gs*k);                              // nb1i is packed list of live neighbour indices
         }
-        s2or3 = (s>>2) ? 0L :(s>>1)&1L;
-        
+        s2or3 = (s>>2L) ? 0L :(s>>1)&1L;
         if (s2or3) {                                                        // if 2 or 3 neighbours alive
+            // if ((s<2)||(s>3)) fprintf(stderr,"s2or3 error s == %lu\n",s);
             if (gol[ij]) {                                                  // survival rule in this version just GoL rule
-                newgol[ij]=1L;
+                newgol[ij]=gol[ij];
                 newgolg[ij]=golg[ij];
             }
             else if (s&0x1L) {                                              // s == 3 and central site empty, i.e. possible birth
@@ -194,24 +194,28 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                             kmin = k;                                                  // no of times rotated to right
                         }
                     }
-                    switch (nbmaskrm) {
-                        case 0x07 : k = 1; break;                                  // 00000111
-                        case 0x0b : k = 0; break;                                  // 00001011
-                        case 0x13 : k = 1; break;                                  // 00010011
-                        case 0x19 : k = 0; break;                                  // 00011001
-                        case 0x0d : k = 3; break;                                  // 00001101
-                        case 0x15 : k = 2; break;                                  // 00010101
-                        case 0x25 : k = 3; break;                                  // 00100101
-                        default  : {
-                            fprintf(stderr,"Error in canonical rotation for three live neighbours \nnbmaskrm = %lx\n",nbmaskrm); k = 0;
-                            fprintf(stderr,"Raw Neighbor Pattern: %lx No neighbors %lx\n",
-                                nbmask, gol[nb[0]]+gol[nb[1]]+gol[nb[2]]+gol[nb[3]]+gol[nb[4]]+gol[nb[5]]+gol[nb[6]]+gol[nb[7]]);
-                            fprintf(stderr,"\n");
+
+                    if (repscheme == 3) newgene = golg[nb[kmin]];                      // 3. deterministic choice of ancestor: replication of live neigbour in bit 0 of canonical pos
+                    else {
+                        switch (nbmaskrm) {
+                            case 0x07 : k = 1; break;                                  // 00000111
+                            case 0x0b : k = 0; break;                                  // 00001011
+                            case 0x13 : k = 1; break;                                  // 00010011
+                            case 0x19 : k = 0; break;                                  // 00011001
+                            case 0x0d : k = 3; break;                                  // 00001101
+                            case 0x15 : k = 2; break;                                  // 00010101
+                            case 0x25 : k = 5; break;                                  // 00100101
+                            default  : {
+                                fprintf(stderr,"Error in canonical rotation for three live neighbours \nnbmaskrm = %lx\n",nbmaskrm); k = 0;
+                                fprintf(stderr,"Raw Neighbor Pattern: %lx No neighbors %lx\n",
+                                    nbmask, gol[nb[0]]+gol[nb[1]]+gol[nb[2]]+gol[nb[3]]+gol[nb[4]]+gol[nb[5]]+gol[nb[6]]+gol[nb[7]]);
+                                fprintf(stderr,"\n");
+                            }
                         }
+                        newgene = golg[nb[(kmin+k)&0x7]];                               // rotate unique nb k left (kmin) back to orig nb pat
                     }
-                    newgene = golg[nb[(kmin+k)&0x7]];                               // rotate unique nb k left (kmin) back to orig nb pat
                     if (newgene == 0L) {
-                        fprintf(stderr,"Error with new gene zero\n");
+                        fprintf(stderr,"step %d Error with new gene zero: nbmask %lu nbmaskrm %lu kmin %d gol %lu golg %lx newgene %lx ij %d\n",totsteps,nbmask,nbmaskrm,kmin,gol[nb[kmin]],golg[nb[kmin]],newgene,ij);
                     }
                     RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
                     // compute random events for single bit mutation, as well as mutation position nmut
@@ -219,18 +223,18 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
 	                r2 = randnr2?0L:1L;                                                   // 1 if lowest nlog2pmut bits of (bits 24-47 of randnr) are zero, else zero
 	                nmut = (randnr >> 48) & 0x3f;                                       // choose mutation position for length 64 gene : from bits 48:53 of randnr
 	                // complete calculation of newgol and newgolg, including mutation
-	                newgene = newgene ^ (r2<<nmut);                              // introduce single mutation with probability pmut = probmut
+	                // newgene = newgene ^ (r2<<nmut);                              // introduce single mutation with probability pmut = probmut
                     newgol[ij]  =  gol[ij];                                      // new game of life cell value: stays same or set to one from zero if birth
                     newgolg[ij] =  newgene;                                      // if birth then newgene
                  } // end if birth
                  else {
                     newgol[ij]  = 0L;                                                    // new game of life cell value
-                    newgolg[ij] = 0L;                                                    // gene dies
+                    newgolg[ij] = 0L;                                                    // gene stays dead
                  }
             }  // end else if s==3
-            else {
+            else {  // s==2 and gol[ij]==0L
                 newgol[ij]  = 0L;                                                    // new game of life cell value
-                newgolg[ij] = 0L;                                                    // gene dies
+                newgolg[ij] = 0L;                                                    // gene stays dead
             }
         }  // end if s2or3
         else {                                                              // else not birth or survival, 0 values
@@ -465,7 +469,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
                 else g = startgenes[selection & 0x7];
             }
             golg[ij] = g;
-            if (golg[ij] == 0 && gol[ij] != 0) fprintf(stderr,"zero gene at %d\n",ij);
+            if (golg[ij] == 0L && gol[ij] != 0L) fprintf(stderr,"zero gene at %d\n",ij);
         }
         // for (ij=0; ij<40; ij++) fprintf(stderr,"gene at %d %lx\n",ij,golg[ij]);   // test first 40
     }
