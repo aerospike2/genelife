@@ -157,11 +157,9 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
     long unsigned int nbmask, nbmaskr, nbmaskrm;
     long unsigned int newgene, livegenes[3];
     long unsigned int s2or3, birth;
-    int lastbirthij;
+    static long unsigned int overwritemask = 0x0;                          // bit mask for 4 cases of overwrite
+                                                                           // 0. s==3  1. special birth s==2
 
-    //birth = 0;
-    //newgene = 0L;
-    lastbirthij = 0;
     totsteps++;
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
 	    i = ij & Nmask;  j = ij >> log2N;                                   // row & column
@@ -177,8 +175,11 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
         s2or3 = (s>>2L) ? 0L :(s>>1)&1L;
         if (s2or3) {                                                        // if 2 or 3 neighbours alive
             // if ((s<2)||(s>3)) fprintf(stderr,"s2or3 error s == %lu\n",s);
+            birth = 0L;
+            newgene = 0L;
             if (s&0x1L) {  // s==3                                                 // birth (with possible overwrite)
-                birth = 1; lastbirthij = ij;
+              if ((0x1L&overwritemask)|(0x1L&~gol[ij]) ) {
+                birth = 1L;
                 for (k=7,nbmask=0L;k>=0;k--) nbmask = (nbmask << 1) + gol[nb[k]];  // compute 8-bit mask of GoL states of 8 neighbours, clockwise starting top left
                 for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {                 // compute canonical rotation (minimum) of this mask
                     nbmaskr = ((nbmaskr & 0x1L)<<7) + (nbmaskr>>1);                // 8 bit rotate right
@@ -204,34 +205,28 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                             fprintf(stderr,"Raw Neighbor Pattern: %lx No neighbors %lx\n",
                                 nbmask, gol[nb[0]]+gol[nb[1]]+gol[nb[2]]+gol[nb[3]]+gol[nb[4]]+gol[nb[5]]+gol[nb[6]]+gol[nb[7]]);
                             fprintf(stderr,"\n");
-                        }
-                    }
+                        } //case
+                    } //switch
                     newgene = golg[nb[(kmin+k)&0x7]];                               // rotate unique nb k left (kmin) back to orig nb pat
                 }
                 if (newgene == 0L) {
                     fprintf(stderr,"step %d Error with new gene zero: nbmask %lu nbmaskrm %lu kmin %d gol %lu golg %lx newgene %lx ij %d\n",totsteps,nbmask,nbmaskrm,kmin,gol[nb[kmin]],golg[nb[kmin]],newgene,ij);
                 }
+              }
             }  // end else if s==3
             else {  // s==2                                                 // possible birth as exception to GoL rule
-                if (gol[ij]) {                                              // gene present, simply survival, no birth
-                    birth = 0L;
-                    newgene = 0L;
-                }
                 if (rulemod) {                                              // special rule allowed if rulemod==1, no birth if all sequences same
+                  if ((0x1L&(overwritemask>>1))|(0x1L&~gol[ij])) {          // either overwrite on for s==2 or central site is empty
                     for (k=0;k<s;k++)                                       // loop only over live neigbours
                         livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];        // live gene at neighbour site
                     birth = (livegenes[0]^livegenes[1]) ? 1L: 0L;           // birth first condition is two genes different
-                    if (birth) lastbirthij = ij;
-                    newgene= livegenes[0]>livegenes[1] ?  livegenes[0] : livegenes[1]; // choose one with more 1s to replicate
-                }
-                else {                                                     // no birth, just survival
-                    birth = 0L;
-                    newgene = 0L;
+                    newgene = livegenes[0]>livegenes[1] ?  livegenes[0] : livegenes[1]; // choose one with more 1s to replicate
+                  }
                 }
             }
 
             if(birth){
-                if (gol[ij]) fprintf(stderr,"birth overwrite event ij %d lastbirthij %d newgene %lu s %lu\n",ij,lastbirthij,newgene,s);
+                // if (gol[ij]) fprintf(stderr,"birth overwrite event ij %d newgene %lu s %lu\n",ij,newgene,s);
                 RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
                 // compute random events for single bit mutation, as well as mutation position nmut
                 randnr2 = (randnr >> 24) & pmutmask;                                // extract bits from randnr for random trial for 0 on pmutmask
