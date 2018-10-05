@@ -175,6 +175,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
             // if ((s<2)||(s>3)) fprintf(stderr,"s2or3 error s == %lu\n",s);
             if (gol[ij]) {                                                  // survival rule in this version just GoL rule
                 birth = 0L;
+                newgene = 0L;
                 newgol[ij]=gol[ij];
                 newgolg[ij]=golg[ij];
             }
@@ -191,15 +192,16 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
 
                 if (repscheme == 3) newgene = golg[nb[kmin]];                      // 3. deterministic choice of ancestor: replication of live neigbour in bit 0 of canonical pos
                 else {
-                    switch (nbmaskrm) {
-                        case 0x07 : k = 1; break;                                  // 00000111
-                        case 0x0b : k = 0; break;                                  // 00001011
-                        case 0x13 : k = 1; break;                                  // 00010011
-                        case 0x19 : k = 0; break;                                  // 00011001
-                        case 0x0d : k = 3; break;                                  // 00001101
-                        case 0x15 : k = 2; break;                                  // 00010101
-                        case 0x25 : k = 5; break;                                  // 00100101
-                        default  : {
+                    switch (nbmaskrm) {                //             x07   x0b   x13   x19   x0d   x15   x25
+                        case 0x07 : k = 1; break;      // 00000111    012  <-
+                        case 0x0b : k = 0; break;      // 00001011    ...   01.  <-
+                        case 0x13 : k = 1; break;      // 00010011    ...   ..3   01.  <-
+                        case 0x19 : k = 0; break;      // 00011001          ...   ...   0..  <-
+                        case 0x0d : k = 3; break;      // 00001101                ..4   ..3   0.2  <-
+                        case 0x15 : k = 2; break;      // 00010101                      ..4   ..3   0.2  <-
+                        case 0x25 : k = 5; break;      // 00100101                            ...   ...   0.2  <-
+                        default  : {                   //                                           ..4   ...
+                                                       //                                                 .5.
                             fprintf(stderr,"Error in canonical rotation for three live neighbours \nnbmaskrm = %lx\n",nbmaskrm); k = 0;
                             fprintf(stderr,"Raw Neighbor Pattern: %lx No neighbors %lx\n",
                                 nbmask, gol[nb[0]]+gol[nb[1]]+gol[nb[2]]+gol[nb[3]]+gol[nb[4]]+gol[nb[5]]+gol[nb[6]]+gol[nb[7]]);
