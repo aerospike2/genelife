@@ -123,13 +123,14 @@ def doanimation(nrun=1,         # number of CA iterations per animation time ste
         cnt = cnt+1
         if cnt % ndisp == 0:  # insert the non-displayed iterations
             genelife.genelife_update(nskip, 0)
+            cnt = cnt+nskip            # keep cnt as track of number of iterations
         genelife.genelife_update(1, 0) # 1 should be nrun
         genelife.get_curgol(gol)
         genelife.get_curgolg(golg)
         framenr = framenr+1         # 1 should be nrun
         colorgrid(N)                # sets cgrid from gol, golg
         mat.set_data(cgrid)
-        time_text.set_text('cnt = %.1d' % framenr)
+        time_text.set_text('cnt = %.1d' % cnt)
         time_text.set_color('w')
 
     mat = ax.matshow(cgrid, cmap=my_cmap, vmin=0.01, vmax=257)  # was vmax = LEN+1

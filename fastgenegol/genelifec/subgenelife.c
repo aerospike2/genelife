@@ -157,7 +157,11 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
     long unsigned int nbmask, nbmaskr, nbmaskrm;
     long unsigned int newgene, livegenes[3];
     long unsigned int s2or3, birth;
+    int lastbirthij;
 
+    //birth = 0;
+    //newgene = 0L;
+    lastbirthij = 0;
     totsteps++;
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
 	    i = ij & Nmask;  j = ij >> log2N;                                   // row & column
@@ -173,14 +177,8 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
         s2or3 = (s>>2L) ? 0L :(s>>1)&1L;
         if (s2or3) {                                                        // if 2 or 3 neighbours alive
             // if ((s<2)||(s>3)) fprintf(stderr,"s2or3 error s == %lu\n",s);
-            if (gol[ij]) {                                                  // survival rule in this version just GoL rule
-                birth = 0L;
-                newgene = 0L;
-                newgol[ij]=gol[ij];
-                newgolg[ij]=golg[ij];
-            }
-            else if (s&0x1L) {                                              // s == 3 and central site empty, i.e. possible birth
-                birth = 1;
+            if (s&0x1L) {  // s==3                                                 // birth (with possible overwrite)
+                birth = 1; lastbirthij = ij;
                 for (k=7,nbmask=0L;k>=0;k--) nbmask = (nbmask << 1) + gol[nb[k]];  // compute 8-bit mask of GoL states of 8 neighbours, clockwise starting top left
                 for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {                 // compute canonical rotation (minimum) of this mask
                     nbmaskr = ((nbmaskr & 0x1L)<<7) + (nbmaskr>>1);                // 8 bit rotate right
@@ -214,19 +212,26 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                     fprintf(stderr,"step %d Error with new gene zero: nbmask %lu nbmaskrm %lu kmin %d gol %lu golg %lx newgene %lx ij %d\n",totsteps,nbmask,nbmaskrm,kmin,gol[nb[kmin]],golg[nb[kmin]],newgene,ij);
                 }
             }  // end else if s==3
-            else {  // s==2 and gol[ij]==0L
+            else {  // s==2                                                 // possible birth as exception to GoL rule
+                if (gol[ij]) {                                              // gene present, simply survival, no birth
+                    birth = 0L;
+                    newgene = 0L;
+                }
                 if (rulemod) {                                              // special rule allowed if rulemod==1, no birth if all sequences same
                     for (k=0;k<s;k++)                                       // loop only over live neigbours
                         livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];        // live gene at neighbour site
                     birth = (livegenes[0]^livegenes[1]) ? 1L: 0L;           // birth first condition is two genes different
+                    if (birth) lastbirthij = ij;
                     newgene= livegenes[0]>livegenes[1] ?  livegenes[0] : livegenes[1]; // choose one with more 1s to replicate
                 }
-                else {
-                    birth = 0L;                                            // birth always for s==3 if rulemod=0
+                else {                                                     // no birth, just survival
+                    birth = 0L;
                     newgene = 0L;
                 }
             }
+
             if(birth){
+                if (gol[ij]) fprintf(stderr,"birth overwrite event ij %d lastbirthij %d newgene %lu s %lu\n",ij,lastbirthij,newgene,s);
                 RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
                 // compute random events for single bit mutation, as well as mutation position nmut
                 randnr2 = (randnr >> 24) & pmutmask;                                // extract bits from randnr for random trial for 0 on pmutmask
@@ -238,8 +243,8 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                 newgolg[ij] =  newgene;                                      // if birth then newgene
             }
             else {
-                newgol[ij]  = 0L;                                                    // new game of life cell value
-                newgolg[ij] = 0L;                                                    // gene stays dead
+                newgol[ij]  = gol[ij];                                                    // new game of life cell value same
+                newgolg[ij] = golg[ij];                                                   // gene stays as before live or not
             }
         }  // end if s2or3
         else {                                                              // else not birth or survival, 0 values
