@@ -157,7 +157,8 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
     long unsigned int nbmask, nbmaskr, nbmaskrm;
     long unsigned int newgene, livegenes[3];
     long unsigned int s2or3, birth;
-    static long unsigned int overwritemask = 0x2;                          // bit mask for 4 cases of overwrite
+    int d0,d1;
+    static long unsigned int overwritemask = 0x0;                          // bit mask for 4 cases of overwrite
                                                                            // 0. s==3  1. special birth s==2
 
     totsteps++;
@@ -216,11 +217,14 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
             }  // end else if s==3
             else {  // s==2                                                 // possible birth as exception to GoL rule
                 if (rulemod) {                                              // special rule allowed if rulemod==1, NB no birth if all sequences same
+                    POPCOUNT64C(livegenes[0],d0);
+                    POPCOUNT64C(livegenes[1],d1);
                   if ((0x1L&(overwritemask>>1))|(0x1L&~gol[ij])) {          // either overwrite on for s==2 or central site is empty
                     for (k=0;k<s;k++)                                       // loop only over live neigbours
                         livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];        // live gene at neighbour site
                     birth = (livegenes[0]^livegenes[1]) ? 1L: 0L;           // birth first condition is two genes different
                     newgene = livegenes[0]>livegenes[1] ?  livegenes[0] : livegenes[1]; // choose one with more 1s to replicate
+                    newgene= d0>d1 ?  livegenes[0] : (d0<d1 ? livegenes[1] : (livegenes[0]>livegenes[1] ?  livegenes[0] : livegenes[1]));
                   }
                 }
             }
