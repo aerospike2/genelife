@@ -157,7 +157,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
     long unsigned int nbmask, nbmaskr, nbmaskrm;
     long unsigned int newgene, livegenes[3];
     long unsigned int s2or3, birth;
-    static long unsigned int overwritemask = 0x0;                          // bit mask for 4 cases of overwrite
+    static long unsigned int overwritemask = 0x2;                          // bit mask for 4 cases of overwrite
                                                                            // 0. s==3  1. special birth s==2
 
     totsteps++;
@@ -178,19 +178,19 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
             birth = 0L;
             newgene = 0L;
             if (s&0x1L) {  // s==3                                                 // birth (with possible overwrite)
-              if ((0x1L&overwritemask)|(0x1L&~gol[ij]) ) {
-                birth = 1L;
-                for (k=7,nbmask=0L;k>=0;k--) nbmask = (nbmask << 1) + gol[nb[k]];  // compute 8-bit mask of GoL states of 8 neighbours, clockwise starting top left
+              if ((0x1L&overwritemask)|(0x1L&~gol[ij]) ) {                         // central site empty or overwrite mode
+                birth = 1L;                                                        // birth flag
+                for (k=7,nbmask=0L;k>=0;k--) nbmask = (nbmask << 1) + gol[nb[k]];  // compute 8-bit mask of GoL states of 8 nbs, clockwise from top left
                 for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {                 // compute canonical rotation (minimum) of this mask
                     nbmaskr = ((nbmaskr & 0x1L)<<7) + (nbmaskr>>1);                // 8 bit rotate right
                     if (nbmaskr < nbmaskrm) {                                      // choose minimal value of mask rotation
-                        nbmaskrm = nbmaskr;
+                        nbmaskrm = nbmaskr;                                        // neighbor mask rotate min is current rotation
                         kmin = k;                                                  // no of times rotated to right
                     }
                 }
 
                 if (repscheme == 3) newgene = golg[nb[kmin]];                      // 3. deterministic choice of ancestor: replication of live neigbour in bit 0 of canonical pos
-                else {
+                else {                                                             // repscheme = 0 or 4 for example
                     switch (nbmaskrm) {                //             x07   x0b   x13   x19   x0d   x15   x25
                         case 0x07 : k = 1; break;      // 00000111    012  <-
                         case 0x0b : k = 0; break;      // 00001011    ...   01.  <-
@@ -215,7 +215,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
               }
             }  // end else if s==3
             else {  // s==2                                                 // possible birth as exception to GoL rule
-                if (rulemod) {                                              // special rule allowed if rulemod==1, no birth if all sequences same
+                if (rulemod) {                                              // special rule allowed if rulemod==1, NB no birth if all sequences same
                   if ((0x1L&(overwritemask>>1))|(0x1L&~gol[ij])) {          // either overwrite on for s==2 or central site is empty
                     for (k=0;k<s;k++)                                       // loop only over live neigbours
                         livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];        // live gene at neighbour site
@@ -238,11 +238,11 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                 newgolg[ij] =  newgene;                                      // if birth then newgene
             }
             else {
-                newgol[ij]  = gol[ij];                                                    // new game of life cell value same
-                newgolg[ij] = golg[ij];                                                   // gene stays as before live or not
+                newgol[ij]  = gol[ij];                                                    // new game of life cell value same as old
+                newgolg[ij] = golg[ij];                                                   // gene stays as before, live or not
             }
         }  // end if s2or3
-        else {                                                              // else not birth or survival, 0 values
+        else {                                                              // else not birth or survival, 0 values for gol and gene
 	        newgol[ij]  = 0L;                                                    // new game of life cell value
 	        newgolg[ij] = 0L;                                                    // gene dies
         }
