@@ -55,8 +55,8 @@ def initialize(runparams,simparams):
 def initialize_planes(offsets):
     return libcd.initialize_planes(offsets, len(offsets))
 
-def countspecies(golg, simparams):
-    return libcd.countspecies(golg,  simparams, len(golg), len(simparams))
+def countspecies(golg, runparams):
+    return libcd.countspecies(golg,  runparams, len(golg), len(runparams))
 
 def print_gol( gol, N):
     return libcd.print_gol( gol, N, len(gol))

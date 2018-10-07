@@ -36,14 +36,15 @@ long unsigned int pmutmask;         // binary mask so that prob of choosing zero
 
 int totsteps=0;
 int rulemod = 1;                    // det: whether to modify GoL rule for 2 and 3 live neighbours : opposite outcome with small probability p0
-int selection = 1;                  // fitness model: 0 neutral 1 selected gene prob of rule departure 2 presence of replicase gene
+int selection = 1;                  // fitness of 2 live neighbours: integer value (0), number of ones (1), Norman compete (2), 2 target coding (3)
 int repscheme = 1;                  // replication scheme: 0 random choice , 1 XOR of all 3, 2 consensus, 3 unique det choice, 4 most different
-int ncoding = 16;                   // number of bits used to encode valid neighbour connection in gene 1-16
-int survival = 2;                   // survive mask for two (bit 1) and three (bit 0) live neighbours
+int ncoding = 16;                   // maximal distances between sequences for fitness2 == 2
+                                    // number of bits used to encode non zero bits in 2nd gene in sequence space for fitness2 == 3
+int survival = 0x2;                 // survive mask for two (bit 1) and three (bit 0) live neighbours
 int overwritemask = 0x2;            // bit mask for 4 cases of overwrite: bit 0. s==3  bit 1. special birth s==2
-int fitness2 = 1;                   // fitness of 2 live neighbours determined by number of ones (1) or integer value (0)
 int initial1density = (1<<15)>>1;   // initial density of ones in gol as integer value, divide by 2^15 for true density
 int initialrdensity = (1<<15)>>1;   // initial density of random genes in live sites, divide by 2^15 for true density
+int startgenechoice = 8;            // selection for defined starting genes 0-8 (8 is random 0-7) otherwise choose only particular startgene
 long unsigned int codingmask;       // mask for ncoding bits
 static long unsigned int  emptysites = 0;  // cumulative number of empty sites during simulation updates
 
@@ -93,19 +94,6 @@ const long unsigned int h01 = 0x0101010101010101; //the sum of 256 to the power 
     x = (x & m2) + ((x >> 2) & m2); /* put count of each 4 bits into those 4 bits */ \
     x = (x + (x >> 4)) & m4;        /* put count of each 8 bits into those 8 bits */ \
     val = (x * h01) >> 56;}         /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
-
-const long unsigned int hlo = 0xffffffff;
-const long unsigned int h02 = h01&hlo;     //lower word multiplier
-#define POPCOUNT2X32(x, val1, val2) {      /* Separate Hamming weights of lower and upper 32 bits */  \
-    x -= (x >> 1) & m1;             /* put count of each 2 bits into those 2 bits */ \
-    x = (x & m2) + ((x >> 2) & m2); /* put count of each 4 bits into those 4 bits */ \
-    x = (x + (x >> 4)) & m4;        /* put count of each 8 bits into those 8 bits */ \
-    val1 = ((x&hlo) * h02) >> 24;   /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) for x = x&hlo */ \
-    val2 = ((x>>32) * h02) >> 24;}  /* left 8 bits of y + (y<<8) + (y<<16) + (y<<24) for y = x>>32  */
-
-const long unsigned int m3  = 0x0707070707070707; //for cumcount64c selects counter relevant bits only
-#define CUMCOUNT64C(x, val) {       /* Assumes gene specifies 8 8-bit counters each with max value 7 */  \
-    val = ((x & m3) * h01) >> 56;}  /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
 
 void countconfigs(){		// count configs specified by offset array
     // each row of the offset array becomes a bit in an address for the histo array.
@@ -158,9 +146,11 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
     int nb[8], ij, i, j, jp1, jm1, ip1, im1;
     long unsigned int s, gs, nb1i, randnr, randnr2, r2;
     long unsigned int nbmask, nbmaskr, nbmaskrm;
-    long unsigned int newgene, livegenes[3];
+    long unsigned int newgene, livegenes[3],gdiff,gdiff0,gdiff1;
     long unsigned int s2or3, birth;
-    int d0,d1;
+    int d0,d1,d2,d3,dd;
+    long unsigned int gene2centre;
+    int g0011,g0110;
     
     totsteps++;
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
@@ -218,17 +208,40 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
             }  // end else if s==3
             else {  // s==2                                                 // possible birth as exception to GoL rule
                 if (rulemod) {                                              // special rule allowed if rulemod==1, NB no birth if all sequences same
-                    if ((0x1L&(overwritemask>>1))|(0x1L&~gol[ij])) {          // either overwrite on for s==2 or central site is empty
-                        for (k=0;k<s;k++)                                       // loop only over live neigbours
-                            livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];        // live gene at neighbour site
-                        birth = (livegenes[0]^livegenes[1]) ? 1L: 0L;           // birth first condition is two genes different
-                        if (fitness2) {                                        // use number of ones in sequence as fitness
+                    if ((0x1L&(overwritemask>>1))|(0x1L&~gol[ij])) {        // either overwrite on for s==2 or central site is empty
+                        for (k=0;k<s;k++)                                   // loop only over live neigbours
+                            livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];    // live gene at neighbour site
+                        birth = (livegenes[0]^livegenes[1]) ? 1L: 0L;       // birth condition is two genes different
+                        if (selection==0) {                                  // use integer value of sequence as fitness
+                            newgene = livegenes[0]>livegenes[1] ?  livegenes[0] : livegenes[1]; // choose one with larger gene to replicate
+                        }
+                        else {
                             POPCOUNT64C(livegenes[0],d0);
                             POPCOUNT64C(livegenes[1],d1);
-                            newgene= (d0>d1) ? livegenes[0] : (d0<d1 ? livegenes[1] : ((livegenes[0]>livegenes[1]) ?  livegenes[0] : livegenes[1]));
-                        }
-                        else {                                                  // use integer value of sequence as fitness
-                            newgene = livegenes[0]>livegenes[1] ?  livegenes[0] : livegenes[1]; // choose one with larger gene to replicate
+                            if (selection==1) {                              // use number of ones in sequence as fitness
+                                newgene= (d0>d1) ? livegenes[0] : (d0<d1 ? livegenes[1] : ((livegenes[0]>livegenes[1]) ?  livegenes[0] : livegenes[1]));
+                            }
+                            else if (selection==2) {                         // birth if 2 genes obey 3 distance constraints < ncoding
+                                gdiff=livegenes[0]^livegenes[1];
+                                POPCOUNT64C(gdiff,dd);
+                                birth = (dd<ncoding & d0<ncoding & d1<ncoding) ? 1L: 0L; // birth if 2 genes close enough (< has higher priority than &)
+                                newgene= (d0>d1) ? livegenes[0] : (d0<d1 ? livegenes[1] : ((livegenes[0]>livegenes[1]) ?  livegenes[0] : livegenes[1]));
+                            }
+                             else if (selection==3) {                        // birth if 2 genes differently functional
+                                gene2centre = (1L<<ncoding)-1L;               // first ncoding 1s in this sequence
+                                gdiff  = livegenes[0]^livegenes[1];
+                                gdiff0 = livegenes[0]^gene2centre;
+                                gdiff1 = livegenes[1]^gene2centre;
+                                POPCOUNT64C(gdiff,dd);
+                                POPCOUNT64C(gdiff0,d2);
+                                POPCOUNT64C(gdiff1,d3);
+                                g0011 = d0<dd && d3<dd;
+                                g0110 = d2<dd && d1<dd;
+                                birth = (g0011 || g0110)  ? 1L: 0L;         // birth if 2 genes closer to two different targets than each other
+                                newgene= g0011 ? ((d0<d3) ? livegenes[0] : livegenes[1]) : ((d2<d1) ? livegenes[0] : livegenes[1]);
+                            }
+ 
+                            else fprintf(stderr,"Error: two live gene fitness value %d is not allowed\n",selection);
                         }
                     }
                 }
@@ -285,14 +298,6 @@ void genelife_update (int nsteps, int histoflag) {
     int t;
     long unsigned int *gol, *newgol, *golg, *newgolg;
 
-    static int first = 1;
-
-    if (first) {
-        srand(1234567);
-        state[0] = rand();state[1] = rand();
-        pmutmask = (0x1 << nlog2pmut) - 1;
-        first = 0;
-    }
     for (t=0; t<nsteps; t++) {
 	    gol = planes[curPlane];
 	    newgol = planes[newPlane];
@@ -431,27 +436,27 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     static int Nf = 0;
     char *golgin;
     
+    srand(1234567);
+    state[0] = rand();state[1] = rand();
+
     // writeFile("genepat.dat");
 
     rulemod = runparams[0];
     repscheme = runparams[1];
     selection = runparams[2];
+    overwritemask = runparams[3];
+    survival = runparams[4];
 
     nlog2pmut = simparams[0];
+    pmutmask = (0x1 << nlog2pmut) - 1;
     initial1density = simparams[1];
     initialrdensity = simparams[2];
     ncoding = simparams[3];
     codingmask = (0x1L<<ncoding)-1;
-
-
-//    startgenes[0] = 0x000000000000aaaa;
-//    startgenes[1] = 0x00000000ffffaaaa;
-//    startgenes[2] = 0x0000ffff0000aaaa;
-//    startgenes[3] = 0x0000ffffffffaaaa;
-//    startgenes[4] = 0xffff00000000aaaa;
-//    startgenes[5] = 0xffff0000ffffaaaa;
-//    startgenes[6] = 0xffffffff0000aaaa;
-//    startgenes[7] = 0xffffffffffffaaaa;
+    startgenechoice = simparams[4];
+    
+    fprintf(stdout,"runparams %d %d %d %d %d\n",runparams[0],runparams[1],runparams[2],runparams[3],runparams[4]);
+    fprintf(stdout,"simparams %d %d %d %d %d\n",simparams[0],simparams[1],simparams[2],simparams[3],simparams[4]);
 
     startgenes[0] = 0xaaaa000000000000;
     startgenes[1] = 0xaaaa00000000ffff;
@@ -494,8 +499,9 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
             g = 0;
             if (gol[ij] != 0)    { // if live cell, fill with random genome g or randomly chosen startgene depending on initialrdensity
                 if ((rand() & rmask) < initialrdensity) for (k=0; k<64; k++) g = (g << 1) | (rand() & 0x1);
-                else if (selection == 8) g = startgenes[rand() & 0x7];
-                else g = startgenes[selection & 0x7];
+                else if (startgenechoice == 8) g = startgenes[rand() & 0x7];
+                else if (startgenechoice > 8) fprintf(stderr,"startgenechoice %d out of range\n",startgenechoice);
+                else g = startgenes[startgenechoice & 0x7];
             }
             golg[ij] = g;
             if (golg[ij] == 0L && gol[ij] != 0L) fprintf(stderr,"zero gene at %d\n",ij);
@@ -534,8 +540,8 @@ int cmpfunc2 ( const void *pa, const void *pb )
 }
 
 void countspecies(long unsigned int golg[], int params[], int N2, int nparams) {  /* counts numbers of all different species using qsort first */
-    int ij, k, ijlast, nspecies, counts[N2], nones, fitness;
-    long unsigned int last, golgs[N2];
+    int ij, k, ijlast, nspecies, counts[N2], nones;
+    long unsigned int last, golgs[N2], fitness;
     long unsigned int golgsc[N2][2];
     int selection = params[2];
 
@@ -563,16 +569,22 @@ void countspecies(long unsigned int golg[], int params[], int N2, int nparams) {
     qsort(golgsc, nspecies, sizeof(golgsc[0]), cmpfunc2);                   // sort in decreasing count order
     for (k=0; k<nspecies; k++) {
         last = golgsc[k][0];
-        if (selection == 0) {                                               // neutral model : GoL rule departures depend only on seq diversity
-	    POPCOUNT64C(last, nones);
-	    fitness = 0;}
-        else if (selection == 1) {                                          // non-neutral model with selection for rule departure probability
-	    POPCOUNT64C(last, nones);                                     // number of ones in new gene determines fitness
-	    fitness = ((nones < 16) ? 0 : (nones - 23));}       // 0 if < 16 otherwise nones-23
-        else {                                                              // non-neutral model based on presence of replicase gene
-	    POPCOUNT64C(last, nones);                                     // number of ones in new gene determines fitness
-	    fitness = ((nones < 16) ? 0 : (nones - 23));}       // 0 if < 16 otherwise nones-23
-        fprintf(stdout,"count species %d with gene %lx has counts %lu and %d ones, fitness %d\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
+        POPCOUNT64C(last, nones);
+        fitness = 999;
+        if (selection == 0) {                                               // 2-live neighbor fitness is integer value
+	        fitness = last;
+        }
+        else if (selection == 1) {                                          // 2-live neighbor fitness is number of ones
+	        fitness = (long unsigned) nones;
+        }
+        else if (selection == 2){                                           // non-neutral model based on presence of replicase gene
+	        fitness = 999;                                                  // undefined, depends on competing sequence
+        }
+        else if (selection == 3){
+             fitness = 999;                                                 // undefined, depends on competing sequence
+        }
+        else fprintf(stderr,"selection parameter %d out of range\n",selection);
+        fprintf(stdout,"count species %d with gene %lx has counts %lu and %d ones, fitness %lu\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
     }
     fprintf(stdout,"cumulative activity = %lu\n",(N2 * (long unsigned int) totsteps) - emptysites);
 }
