@@ -39,9 +39,12 @@ int rulemod = 1;                    // det: whether to modify GoL rule for 2 and
 int selection = 1;                  // fitness model: 0 neutral 1 selected gene prob of rule departure 2 presence of replicase gene
 int repscheme = 1;                  // replication scheme: 0 random choice , 1 XOR of all 3, 2 consensus, 3 unique det choice, 4 most different
 int ncoding = 16;                   // number of bits used to encode valid neighbour connection in gene 1-16
-int initial1density = (1<<15)>>1;        // initial density of ones in gol as integer value, divide by 2^15 for true density
-int initialrdensity = (1<<15)>>1;        // initial density of random genes in live sites, divide by 2^15 for true density
-long unsigned int codingmask;           // mask for ncoding bits
+int survival = 2;                   // survive mask for two (bit 1) and three (bit 0) live neighbours
+int overwritemask = 0x2;            // bit mask for 4 cases of overwrite: bit 0. s==3  bit 1. special birth s==2
+int fitness2 = 1;                   // fitness of 2 live neighbours determined by number of ones (1) or integer value (0)
+int initial1density = (1<<15)>>1;   // initial density of ones in gol as integer value, divide by 2^15 for true density
+int initialrdensity = (1<<15)>>1;   // initial density of random genes in live sites, divide by 2^15 for true density
+long unsigned int codingmask;       // mask for ncoding bits
 static long unsigned int  emptysites = 0;  // cumulative number of empty sites during simulation updates
 
 int Noff = 9;                           // number of offsets
@@ -158,9 +161,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
     long unsigned int newgene, livegenes[3];
     long unsigned int s2or3, birth;
     int d0,d1;
-    static long unsigned int overwritemask = 0x0;                          // bit mask for 4 cases of overwrite
-                                                                           // 0. s==3  1. special birth s==2
-
+    
     totsteps++;
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
 	    i = ij & Nmask;  j = ij >> log2N;                                   // row & column
@@ -173,9 +174,9 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
             s += gs;                                                        // s is number of live nbs
             nb1i = (nb1i << (gs<<2)) + (gs*k);                              // nb1i is packed list of live neighbour indices
         }
-        s2or3 = (s>>2L) ? 0L :(s>>1)&1L;
-        if (s2or3) {                                                        // if 2 or 3 neighbours alive
-            // if ((s<2)||(s>3)) fprintf(stderr,"s2or3 error s == %lu\n",s);
+       s2or3 = (s>>2) ? 0L : (s>>1);                                       // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
+       if (s2or3) {                                                        // if 2 or 3 neighbours alive
+            if ((s<2)||(s>3)) fprintf(stderr,"s2or3 error s == %lu\n",s);
             birth = 0L;
             newgene = 0L;
             if (s&0x1L) {  // s==3                                                 // birth (with possible overwrite)
@@ -217,14 +218,27 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
             }  // end else if s==3
             else {  // s==2                                                 // possible birth as exception to GoL rule
                 if (rulemod) {                                              // special rule allowed if rulemod==1, NB no birth if all sequences same
-                    POPCOUNT64C(livegenes[0],d0);
-                    POPCOUNT64C(livegenes[1],d1);
+                    if ((0x1L&(overwritemask>>1))|(0x1L&~gol[ij])) {          // either overwrite on for s==2 or central site is empty
+                        for (k=0;k<s;k++)                                       // loop only over live neigbours
+                            livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];        // live gene at neighbour site
+                        birth = (livegenes[0]^livegenes[1]) ? 1L: 0L;           // birth first condition is two genes different
+                        if (fitness2) {                                        // use number of ones in sequence as fitness
+                            POPCOUNT64C(livegenes[0],d0);
+                            POPCOUNT64C(livegenes[1],d1);
+                            newgene= (d0>d1) ? livegenes[0] : (d0<d1 ? livegenes[1] : ((livegenes[0]>livegenes[1]) ?  livegenes[0] : livegenes[1]));
+                        }
+                        else {                                                  // use integer value of sequence as fitness
+                            newgene = livegenes[0]>livegenes[1] ?  livegenes[0] : livegenes[1]; // choose one with larger gene to replicate
+                        }
+                    }
+                }
+
+                if (rulemod) {                                              // special rule allowed if rulemod==1, NB no birth if all sequences same
                   if ((0x1L&(overwritemask>>1))|(0x1L&~gol[ij])) {          // either overwrite on for s==2 or central site is empty
                     for (k=0;k<s;k++)                                       // loop only over live neigbours
                         livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];        // live gene at neighbour site
                     birth = (livegenes[0]^livegenes[1]) ? 1L: 0L;           // birth first condition is two genes different
                     newgene = livegenes[0]>livegenes[1] ?  livegenes[0] : livegenes[1]; // choose one with more 1s to replicate
-                    newgene= d0>d1 ?  livegenes[0] : (d0<d1 ? livegenes[1] : (livegenes[0]>livegenes[1] ?  livegenes[0] : livegenes[1]));
                   }
                 }
             }
@@ -242,8 +256,14 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                 newgolg[ij] =  newgene;                                      // if birth then newgene
             }
             else {
-                newgol[ij]  = gol[ij];                                                    // new game of life cell value same as old
-                newgolg[ij] = golg[ij];                                                   // gene stays as before, live or not
+                if ((survival&s&0x1L)|((survival>>1)&(~s)&0x1L)|((~rulemod)&0x1L)) { // survival bit 0 and s==3, or (survival bit 1 and s==2) or not rulemod
+                    newgol[ij]  = gol[ij];                                  // new game of life cell value same as old
+                    newgolg[ij] = golg[ij];                                 // gene stays as before, live or not
+                }
+                else {
+                    newgol[ij]  = 0L;                                       // new game of life cell value dead
+                    newgolg[ij] = 0L;                                       // gene dies or stays dead
+                }
             }
         }  // end if s2or3
         else {                                                              // else not birth or survival, 0 values for gol and gene
