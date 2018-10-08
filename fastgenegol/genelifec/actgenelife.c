@@ -57,7 +57,7 @@ void printspecies(long unsigned int golg[]) {  /* counts numbers of all differen
 int main (int argc, char *argv[]) {
     int	 i;
     long unsigned int *golg;
-    int nsteps = 10000;                 // total number of steps to simulate GoL
+    int nsteps = 20000;                 // total number of steps to simulate GoL
     
     int myoffs[27] = {0,0,0,
 		  -1, 0, 0,
@@ -68,8 +68,8 @@ int main (int argc, char *argv[]) {
 		  1, -1, 0,
 		  0, -1, 0,
 		  -1, -1, 0};
-    int runparams[3];
-    int simparams[4];
+    int runparams[5];
+    int simparams[5];
     int nrunparams=3; int nsimparams=4;
 
     int opt;
@@ -85,25 +85,32 @@ int main (int argc, char *argv[]) {
     state[0] = rand();state[1] = rand();
     Noff = 9;
     runparams[0] = 1;        // 0,1 rulemod
-    runparams[1] = 3;        // 0-4 repscheme 
-    runparams[2] = 1;        // 0-2 selection
-    
+    runparams[1] = 4;        // 3-4 repscheme 
+    runparams[2] = 4;        // 0-4 selection
+    runparams[3] = 2;         // overwritemask = 2 bit mask
+    runparams[4] = 0;        // survival mask for two (bit1) and three (bit0) params
     simparams[0] = 8;        // nlog2pmut: gene mutation probability
     simparams[1] = 16384;    // initial1density: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
     simparams[2] = 32768 ;    // initialrdensity: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
-    simparams[3]= 12;
+    simparams[3]= 12;         // ncoding
+    simparams[4] = 8;         // initialize genes to 0-7 or 8=random
 
     if (argc>1) runparams[0] = atoi(argv[1]); // if present update rulemod from command line
     if (argc>2) runparams[1] = atoi(argv[2]); // if present update repscheme from command line
     if (argc>3) runparams[2] = atoi(argv[3]); // if present update selection from command line
-    if (argc>4) simparams[0] = atoi(argv[4]); // if present update nlog2pmut from command line
-    if (argc>5) simparams[1] = atoi(argv[5]); // if present update initial density from command line
-    if (argc>6) simparams[2] = atoi(argv[6]); // if present update init rand density from command line
-    if (argc>7) simparams[3] = atoi(argv[7]); // if present update ncoding no of bits used to encode valid connection functions 1-16
+    if (argc>4) runparams[3] = atoi(argv[4]); // if present update overwritemask from command line
+    if (argc>5) runparams[4] = atoi(argv[5]); // if present update survivalmask from command line
+    if (argc>6) simparams[0] = atoi(argv[6]); // if present update nlog2pmut from command line
+    if (argc>7) simparams[1] = atoi(argv[7]); // if present update initial density from command line
+    if (argc>8) simparams[2] = atoi(argv[8]); // if present update init rand density from command line
+    if (argc>9) simparams[3] = atoi(argv[9]); // if present update ncoding no of bits used to encode valid connection functions 1-16
+    if (argc>10) simparams[4] = atoi(argv[10]); // if present update ncoding no of bits used to encode valid connection functions 1-16
  
     fprintf(stderr,"Parameters:\n");
-    fprintf(stderr,"rulemod-0-1\trepscheme=0-4\tselection=0-2\tnlog2pmut\tinitial1density\tinitialrdensity\tncoding\n");
-    fprintf(stderr,"%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\n",runparams[0],runparams[1],runparams[2],simparams[0],simparams[1],simparams[2],simparams[3]);
+    fprintf(stderr,"rulemod-0-1\trepscheme=3,4\tselection=0-4\toverwrite\tsurvival\n");
+    fprintf(stderr,"%d\t\t%d\t\t%d\t\t%d\t\t%d\n",runparams[0],runparams[1],runparams[2],runparams[3],runparams[4]);
+    fprintf(stderr,"nlog2pmut\tinitial1density\tinitialrdensity\tncoding\tinitgene=0-8\n");
+    fprintf(stderr,"%d\t\t%d\t\t%d\t\t%d\t\t%d\n",simparams[0],simparams[1],simparams[2],simparams[3],simparams[4]);
 
     initialize_planes(myoffs,Noff);
     initialize(runparams,nrunparams,simparams,nsimparams);
