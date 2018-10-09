@@ -224,7 +224,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                             else if (selection==2) {                         // birth if 2 genes obey 3 distance constraints < ncoding
                                 gdiff=livegenes[0]^livegenes[1];
                                 POPCOUNT64C(gdiff,dd);
-                                birth = (dd<ncoding && d0<ncoding && d1<ncoding) ? 1L: 0L; // birth if 2 genes close enough (< has higher priority than &)
+                                birth = (dd<ncoding && d0<ncoding && d1<ncoding) ? 1L: 0L; // birth if 2 genes close enough
                                 newgene= (d0>d1) ? livegenes[0] : (d0<d1 ? livegenes[1] : ((livegenes[0]>livegenes[1]) ?  livegenes[0] : livegenes[1]));
                             }
                              else if (selection==3) {                        // birth if 2 genes differently functional
@@ -252,15 +252,6 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                             else fprintf(stderr,"Error: two live gene fitness value %d is not allowed\n",selection);
                         }
                     }
-                }
-
-                if (rulemod) {                                              // special rule allowed if rulemod==1, NB no birth if all sequences same
-                  if ((0x1L&(overwritemask>>1))|(0x1L&~gol[ij])) {          // either overwrite on for s==2 or central site is empty
-                    for (k=0;k<s;k++)                                       // loop only over live neigbours
-                        livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];        // live gene at neighbour site
-                    birth = (livegenes[0]^livegenes[1]) ? 1L: 0L;           // birth first condition is two genes different
-                    newgene = livegenes[0]>livegenes[1] ?  livegenes[0] : livegenes[1]; // choose one with more 1s to replicate
-                  }
                 }
             }
 
@@ -475,6 +466,15 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     startgenes[6] = 0xaaaaffffffff0000;         //   ... as 2
     startgenes[7] = 0xaaaaffffffffffff;         //   ... as 3
     
+    startgenes[0] = 0xffffffffffc00000;
+    startgenes[1] = 0xffffffffffc00000;
+    startgenes[2] = 0xffffffffffc00000;
+    startgenes[3] = 0xffffffffffc00000;
+    startgenes[4] = 0x00000fffffc00000;
+    startgenes[5] = 0x00000fffffc00000;
+    startgenes[6] = 0x00000fffffc00000;
+    startgenes[7] = 0x00000fffffc00000;
+  
     gol = planes[curPlane];
     golg = planesg[curPlane];
  
