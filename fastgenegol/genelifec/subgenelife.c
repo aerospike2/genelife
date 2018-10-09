@@ -150,7 +150,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
     long unsigned int s2or3, birth;
     int d0,d1,d2,d3,dd;
     long unsigned int gene2centre;
-    int g0011,g0110;
+    int g0011,g0110,prey;
     
     totsteps++;
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
@@ -211,24 +211,25 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                     if ((0x1L&(overwritemask>>1))|(0x1L&~gol[ij])) {        // either overwrite on for s==2 or central site is empty
                         for (k=0;k<s;k++)                                   // loop only over live neigbours
                             livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];    // live gene at neighbour site
-                        birth = (livegenes[0]^livegenes[1]) ? 1L: 0L;       // birth condition is two genes different
-                        if (selection==0) {                                  // use integer value of sequence as fitness
+                        if (selection==0) {                                 // use integer value of sequence as fitness
+                            birth = (livegenes[0]^livegenes[1]) ? 1L: 0L;   // birth condition is two genes different
                             newgene = livegenes[0]>livegenes[1] ?  livegenes[0] : livegenes[1]; // choose one with larger gene to replicate
                         }
                         else {
                             POPCOUNT64C(livegenes[0],d0);
                             POPCOUNT64C(livegenes[1],d1);
-                            if (selection==1) {                              // use number of ones in sequence as fitness
-                                newgene= (d0>d1) ? livegenes[0] : (d0<d1 ? livegenes[1] : ((livegenes[0]>livegenes[1]) ?  livegenes[0] : livegenes[1]));
+                            if (selection==1) {                             // use number of ones in sequence as fitness
+                                birth = (d0^d1) ? 1L: 0L;                   // birth condition if two genes different in number of ones
+                                newgene= (d0>d1) ? livegenes[0] : livegenes[1];
                             }
-                            else if (selection==2) {                         // birth if 2 genes obey 3 distance constraints < ncoding
-                                gdiff=livegenes[0]^livegenes[1];
-                                POPCOUNT64C(gdiff,dd);
-                                birth = (dd<ncoding && d0<ncoding && d1<ncoding) ? 1L: 0L; // birth if 2 genes close enough
-                                newgene= (d0>d1) ? livegenes[0] : (d0<d1 ? livegenes[1] : ((livegenes[0]>livegenes[1]) ?  livegenes[0] : livegenes[1]));
+                            else if (selection==2) {                        // use scissors-paper-stone-well game on number ones mod 4
+                                d2=d0&0x3;
+                                d3=d1&0x3;
+                                birth = (d2^d3) ? 1L: 0L;                   // birth if 2 genes differ mod 4 in number of ones
+                                newgene= 3-d2 ? livegenes[1] : (d2<d3 ? livegenes[1] : livegenes[0]);
                             }
-                             else if (selection==3) {                        // birth if 2 genes differently functional
-                                gene2centre = (1L<<ncoding)-1L;               // first ncoding 1s in this sequence
+                             else if (selection==3) {                       // birth if 2 genes differently functional (Not Yet Working)
+                                gene2centre = (1L<<ncoding)-1L;             // first ncoding 1s in this sequence
                                 gdiff  = livegenes[0]^livegenes[1];
                                 gdiff0 = livegenes[0]^gene2centre;
                                 gdiff1 = livegenes[1]^gene2centre;
@@ -240,15 +241,20 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                                 birth = (g0011 || g0110)  ? 1L: 0L;         // birth if 2 genes closer to two different targets than each other
                                 newgene= g0011 ? ((d0<d3) ? livegenes[0] : livegenes[1]) : ((d2<d1) ? livegenes[0] : livegenes[1]);
                             }
-                            else if (selection==4) {                        // birth if 2 genes obey 3 distance constraints < ncoding
-                                gdiff1 = ~livegenes[0];                     // find distance to 0x0 for gene 0
+                            else if (selection==4) {                        // birth if 2 genes obey 3 distance constraints < ncoding (NYW)
+                                gdiff1 = ~livegenes[0];                     // find distance to 0xfffffffffffff for gene 0
                                 POPCOUNT64C(gdiff1,d0);                     // in d0
                                 gdiff=livegenes[0]^livegenes[1];
                                 POPCOUNT64C(gdiff,dd);
                                 birth = (dd<ncoding && d0<ncoding && d1<ncoding) ? 1L: 0L; // birth if 2 genes close enough (< has higher priority than &)
                                 newgene= (d0>d1) ? livegenes[0] : (d0<d1 ? livegenes[1] : ((livegenes[0]>livegenes[1]) ?  livegenes[0] : livegenes[1]));
                             }
- 
+                            else if (selection==5) {                        // predator prey model : prey evolves to all 0, predator to all 1
+                                prey = d0<32 || d1<32;                      // >=1 prey required for birth
+                                birth = ((d0^d1) && prey) ? 1L: 0L;         // birth if different and >=1 prey)
+                                prey = d0<32 && d1<32;                      // 2 prey : newgene is one with less ones, 1 prey : predator wins
+                                newgene= (prey ? (d0<d1 ? livegenes[0] : livegenes[1]) : (d0<d1 ? livegenes[1] : livegenes[0]));
+                            }
                             else fprintf(stderr,"Error: two live gene fitness value %d is not allowed\n",selection);
                         }
                     }
@@ -592,6 +598,9 @@ void countspecies(long unsigned int golg[], int params[], int N2, int nparams) {
              fitness = 999;                                                 // undefined, depends on competing sequence
         }
         else if (selection == 4){
+             fitness = 999;                                                 // undefined, depends on competing sequence
+        }
+        else if (selection == 5){
              fitness = 999;                                                 // undefined, depends on competing sequence
         }
         else fprintf(stderr,"selection parameter %d out of range\n",selection);
