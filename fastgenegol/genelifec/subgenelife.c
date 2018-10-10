@@ -242,16 +242,17 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                                 newgene= g0011 ? ((d0<d3) ? livegenes[0] : livegenes[1]) : ((d2<d1) ? livegenes[0] : livegenes[1]);
                             }
                             else if (selection==4) {                        // birth if 2 genes obey 3 distance constraints < ncoding (NYW)
-                                gdiff1 = ~livegenes[0];                     // find distance to 0xfffffffffffff for gene 0
-                                POPCOUNT64C(gdiff1,d0);                     // in d0
+                                gdiff0 = ~livegenes[0];                     // find distance to 0x0 for gene 0
+                                POPCOUNT64C(gdiff0,d0);                     // in d0
                                 gdiff=livegenes[0]^livegenes[1];
                                 POPCOUNT64C(gdiff,dd);
-                                birth = (dd<ncoding && d0<ncoding && d1<ncoding) ? 1L: 0L; // birth if 2 genes close enough (< has higher priority than &)
+                                birth = (dd<ncoding && d0<ncoding && d1<ncoding) ? 1L: 0L; // birth if 2 genes close enough (< has higher priority than &&)
                                 newgene= (d0>d1) ? livegenes[0] : (d0<d1 ? livegenes[1] : ((livegenes[0]>livegenes[1]) ?  livegenes[0] : livegenes[1]));
                             }
                             else if (selection==5) {                        // predator prey model : prey evolves to all 0, predator to all 1
                                 prey = d0<32 || d1<32;                      // >=1 prey required for birth
-                                birth = ((d0^d1) && prey) ? 1L: 0L;         // birth if different and >=1 prey)
+                                gdiff=livegenes[0]^livegenes[1];
+                                birth = (gdiff && prey) ? 1L: 0L;         // birth if different and >=1 prey)
                                 prey = d0<32 && d1<32;                      // 2 prey : newgene is one with less ones, 1 prey : predator wins
                                 newgene= (prey ? (d0<d1 ? livegenes[0] : livegenes[1]) : (d0<d1 ? livegenes[1] : livegenes[0]));
                             }
