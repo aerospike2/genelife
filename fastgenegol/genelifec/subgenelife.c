@@ -658,13 +658,14 @@ void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], i
       }
       else{
 	    for (ij=0; ij<N2; ij++) {
-	        if (gol[ij]) {
-		    gene = golg[ij];
+                gene = golg[ij];
+	        if (gene) {
 		    mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
-		    cgolg[ij] = 1 + (int) mask;
-	    }		
-	    else cgolg[ij] = 0;
+                }		
+                else{
+                    mask = (111 * 11400714819323198549ul) >> (64 - 8);   // random color for gene==0
+                }
+                cgolg[ij] = 1 + (int) mask;
 	  }
     }
 }
-
