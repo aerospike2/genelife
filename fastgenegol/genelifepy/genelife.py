@@ -38,7 +38,7 @@ def rand_cmap(nlabels, type='bright', first_color_black=True, last_color_black=F
         return
     if verbose:
         print('Number of labels: ' + str(nlabels))
-
+    np.random.seed(123456)
     # Generate color map for bright colors, based on hsv
     if type == 'bright':
         randHSVcolors = [(np.random.uniform(low=0.0, high=1),
@@ -49,10 +49,27 @@ def rand_cmap(nlabels, type='bright', first_color_black=True, last_color_black=F
             randRGBcolors.append(colorsys.hsv_to_rgb(HSVcolor[0], HSVcolor[1], HSVcolor[2]))
         if first_color_black:
             randRGBcolors[0] = [0, 0, 0]
+#            randRGBcolors[1] = [0, 0, 1] # this color otherwise is black
         if last_color_black:
             randRGBcolors[-1] = [0, 0, 0]
         random_colormap = LinearSegmentedColormap.from_list('new_map', randRGBcolors, N=nlabels)
 
+    if type == 'bright':
+        randHSVcolors = [(np.random.uniform(low=0.0, high=1),
+                      np.random.uniform(low=0.2, high=1),
+                      np.random.uniform(low=0.9, high=1)) for i in xrange(nlabels)]
+        randRGBcolors = []
+        for HSVcolor in randHSVcolors:  # Convert HSV list to RGB
+            randRGBcolors.append(colorsys.hsv_to_rgb(HSVcolor[0], HSVcolor[1], HSVcolor[2]))
+        if first_color_black:
+            randRGBcolors[0] = [0, 0, 0]
+            randRGBcolors[1] = [0, 0, 1] # blue
+            randRGBcolors[2] = [0, 1, 0] # green
+            randRGBcolors[256] = [1, 0, 0] # red
+        if last_color_black:
+            randRGBcolors[-1] = [0, 0, 0]
+        random_colormap = LinearSegmentedColormap.from_list('new_map', randRGBcolors, N=nlabels)
+        
     # Generate soft pastel colors, by limiting the RGB spectrum
     if type == 'soft':
         low = 0.6
@@ -79,7 +96,7 @@ def rand_cmap(nlabels, type='bright', first_color_black=True, last_color_black=F
     return random_colormap
 #-----------------------------------------------------------------------------------------------------------
 
-my_cmap = rand_cmap(257, type='bright', first_color_black=True, last_color_black=False, verbose=False)
+my_cmap = rand_cmap(257, type='bright', first_color_black=True, last_color_black=False, verbose=True)
 
 def colorgrid(N):
     """ colors array according to grid and genegrid using colormethod"""
@@ -133,7 +150,8 @@ def doanimation(nrun=1,         # number of CA iterations per animation time ste
         time_text.set_text('cnt = %.1d' % cnt)
         time_text.set_color('w')
 
-    mat = ax.matshow(cgrid, cmap=my_cmap, vmin=0.01, vmax=257)  # was vmax = LEN+1
+#    mat = ax.matshow(cgrid, cmap=my_cmap, vmin=0.01, vmax=257)  # was vmax = LEN+1
+    mat = ax.matshow(cgrid, cmap=my_cmap, norm=Normalize)
     ani = animation.FuncAnimation(fig, update_anim, interval=1, # ~40 ms to see every time step
                                       save_count=0, frames=niter*ndisp, repeat = False)
     plt.show()

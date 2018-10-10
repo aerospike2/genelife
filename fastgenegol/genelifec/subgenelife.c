@@ -201,9 +201,9 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                     } //switch
                     newgene = golg[nb[(kmin+k)&0x7]];                               // rotate unique nb k left (kmin) back to orig nb pat
                 }
-                if (newgene == 0L) {
-                    fprintf(stderr,"step %d Error with new gene zero: nbmask %lu nbmaskrm %lu kmin %d gol %lu golg %lx newgene %lx ij %d\n",totsteps,nbmask,nbmaskrm,kmin,gol[nb[kmin]],golg[nb[kmin]],newgene,ij);
-                }
+                //if (newgene == 0L) {
+                //    fprintf(stderr,"step %d Error with new gene zero: nbmask %lu nbmaskrm %lu kmin %d gol %lu golg %lx newgene %lx ij %d\n",totsteps,nbmask,nbmaskrm,kmin,gol[nb[kmin]],golg[nb[kmin]],newgene,ij);
+                //}
               }
             }  // end else if s==3
             else {  // s==2                                                 // possible birth as exception to GoL rule
@@ -480,6 +480,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     startgenes[5] = 0x00000fffffc00000;
     startgenes[6] = 0x00000fffffc00000;
     startgenes[7] = 0x00000fffffc00000;
+    startgenes[7] = 0x0000000000000000;
   
     gol = planes[curPlane];
     golg = planesg[curPlane];
@@ -501,7 +502,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
                 gol[ij] = 0;
                 golg[ij] = 0;
             }
-            if (golg[ij] == 0 && gol[ij] != 0) fprintf(stderr,"zero gene at %d\n",ij);
+            // if (golg[ij] == 0 && gol[ij] != 0) fprintf(stderr,"zero gene at %d\n",ij);
         }
 
     }
@@ -518,7 +519,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
                 else g = startgenes[startgenechoice & 0x7];
             }
             golg[ij] = g;
-            if (golg[ij] == 0L && gol[ij] != 0L) fprintf(stderr,"zero gene at %d\n",ij);
+            // if (golg[ij] == 0L && gol[ij] != 0L) fprintf(stderr,"zero gene at %d\n",ij);
         }
         // for (ij=0; ij<40; ij++) fprintf(stderr,"gene at %d %lx\n",ij,golg[ij]);   // test first 40
     }
@@ -633,30 +634,23 @@ void printxy (long unsigned int gol[],long unsigned int golg[]) {   /* print the
     printf("\n");
 }
 
-int colorFunction = 0;
+int colorFunction = 1;
 
 void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], int N2) {
-    long unsigned int gene, genelink, mask;
-    int ij,l;
-    unsigned int cmask;
+    long unsigned int gene, mask;
+    int ij,d;
     
     if(colorFunction){
-	  for (ij=0; ij<N2; ij++) {
-	    if (gol[ij]) {
-		    gene = golg[ij];
-		    cmask = 0;                                          // connection mask initialized to 0
-		    for(l=1;l<4;l++) {                                  // 3 possible connections encoded in 3 16-bit gene words
-		        genelink = (gene >> (l<<4)) & codingmask;           // ncoding bit sequences describing possible links: ncoding <=16
-		        if (genelink == codingmask) cmask = cmask|(1<<(l-1));// set mask only if connection encoded (all ones), later use probs
-            }
-		    // cmask = (gene * 11400714819323198549ul) >> (64 - 8);   // alternatively hash with optimal prime multiplicator down to 8 bits
-
-		    cgolg[ij] = 1 + (int) cmask;
+	    for (ij=0; ij<N2; ij++) {
+	        if (gol[ij]) {
+		        gene = golg[ij];
+                POPCOUNT64C(gene,d);
+		        cgolg[ij] = 2 + d;
 	        }
 	        else cgolg[ij] = 0;
 	    }
-      }
-      else{
+    }
+    else{
 	    for (ij=0; ij<N2; ij++) {
                 gene = golg[ij];
 	        if (gene) {
