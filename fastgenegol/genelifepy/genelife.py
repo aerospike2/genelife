@@ -33,8 +33,8 @@ def rand_cmap(nlabels, type='bright', first_color_black=True, last_color_black=F
     import colorsys
     import numpy as np
 
-    if type not in ('bright', 'soft'):
-        print ('Please choose "bright" or "soft" for type')
+    if type not in ('bright', 'soft','grad'):
+        print ('Please choose "bright" or "soft" or "grad" for type')
         return
     if verbose:
         print('Number of labels: ' + str(nlabels))
@@ -54,20 +54,12 @@ def rand_cmap(nlabels, type='bright', first_color_black=True, last_color_black=F
             randRGBcolors[-1] = [0, 0, 0]
         random_colormap = LinearSegmentedColormap.from_list('new_map', randRGBcolors, N=nlabels)
 
-    if type == 'bright':
-        randHSVcolors = [(np.random.uniform(low=0.0, high=1),
-                      np.random.uniform(low=0.2, high=1),
-                      np.random.uniform(low=0.9, high=1)) for i in xrange(nlabels)]
-        randRGBcolors = []
-        for HSVcolor in randHSVcolors:  # Convert HSV list to RGB
-            randRGBcolors.append(colorsys.hsv_to_rgb(HSVcolor[0], HSVcolor[1], HSVcolor[2]))
-        if first_color_black:
-            randRGBcolors[0] = [0, 0, 0]
-            randRGBcolors[1] = [0, 0, 1] # blue
-            randRGBcolors[2] = [0, 1, 0] # green
-            randRGBcolors[256] = [1, 0, 0] # red
-        if last_color_black:
-            randRGBcolors[-1] = [0, 0, 0]
+    if type == 'grad':
+#        randRGBcolors = np.array((np.linspace(0.0, 1.0, num=256),
+#                                  np.linspace(1.0, 0.0, num=256),
+#                                  np.concatenate(np.linspace(1.0, 0.0, num=128),np.linspace(0.0, 1.0, num=128)))).T
+        randRGBcolors =[((i-1)/255.,(255.-(i-1))/255.,(i-1)/128. if i<=128 else (255.-(i-1))/128.) for i in xrange(nlabels)]
+        randRGBcolors[0] = [0, 0, 0]
         random_colormap = LinearSegmentedColormap.from_list('new_map', randRGBcolors, N=nlabels)
         
     # Generate soft pastel colors, by limiting the RGB spectrum
@@ -96,7 +88,8 @@ def rand_cmap(nlabels, type='bright', first_color_black=True, last_color_black=F
     return random_colormap
 #-----------------------------------------------------------------------------------------------------------
 
-my_cmap = rand_cmap(257, type='bright', first_color_black=True, last_color_black=False, verbose=True)
+# my_cmap = rand_cmap(257, type='bright', first_color_black=True, last_color_black=False, verbose=True)
+my_cmap = rand_cmap(257, type='grad', first_color_black=True, last_color_black=False, verbose=True)
 
 def colorgrid(N):
     """ colors array according to grid and genegrid using colormethod"""
