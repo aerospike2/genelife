@@ -499,7 +499,6 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     startgenes[5] = 0x00000fffffc00000;
     startgenes[6] = 0x00000fffffc00000;
     startgenes[7] = 0x00000fffffc00000;
-    startgenes[7] = 0x0000000000000000;
   
     gol = planes[curPlane];
     golg = planesg[curPlane];
@@ -590,7 +589,8 @@ void countspecies(long unsigned int gol[], long unsigned int golg[], int params[
             ijlast = ij;
         }
     }
-    nspecies = k;  // print excluding 0 since this is most likely an empty site not a true gene
+    counts[k++]=N2-ijlast;
+    nspecies = k;  // print including 0
     fprintf(stdout,"The number of different non-zero species is %d\n",nspecies);
 
     for (k=0,ij=0;k<nspecies;k++) {     // now condense array to give only different genes with counts
@@ -674,7 +674,7 @@ void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], i
 	    for (ij=0; ij<N2; ij++) {
             if (gol[ij]) {
                 gene = golg[ij];
-                if (gene == 0L) gene = 111L; // random color for gene==0
+                if (gene == 0L) gene = 11778L; // random color for gene==0
                 mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
                 cgolg[ij] = 1 + (int) mask;
                 if (((int) mask) == 0) cnt++;
