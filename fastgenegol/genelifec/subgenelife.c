@@ -573,7 +573,7 @@ int cmpfunc2 ( const void *pa, const void *pb )
         return (int) (b[1] - a[1]);
 }
 
-void countspecies(long unsigned int golg[], int params[], int N2, int nparams) {  /* counts numbers of all different species using qsort first */
+void countspecies(long unsigned int gol[], long unsigned int golg[], int params[], int N2, int nparams) {  /* counts numbers of all different species using qsort first */
     int ij, k, ijlast, nspecies, counts[N2], nones;
     long unsigned int last, golgs[N2], fitness;
     long unsigned int golgsc[N2][2];
@@ -653,12 +653,13 @@ void printxy (long unsigned int gol[],long unsigned int golg[]) {   /* print the
     printf("\n");
 }
 
-int colorFunction = 1;
+int colorFunction = 0;
 
 void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], int N2) {
     long unsigned int gene, mask;
     int ij,d;
-    
+    int cnt;
+    cnt=0;
     if(colorFunction){
 	    for (ij=0; ij<N2; ij++) {
 	        if (gol[ij]) {
@@ -676,8 +677,10 @@ void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], i
                 if (gene == 0L) gene = 111L; // random color for gene==0
                 mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
                 cgolg[ij] = 1 + (int) mask;
+                if (((int) mask) == 0) cnt++;
             }
             else cgolg[ij] = 0;
 	    }
     }
+    fprintf(stderr,"hash count of zero genes %d\n",cnt);
 }
