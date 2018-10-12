@@ -172,17 +172,34 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
             if (s&0x1L) {  // s==3                                                 // birth (with possible overwrite)
               if ((0x1L&overwritemask)|(0x1L&~gol[ij]) ) {                         // central site empty or overwrite mode
                 birth = 1L;                                                        // birth flag
-                for (k=7,nbmask=0L;k>=0;k--) nbmask = (nbmask << 1) + gol[nb[k]];  // compute 8-bit mask of GoL states of 8 nbs, clockwise from top left
-                for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {                 // compute canonical rotation (minimum) of this mask
+                if (repscheme & 0x1) {
+                    for(k=0;k<s;k++) livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];  // live neighbour genes
+                    if((livegenes[0]^livegenes[1])|(livegenes[0]^livegenes[2])) {  // genes not all same
+                        gdiff  = livegenes[0]^livegenes[2];
+                        gdiff0 = livegenes[0]^livegenes[1];
+                        gdiff1 = livegenes[1]^livegenes[2];
+                        if(gdiff0&&gdiff1&&gdiff) {                                //all three different
+                            POPCOUNT64C(gdiff0,d0);
+                            POPCOUNT64C(gdiff1,d1);
+                            POPCOUNT64C(gdiff,d2);
+                            d3 = d0!=d1? (d0!=d2 ? 4 : 1) : (d0!= d2 ? 2 : (d1!=d2 ? 3 : 0));
+                        }
+                        else if (gdiff1) livegenes[1]=livegenes[2];
+                    }
+                    else newgene= golg[nb[nb1i&0x7]];
+                }
+                else {
+                  for (k=7,nbmask=0L;k>=0;k--) nbmask = (nbmask << 1) + gol[nb[k]];  // compute 8-bit mask of GoL states of 8 nbs, clockwise from top left
+                  for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {                 // compute canonical rotation (minimum) of this mask
                     nbmaskr = ((nbmaskr & 0x1L)<<7) + (nbmaskr>>1);                // 8 bit rotate right
                     if (nbmaskr < nbmaskrm) {                                      // choose minimal value of mask rotation
                         nbmaskrm = nbmaskr;                                        // neighbor mask rotate min is current rotation
                         kmin = k;                                                  // no of times rotated to right
                     }
-                }
+                  }
 
-                if (repscheme == 3) newgene = golg[nb[kmin]];                      // 3. deterministic choice of ancestor: replication of live neigbour in bit 0 of canonical pos
-                else {                                                             // repscheme = 0 or 4 for example
+                  if ((repscheme>>1) & 0x1) newgene = golg[nb[kmin]];                // 2,3,6,7... deterministic choice of ancestor: replication of live neigbour in bit 0 of canonical pos
+                  else {                                                             // repscheme = 0 or 4 for example
                     switch (nbmaskrm) {                //             x07   x0b   x13   x19   x0d   x15   x25
                         case 0x07 : k = 1; break;      // 00000111    012  <-
                         case 0x0b : k = 0; break;      // 00001011    ...   01.  <-
@@ -200,10 +217,11 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                         } //case
                     } //switch
                     newgene = golg[nb[(kmin+k)&0x7]];                               // rotate unique nb k left (kmin) back to orig nb pat
+                  }
+                  //if (newgene == 0L) {
+                  //    fprintf(stderr,"step %d Error with new gene zero: nbmask %lu nbmaskrm %lu kmin %d gol %lu golg %lx newgene %lx ij %d\n",totsteps,nbmask,nbmaskrm,kmin,gol[nb[kmin]],golg[nb[kmin]],newgene,ij);
+                  //}
                 }
-                //if (newgene == 0L) {
-                //    fprintf(stderr,"step %d Error with new gene zero: nbmask %lu nbmaskrm %lu kmin %d gol %lu golg %lx newgene %lx ij %d\n",totsteps,nbmask,nbmaskrm,kmin,gol[nb[kmin]],golg[nb[kmin]],newgene,ij);
-                //}
               }
             }  // end else if s==3
             else {  // s==2                                                 // possible birth as exception to GoL rule
@@ -635,7 +653,7 @@ void printxy (long unsigned int gol[],long unsigned int golg[]) {   /* print the
     printf("\n");
 }
 
-int colorFunction = 0;
+int colorFunction = 1;
 
 void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], int N2) {
     long unsigned int gene, mask;
@@ -646,7 +664,7 @@ void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], i
 	        if (gol[ij]) {
 		        gene = golg[ij];
                 POPCOUNT64C(gene,d);
-		        cgolg[ij] = 2 + d;
+		        cgolg[ij] = 2 + 3*d;
 	        }
 	        else cgolg[ij] = 0;
 	    }
