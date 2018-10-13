@@ -675,12 +675,13 @@ void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], i
             if (gol[ij]) {
                 gene = golg[ij];
                 if (gene == 0L) gene = 11778L; // random color for gene==0
-                mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
+                // mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
+                mask = (gene * 11400714819323198549ul) >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
                 cgolg[ij] = 1 + (int) mask;
                 if (((int) mask) == 0) cnt++;
             }
             else cgolg[ij] = 0;
 	    }
     }
-    fprintf(stderr,"hash count of zero genes %d\n",cnt);
+    // fprintf(stderr,"hash count of zero genes %d\n",cnt);
 }
