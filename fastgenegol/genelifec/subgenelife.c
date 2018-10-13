@@ -170,7 +170,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
             birth = 0L;
             newgene = 0L;
             if (s&0x1L) {  // s==3                                                 // birth (with possible overwrite)
-              if ((0x1L&overwritemask)|(0x1L&~gol[ij]) ) {                         // central site empty or overwrite mode
+              if ((0x1L&overwritemask)|(0x1L&~gol[ij]) ) {                         // central site empty or overwrite mode on (for bit 0)
                 birth = 1L;                                                        // birth flag
                 if (repscheme & 0x1) {
                     for(k=0;k<s;k++) livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];  // live neighbour genes
@@ -226,7 +226,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
             }  // end else if s==3
             else {  // s==2                                                 // possible birth as exception to GoL rule
                 if (rulemod) {                                              // special rule allowed if rulemod==1, NB no birth if all sequences same
-                    if ((0x1L&(overwritemask>>1))|(0x1L&~gol[ij])) {        // either overwrite on for s==2 or central site is empty
+                    if ((0x1L&(overwritemask>>1))|(0x1L&~gol[ij])) {        // either overwrite on for s==2 (bit 1) or central site is empty
                         for (k=0;k<s;k++)                                   // loop only over live neigbours
                             livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];    // live gene at neighbour site
                         if (selection==0) {                                 // use integer value of sequence as fitness
@@ -591,7 +591,7 @@ void countspecies(long unsigned int gol[], long unsigned int golg[], int params[
     }
     counts[k++]=N2-ijlast;
     nspecies = k;  // print including 0
-    fprintf(stdout,"The number of different non-zero species is %d\n",nspecies);
+    fprintf(stdout,"The number of different species is %d\n",nspecies);
 
     for (k=0,ij=0;k<nspecies;k++) {     // now condense array to give only different genes with counts
         // printf("species %4d with gene %x has counts %d\n",k, golgs[ij],counts[k]);
@@ -659,7 +659,8 @@ void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], i
     long unsigned int gene, mask;
     int ij,d;
     int cnt;
-    cnt=0;
+    int counts[256];
+    
     if(colorFunction){
 	    for (ij=0; ij<N2; ij++) {
 	        if (gol[ij]) {
@@ -671,16 +672,22 @@ void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], i
 	    }
     }
     else{
+        for(d=0;d<256;d++) counts[d]=0;
+        // see https://stackoverflow.com/questions/6943493/hash-table-with-64-bit-values-as-key/33871291
 	    for (ij=0; ij<N2; ij++) {
             if (gol[ij]) {
                 gene = golg[ij];
                 if (gene == 0L) gene = 11778L; // random color for gene==0
-                mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
+                //mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
+                //mask = (gene * 11400714819323198549ul) & 0xff;   // hash with optimal prime multiplicator down to 8 bits
+                mask = (gene * 11400714819323198485ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
                 cgolg[ij] = 1 + (int) mask;
-                if (((int) mask) == 0) cnt++;
+                counts[(int) mask]++;
             }
             else cgolg[ij] = 0;
 	    }
     }
-    fprintf(stderr,"hash count of zero genes %d\n",cnt);
+    // fprintf(stderr,"hash count of genes with zero hash %d\n",cnt);
+    for(d=0;d<256;d++)
+        if (counts[d]) fprintf(stderr,"counting hash table hash %d has %d counts\n",d,counts[d]);
 }
