@@ -293,7 +293,8 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                 newgolg[ij] =  newgene;                                      // if birth then newgene
             }
             else {
-                if ((survival&s&0x1L)|((survival>>1)&(~s)&0x1L)|((~rulemod)&0x1L)) { // survival bit 0 and s==3, or (survival bit 1 and s==2) or not rulemod
+//                if ((survival&s&0x1L)|((survival>>1)&(~s)&0x1L)|((~rulemod)&0x1L)) { // survival bit 0 and s==3, or (survival bit 1 and s==2) or not rulemod
+                if ((survival&s&0x1L)|((survival>>1)&(~s)&0x1L)) { // survival bit 0 and s==3, or (survival bit 1 and s==2) or not rulemod
                     newgol[ij]  = gol[ij];                                  // new game of life cell value same as old
                     newgolg[ij] = golg[ij];                                 // gene stays as before, live or not
                 }
@@ -677,6 +678,7 @@ void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], i
                 if (gene == 0L) gene = 11778L; // random color for gene==0
                 // mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
                 mask = (gene * 11400714819323198549ul) >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
+                mask |= 0x80808000; // ensure brighter color at risk of improbable redundancy
                 cgolg[ij] = 1 + (int) mask;
                 if (((int) mask) == 0) cnt++;
             }
