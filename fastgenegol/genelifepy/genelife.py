@@ -7,7 +7,7 @@ import matplotlib
 import genelife_update_module as genelife
 
 
-log2N = 8                       #  log2N=7 => N=128
+log2N = 9                       #  log2N=7 => N=128
 N = 2**log2N
 N2 = N*N
 Nmask = N-1

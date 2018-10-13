@@ -20,7 +20,7 @@
 
 #define ASCII_ESC 27                // escape for printing terminal commands, such as cursor repositioning
 
-const int log2N = 8;                // toroidal array of side length N = 2 to the power of log2N
+const int log2N = 9;                // toroidal array of side length N = 2 to the power of log2N
 const int N = 0x1 << log2N;
 const int N2 = N*N;                 // number of sites in toroidal array
 const int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
