@@ -688,7 +688,6 @@ void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], i
             else cgolg[ij] = 0;
 	    }
     }
-    // fprintf(stderr,"hash count of genes with zero hash %d\n",cnt);
-    for(d=0;d<256;d++)
-        if (counts[d]) fprintf(stderr,"counting hash table hash %d has %d counts\n",d,counts[d]);
+    //for(d=0;d<256;d++)
+    //    if (counts[d]) fprintf(stderr,"counting hash table hash %d has %d counts\n",d,counts[d]);
 }
