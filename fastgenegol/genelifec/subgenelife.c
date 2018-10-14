@@ -20,7 +20,7 @@
 
 #define ASCII_ESC 27                // escape for printing terminal commands, such as cursor repositioning
 
-const int log2N = 8;                // toroidal array of side length N = 2 to the power of log2N
+const int log2N = 9;                // toroidal array of side length N = 2 to the power of log2N
 const int N = 0x1 << log2N;
 const int N2 = N*N;                 // number of sites in toroidal array
 const int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
@@ -170,7 +170,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
             birth = 0L;
             newgene = 0L;
             if (s&0x1L) {  // s==3                                                 // birth (with possible overwrite)
-              if ((0x1L&overwritemask)|(0x1L&~gol[ij]) ) {                         // central site empty or overwrite mode on (for bit 0)
+              if ((0x1L&overwritemask)|(0x1L&~gol[ij]) ) {                         // central site empty or overwrite mode
                 birth = 1L;                                                        // birth flag
                 if (repscheme & 0x1) {
                     for(k=0;k<s;k++) livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];  // live neighbour genes
@@ -226,7 +226,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
             }  // end else if s==3
             else {  // s==2                                                 // possible birth as exception to GoL rule
                 if (rulemod) {                                              // special rule allowed if rulemod==1, NB no birth if all sequences same
-                    if ((0x1L&(overwritemask>>1))|(0x1L&~gol[ij])) {        // either overwrite on for s==2 (bit 1) or central site is empty
+                    if ((0x1L&(overwritemask>>1))|(0x1L&~gol[ij])) {        // either overwrite on for s==2 or central site is empty
                         for (k=0;k<s;k++)                                   // loop only over live neigbours
                             livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];    // live gene at neighbour site
                         if (selection==0) {                                 // use integer value of sequence as fitness
@@ -293,7 +293,8 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                 newgolg[ij] =  newgene;                                      // if birth then newgene
             }
             else {
-                if ((survival&s&0x1L)|((survival>>1)&(~s)&0x1L)|((~rulemod)&0x1L)) { // survival bit 0 and s==3, or (survival bit 1 and s==2) or not rulemod
+//                if ((survival&s&0x1L)|((survival>>1)&(~s)&0x1L)|((~rulemod)&0x1L)) { // survival bit 0 and s==3, or (survival bit 1 and s==2) or not rulemod
+                if ((survival&s&0x1L)|((survival>>1)&(~s)&0x1L)) { // survival bit 0 and s==3, or (survival bit 1 and s==2) or not rulemod
                     newgol[ij]  = gol[ij];                                  // new game of life cell value same as old
                     newgolg[ij] = golg[ij];                                 // gene stays as before, live or not
                 }
@@ -678,9 +679,9 @@ void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], i
             if (gol[ij]) {
                 gene = golg[ij];
                 if (gene == 0L) gene = 11778L; // random color for gene==0
-                //mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
-                //mask = (gene * 11400714819323198549ul) & 0xff;   // hash with optimal prime multiplicator down to 8 bits
-                mask = (gene * 11400714819323198485ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
+                // mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
+                mask = (gene * 11400714819323198549ul) >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
+                mask |= 0x80808000; // ensure brighter color at risk of improbable redundancy
                 cgolg[ij] = 1 + (int) mask;
                 counts[(int) mask]++;
             }

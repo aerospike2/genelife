@@ -7,13 +7,13 @@ import matplotlib
 import genelife_update_module as genelife
 
 
-log2N = 8                       #  log2N=7 => N=128
+log2N = 9                       #  log2N=7 => N=128
 N = 2**log2N
 N2 = N*N
 Nmask = N-1
 gol = np.zeros(N2,np.uint64)
 golg = np.zeros(N2,np.uint64)
-cgrid = np.zeros((N,N),np.uint)
+cgrid = np.zeros((N,N),np.int32)
 cgolg =np.zeros(N2,np.int32)
 
 # setup of color map : black for 0, colors for 1 to LEN+1 or 257 for colormethod 0 or 1
@@ -89,11 +89,11 @@ def rand_cmap(nlabels, type='bright', first_color_black=True, last_color_black=F
 #-----------------------------------------------------------------------------------------------------------
 
 # my_cmap = rand_cmap(257, type='bright', first_color_black=True, last_color_black=False, verbose=True)
-my_cmap = rand_cmap(257, type='grad', first_color_black=True, last_color_black=False, verbose=True)
+#my_cmap = rand_cmap(257, type='grad', first_color_black=True, last_color_black=False, verbose=True)
 
-def colorgrid(N):
+def colorgrid():
     """ colors array according to grid and genegrid using colormethod"""
-    global gol,cgrid,golg,cgolg
+    global gol,cgrid,golg,cgolg,N
     
     genelife.colorgenes(gol,golg,cgolg)
     for i in xrange(N):
