@@ -656,14 +656,12 @@ void printxy (long unsigned int gol[],long unsigned int golg[]) {   /* print the
 
 int colorFunction = 0;
 
-void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], int N2) {
+void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], int NN2) {
     long unsigned int gene, mask;
     int ij,d;
-    int cnt;
-    int counts[256];
-    
+
     if(colorFunction){
-	    for (ij=0; ij<N2; ij++) {
+	    for (ij=0; ij<NN2; ij++) {
 	        if (gol[ij]) {
 		        gene = golg[ij];
                 POPCOUNT64C(gene,d);
@@ -673,9 +671,9 @@ void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], i
 	    }
     }
     else{
-        for(d=0;d<256;d++) counts[d]=0;
+        // for(d=0;d<256;d++) counts[d]=0;
         // see https://stackoverflow.com/questions/6943493/hash-table-with-64-bit-values-as-key/33871291
-	    for (ij=0; ij<N2; ij++) {
+        for (ij=0; ij<NN2; ij++) {
             if (gol[ij]) {
                 gene = golg[ij];
                 if (gene == 0L) gene = 11778L; // random color for gene==0
@@ -683,10 +681,9 @@ void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], i
                 mask = (gene * 11400714819323198549ul) >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
                 mask |= 0x80808000; // ensure brighter color at risk of improbable redundancy
                 cgolg[ij] = 1 + (int) mask;
-                counts[(int) mask]++;
             }
             else cgolg[ij] = 0;
-	    }
+        }
     }
     //for(d=0;d<256;d++)
     //    if (counts[d]) fprintf(stderr,"counting hash table hash %d has %d counts\n",d,counts[d]);
