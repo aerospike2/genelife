@@ -229,7 +229,7 @@ def main():
         #         datout.write(str(act)+' ')
         #     datout.write("\n")
         cnt += 1                        # counting number of data chunks piped from source program
-    image.save(screen, "/tmp/activity.jpeg")
+#    image.save(screen, "/tmp/activity.jpeg")
 
 if __name__=='__main__':
     main()
