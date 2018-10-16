@@ -184,7 +184,6 @@ extern inline void selectone(int s, long unsigned int livegenes[], int nb[], lon
             *newgene= (d0>d1) ? livegenes[0] : (d0<d1 ? livegenes[1] : ((livegenes[0]>livegenes[1]) ?  livegenes[0] : livegenes[1]));
         }
         else if (selection==5) {                         // predator prey model : prey evolves to all 0, predator to all 1
-            prey = d0<32 || d1<32;                       // >=1 prey required for birth
             gdiff=livegenes[0]^livegenes[1];
             prey = d0<32 && d1<32;                       // 2 prey : newgene is one with less ones, 1 prey : predator wins
             *birth = (gdiff && prey) ? 1L: 0L;           // birth if different and >=1 prey)
