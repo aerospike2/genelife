@@ -138,19 +138,73 @@ void init_histo(){     // initialize the history array to zero
     for(i=0; i<numHisto; i++)        histo[i] = 0;
 }
 
+extern inline void selectone(int s, long unsigned int livegenes[], int nb[], long unsigned int golg[],long unsigned int * birth, long unsigned int *newgene) {
+    // Selection of which of two genes to copy. birth is one if ancestor choice made
+    int d0,d1,d2,d3,dd;
+    long unsigned int gdiff,gdiff0,gdiff1;
+    long unsigned int gene2centre;
+    int g0011,g0110,prey;
+
+    if (selection==0) {                                  // use integer value of sequence as fitness
+        *birth = (livegenes[0]^livegenes[1]) ? 1L: 0L;   // birth condition is two genes different
+        *newgene = livegenes[0]>livegenes[1] ?  livegenes[0] : livegenes[1]; // choose one with larger gene to replicate
+    }
+    else {
+        POPCOUNT64C(livegenes[0],d0);
+        POPCOUNT64C(livegenes[1],d1);
+        if (selection==1) {                              // use number of ones in sequence as fitness
+            *birth = (d0^d1) ? 1L: 0L;                   // birth condition if two genes different in number of ones
+            *newgene= (d0>d1) ? livegenes[0] : livegenes[1];
+        }
+        else if (selection==2) {                         // use scissors-paper-stone-well game on number ones mod 4
+            d2=d0&0x3;
+            d3=d1&0x3;
+            *birth = (d2^d3) ? 1L: 0L;                   // birth if 2 genes differ mod 4 in number of ones
+            *newgene= 3-d2 ? livegenes[1] : (d2<d3 ? livegenes[1] : livegenes[0]);
+        }
+        else if (selection==3) {                         // birth if 2 genes differently functional (Not Yet Working)
+            gene2centre = (1L<<ncoding)-1L;              // first ncoding 1s in this sequence
+            gdiff  = livegenes[0]^livegenes[1];
+            gdiff0 = livegenes[0]^gene2centre;
+            gdiff1 = livegenes[1]^gene2centre;
+            POPCOUNT64C(gdiff,dd);
+            POPCOUNT64C(gdiff0,d2);
+            POPCOUNT64C(gdiff1,d3);
+            g0011 = d0<dd && d3<dd;
+            g0110 = d2<dd && d1<dd;
+            *birth = (g0011 || g0110)  ? 1L: 0L;         // birth if 2 genes closer to two different targets than each other
+            *newgene= g0011 ? ((d0<d3) ? livegenes[0] : livegenes[1]) : ((d2<d1) ? livegenes[0] : livegenes[1]);
+        }
+        else if (selection==4) {                         // birth if 2 genes obey 3 distance constraints < ncoding (NYW)
+            gdiff0 = ~livegenes[0];                      // find distance to 0x0 for gene 0
+            POPCOUNT64C(gdiff0,d0);                      // in d0
+            gdiff=livegenes[0]^livegenes[1];
+            POPCOUNT64C(gdiff,dd);
+            *birth = (dd<ncoding && d0<ncoding && d1<ncoding) ? 1L: 0L; // birth if 2 genes close enough (< has higher priority than &&)
+            *newgene= (d0>d1) ? livegenes[0] : (d0<d1 ? livegenes[1] : ((livegenes[0]>livegenes[1]) ?  livegenes[0] : livegenes[1]));
+        }
+        else if (selection==5) {                         // predator prey model : prey evolves to all 0, predator to all 1
+            prey = d0<32 || d1<32;                       // >=1 prey required for birth
+            gdiff=livegenes[0]^livegenes[1];
+            prey = d0<32 && d1<32;                       // 2 prey : newgene is one with less ones, 1 prey : predator wins
+            *birth = (gdiff && prey) ? 1L: 0L;           // birth if different and >=1 prey)
+            *newgene= (prey ? (d0<d1 ? livegenes[0] : livegenes[1]) : (d0<d1 ? livegenes[1] : livegenes[0]));
+        }
+        else fprintf(stderr,"Error: two live gene fitness value %d is not allowed\n",selection);
+    }
+}
+
 void update(long unsigned int gol[], long unsigned int golg[],long unsigned int newgol[], long unsigned int newgolg[]){
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
 
-    int k, kmin, nmut;
-    int nb[8], ij, i, j, jp1, jm1, ip1, im1;
-    long unsigned int s, gs, nb1i, randnr, randnr2, r2;
+    int s, k, k1, kmin, nmut;
+    int nb[8], nbc, nbch, ij, i, j, jp1, jm1, ip1, im1;
+    long unsigned int gs, nb1i, randnr, randnr2, r2;
     long unsigned int nbmask, nbmaskr, nbmaskrm;
-    long unsigned int newgene, livegenes[3],gdiff,gdiff0,gdiff1;
+    long unsigned int newgene, livegenes[3];
     long unsigned int s2or3, birth;
-    int d0,d1,d2,d3,dd;
-    long unsigned int gene2centre;
-    int g0011,g0110,prey;
+
     
     totsteps++;
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
@@ -166,29 +220,14 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
         }
        s2or3 = (s>>2) ? 0L : (s>>1);                                       // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
        if (s2or3) {                                                        // if 2 or 3 neighbours alive
-            if ((s<2)||(s>3)) fprintf(stderr,"s2or3 error s == %lu\n",s);
+            if ((s<2)||(s>3)) fprintf(stderr,"s2or3 error s == %d\n",s);
             birth = 0L;
             newgene = 0L;
             if (s&0x1L) {  // s==3                                                 // birth (with possible overwrite)
               if ((0x1L&overwritemask)|(0x1L&~gol[ij]) ) {                         // central site empty or overwrite mode
                 birth = 1L;                                                        // birth flag
-                if (repscheme & 0x1) {
-                    for(k=0;k<s;k++) livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];  // live neighbour genes
-                    if((livegenes[0]^livegenes[1])|(livegenes[0]^livegenes[2])) {  // genes not all same
-                        gdiff  = livegenes[0]^livegenes[2];
-                        gdiff0 = livegenes[0]^livegenes[1];
-                        gdiff1 = livegenes[1]^livegenes[2];
-                        if(gdiff0&&gdiff1&&gdiff) {                                //all three different
-                            POPCOUNT64C(gdiff0,d0);
-                            POPCOUNT64C(gdiff1,d1);
-                            POPCOUNT64C(gdiff,d2);
-                            d3 = d0!=d1? (d0!=d2 ? 4 : 1) : (d0!= d2 ? 2 : (d1!=d2 ? 3 : 0));
-                        }
-                        else if (gdiff1) livegenes[1]=livegenes[2];
-                    }
-                    else newgene= golg[nb[nb1i&0x7]];
-                }
-                else {
+                for(k=0;k<s;k++) livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];      // live neighbour genes
+                if((livegenes[0]^livegenes[1])|(livegenes[0]^livegenes[2])) {      // genes not all same, need ancestor calculation
                   for (k=7,nbmask=0L;k>=0;k--) nbmask = (nbmask << 1) + gol[nb[k]];  // compute 8-bit mask of GoL states of 8 nbs, clockwise from top left
                   for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {                 // compute canonical rotation (minimum) of this mask
                     nbmaskr = ((nbmaskr & 0x1L)<<7) + (nbmaskr>>1);                // 8 bit rotate right
@@ -197,8 +236,8 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                         kmin = k;                                                  // no of times rotated to right
                     }
                   }
-
-                  if ((repscheme>>1) & 0x1) newgene = golg[nb[kmin]];                // 2,3,6,7... deterministic choice of ancestor: replication of live neigbour in bit 0 of canonical pos
+                  
+                  if ((repscheme>>1) & 0x1) nbch = nb[kmin];                // 2,3,6,7... deterministic choice of ancestor: replication of live neigbour in bit 0 of canonical pos
                   else {                                                             // repscheme = 0 or 4 for example
                     switch (nbmaskrm) {                //             x07   x0b   x13   x19   x0d   x15   x25
                         case 0x07 : k = 1; break;      // 00000111    012  <-
@@ -216,66 +255,30 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                             fprintf(stderr,"\n");
                         } //case
                     } //switch
-                    newgene = golg[nb[(kmin+k)&0x7]];                               // rotate unique nb k left (kmin) back to orig nb pat
+                    nbch = nb[(kmin+k)&0x7];                                // rotate unique nb k left (kmin) back to orig nb pat
                   }
-                  //if (newgene == 0L) {
-                  //    fprintf(stderr,"step %d Error with new gene zero: nbmask %lu nbmaskrm %lu kmin %d gol %lu golg %lx newgene %lx ij %d\n",totsteps,nbmask,nbmaskrm,kmin,gol[nb[kmin]],golg[nb[kmin]],newgene,ij);
-                  //}
+                  if (repscheme & 0x1) {                                    // execute selective replication of one of two otherwise unchosen live genes
+                      for(k1=k=0;k<3;k++) {                                 // choice of two other live genes for possible ancestor
+                          nbc=(nb1i>>(k<<2))&0x7;
+                          if(nb[nbc]!=nbch) livegenes[k1++]=golg[nbc];
+                      }
+                      selectone(s,&livegenes[0],nb,golg,&birth,&newgene);
+                      if (birth==0L) newgene = golg[nbch];
+                  }
+                  else {
+                      newgene = golg[nbch];
+                  }
+
+                  //if (newgene == 0L) fprintf(stderr,"step %d Error with new gene zero: nbmask %lu nbmaskrm %lu kmin %d gol %lu golg %lx newgene %lx ij %d\n",totsteps,nbmask,nbmaskrm,kmin,gol[nb[kmin]],golg[nb[kmin]],newgene,ij);
                 }
+                else newgene = livegenes[0];                                // genes all the same : copy first one
               }
             }  // end else if s==3
             else {  // s==2                                                 // possible birth as exception to GoL rule
-                if (rulemod) {                                              // special rule allowed if rulemod==1, NB no birth if all sequences same
+                if (rulemod) {                                              // special rule allowed if rulemod==1
                     if ((0x1L&(overwritemask>>1))|(0x1L&~gol[ij])) {        // either overwrite on for s==2 or central site is empty
-                        for (k=0;k<s;k++)                                   // loop only over live neigbours
-                            livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];    // live gene at neighbour site
-                        if (selection==0) {                                 // use integer value of sequence as fitness
-                            birth = (livegenes[0]^livegenes[1]) ? 1L: 0L;   // birth condition is two genes different
-                            newgene = livegenes[0]>livegenes[1] ?  livegenes[0] : livegenes[1]; // choose one with larger gene to replicate
-                        }
-                        else {
-                            POPCOUNT64C(livegenes[0],d0);
-                            POPCOUNT64C(livegenes[1],d1);
-                            if (selection==1) {                             // use number of ones in sequence as fitness
-                                birth = (d0^d1) ? 1L: 0L;                   // birth condition if two genes different in number of ones
-                                newgene= (d0>d1) ? livegenes[0] : livegenes[1];
-                            }
-                            else if (selection==2) {                        // use scissors-paper-stone-well game on number ones mod 4
-                                d2=d0&0x3;
-                                d3=d1&0x3;
-                                birth = (d2^d3) ? 1L: 0L;                   // birth if 2 genes differ mod 4 in number of ones
-                                newgene= 3-d2 ? livegenes[1] : (d2<d3 ? livegenes[1] : livegenes[0]);
-                            }
-                             else if (selection==3) {                       // birth if 2 genes differently functional (Not Yet Working)
-                                gene2centre = (1L<<ncoding)-1L;             // first ncoding 1s in this sequence
-                                gdiff  = livegenes[0]^livegenes[1];
-                                gdiff0 = livegenes[0]^gene2centre;
-                                gdiff1 = livegenes[1]^gene2centre;
-                                POPCOUNT64C(gdiff,dd);
-                                POPCOUNT64C(gdiff0,d2);
-                                POPCOUNT64C(gdiff1,d3);
-                                g0011 = d0<dd && d3<dd;
-                                g0110 = d2<dd && d1<dd;
-                                birth = (g0011 || g0110)  ? 1L: 0L;         // birth if 2 genes closer to two different targets than each other
-                                newgene= g0011 ? ((d0<d3) ? livegenes[0] : livegenes[1]) : ((d2<d1) ? livegenes[0] : livegenes[1]);
-                            }
-                            else if (selection==4) {                        // birth if 2 genes obey 3 distance constraints < ncoding (NYW)
-                                gdiff0 = ~livegenes[0];                     // find distance to 0x0 for gene 0
-                                POPCOUNT64C(gdiff0,d0);                     // in d0
-                                gdiff=livegenes[0]^livegenes[1];
-                                POPCOUNT64C(gdiff,dd);
-                                birth = (dd<ncoding && d0<ncoding && d1<ncoding) ? 1L: 0L; // birth if 2 genes close enough (< has higher priority than &&)
-                                newgene= (d0>d1) ? livegenes[0] : (d0<d1 ? livegenes[1] : ((livegenes[0]>livegenes[1]) ?  livegenes[0] : livegenes[1]));
-                            }
-                            else if (selection==5) {                        // predator prey model : prey evolves to all 0, predator to all 1
-                                prey = d0<32 || d1<32;                      // >=1 prey required for birth
-                                gdiff=livegenes[0]^livegenes[1];
-                                birth = (gdiff && prey) ? 1L: 0L;         // birth if different and >=1 prey)
-                                prey = d0<32 && d1<32;                      // 2 prey : newgene is one with less ones, 1 prey : predator wins
-                                newgene= (prey ? (d0<d1 ? livegenes[0] : livegenes[1]) : (d0<d1 ? livegenes[1] : livegenes[0]));
-                            }
-                            else fprintf(stderr,"Error: two live gene fitness value %d is not allowed\n",selection);
-                        }
+                        for (k=0;k<s;k++) livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]]; // live gene at neighbour site
+                        selectone(s,livegenes,nb,golg,&birth,&newgene);
                     }
                 }
             }
@@ -659,8 +662,7 @@ int colorFunction = 0;
 void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], int N2) {
     long unsigned int gene, mask;
     int ij,d;
-    int cnt;
-    cnt=0;
+
     if(colorFunction){
 	    for (ij=0; ij<N2; ij++) {
 	        if (gol[ij]) {
@@ -677,10 +679,11 @@ void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], i
                 gene = golg[ij];
                 if (gene == 0L) gene = 11778L; // random color for gene==0
                 // mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
-                mask = (gene * 11400714819323198549ul) >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
-                mask |= 0x80808000; // ensure brighter color at risk of improbable redundancy
-                cgolg[ij] = 1 + (int) mask;
-                if (((int) mask) == 0) cnt++;
+//                mask = (gene * 11400714819323198549ul) >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
+                mask = gene * 11400714819323198549ul;
+                mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
+                mask |= 0x808080ff; // ensure brighter color at risk of improbable redundancy, make alpha opaque
+                cgolg[ij] = (int) mask;
             }
             else cgolg[ij] = 0;
 	    }
