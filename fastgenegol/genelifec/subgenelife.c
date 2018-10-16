@@ -140,9 +140,9 @@ void init_histo(){     // initialize the history array to zero
 
 extern inline void selectone(int s, long unsigned int livegenes[], int nb[], long unsigned int golg[],long unsigned int * birth, long unsigned int *newgene) {
     // Selection of which of two genes to copy. birth is one if ancestor choice made
-    int d0,d1,d2,d3,dd;
-    long unsigned int gdiff,gdiff0,gdiff1;
-    long unsigned int gene2centre;
+    unsigned int d0,d1,d2,d3,dd,swap;                         // number of ones in various gene combinations
+    long unsigned int gdiff,gdiff0,gdiff1;               // various gene combinations
+    long unsigned int gene2centre;                       // gene function centres in sequence space
     int g0011,g0110,prey;
 
     if (selection==0) {                                  // use integer value of sequence as fitness
@@ -156,11 +156,23 @@ extern inline void selectone(int s, long unsigned int livegenes[], int nb[], lon
             *birth = (d0^d1) ? 1L: 0L;                   // birth condition if two genes different in number of ones
             *newgene= (d0>d1) ? livegenes[0] : livegenes[1];
         }
-        else if (selection==2) {                         // use scissors-paper-stone-well game on number ones mod 4
-            d2=d0&0x3;
-            d3=d1&0x3;
-            *birth = (d2^d3) ? 1L: 0L;                   // birth if 2 genes differ mod 4 in number of ones
-            *newgene= 3-d2 ? livegenes[1] : (d2<d3 ? livegenes[1] : livegenes[0]);
+        else if (selection==2) {                         // use scissors-stone-well-paper game on number ones mod 4
+                                                         // scissors 0 stone 1 well 2 paper 3
+                                                         // exception to numerical order: sc>pa
+            d0=d0&0x3;
+            d1=d1&0x3;
+            *birth = (d0^d1) ? 1L: 0L;                   // birth if 2 genes differ mod 4 in number of ones
+            if(*birth) {
+                swap = 0;
+                if (d0>d1) {                             // swap d0 and d1 so that smaller one comes first
+                    dd = d0;
+                    d0 = d1;
+                    d1 = dd;
+                    swap = 1;
+                }
+                *newgene = (d0==0 && d1==3) ? livegenes[swap^0] : livegenes[swap^1];
+            }
+            else *newgene = 0L;
         }
         else if (selection==3) {                         // birth if 2 genes differently functional (Not Yet Working)
             gene2centre = (1L<<ncoding)-1L;              // first ncoding 1s in this sequence
@@ -262,7 +274,10 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                           if(nb[nbc]!=nbch) livegenes[k1++]=golg[nbc];
                       }
                       selectone(s,&livegenes[0],nb,golg,&birth,&newgene);
-                      if (birth==0L) newgene = golg[nbch];
+                      if (birth==0L) {
+                        newgene = golg[nbch];
+                        birth = 1L;                                           // must reset birth if 0 from selectone
+                      }
                   }
                   else {
                       newgene = golg[nbch];
@@ -284,15 +299,15 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
 
             if(birth){
                 // if (gol[ij]) fprintf(stderr,"birth overwrite event ij %d newgene %lu s %lu\n",ij,newgene,s);
-                RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
+                RAND128P(randnr);                                           // inline exp so compiler recognizes auto-vec,
                 // compute random events for single bit mutation, as well as mutation position nmut
-                randnr2 = (randnr >> 24) & pmutmask;                                // extract bits from randnr for random trial for 0 on pmutmask
-                r2 = randnr2?0L:1L;                                                   // 1 if lowest nlog2pmut bits of (bits 24-47 of randnr) are zero, else zero
-                nmut = (randnr >> 48) & 0x3f;                                       // choose mutation position for length 64 gene : from bits 48:53 of randnr
+                randnr2 = (randnr >> 24) & pmutmask;                        // extract bits from randnr for random trial for 0 on pmutmask
+                r2 = randnr2?0L:1L;                                         // 1 if lowest nlog2pmut bits of (bits 24-47 of randnr) are zero, else zero
+                nmut = (randnr >> 48) & 0x3f;                               // choose mutation position for length 64 gene : from bits 48:53 of randnr
                 // complete calculation of newgol and newgolg, including mutation
-                newgene = newgene ^ (r2<<nmut);                              // introduce single mutation with probability pmut = probmut
-                newgol[ij]  =  1L;                                      // new game of life cell value: stays same or set to one from zero if birth
-                newgolg[ij] =  newgene;                                      // if birth then newgene
+                newgene = newgene ^ (r2<<nmut);                             // introduce single mutation with probability pmut = probmut
+                newgol[ij]  =  1L;                                          // new game of life cell value: alive
+                newgolg[ij] =  newgene;                                     // if birth then newgene
             }
             else {
 //                if ((survival&s&0x1L)|((survival>>1)&(~s)&0x1L)|((~rulemod)&0x1L)) { // survival bit 0 and s==3, or (survival bit 1 and s==2) or not rulemod
@@ -667,7 +682,13 @@ void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], i
 	        if (gol[ij]) {
 		        gene = golg[ij];
                 POPCOUNT64C(gene,d);
-		        cgolg[ij] = 2 + 3*d;
+                switch (selection) {
+                        case 0 : mask = ((gene>>40)<<8)+0xff; break;
+                        case 1 : mask = ((d+(d<<6)+(d<<12)+(d<<18))<<8) + 0xff; break;
+                        case 2 : d = d & 0x3; mask = d==3 ? 0xf0f0f0ff : ((0xff<<(d<<3))<<8)+0xff; break;
+                        default  : mask = ((d+(d<<6)+(d<<12)+(d<<18))<<8) + 0xff;
+                }
+		        cgolg[ij] = (int) mask;
 	        }
 	        else cgolg[ij] = 0;
 	    }
