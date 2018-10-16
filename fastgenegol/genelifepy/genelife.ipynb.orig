@@ -1,0 +1,306 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [],
+   "source": [
+    "%gui osx\n",
+    "\n",
+    "import random as rand\n",
+    "import pygame as pg\n",
+    "\n",
+    "from genelife import *"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Graphics notes"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "This notebook uses the pygame interface.\n",
+    "\n",
+    "It pops up a pygame window (labeled \"Gene Life\"), which must be moved to the side to see the notebook.\n",
+    "\n",
+    "To stop the simulation mid-stream, you can click on the pygame window, click in the window. \n",
+    "\n",
+    "Color is currently a 32 bit hash of the 64 bit gene value.\n",
+    "\n",
+    "To change resolution: \n",
+    "* change `subgenelife.c` line 23 (`log2N`) and rebuild c lib\n",
+    "* change `genlife.py` line 10 (also `log2N`)\n",
+    "* change `Width` and `Height` below."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Initialization"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "See additional discussion in the [genelife wiki](https://github.com/js1200/genelife/wiki/Probability-parameters-in-genelife).\n",
+    "\n",
+    "The code determining the effect of genes on birth, and the mutation of genomes is currently on lines 229-242 of `subgene.c`.\n",
+    "\n",
+    "* param `rulemod=1` => genetically alteration of GOL rule kicks in\n",
+    "\n",
+    "Possible replication schemes for case of 2 live nbrs:\n",
+    "\n",
+    "* `selection == 0` larger integer value determines survival\n",
+    "* `selection == 1` paper scissors stone well on bottom 2 bits of N1(g0), N1(g1).\n",
+    "* `selection == 2` compete model (Norman) : mutual and distances to 0 all less than ncoding\n",
+    "* `selection == 3` selection based on closeness to one of the two difft targets (ncoding bits apart)\n",
+    "* `selection == 4` selection based on closeness of g0 to 0x0 and g1 to all 1's; for birth distances must satisfy `d0<ncoding`, `d1<ncoding`, and `dd=D(g0,g1) < ncoding.`  `ncoding>55` for any exceptions.\n",
+    "* `selection == 5` Predator prey: prey goes toward all 0's, predator goes toward all 1's.  N1(g)<32 => prey; birth if different and at least one prey; both prey => prey with less 1's wins, prey-predator => predator wins.\n",
+    "\n",
+    "* param `nlog2pmut` fixes mutation probability"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "offsets = [[ 0, 0, 0],\n",
+    "           [-1,-1, 0],\n",
+    "           [ 0,-1, 0],\n",
+    "           [ 1,-1, 0],\n",
+    "           [ 1, 0, 0],\n",
+    "           [ 1, 1, 0],\n",
+    "           [ 0, 1, 0],\n",
+    "           [-1, 1, 0],\n",
+    "           [-1, 0, 0]]\n",
+    "numHis = pow(2,len(offsets))\n",
+    "histo=np.zeros(numHis,np.uint64)\n",
+    "flatoff =  [x for sublist in offsets for x in sublist]\n",
+    "npoffsets = np.array(flatoff,np.int32)\n",
+    "\n",
+    "runparams = np.zeros(5,np.int32)\n",
+    "simparams = np.zeros(5,np.int32)    # 5 parameters passed to C"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Following animation cell is set up to display for `ndisp` time steps, run without display for `nskip` time steps, and repeat, up to a total of `niter*ndisp` frames displayed (`niter*(ndisp+nskip)` total time steps):\n",
+    "\n",
+    "|---`ndisp`---|------------------`nskip`---------------| ... repeated for `niter` times\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "Width = 512\n",
+    "Height = 512\n",
+    "\n",
+    "screen = pg.display.set_mode([Width, Height])\n",
+    "scr = pg.surface.Surface([Width,Height], 0)\n",
+    "#scr2 = pg.surface.Surface([Width*2,Height*2], 0)\n",
+    "#pygame.transform.scale2x(scr,scr2)  # Norman do you know how to do this?\n",
+    "cnt = 0\n",
+    "caption = \"Gene Life at iteration %d\" % cnt\n",
+    "pg.display.set_caption(caption)\n",
+    "pg.draw.rect(screen, [10, 10, 10],(0, 0 , Width, Height + 1), 0)\n",
+    "pg.display.update()\n",
+    "\n",
+    "cgrid = pg.surfarray.pixels2d(screen)"
+   ]
+  },
+  {
+   "cell_type": "code",
+<<<<<<< HEAD
+   "execution_count": null,
+   "metadata": {
+    "collapsed": true
+   },
+=======
+   "execution_count": 13,
+   "metadata": {},
+>>>>>>> 707290908798895cf87af2f70b1f2ccee4ae2eca
+   "outputs": [],
+   "source": [
+    "def update():\n",
+    "    global gol, cgrid\n",
+    "    global golg\n",
+    "    global log2N\n",
+    "    global runparams\n",
+    "    global cnt\n",
+    "    global framenr\n",
+    "\n",
+    "    cnt = cnt+1\n",
+    "    if cnt % ndisp == 0:  # insert the non-displayed iterations\n",
+    "        genelife.genelife_update(nskip, 0)\n",
+    "        genelife.countspecies(gol,golg,runparams)\n",
+<<<<<<< HEAD
+    "        framenr = framenr + nskip\n",
+=======
+    "        cnt = cnt + nskip\n",
+    "        sys.stdout.write('\\r'+str(cnt)+' updates.\\n')\n",
+>>>>>>> 707290908798895cf87af2f70b1f2ccee4ae2eca
+    "    genelife.genelife_update(nrun, 0)\n",
+    "    genelife.get_curgol(gol)\n",
+    "    genelife.get_curgolg(golg)\n",
+    "    framenr = framenr+nrun\n",
+    "    colorgrid()  # sets  cgrid\n",
+    "    #time_text.set_text('cnt = %.1d' % framenr)\n",
+    "    #time_text.set_color('w')\n",
+    "    return\n",
+    "\n",
+    "# this function defined in genelife.py doesn't work in the notebook.\n",
+    "# must redefine it here.  Maybe scope of globals?\n",
+    "def colorgrid():\n",
+    "    \"\"\" colors array according to grid and genegrid using colormethod\"\"\"\n",
+    "    global gol,cgrid,golg,cgolg,N\n",
+    "    \n",
+    "    genelife.colorgenes(gol,golg,cgolg)\n",
+    "    for i in xrange(N):\n",
+    "        for j in xrange(N):\n",
+    "            ij = i+j*N\n",
+    "            cgrid[i,j] = cgolg[ij]\n",
+    "            # cgrid=np.reshape(cgolg,(N,N))   does not work, why ???????\n",
+    "    return\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+<<<<<<< HEAD
+   "execution_count": null,
+   "metadata": {
+    "collapsed": true
+   },
+=======
+   "execution_count": 14,
+   "metadata": {},
+>>>>>>> 707290908798895cf87af2f70b1f2ccee4ae2eca
+   "outputs": [],
+   "source": [
+    "nrun=1; nskip = 200; ndisp=100; niter=10;  # changed from niter 10 just for quicker exploration\n",
+    "rulemod = runparams[0] = 1               # 0,1 whether to allow GoL rule modifications\n",
+<<<<<<< HEAD
+    "repscheme = runparams[1] = 0             # 0-3, bit 0 on allow selection in 3 live nb configs, bit 1 on most difft vs 0 bit of canonical rotation\n",
+    "selection = runparams[2] = 0             # fitness for 2 live neighbor rule : 0-5 see subgenelife.c code\n",
+    "overwritemask = runparams[3] = 3         # mask of 2 bits to overwrite instead of survival for 3(bit0) or 2(bit1) live nbs\n",
+    "survival = runparams[4] = 0              # survive mask for two (bit 1) and three (bit 0) live neighbours : GoL = 3\n",
+    "\n",
+    "nlog2pmut = simparams[0] = 9             # gene mutation probability\n",
+=======
+    "repscheme = runparams[1] = 4             # 3 or 4, if 3 then choose lowest bit position, if 4 choose most different\n",
+    "selection = runparams[2] = 4             # fitness for 2 live neighbor rule : 0-5 see subgenelife.c code\n",
+    "overwritemask = runparams[3] = 3         # mask of 2 bits to overwrite instead of survival for 3(bit0) or 2(bit1) live nbs\n",
+    "survival = runparams[4] = 2              # survive mask for two (bit 1) and three (bit 0) live neighbours : GoL = 3\n",
+    "\n",
+    "nlog2pmut = simparams[0] = 4             # gene mutation probability\n",
+>>>>>>> 707290908798895cf87af2f70b1f2ccee4ae2eca
+    "initial1density = simparams[1] = 16384   # initial 1 density in GOL state\n",
+    "                                         # 16384 = nearest to half of guaranteed C rand max value 32767 = 2**15 - 1\n",
+    "initialrdensity = simparams[2] = 32768       # initial density of random genes\n",
+    "ncoding = simparams[3] = 56              # no of bits used to encode valid connection functions 1-16\n",
+    "startgenechoice = simparams[4] = 8       # initialize genes to startgene number 0-8 : 8 is random choice of 0-7\n",
+    "\n",
+    "genelife.initialize_planes(npoffsets)\n",
+    "genelife.initialize(runparams,simparams)\n",
+    "framenr = 0\n",
+    "cnt=0"
+   ]
+  },
+  {
+   "cell_type": "code",
+<<<<<<< HEAD
+   "execution_count": null,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [],
+=======
+   "execution_count": 15,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "300 updates.\n",
+      "600 updates.\n"
+     ]
+    }
+   ],
+>>>>>>> 707290908798895cf87af2f70b1f2ccee4ae2eca
+   "source": [
+    "gogo = True\n",
+    "while gogo:\n",
+    "    for event in pg.event.get():\n",
+    "        if event.type==pg.QUIT:\n",
+    "            gogo = False\n",
+    "        if event.type==pg.MOUSEBUTTONDOWN:\n",
+    "            gogo = False\n",
+    "    caption = \"Gene Life at iteration %d\" % framenr\n",
+    "    pg.display.set_caption(caption)\n",
+    "    update()\n",
+    "    pg.display.flip()\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "hide_input": false,
+  "kernelspec": {
+   "display_name": "Python 2",
+   "language": "python",
+   "name": "python2"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 2
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython2",
+   "version": "2.7.14"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
