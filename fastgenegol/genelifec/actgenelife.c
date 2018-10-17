@@ -24,10 +24,10 @@
 
 #include <unistd.h>		// for command line parsing
 
-void printspecies(long unsigned int golg[]) {  /* counts numbers of all different species using qsort first */
+void printspecies(uint64_t golg[]) {  /* counts numbers of all different species using qsort first */
     int ij, k, ijlast, nspecies, counts[N2];
-    long unsigned int last, golgs[N2];
-    long unsigned int golgsc[N2][2];
+    uint64_t last, golgs[N2];
+    uint64_t golgsc[N2][2];
     
     for (ij=0; ij<N2; ij++) { golgs[ij] = golg[ij];  counts[ij] = 0;}  // initialize sorted gene & count arrays to zero
 
@@ -49,14 +49,14 @@ void printspecies(long unsigned int golg[]) {  /* counts numbers of all differen
     for (k=0; k<nspecies; k++) { golgsc[k][0] = golgs[k];  golgsc[k][1] = counts[k];}  // initialize joint gene & count array
     qsort(golgsc, nspecies, sizeof(golgsc[0]), cmpfunc2);                   // sort in decreasing count order
     for (k=0; k<nspecies; k++) {
-        printf("%lx  %lu ",golgsc[k][0],golgsc[k][1]);
+        printf("%llx  %llu ",golgsc[k][0],golgsc[k][1]);
     }
     printf("\n");
 }
 
 int main (int argc, char *argv[]) {
     int	 i;
-    long unsigned int *golg;
+    uint64_t *golg;
     int nsteps = 20000;                 // total number of steps to simulate GoL
     
     int myoffs[27] = {0,0,0,

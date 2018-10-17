@@ -15,9 +15,29 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <time.h>
 #include <math.h>
 
+// use Mattias Gustavsson's hashtable (github) for unsigned 64 bit key dictionary
+#define HASHTABLE_IMPLEMENTATION
+// use 64 bit unsigned key type consistent with this file
+#define HASHTABLE_U32 uint32_t
+#define HASHTABLE_U64 uint64_t
+#define HASHTABLE_SIZE_T uint64_t
+#include "hashtable.h"
+hashtable_t genetable;
+typedef struct genedata {            // value of keys stored for each gene encountered in simulation
+            int popcount;
+            int firstbirthframe;
+            int lastextinctionframe;
+            int activity;
+            uint64_t firstancestor;
+            } genedata;
+genedata ginitdata = {1,0,-1,0,0xfedcba9876543210};  // initialization data structure for gene data
+genedata *genedataptr;                      // pointer to a genedata instance
+HASHTABLE_SIZE_T const* genotypes;
+genedata* geneitems;
 #define ASCII_ESC 27                // escape for printing terminal commands, such as cursor repositioning
 
 const int log2N = 9;                // toroidal array of side length N = 2 to the power of log2N
@@ -25,12 +45,13 @@ const int N = 0x1 << log2N;
 const int N2 = N*N;                 // number of sites in toroidal array
 const int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
 
+
 // from fastgenelifed.c (9/9/18):
                                     // integer negative log 2 of max prob p0 for rule departure and prob pmut of mutation
                                     // the maximum prob is further reduced by a sequence-specific prob p1 (p=p0*p1)
                                     // p1 goes from 1 down to 2^-32 depending on genetic differences
 int nlog2pmut = 5;                  // pmut (prob of mutation) = 2^(-nlog2pmut), minimum
-long unsigned int pmutmask;         // binary mask so that prob of choosing zero is pmut, assigned
+uint64_t pmutmask;         // binary mask so that prob of choosing zero is pmut, assigned
 
 //const int nlog2pmut = 5;            // pmut = probmut = 2 to the power of - nlog2pmut
 
@@ -45,60 +66,61 @@ int overwritemask = 0x2;            // bit mask for 4 cases of overwrite: bit 0.
 int initial1density = (1<<15)>>1;   // initial density of ones in gol as integer value, divide by 2^15 for true density
 int initialrdensity = (1<<15)>>1;   // initial density of random genes in live sites, divide by 2^15 for true density
 int startgenechoice = 8;            // selection for defined starting genes 0-8 (8 is random 0-7) otherwise choose only particular startgene
-long unsigned int codingmask;       // mask for ncoding bits
-static long unsigned int  emptysites = 0;  // cumulative number of empty sites during simulation updates
+uint64_t codingmask;       // mask for ncoding bits
+static uint64_t  emptysites = 0;  // cumulative number of empty sites during simulation updates
 
 int Noff = 9;                           // number of offsets
 int **offsets;                      // array of offsets (2D + time) for planes
 int curPlane = 0;
 int newPlane = 1;
 int xL=0,xR=0,yU=0,yD=0;            // offsets for border of stats
-long unsigned int *histo;
+uint64_t *histo;
 int numHisto;
 
 // initialize planes:
 int numPlane = 8;
-long unsigned int *planes[8];         // ring buffer planes of gol array states
-long unsigned int *planesg[8];        // ring buffer planes of golg genes
-long unsigned int plane0[N2];
-long unsigned int plane1[N2];
-long unsigned int plane2[N2];
-long unsigned int plane3[N2];
-long unsigned int plane4[N2];
-long unsigned int plane5[N2];
-long unsigned int plane6[N2];
-long unsigned int plane7[N2];
-long unsigned int planeg0[N2];
-long unsigned int planeg1[N2];
-long unsigned int planeg2[N2];
-long unsigned int planeg3[N2];
-long unsigned int planeg4[N2];
-long unsigned int planeg5[N2];
-long unsigned int planeg6[N2];
-long unsigned int planeg7[N2];
+uint64_t *planes[8];         // ring buffer planes of gol array states
+uint64_t *planesg[8];        // ring buffer planes of golg genes
+uint64_t plane0[N2];
+uint64_t plane1[N2];
+uint64_t plane2[N2];
+uint64_t plane3[N2];
+uint64_t plane4[N2];
+uint64_t plane5[N2];
+uint64_t plane6[N2];
+uint64_t plane7[N2];
+uint64_t planeg0[N2];
+uint64_t planeg1[N2];
+uint64_t planeg2[N2];
+uint64_t planeg3[N2];
+uint64_t planeg4[N2];
+uint64_t planeg5[N2];
+uint64_t planeg6[N2];
+uint64_t planeg7[N2];
 
                                     // Wikipedia "Xorshift" rewritten here as inline macro &
                                     // Vigna, Sebastiano. "xorshift*/xorshift+ generators and the PRNG shootout". Retrieved 2014-10-25.
-static long unsigned int state[2]; // State for xorshift pseudorandom number generation. The state must be seeded so that it is not zero
+static uint64_t state[2]; // State for xorshift pseudorandom number generation. The state must be seeded so that it is not zero
 #define RAND128P(val) {                                                       \
-    long unsigned int x = state[0]; long unsigned int const y = state[1];                       \
+    uint64_t x = state[0]; uint64_t const y = state[1];                       \
 	state[0] = y;	x ^= x << 23;  state[1] = x ^ y ^ (x >> 17) ^ (y >> 26);  \
 	val = state[1] + y;}
 
-const long unsigned int m1  = 0x5555555555555555; //binary: 0101...           Constants for Hamming distance macro POPCOUNT24C
-const long unsigned int m2  = 0x3333333333333333; //binary: 00110011..
-const long unsigned int m4  = 0x0f0f0f0f0f0f0f0f; //binary:  4 zeros,  4 ones ...
-const long unsigned int h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,3...
-#define POPCOUNT64C(x, val) {       /* Wikipedia "Hamming Weight" popcount4c alg */  \
-    x -= (x >> 1) & m1;             /* put count of each 2 bits into those 2 bits */ \
-    x = (x & m2) + ((x >> 2) & m2); /* put count of each 4 bits into those 4 bits */ \
-    x = (x + (x >> 4)) & m4;        /* put count of each 8 bits into those 8 bits */ \
-    val = (x * h01) >> 56;}         /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
+const uint64_t m1  = 0x5555555555555555; //binary: 0101...           Constants for Hamming distance macro POPCOUNT24C
+const uint64_t m2  = 0x3333333333333333; //binary: 00110011..
+const uint64_t m4  = 0x0f0f0f0f0f0f0f0f; //binary:  4 zeros,  4 ones ...
+const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,3...
+#define POPCOUNT64C(x, val) {          /* Wikipedia "Hamming Weight" popcount4c alg */  \
+    gx = x;                            /* since the macro modifies gx, make a copy first */\
+    gx -= (gx >> 1) & m1;              /* put count of each 2 bits into those 2 bits */ \
+    gx = (gx & m2) + ((gx >> 2) & m2); /* put count of each 4 bits into those 4 bits */ \
+    gx = (gx + (gx >> 4)) & m4;        /* put count of each 8 bits into those 8 bits */ \
+    val = (gx * h01) >> 56;}           /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
 
 void countconfigs(){		// count configs specified by offset array
     // each row of the offset array becomes a bit in an address for the histo array.
     int i,j,k,t,x,y;
-    unsigned long int *pl, adr, bit;
+    uint64_t *pl, adr, bit;
 
     for(i=0; i<N; i++){		// rows
 	    if(i<xL) continue;
@@ -114,7 +136,7 @@ void countconfigs(){		// count configs specified by offset array
 		        pl = planes[t];
 		        bit = *(pl + y*N +x);
 		        if(bit!=1 || bit != 0){                                            // J nmodified check for unsigned values */
-		            fprintf(stderr,"Ack! bit = %lud != 0 or 1\n",bit);
+		            fprintf(stderr,"Ack! bit = %llu != 0 or 1\n",bit);
 		            exit(1);
 		        }
 		        adr = (adr<<1) | bit;
@@ -124,7 +146,7 @@ void countconfigs(){		// count configs specified by offset array
     }
 }
 
-void get_histo(long unsigned int outhisto[],int numHistoC){
+void get_histo(uint64_t outhisto[],int numHistoC){
     int i;
     if(numHistoC != numHisto){
 	    fprintf(stderr,"Ack! numHisto = %d  != numHistoC = %d\n",numHisto,numHistoC);
@@ -138,11 +160,11 @@ void init_histo(){     // initialize the history array to zero
     for(i=0; i<numHisto; i++)        histo[i] = 0;
 }
 
-extern inline void selectone(int s, long unsigned int livegenes[], int nb[], long unsigned int golg[],long unsigned int * birth, long unsigned int *newgene) {
+extern inline void selectone(int s, uint64_t livegenes[], int nb[], uint64_t golg[],uint64_t * birth, uint64_t *newgene) {
     // Selection of which of two genes to copy. birth is one if ancestor choice made
     unsigned int d0,d1,d2,d3,dd,swap;                         // number of ones in various gene combinations
-    long unsigned int gdiff,gdiff0,gdiff1;               // various gene combinations
-    long unsigned int gene2centre;                       // gene function centres in sequence space
+    uint64_t gx,gdiff,gdiff0,gdiff1;               // various gene combinations
+    uint64_t gene2centre;                       // gene function centres in sequence space
     int g0011,g0110,prey;
 
     if (selection==0) {                                  // use integer value of sequence as fitness
@@ -205,17 +227,18 @@ extern inline void selectone(int s, long unsigned int livegenes[], int nb[], lon
     }
 }
 
-void update(long unsigned int gol[], long unsigned int golg[],long unsigned int newgol[], long unsigned int newgolg[]){
+void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
 
     int s, k, k1, kmin, nmut;
     int nb[8], nbc, nbch, ij, i, j, jp1, jm1, ip1, im1;
-    long unsigned int gs, nb1i, randnr, randnr2, r2;
-    long unsigned int nbmask, nbmaskr, nbmaskrm;
-    long unsigned int newgene, livegenes[3];
-    long unsigned int s2or3, birth;
-
+    uint64_t gs, nb1i, randnr, randnr2, r2;
+    uint64_t nbmask, nbmaskr, nbmaskrm;
+    uint64_t newgene, ancestor, livegenes[3];
+    uint64_t s2or3, birth;
+    genedata gdata;
+    HASHTABLE_U64 gene2hash;
     
     totsteps++;
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
@@ -260,8 +283,8 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                         case 0x25 : k = 5; break;      // 00100101                            ...   ...   0.2  <-
                         default  : {                   //                                           ..4   ...
                                                        //                                                 .5.
-                            fprintf(stderr,"Error in canonical rotation for three live neighbours \nnbmaskrm = %lx\n",nbmaskrm); k = 0;
-                            fprintf(stderr,"Raw Neighbor Pattern: %lx No neighbors %lx\n",
+                            fprintf(stderr,"Error in canonical rotation for three live neighbours \nnbmaskrm = %llx\n",nbmaskrm); k = 0;
+                            fprintf(stderr,"Raw Neighbor Pattern: %llx No neighbors %llx\n",
                                 nbmask, gol[nb[0]]+gol[nb[1]]+gol[nb[2]]+gol[nb[3]]+gol[nb[4]]+gol[nb[5]]+gol[nb[6]]+gol[nb[7]]);
                             fprintf(stderr,"\n");
                         } //case
@@ -283,7 +306,7 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
                       newgene = golg[nbch];
                   }
 
-                  //if (newgene == 0L) fprintf(stderr,"step %d Error with new gene zero: nbmask %lu nbmaskrm %lu kmin %d gol %lu golg %lx newgene %lx ij %d\n",totsteps,nbmask,nbmaskrm,kmin,gol[nb[kmin]],golg[nb[kmin]],newgene,ij);
+                  //if (newgene == 0L) fprintf(stderr,"step %d Error with new gene zero: nbmask %llx nbmaskrm %llx kmin %d gol %llu golg %llx newgene %llx ij %d\n",totsteps,nbmask,nbmaskrm,kmin,gol[nb[kmin]],golg[nb[kmin]],newgene,ij);
                 }
                 else newgene = livegenes[0];                                // genes all the same : copy first one
               }
@@ -298,30 +321,62 @@ void update(long unsigned int gol[], long unsigned int golg[],long unsigned int 
             }
 
             if(birth){
-                // if (gol[ij]) fprintf(stderr,"birth overwrite event ij %d newgene %lu s %lu\n",ij,newgene,s);
+                // if (gol[ij]) fprintf(stderr,"birth overwrite event ij %d newgene %llx s %llu\n",ij,newgene,s);
                 RAND128P(randnr);                                           // inline exp so compiler recognizes auto-vec,
                 // compute random events for single bit mutation, as well as mutation position nmut
                 randnr2 = (randnr >> 24) & pmutmask;                        // extract bits from randnr for random trial for 0 on pmutmask
                 r2 = randnr2?0L:1L;                                         // 1 if lowest nlog2pmut bits of (bits 24-47 of randnr) are zero, else zero
                 nmut = (randnr >> 48) & 0x3f;                               // choose mutation position for length 64 gene : from bits 48:53 of randnr
-                // complete calculation of newgol and newgolg, including mutation
+                // complete calculation of newgol and newgolg, including mutation                          //
+                ancestor = newgene;
                 newgene = newgene ^ (r2<<nmut);                             // introduce single mutation with probability pmut = probmut
+                if(gol[ij]) {                                               // central old gene present: overwritten
+                    gene2hash = (HASHTABLE_U64) golg[ij];
+                    if((genedataptr = (genedata *) hashtable_find(&genetable, gene2hash)) != NULL) {
+                        genedataptr->popcount--;
+                        // if(genedataptr->popcount == 0) genedataptr->lastextinctionframe = totsteps; // need to do this after whole frame
+                    }
+                    else fprintf(stderr,"hash storage error 1, old gene %llx not stored\n",gene2hash);
+                }
+                gene2hash=(HASHTABLE_U64) newgene;
+                if((genedataptr = (genedata *) hashtable_find(&genetable, gene2hash)) != NULL) {
+                    genedataptr->popcount++;
+                }
+                else {
+                    gdata=ginitdata;
+                    gdata.firstbirthframe = totsteps;
+                    gdata.firstancestor = ancestor;
+                    hashtable_insert(&genetable,gene2hash,(genedata *) &gdata);
+                }
                 newgol[ij]  =  1L;                                          // new game of life cell value: alive
                 newgolg[ij] =  newgene;                                     // if birth then newgene
             }
             else {
-//                if ((survival&s&0x1L)|((survival>>1)&(~s)&0x1L)|((~rulemod)&0x1L)) { // survival bit 0 and s==3, or (survival bit 1 and s==2) or not rulemod
-                if ((survival&s&0x1L)|((survival>>1)&(~s)&0x1L)) { // survival bit 0 and s==3, or (survival bit 1 and s==2) or not rulemod
+                if ((survival&s&0x1L)|((survival>>1)&(~s)&0x1L)|((~rulemod)&0x1L)) { // survival bit 0 and s==3, or (survival bit 1 and s==2) or not rulemod
                     newgol[ij]  = gol[ij];                                  // new game of life cell value same as old
                     newgolg[ij] = golg[ij];                                 // gene stays as before, live or not
                 }
                 else {
+                    if(gol[ij]) {                                           // death : need to update hash table
+                        gene2hash = (HASHTABLE_U64) golg[ij];
+                        if((genedataptr = (genedata *) hashtable_find(&genetable, gene2hash)) != NULL) {
+                            genedataptr->popcount--;
+                        }
+                        else fprintf(stderr,"hash storage error 2, old gene %llx not stored\n",gene2hash);
+                    }
                     newgol[ij]  = 0L;                                       // new game of life cell value dead
                     newgolg[ij] = 0L;                                       // gene dies or stays dead
                 }
             }
         }  // end if s2or3
         else {                                                              // else not birth or survival, 0 values for gol and gene
+            if(gol[ij]) {                                                   // death : need to update hash table
+                gene2hash = (HASHTABLE_U64) golg[ij];
+                if((genedataptr = (genedata *) hashtable_find(&genetable, gene2hash)) != NULL) {
+                    genedataptr->popcount--;
+                }
+                else fprintf(stderr,"hash storage error 3, old gene %llx not stored\n",gene2hash);
+            }
 	        newgol[ij]  = 0L;                                                    // new game of life cell value
 	        newgolg[ij] = 0L;                                                    // gene dies
         }
@@ -338,7 +393,7 @@ void genelife_update (int nsteps, int histoflag) {
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
     int t;
-    long unsigned int *gol, *newgol, *golg, *newgolg;
+    uint64_t *gol, *newgol, *golg, *newgolg;
 
     for (t=0; t<nsteps; t++) {
 	    gol = planes[curPlane];
@@ -355,7 +410,7 @@ void genelife_update (int nsteps, int histoflag) {
 } /* genelife_update */
 
 
-void printscreen (long unsigned int gol[], long unsigned int golg[], int N, int N2) {   /* print the game of life configuration */
+void printscreen (uint64_t gol[], uint64_t golg[], int N, int N2) {   /* print the game of life configuration */
 	int	ij, col;
     // https://stackoverflow.com/questions/27159322/rgb-values-of-the-colors-in-the-ansi-extended-colors-index-17-255
     printf("\e[38;5;255;48;5;238m");
@@ -367,7 +422,7 @@ void printscreen (long unsigned int gol[], long unsigned int golg[], int N, int 
     printf("\e[38;5;238;48;5;255m");
 }
 
-void print_gol (long unsigned int gol[], int N, int N2) {   /* print the game of life configuration */
+void print_gol (uint64_t gol[], int N, int N2) {   /* print the game of life configuration */
 	int	ij;
 	for (ij=0; ij<N2; ij++) {
 		printf ("%c", gol[ij] ? '*' : ' ');
@@ -385,7 +440,7 @@ void initialize_planes(int offs[],  int N) {
         exit(1);
     }
     numHisto = 1<<Noff;
-    histo = (long unsigned int *) calloc(numHisto,sizeof(long unsigned int));
+    histo = (uint64_t *) calloc(numHisto,sizeof(uint64_t));
 
     // install offsets:
     offsets = (int **) calloc(Noff,sizeof(int *));
@@ -466,21 +521,23 @@ int writeFile(char *fileName)
 }
 
 void initialize (int runparams[], int nrunparams, int simparams[], int nsimparams) {
-    int ij,ij1,k;
-    long unsigned int g;
-    long unsigned int *gol;
-    long unsigned int *golg;
+    int ij,ij1,k,cnt,hcnt;
+    uint64_t g;
+    uint64_t *gol;
+    uint64_t *golg;
     static unsigned int rmask = (1 << 15) - 1;
+    static int notfirst = 0;
     // Range: rand returns numbers in the range of [0, RAND_MAX ), and RAND_MAX is specified with a minimum value of 32,767. i.e. 15 bit
 
-    long unsigned int startgenes[8];
+    uint64_t startgenes[8];
     
     static int Nf = 0;
     char *golgin;
     
     srand(1234567);
     state[0] = rand();state[1] = rand();
-
+    cnt = 0;
+    
     // writeFile("genepat.dat");
 
     rulemod = runparams[0];
@@ -499,15 +556,6 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     
     fprintf(stdout,"runparams %d %d %d %d %d\n",runparams[0],runparams[1],runparams[2],runparams[3],runparams[4]);
     fprintf(stdout,"simparams %d %d %d %d %d\n",simparams[0],simparams[1],simparams[2],simparams[3],simparams[4]);
-
-    startgenes[0] = 0xaaaa000000000000;
-    startgenes[1] = 0xaaaa00000000ffff;
-    startgenes[2] = 0xaaaa0000ffff0000;
-    startgenes[3] = 0xaaaa0000ffffffff;
-    startgenes[4] = 0xaaaaffff00000000;         // should have same functionality as 0
-    startgenes[5] = 0xaaaaffff0000ffff;         //   ... as 1
-    startgenes[6] = 0xaaaaffffffff0000;         //   ... as 2
-    startgenes[7] = 0xaaaaffffffffffff;         //   ... as 3
     
     startgenes[0] = 0xffffffffffc00000;
     startgenes[1] = 0xffffffffffc00000;
@@ -520,7 +568,10 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
   
     gol = planes[curPlane];
     golg = planesg[curPlane];
- 
+    
+    if(notfirst) hashtable_term(&genetable);
+    hashtable_init(&genetable,sizeof(genedata),N2<<2,0);     // initialize dictionary for genes
+    notfirst = 1;
     if (Nf) {           // input from file
         golgin=readFile("genepat.dat");
         for (ij=0; ij<N2; ij++) {
@@ -533,6 +584,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
                 gol[ij] = 1L;
                 if(golgin[ij1] <= 8 ) golg[ij] = startgenes[golgin[ij1]-1];
                 else golg[ij] = startgenes[7];
+                cnt++;
             }
             else {
                 gol[ij] = 0;
@@ -553,21 +605,38 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
                 else if (startgenechoice == 8) g = startgenes[rand() & 0x7];
                 else if (startgenechoice > 8) fprintf(stderr,"startgenechoice %d out of range\n",startgenechoice);
                 else g = startgenes[startgenechoice & 0x7];
+                cnt++;
             }
             golg[ij] = g;
             // if (golg[ij] == 0L && gol[ij] != 0L) fprintf(stderr,"zero gene at %d\n",ij);
         }
-        // for (ij=0; ij<40; ij++) fprintf(stderr,"gene at %d %lx\n",ij,golg[ij]);   // test first 40
+        // for (ij=0; ij<40; ij++) fprintf(stderr,"gene at %d %llx\n",ij,golg[ij]);   // test first 40
     }
+
+    for (ij=0; ij<N2; ij++) {
+        if(gol[ij]) {
+            if((genedataptr = (genedata *) hashtable_find(&genetable, (HASHTABLE_U64) golg[ij])) != NULL) {
+                genedataptr->popcount++;
+            }
+            else {
+                hashtable_insert(&genetable,(HASHTABLE_U64) golg[ij],(genedata *) &ginitdata);
+            }
+        }
+    }
+    // it is possible to enumerate keys and values
+    hcnt=hashtable_count(&genetable);
+    genotypes = hashtable_keys( &genetable );
+
+    fprintf(stderr,"population size %d with %d different genes\n",cnt,hcnt);
 }
 
-void get_curgol(long unsigned int outgol[], int NN){
+void get_curgol(uint64_t outgol[], int NN){
     int ij;
     for (ij=0; ij<NN; ij++) {
 	    outgol[ij] = planes[curPlane][ij];
     }
 }
-void get_curgolg(long unsigned int outgolg[], int NN){
+void get_curgolg(uint64_t outgolg[], int NN){
     int ij;
     for (ij=0; ij<NN; ij++) {
 	    outgolg[ij] = planesg[curPlane][ij];
@@ -577,29 +646,29 @@ void get_curgolg(long unsigned int outgolg[], int NN){
 int cmpfunc (const void * pa, const void * pb)
 {
    // return ( *(int*)pa - *(int*)pb );
-   return ((*(long unsigned int*)pa > *(long unsigned int*)pb)  ? 1 : -1);
+   return ((*(uint64_t*)pa > *(uint64_t*)pb)  ? 1 : -1);
 }
 
-int cmpfunc2 ( const void *pa, const void *pb )
+int cmpfunc1 ( const void *pa, const void *pb )
 {
-    const long unsigned int *a = pa;
-    const long unsigned int *b = pb;
+    const uint64_t *a = pa;
+    const uint64_t *b = pb;
     if(a[1] == b[1])
         return a[0] > b[0] ? 1 : -1;
     else
         return (int) (b[1] - a[1]);
 }
 
-void countspecies(long unsigned int gol[], long unsigned int golg[], int params[], int N2, int nparams) {  /* counts numbers of all different species using qsort first */
+void countspecies(uint64_t gol[], uint64_t golg[], int params[], int N2, int nparams) {  /* counts numbers of all different species using qsort first */
     int ij, k, ijlast, nspecies, counts[N2], nones;
-    long unsigned int last, golgs[N2], fitness;
-    long unsigned int golgsc[N2][2];
+    uint64_t gx, last, golgs[N2], fitness;
+    uint64_t golgsc[N2][2];
     int selection = params[2];
 
 
     for (ij=0; ij<N2; ij++) { golgs[ij] = golg[ij];  counts[ij] = 0;}  // initialize sorted gene & count arrays to zero
 
-    qsort(golgs, N2, sizeof(long unsigned int), cmpfunc);              // sort in increasing gene order
+    qsort(golgs, N2, sizeof(uint64_t), cmpfunc);              // sort in increasing gene order
     for (ij=0,k=0,ijlast=0,last=golgs[0]; ij<N2; ij++) {               // count each new species in sorted list
         if (golgs[ij] != last) {
             last = golgs[ij];
@@ -609,7 +678,7 @@ void countspecies(long unsigned int gol[], long unsigned int golg[], int params[
     }
     counts[k++]=N2-ijlast;
     nspecies = k;  // print including 0
-    fprintf(stdout,"The number of different species is %d\n",nspecies);
+    fprintf(stdout,"The number of different species (countspecies) is %d\n",nspecies);
 
     for (k=0,ij=0;k<nspecies;k++) {     // now condense array to give only different genes with counts
         // printf("species %4d with gene %x has counts %d\n",k, golgs[ij],counts[k]);
@@ -618,7 +687,17 @@ void countspecies(long unsigned int gol[], long unsigned int golg[], int params[
     }
 
     for (k=0; k<nspecies; k++) { golgsc[k][0] = golgs[k];  golgsc[k][1] = counts[k];}  // initialize joint gene & count array
-    qsort(golgsc, nspecies, sizeof(golgsc[0]), cmpfunc2);                   // sort in decreasing count order
+    qsort(golgsc, nspecies, sizeof(golgsc[0]), cmpfunc1);                   // sort in decreasing count order
+
+
+    for (k=1; k<nspecies; k++) {                            // check consistency of hash table data, assuming empty site gene is most frequent
+        if((genedataptr = (genedata *) hashtable_find(&genetable, (HASHTABLE_U64) golgsc[k][0])) != NULL) {
+                    if(genedataptr->popcount != golgsc[k][1])
+                        fprintf(stderr,"popcount %llu <> %d hash error at k = %d\n",golgsc[k][1],genedataptr->popcount,k);
+        }
+        else fprintf(stderr,"countspecies popcount error, no entry in hash table\n");
+    }
+
     for (k=0; k<nspecies; k++) {
         last = golgsc[k][0];
         POPCOUNT64C(last, nones);
@@ -627,7 +706,7 @@ void countspecies(long unsigned int gol[], long unsigned int golg[], int params[
 	        fitness = last;
         }
         else if (selection == 1) {                                          // 2-live neighbor fitness is number of ones
-	        fitness = (long unsigned) nones;
+	        fitness = (uint64_t) nones;
         }
         else if (selection == 2){                                           // non-neutral model based on presence of replicase gene
 	        fitness = 999;                                                  // undefined, depends on competing sequence
@@ -642,9 +721,74 @@ void countspecies(long unsigned int gol[], long unsigned int golg[], int params[
              fitness = 999;                                                 // undefined, depends on competing sequence
         }
         else fprintf(stderr,"selection parameter %d out of range\n",selection);
-        fprintf(stdout,"count species %d with gene %lx has counts %lu and %d ones, fitness %lu\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
+        fprintf(stdout,"count species %d with gene %llx has counts %llu and %d ones, fitness %llu\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
+        fprintf(stdout,"count species %d with gene %llx has counts %llu and %d ones, fitness %llu\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
+
     }
-    fprintf(stdout,"cumulative activity = %lu\n",(N2 * (long unsigned int) totsteps) - emptysites);
+    fprintf(stdout,"cumulative activity = %llu\n",(N2 * (uint64_t) totsteps) - emptysites);
+}
+
+int cmpfunc2 (const void * pa, const void * pb)
+{
+   return ( genotypes[*(int*)pa] > genotypes[*(int*)pb] ? 1 : -1);
+}
+
+int cmpfunc3 (const void * pa, const void * pb)
+{
+   return ( geneitems[*(int*)pa].popcount < geneitems[*(int*)pb].popcount ? 1 : -1);
+}
+
+void countspecieshash( int params[], int nparams) {  /* counts numbers of all different species using qsort first */
+    int k, golgs[N2], nspecies, nones;
+    uint64_t gx, last, fitness;
+    int selection = params[2];
+
+    nspecies = hashtable_count(&genetable);
+    genotypes = hashtable_keys(&genetable);
+    geneitems = (genedata*) hashtable_items( &genetable );
+    fprintf(stdout,"The number of different species is %d\n",nspecies);
+    
+    for (k=0; k<nspecies; k++) golgs[k] = k;  // initialize sorted genotype array to same order as hash table
+
+    // qsort(golgs, nspecies, sizeof(int), cmpfunc2);                     // sort in increasing gene order
+    qsort(golgs, nspecies, sizeof(int), cmpfunc3);                     // sort in decreasing count order
+
+    // for (k=0; k<nspecies; k++) fprintf(stdout,"in countspecieshash genotype %d is %llx\n", k, genotypes[k]);
+    for (k=0; k<nspecies; k++) {
+        last = genotypes[golgs[k]];
+        POPCOUNT64C(last, nones);
+        fitness = 999L;
+        if (selection == 0) {                                               // 2-live neighbor fitness is integer value
+            fitness = last;
+        }
+        else if (selection == 1) {                                          // 2-live neighbor fitness is number of ones
+            fitness = (uint64_t) nones;
+        }
+        else if (selection == 2){                                           // non-neutral model based on presence of replicase gene
+            fitness = 999L;                                                 // undefined, depends on competing sequence
+        }
+        else if (selection == 3){
+             fitness = 999L;                                                // undefined, depends on competing sequence
+        }
+        else if (selection == 4){
+             fitness = 999L;                                                // undefined, depends on competing sequence
+        }
+        else if (selection == 5){
+             fitness = 999L;                                                // undefined, depends on competing sequence
+        }
+        else fprintf(stderr,"selection parameter %d out of range\n",selection);
+        if((genedataptr = (genedata *) hashtable_find(&genetable, (HASHTABLE_U64) last)) != NULL) {
+            if(genedataptr->popcount)
+                fprintf(stdout,"count species %7d with gene %16llx has counts %7d and %3d ones, fitness %llu\n",k,last,
+                    genedataptr->popcount,nones,fitness);
+        }
+        else {
+            fprintf(stderr,"countspecieshash popcount error, no entry in hash table\n");
+            fprintf(stdout,"count species %d with gene %llx has counts ?? and %d ones, fitness %llu\n",k,last,
+                    nones,fitness);
+        }
+    }
+    // fprintf(stdout,"cumulative activity = %llu\n",(N2 * (uint64_t) totsteps) - emptysites);
 }
 
 void delay(int milliseconds)
@@ -657,7 +801,7 @@ void delay(int milliseconds)
         now = clock();
 }
 
-void printxy (long unsigned int gol[],long unsigned int golg[]) {   /* print the game of life configuration */
+void printxy (uint64_t gol[],uint64_t golg[]) {   /* print the game of life configuration */
     int	ij, col, X, Y;
     // https://stackoverflow.com/questions/27159322/rgb-values-of-the-colors-in-the-ansi-extended-colors-index-17-255
     for (ij=0; ij<N2; ij++) {
@@ -673,8 +817,8 @@ void printxy (long unsigned int gol[],long unsigned int golg[]) {   /* print the
 
 int colorFunction = 0;
 
-void colorgenes(long unsigned int gol[],long unsigned int golg[], int cgolg[], int NN2) {
-    long unsigned int gene, mask;
+void colorgenes(uint64_t gol[],uint64_t golg[], int cgolg[], int NN2) {
+    uint64_t gx, gene, mask;
     int ij,d;
 
     if(colorFunction){

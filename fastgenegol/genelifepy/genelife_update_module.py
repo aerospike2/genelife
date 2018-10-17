@@ -26,6 +26,8 @@ libcd.initialize_planes.restype = None
 libcd.initialize_planes.argtypes = [int_array, c_int]
 libcd.countspecies.restype = None
 libcd.countspecies.argtypes = [uint64_array, uint64_array, int_array, c_int, c_int]
+libcd.countspecieshash.restype = None
+libcd.countspecieshash.argtypes = [int_array, c_int]
 libcd.print_gol.restype = None
 libcd.print_gol.argtypes = [uint64_array, c_int, c_int]
 libcd.printscreen.restype = None
@@ -57,6 +59,9 @@ def initialize_planes(offsets):
 
 def countspecies(gol, golg, runparams):
     return libcd.countspecies(gol, golg,  runparams, len(golg), len(runparams))
+
+def countspecieshash(runparams):
+    return libcd.countspecieshash(runparams, len(runparams))
 
 def print_gol( gol, N):
     return libcd.print_gol( gol, N, len(gol))

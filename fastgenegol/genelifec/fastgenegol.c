@@ -43,18 +43,19 @@ const long unsigned int m2  = 0x3333333333333333; //binary: 00110011..
 const long unsigned int m4  = 0x0f0f0f0f0f0f0f0f; //binary:  4 zeros,  4 ones ...
 const long unsigned int h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,3...
 
-#define POPCOUNT64C(x, val) {       /* Wikipedia "Hamming Weight" popcount4c alg */  \
-    x -= (x >> 1) & m1;             /* put count of each 2 bits into those 2 bits */ \
-    x = (x & m2) + ((x >> 2) & m2); /* put count of each 4 bits into those 4 bits */ \
-    x = (x + (x >> 4)) & m4;        /* put count of each 8 bits into those 8 bits */ \
-    val = (x * h01) >> 56;}         /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
+#define POPCOUNT64C(x, val) {          /* Wikipedia "Hamming Weight" popcount4c alg */  \
+    gx = x;                            /* since the macro modifies gx, make a copy first */\
+    gx -= (gx >> 1) & m1;              /* put count of each 2 bits into those 2 bits */ \
+    gx = (gx & m2) + ((gx >> 2) & m2); /* put count of each 4 bits into those 4 bits */ \
+    gx = (gx + (gx >> 4)) & m4;        /* put count of each 8 bits into those 8 bits */ \
+    val = (gx * h01) >> 56;}           /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
 
 void update (long unsigned int gol[], long unsigned int golg[]) {
 	/* update GoL for toroidal field which has side length which is a binary power of 2 */
 	/* encode without if structures for optimal vector treatment */
 
 	int k, nmut, hamming, nb[8], ij, i, j , jp1, jm1, ip1, im1;
-    long unsigned int s, s2or3, nb1i, randnr, randnr1, randnr2, ng, r1, r2, r3, nlog2p, pmask, genediff, birth, newgene;
+    long unsigned int s, s2or3, nb1i, randnr, randnr1, randnr2, ng, r1, r2, r3, nlog2p, pmask, gx, genediff, birth, newgene;
     static long unsigned int  newgol[N2],newgolg[N2];
     static long unsigned int  pmutmask = (0x1 << nlog2pmut) - 1;
     static long unsigned int ngx = 0;
@@ -188,9 +189,9 @@ void countspecies(long unsigned int golg[]) {  /* counts numbers of all differen
     for (k=0; k<nspecies; k++) { golgsc[k][0] = golgs[k];  golgsc[k][1] = counts[k];}  // initialize joint gene & count array
     qsort(golgsc, nspecies, sizeof(golgsc[0]), cmpfunc2);                   // sort in decreasing count order
     for (k=0; k<nspecies; k++) {
-        printf("count species %d with gene %lx has counts %lu\n",k, golgsc[k][0],golgsc[k][1]);
+        printf("count species %d with gene %llx has counts %llu\n",k, golgsc[k][0],golgsc[k][1]);
     }
-    printf("cumulative activity = %lu\n",(N2 * (long unsigned int) nsteps) - emptysites);
+    printf("cumulative activity = %llu\n",(N2 * (uint64_t) nsteps) - emptysites);
 }
 
 void delay(int milliseconds)

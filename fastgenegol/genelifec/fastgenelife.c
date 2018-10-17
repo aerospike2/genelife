@@ -59,11 +59,12 @@ const long unsigned int m4  = 0x0f0f0f0f0f0f0f0f; //binary:  4 zeros,  4 ones ..
 const long unsigned int h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,3...
 const long unsigned int m3  = 0x0707070707070707; // for cumcount64c selects counter relevant bits only
 
-#define POPCOUNT64C(x, val) {       /* Wikipedia "Hamming Weight" popcount4c alg */  \
-    x -= (x >> 1) & m1;             /* put count of each 2 bits into those 2 bits */ \
-    x = (x & m2) + ((x >> 2) & m2); /* put count of each 4 bits into those 4 bits */ \
-    x = (x + (x >> 4)) & m4;        /* put count of each 8 bits into those 8 bits */ \
-    val = (x * h01) >> 56;}         /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
+#define POPCOUNT64C(x, val) {          /* Wikipedia "Hamming Weight" popcount4c alg */  \
+    gx = x;                            /* since the macro modifies gx, make a copy first */\
+    gx -= (gx >> 1) & m1;              /* put count of each 2 bits into those 2 bits */ \
+    gx = (gx & m2) + ((gx >> 2) & m2); /* put count of each 4 bits into those 4 bits */ \
+    gx = (gx + (gx >> 4)) & m4;        /* put count of each 8 bits into those 8 bits */ \
+    val = (gx * h01) >> 56;}           /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
 
 #define CUMCOUNT64C(x, val) {       /* Assumes gene specifies 8 8-bit counters each with max value 7 */  \
     val = ((x & m3) * h01) >> 56;}  /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
@@ -75,7 +76,7 @@ void update (long unsigned int gol[], long unsigned int golg[]) {
     int k, kmin, nmut, nones, nones1, nones2, nb[8], ij, i, j , jp1, jm1, ip1, im1;
     long unsigned int s, s2or3, nb1i, randnr, randnr1, randnr2, ng, r1, r2, r3, nlog2p, pmask, genediff, birth, newgene;
     long unsigned int nbmask, nbmaskr, nbmaskrm,rulemodl;
-    long unsigned int genef1,genef2,genef3;
+    long unsigned int gx,genef1,genef2,genef3;
     static long unsigned int newgol[N2],newgolg[N2];
     static long unsigned int pmutmask = (0x1 << nlog2pmut) - 1;
     static long unsigned int ngx = 0;
@@ -251,7 +252,7 @@ int cmpfunc2 ( const void *pa, const void *pb )
 
 void countspecies(long unsigned int golg[], long unsigned int gol[]) {  /* counts numbers of all different species using qsort first */
     int ij, is, k, ijlast, nspecies, counts[N2], nones, fitness;
-    long unsigned int last, golgs[N2];
+    long unsigned int gx, last, golgs[N2];
     long unsigned int golgsc[N2][2];
     
     for (ij=is=0; ij<N2; ij++) {
@@ -288,9 +289,9 @@ void countspecies(long unsigned int golg[], long unsigned int gol[]) {  /* count
         else {                                                              // non-neutral model based on presence of replicase gene
                 fitness = nlog2p0;}                                         // fitness a function of 3 live sequences, not individual
 
-        printf("count species %d with gene %lx has counts %lu and %d ones, fitness %d\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
+        printf("count species %d with gene %llx has counts %llu and %d ones, fitness %d\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
     }
-    printf("cumulative activity = %lu\n",(N2 * (long unsigned int) nsteps) - emptysites);
+    printf("cumulative activity = %llu\n",(N2 * (long unsigned int) nsteps) - emptysites);
 }
 
 void delay(int milliseconds)
