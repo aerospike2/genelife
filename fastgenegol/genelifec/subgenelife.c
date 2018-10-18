@@ -594,12 +594,17 @@ int cmpfunc2 ( const void *pa, const void *pb )
         return (int) (b[1] - a[1]);
 }
 
-void countspecies(long unsigned int gol[], long unsigned int golg[], int params[], int N2, int nparams) {  /* counts numbers of all different species using qsort first */
+void countspecies(long unsigned int gol[], long unsigned int golg[], int runparams[]) {  /* counts numbers of all different species using qsort first */
     int ij, k, ijlast, nspecies, counts[N2], nones;
     long unsigned int last, golgs[N2], fitness;
     long unsigned int golgsc[N2][2];
-    int selection = params[2];
+    int selection = runparams[2];
 
+
+    fprintf(stdout,"rulemod\trepscheme\tselection\toverwritemask\tsurvival\n");
+    fprintf(stdout,"%d\t%d\t\t%d\t\t%d\t%d\n",rulemod,repscheme,selection,overwritemask,survival);
+    fprintf(stdout,"nlog2pmut\tinit1\tinitr\tncoding\tstartchoice\n");
+    fprintf(stdout,"%d\t\t%d\t%d\t%d\t%d\n",nlog2pmut,initial1density,initialrdensity,ncoding,startgenechoice);
 
     for (ij=0; ij<N2; ij++) { golgs[ij] = golg[ij];  counts[ij] = 0;}  // initialize sorted gene & count arrays to zero
 
