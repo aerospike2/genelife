@@ -18,8 +18,8 @@
 
 int main (int argc, char *argv[]) {
     int	 i,k;
-    long unsigned int *gol;
-    long unsigned int *golg;
+    uint64_t *gol;
+    uint64_t *golg;
 
     int myoffs[27] = {0,0,0,
 		  -1, 0, 0,
