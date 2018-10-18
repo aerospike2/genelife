@@ -89,11 +89,15 @@ const long unsigned int m1  = 0x5555555555555555; //binary: 0101...           Co
 const long unsigned int m2  = 0x3333333333333333; //binary: 00110011..
 const long unsigned int m4  = 0x0f0f0f0f0f0f0f0f; //binary:  4 zeros,  4 ones ...
 const long unsigned int h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,3...
+
+
 #define POPCOUNT64C(x, val) {       /* Wikipedia "Hamming Weight" popcount4c alg */  \
-    x -= (x >> 1) & m1;             /* put count of each 2 bits into those 2 bits */ \
-    x = (x & m2) + ((x >> 2) & m2); /* put count of each 4 bits into those 4 bits */ \
-    x = (x + (x >> 4)) & m4;        /* put count of each 8 bits into those 8 bits */ \
-    val = (x * h01) >> 56;}         /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
+    uint64_t xxxx; \
+    xxxx = x; \
+    xxxx -= (xxxx >> 1) & m1;             /* put count of each 2 bits into those 2 bits */ \
+    xxxx = (xxxx & m2) + ((xxxx >> 2) & m2); /* put count of each 4 bits into those 4 bits */ \
+    xxxx = (xxxx + (xxxx >> 4)) & m4;        /* put count of each 8 bits into those 8 bits */ \
+    val = (xxxx * h01) >> 56;}         /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
 
 void countconfigs(){		// count configs specified by offset array
     // each row of the offset array becomes a bit in an address for the histo array.
