@@ -633,8 +633,8 @@ void countspecies(long unsigned int gol[], long unsigned int golg[], int runpara
     }
     fprintf(stdout,"at step %d cumulative activity = %llu\n",totsteps,(N2 * (uint64_t) totsteps) - emptysites);
     fprintf(stdout,"rulemod\trepscheme\tselection\toverwritemask\tsurvival\n");
-    fprintf(stdout,"%d\t%d\t\t%d\t\t%d\t%d\n",rulemod,repscheme,selection,overwritemask,survival);
-    fprintf(stdout,"nlog2pmut\tinit1\tinitr\tncoding\t\tstartchoice\n");
+    fprintf(stdout,"%d\t%d\t\t%d\t\t%d\t\t%d\n",rulemod,repscheme,selection,overwritemask,survival);
+    fprintf(stdout,"nlog2pmut\tinit1\tinitr\tncoding\tstartchoice\n");
     fprintf(stdout,"%d\t\t%d\t%d\t%d\t%d\n",nlog2pmut,initial1density,initialrdensity,ncoding,startgenechoice);
 }
 
