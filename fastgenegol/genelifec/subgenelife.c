@@ -437,12 +437,13 @@ char *readFile(char *fileName)
 {
   FILE *file;
   char *code = malloc(32* 32 * sizeof(char));
+  char tmp;
   file = fopen(fileName, "r");
   do
   {
-    *code++ = (char)fgetc(file);
+    *code++ = tmp = (char)fgetc(file);
 
-  } while(*code != EOF);
+  } while(tmp != EOF);
   fclose(file);
   return code;
 }
@@ -495,15 +496,6 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     
     fprintf(stdout,"runparams %d %d %d %d %d\n",runparams[0],runparams[1],runparams[2],runparams[3],runparams[4]);
     fprintf(stdout,"simparams %d %d %d %d %d\n",simparams[0],simparams[1],simparams[2],simparams[3],simparams[4]);
-
-    startgenes[0] = 0xaaaa000000000000;
-    startgenes[1] = 0xaaaa00000000ffff;
-    startgenes[2] = 0xaaaa0000ffff0000;
-    startgenes[3] = 0xaaaa0000ffffffff;
-    startgenes[4] = 0xaaaaffff00000000;         // should have same functionality as 0
-    startgenes[5] = 0xaaaaffff0000ffff;         //   ... as 1
-    startgenes[6] = 0xaaaaffffffff0000;         //   ... as 2
-    startgenes[7] = 0xaaaaffffffffffff;         //   ... as 3
     
     startgenes[0] = 0xffffffffffc00000;
     startgenes[1] = 0xffffffffffc00000;
@@ -669,7 +661,7 @@ void printxy (uint64_t gol[],uint64_t golg[]) {   /* print the game of life conf
     printf("\n");
 }
 
-int colorFunction = 0;
+int colorFunction = 1;
 
 void colorgenes(uint64_t gol[],uint64_t golg[], int cgolg[], int NN2) {
     uint64_t gene, gdiff, g2c, mask;
@@ -684,7 +676,7 @@ void colorgenes(uint64_t gol[],uint64_t golg[], int cgolg[], int NN2) {
                         case 0 : mask = ((gene>>40)<<8)+0xff; break;
                         case 1 : mask = ((d+(d<<6)+(d<<12)+(d<<18))<<8) + 0xff; break;
                         case 2 : d = d & 0x3; mask = d==3 ? 0xf0f0f0ff : ((0xff<<(d<<3))<<8)+0xff; break;
-                        case 3 : g2c = (1L<<ncoding)-1L;gdiff = gene^g2c; POPCOUNT64C(gene,d2);
+                        case 3 : g2c = (1L<<ncoding)-1L;gdiff = gene^g2c; POPCOUNT64C(gdiff,d2);
                                  mask = d<d2 ? (d<<26)+0xff : (d2<<10)+0xff; break;
                         default  : mask = ((d+(d<<6)+(d<<12)+(d<<18))<<8) + 0xff;
                 }
@@ -701,7 +693,7 @@ void colorgenes(uint64_t gol[],uint64_t golg[], int cgolg[], int NN2) {
                 gene = golg[ij];
                 if (gene == 0L) gene = 11778L; // random color for gene==0
                 // mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
-//                mask = (gene * 11400714819323198549ul) >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
+                // mask = (gene * 11400714819323198549ul) >> (64 - 32);  // hash with optimal prime multiplicator down to 32 bits
                 mask = gene * 11400714819323198549ul;
                 mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
                 mask |= 0x808080ff; // ensure brighter color at risk of improbable redundancy, make alpha opaque
