@@ -40,7 +40,12 @@ int initial1density = (1<<15)>>1;   // initial density of ones in gol as integer
 int initialrdensity = (1<<15)>>1;   // initial density of random genes in live sites, divide by 2^15 for true density
 int startgenechoice = 8;            // selection for defined starting genes 0-8 (8 is random 0-7) otherwise choose only particular startgene
 uint64_t codingmask;                // mask for ncoding bits
-static uint64_t  emptysites = 0;    // cumulative number of empty sites during simulation updates
+uint64_t  emptysites = 0;           // cumulative number of empty sites during simulation updates
+
+const int startarraysize = 1024;    // starting array size (used when initializing second run)
+int arraysize = startarraysize;     // size of trace array (grows dynamically)
+int *livesites = NULL;              // dynamic array pointer for statistics of number of live sites over time
+int *genotypes = NULL;              // dynamic array pointer for statistics of number of 4 genotype classes over time
 
 int Noff = 9;                       // number of offsets
 int **offsets;                      // array of offsets (2D + time) for planes
@@ -330,6 +335,49 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
     }
 }
 
+int statsflag = 1;
+
+void tracestats(uint64_t gol[],uint64_t golg[], int NN2) {                                         // trace various stats over time of the simulation
+    int ij,cnt,d,dc,gt[4];
+    uint64_t gene;
+  
+    if (totsteps == arraysize) {                              // relallocate memory for arrays : double size
+        arraysize*=2;
+        livesites = (int *)realloc(livesites, arraysize * sizeof(int));
+        genotypes = (int *)realloc(genotypes, arraysize * 4 * sizeof(int));
+    }
+    for (ij=cnt=0;ij<NN2;ij++) {
+        if(gol[ij]) cnt++;
+    }
+    for(d=0;d<4;d++) gt[d]=0;
+    for (ij=cnt=0;ij<NN2;ij++) {
+        if(gol[ij]) {
+            gene=golg[ij];
+            POPCOUNT64C(gene,d);
+            switch(selection) {
+                case 0: if(d==64) d--; dc=(d>>4)&0x3;break;
+                case 1: if(d==64) d--; dc=(d>>4)&0x3;break;
+                case 2: dc=d&0x3;break;
+                default:if(d==64) d--; dc=(d>>4)&0x3;
+            }
+            gt[dc]++;
+        }
+    }
+
+    livesites[totsteps] = cnt;
+    for(d=0;d<4;d++) genotypes[totsteps*4+d]=gt[d];
+}
+
+void get_stats(int outstats[], int outgtypes[], int numStats ){
+    int i;
+    if(numStats > arraysize){
+        fprintf(stderr,"Ack! numStats = %d  > arraysize = %d\n",numStats,arraysize);
+        exit(1);
+    }
+    for(i=0; i<numStats; i++) outstats[i] = livesites[i];
+    for(i=0; i<4*numStats; i++) outgtypes[i] = genotypes[i];
+}
+
 void genelife_update (int nsteps, int histoflag) {
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
@@ -344,6 +392,7 @@ void genelife_update (int nsteps, int histoflag) {
 
 	    update(gol,golg,newgol,newgolg);
 	    if(histoflag) countconfigs();
+        if(statsflag) tracestats(gol,golg, N2);
 
 	    curPlane = (curPlane +1) % numPlane;
 	    newPlane = (newPlane +1) % numPlane;
@@ -433,19 +482,20 @@ void initialize_planes(int offs[],  int N) {
     planesg[4] = planeg4;planesg[5] = planeg5;planesg[6] = planeg6;planesg[7] = planeg7;
 }
 
-char *readFile(char *fileName)
+int readFile(char * code, char *fileName)
 {
   FILE *file;
-  char *code = malloc(32* 32 * sizeof(char));
   char tmp;
+  int cnt;
   file = fopen(fileName, "r");
+  cnt = -1;
   do
   {
     *code++ = tmp = (char)fgetc(file);
-
+    cnt++;
   } while(tmp != EOF);
   fclose(file);
-  return code;
+  return cnt;
 }
 
 int writeFile(char *fileName)
@@ -463,7 +513,7 @@ int writeFile(char *fileName)
 }
 
 void initialize (int runparams[], int nrunparams, int simparams[], int nsimparams) {
-    int ij,ij1,k;
+    int ij,ij1,icf,k;
     uint64_t g;
     uint64_t *gol;
     uint64_t *golg;
@@ -505,17 +555,33 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     startgenes[5] = 0x00000fffffc00000;
     startgenes[6] = 0x00000fffffc00000;
     startgenes[7] = 0x00000fffffc00000;
+
+    if ( livesites !=NULL) {
+        free(livesites);
+        livesites = NULL;
+        free(genotypes);
+        genotypes = NULL;
+    }
+    arraysize = startarraysize;
+    livesites = (int *) malloc(arraysize * sizeof(int));
+    genotypes = (int *) malloc(arraysize * 4 * sizeof(int));
   
     gol = planes[curPlane];
     golg = planesg[curPlane];
  
-    if (Nf) {           // input from file
-        golgin=readFile("genepat.dat");
+    if (Nf) {           // input from file with max size of 32*32 characters
+        golgin = (char *) malloc(32* 32 * sizeof(char));
+        icf=readFile(golgin, "genepat.dat");
+        if (icf != 32*32) {
+            icf = 0;
+            fprintf(stderr,"error reading file, %d not 32*32 chars\n",icf);
+        }
         for (ij=0; ij<N2; ij++) {
             gol[ij] = 0;
             golg[ij] = 0;
         }
         for (ij1=0; ij1<32*32; ij1++) {
+            if(N<32) {fprintf(stderr,"Error, array dim %d too small for file array dim %d\n",N,32);break;}
             ij=(N>>1)-16+(ij1&0x1f)+ N*((N>>1)-16+(ij1>>5));
             if (golgin[ij1] > 0)    {                   // if live cell
                 gol[ij] = 1L;
@@ -580,8 +646,8 @@ int cmpfunc2 ( const void *pa, const void *pb )
 
 void countspecies(long unsigned int gol[], long unsigned int golg[], int runparams[]) {  /* counts numbers of all different species using qsort first */
     int ij, k, ijlast, nspecies, counts[N2], nones;
-    long unsigned int last, golgs[N2], fitness;
-    long unsigned int golgsc[N2][2];
+    uint64_t last, golgs[N2], fitness;
+    uint64_t golgsc[N2][2];
     int selection = runparams[2];
 
     fprintf(stdout,"rulemod\trepscheme\tselection\toverwritemask\tsurvival\n");
@@ -675,7 +741,7 @@ void colorgenes(uint64_t gol[],uint64_t golg[], int cgolg[], int NN2) {
 	    for (ij=0; ij<NN2; ij++) {
 	        if (gol[ij]) {
 		        gene = golg[ij];
-                POPCOUNT64C(gene,d);
+                POPCOUNT64C(gene,d);                    // assigns number of ones in gene to d
                 switch (selection) {
                         case 0 : mask = ((gene>>40)<<8)+0xff; break;
                         case 1 : mask = ((d+(d<<6)+(d<<12)+(d<<18))<<8) + 0xff; break;
