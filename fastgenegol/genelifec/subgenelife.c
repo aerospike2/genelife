@@ -584,11 +584,6 @@ void countspecies(long unsigned int gol[], long unsigned int golg[], int runpara
     long unsigned int golgsc[N2][2];
     int selection = runparams[2];
 
-    fprintf(stdout,"rulemod\trepscheme\tselection\toverwritemask\tsurvival\n");
-    fprintf(stdout,"%d\t%d\t\t%d\t\t%d\t%d\n",rulemod,repscheme,selection,overwritemask,survival);
-    fprintf(stdout,"nlog2pmut\tinit1\tinitr\tncoding\tstartchoice\n");
-    fprintf(stdout,"%d\t\t%d\t%d\t%d\t%d\n",nlog2pmut,initial1density,initialrdensity,ncoding,startgenechoice);
-
     for (ij=0; ij<N2; ij++) { golgs[ij] = golg[ij];  counts[ij] = 0;}  // initialize sorted gene & count arrays to zero
 
     qsort(golgs, N2, sizeof(uint64_t), cmpfunc);              // sort in increasing gene order
@@ -634,11 +629,13 @@ void countspecies(long unsigned int gol[], long unsigned int golg[], int runpara
              fitness = 999;                                                 // undefined, depends on competing sequence
         }
         else fprintf(stderr,"selection parameter %d out of range\n",selection);
-        fprintf(stdout,"count species %d with gene %llx has counts %llu and %d ones, fitness %llu\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
+        fprintf(stdout,"count species %d with gene %lx has counts %lu and %d ones, fitness %lu\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
     }
     fprintf(stdout,"at step %d cumulative activity = %llu\n",totsteps,(N2 * (uint64_t) totsteps) - emptysites);
-    fprintf(stdout,"runparams %d %d %d %d %d\n",rulemod,repscheme,selection,overwritemask,survival);
-    fprintf(stdout,"simparams %d %d %d %d %d\n",nlog2pmut,initial1density,initialrdensity,ncoding,startgenechoice);
+    fprintf(stdout,"rulemod\trepscheme\tselection\toverwritemask\tsurvival\n");
+    fprintf(stdout,"%d\t%d\t\t%d\t\t%d\t%d\n",rulemod,repscheme,selection,overwritemask,survival);
+    fprintf(stdout,"nlog2pmut\tinit1\tinitr\tncoding\t\tstartchoice\n");
+    fprintf(stdout,"%d\t\t%d\t%d\t%d\t%d\n",nlog2pmut,initial1density,initialrdensity,ncoding,startgenechoice);
 }
 
 void delay(int milliseconds)
