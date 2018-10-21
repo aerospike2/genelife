@@ -301,8 +301,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                   else {
                       newgene = golg[nbch];
                   }
-
-                  //if (newgene == 0L) fprintf(stderr,"step %d Error with new gene zero: nbmask %llu nbmaskrm %llu kmin %d gol %llu golg %llx newgene %llx ij %d\n",totsteps,nbmask,nbmaskrm,kmin,gol[nb[kmin]],golg[nb[kmin]],newgene,ij);
+                  if (newgene == 0L) fprintf(stderr,"step %d Error with new gene zero: nbmask %llx nbmaskrm %llx kmin %d gol %llx golg %llx newgene %llx ij %d\n",totsteps,nbmask,nbmaskrm,kmin,gol[nb[kmin]],golg[nb[kmin]],newgene,ij);
                 } // end if not all live neighbors the same
                 else {
                     statflag |= F_3g_same;
@@ -334,6 +333,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 newgolg[ij] =  newgene;                                     // if birth then newgene
                 statflag = statflag | F_birth;
                 if (r2) statflag = statflag | F_mutation;
+                if(newgene==0L) fprintf(stderr,"error in writing newgene, previous = %llx, statflag = %llx\n",golg[ij],statflag);
             } // end birth
             else {
                 if ((survival&s&0x1L)|((survival>>1)&(~s)&0x1L)|((~rulemod)&0x1L)) {// (surv bit 0 and s==3) or (surv bit 1 and s==2) or not rulemod
@@ -343,9 +343,9 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                     if(gol[ij]) statflag |= F_survival;
                 }
                 else {
-                    if(gol[ij]) statflag |= F_death|F_notgolrul;
                     newgol[ij]  = 0L;                                       // new game of life cell value dead
                     newgolg[ij] = 0L;                                       // gene dies or stays dead
+                    if(gol[ij]) statflag |= F_death|F_notgolrul;
                 }
             } // end no birth
         }  // end if s2or3
