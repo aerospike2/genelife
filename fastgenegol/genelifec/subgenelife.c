@@ -52,7 +52,7 @@ uint64_t pmutmask;                  // binary mask so that prob of choosing zero
 int totsteps=0;
 int rulemod = 1;                    // det: whether to modify GoL rule for 2 and 3 live neighbours : opposite outcome with small probability p0
 int selection = 1;                  // fitness of 2 live neighbours: integer value (0), number of ones (1), Norman compete (2), 2 target coding (3)
-int repscheme = 1;                  // replication scheme: 0 random choice , 1 XOR of all 3, 2 consensus, 3 unique det choice, 4 most different
+int repscheme = 1;                  // replication scheme: lowest 3 bits used to define 8 states: bit2 2ndnbs, bit1 not most difft, bit0 2select on 3
 int ncoding = 16;                   // maximal distances between sequences for fitness2 == 2
                                     // number of bits used to encode non zero bits in 2nd gene in sequence space for fitness2 == 3
 int survival = 0x2;                 // survive mask for two (bit 1) and three (bit 0) live neighbours
@@ -131,13 +131,14 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
     xxxx = (xxxx + (xxxx >> 4)) & m4;        /* put count of each 8 bits into those 8 bits */ \
     val = (xxxx * h01) >> 56;}               /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
 
-extern inline void selectone(int s, uint64_t livegenes[], int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene) {
+extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene) {
 // birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene.
-    unsigned int d0,d1,d2,d3,dd,swap;                   // number of ones in various gene combinations
-    uint64_t gdiff,gdiff0,gdiff1;                       // various gene combinations
+    unsigned int k,d0,d1,d2,d3,dd,swap;                   // number of ones in various gene combinations
+    uint64_t livegenes[2],gdiff,gdiff0,gdiff1;                       // various gene combinations
     uint64_t gene2centre;                               // gene function centres in sequence space
     int g0011,g0110,prey;
 
+    for(k=0;k<2;k++) livegenes[k] = golg[nb[(nb2i>>(k<<2))&0xf]];
     if (selection==0) {                                  // use integer value of sequence as fitness
         *birth = (livegenes[0]^livegenes[1]) ? 1L: 0L;   // birth condition is two genes different
         *newgene = livegenes[0]>livegenes[1] ?  livegenes[0] : livegenes[1]; // choose one with larger gene to replicate
@@ -198,13 +199,52 @@ extern inline void selectone(int s, uint64_t livegenes[], int nb[], uint64_t gol
     }
 }
 
+extern inline void selectone_nbs(int s, uint64_t nb2i, int nb[], uint64_t gol[], uint64_t golg[], uint64_t * birth, uint64_t *newgene) {
+// birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene.
+    int k, kanc, l, nb1[8], ij1, i1, j1, j1p1, j1m1, i1p1, i1m1;
+    uint64_t nbi, nbil, gene, genelink, s2, sl;
+    unsigned int cmask;
+
+    for (k=kanc=0,s2=0;k<s;k++) {                           // loop only over live neigbours, s2 is number of live nbs in connected 2nd ring
+        nbi = (nb2i>>(k<<2))&0x7;                           // kth live neighbour index
+        ij1 = nb[nbi];                                      // neighbour site ij index
+        gene = golg[ij1];                                   // gene at neighbour site
+        cmask = 0;                                          // connection mask initialized to 0
+        sl = 0;                                             // initialize number of connected live neighbours of this neighbour
+        for(l=0;l<2;l++) {                                  // 2 possible connections encoded in 2 16-bit gene words
+            genelink = (gene >> ((l+1)<<4)) & codingmask;   // ncoding bit sequences describing possible links: ncoding <=16
+            if (genelink == codingmask) cmask = cmask|(1<<l);// set mask only if connection encoded (all ones), later use probs
+        }
+        if(cmask) {                                                  // only if there are some connections
+            i1 = ij1 & Nmask;  j1 = ij1 >> log2N;                                   // row & column
+            j1p1 = ((j1+1) & Nmask)*N; j1m1 = ((j1-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
+            i1p1 =  (i1+1) & Nmask; i1m1 =  (i1-1) & Nmask;                         // toroidal i+1, i-1
+            nb1[0]=j1m1+i1m1; nb1[1]=j1m1+i1; nb1[2]=j1m1+i1p1; nb1[3]=j1*N+i1p1;   //next nbs  0 to 3
+            nb1[4]=j1p1+i1p1; nb1[5]=j1p1+i1; nb1[6]=j1p1+i1m1; nb1[7]=j1*N+i1m1;   //next nbs  4 to 7
+            for(l=0;l<2;l++) {
+                if ((cmask>>l)&0x1) {
+                    nbil = (nbi+l)&0x7; // on the 2nd ring, wrt nb in direction k,the 2 nbs at & after (l=0,1)
+                    if(gol[nb1[nbil]]) {
+                        s2++;sl++;
+                    } // if
+                }  // if
+            }  // for
+        } // if
+        if (sl&0x2) kanc = k;   // neighbour contributing 2 live next shell neighbours serves as ancestor, only works for repscheme==2
+    } // for
+    if(s2==3) {                 // 3 live neighbours in 2nd shell pointed to by live first shell neighbours
+        *birth = 1L;
+        *newgene = golg[nb[(nb2i>>(kanc<<2))&0x7]];
+    }
+}
+
 void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
 
     int s, k, k1, kmin, nmut;
     int nb[8], nbc, nbch, ij, i, j, jp1, jm1, ip1, im1;
-    uint64_t gs, nb1i, randnr, randnr2, r2;
+    uint64_t gs, nb1i, nb2i, randnr, randnr2, r2;
     uint64_t nbmask, nbmaskr, nbmaskrm;
     uint64_t newgene, ancestor, livegenes[3];
     uint64_t s2or3, birth, statflag;
@@ -264,12 +304,14 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                     nbch = nb[(kmin+k)&0x7];                                // rotate unique nb k left (kmin) back to orig nb pat
                   }
                   if (repscheme & 0x1) {                                    // execute selective replication of one of two otherwise unchosen live genes
+                      nb2i = 0L;
                       for(k1=k=0;k<3;k++) {                                 // choice of two other live genes for possible ancestor
                           nbc=(nb1i>>(k<<2))&0x7;
-                          if(nb[nbc]!=nbch) livegenes[k1++]=golg[nb[nbc]];
+                          if(nb[nbc]!=nbch) nb2i = (nbc<<(k1++<<2))+nb2i;
                       }
-                      selectone(s,livegenes,nb,golg,&birth,&newgene);
-                      if (birth==0L) {                                      // must reset ancestor & birth to if no ancestors chosen selectone
+                      if ((repscheme>>2)&0x1) selectone_nbs(s,nb2i,nb,gol,golg,&birth,&newgene);
+                      else selectone(s,nb2i,nb,golg,&birth,&newgene);
+                      if (birth==0L) {                                      // must reset ancestor & birth if no ancestors chosen in selectone
                         newgene = golg[nbch];
                         birth = 1L;
                       }
@@ -290,8 +332,13 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 statflag |= F_2_live;
                 if (rulemod) {                                              // special rule allowed if rulemod==1
                     if ((0x1L&(overwritemask>>1))|(0x1L&~gol[ij])) {        // either overwrite on for s==2 or central site is empty
-                        for (k=0;k<s;k++) livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]]; // live gene at neighbour site
-                        selectone(s,livegenes,nb,golg,&birth,&newgene);
+                        //for (k=0;k<s;k++) livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]]; // live gene at neighbour site
+                        if ((repscheme>>2)&0x1) {
+                            selectone_nbs(s,nb1i,nb,gol,golg,&birth,&newgene);
+                        }
+                        else {    
+                            selectone(s,nb1i,nb,golg,&birth,&newgene);
+                        }
                         if (birth) statflag |= F_notgolrul|F_2select;
                     }
                 }
@@ -356,8 +403,8 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 }
                 else fprintf(stderr,"hash storage error 3, gene %llx not stored\n",golg[ij]);
             }
-	        newgol[ij]  = 0L;                                                    // new game of life cell value
-	        newgolg[ij] = 0L;                                                    // gene dies
+	        newgol[ij]  = 0L;                                               // new game of life cell value
+	        newgolg[ij] = 0L;                                               // gene dies
             if(gol[ij]) statflag |= F_death;
         }
         if(gol[ij]) statflag |= F_golstate;
@@ -390,11 +437,11 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
 
 int statsflag = 1;
 
-void tracestats(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int NN2) {                                         // trace various stats over time of the simulation
+void tracestats(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int NN2) { // trace various stats over time of the simulation
     int ij,cnt,k,d,dc,gt[4],st[10];
     uint64_t gene,statflag;
   
-    if (totsteps == arraysize) {                              // relallocate memory for arrays : double size
+    if (totsteps == arraysize) {                                            // relallocate memory for arrays : double size
         arraysize*=2;
         livesites = (int *)realloc(livesites, arraysize * sizeof(int));
         genestats = (int *)realloc(genestats, arraysize * 4 * sizeof(int));
