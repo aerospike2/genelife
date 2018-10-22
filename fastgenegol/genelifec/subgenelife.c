@@ -469,6 +469,26 @@ void init_histo(){     // initialize the history array to zero
     for(i=0; i<numHisto; i++)        histo[i] = 0;
 }
 
+void get_activities(uint64_t actgenes[],int activities[],int ngenesp[]) {
+    int k, nlivegenes, nspecies;
+
+    nspecies = hashtable_count(&genetable);
+    genotypes = hashtable_keys(&genetable);
+    geneitems = (genedata*) hashtable_items( &genetable );
+    fprintf(stdout,"The number of different species that have ever existed is %d\n",nspecies);
+    
+    for (k=nlivegenes=0; k<nspecies; k++) {
+        if((genedataptr = (genedata *) hashtable_find(&genetable, genotypes[k])) != NULL) {
+            if(genedataptr->popcount) {
+                actgenes[nlivegenes] = genotypes[k];
+                activities[nlivegenes++] = genedataptr->popcount;
+            }
+        }
+        else fprintf(stderr,"get_activities error, no entry for gene %llx in hash table\n", genotypes[k]);
+    }
+    ngenesp[0] = nlivegenes;
+}
+
 void genelife_update (int nsteps, int histoflag) {
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
@@ -886,20 +906,6 @@ void delay(int milliseconds)
     now = then = clock();
     while( (now-then) < pause )
         now = clock();
-}
-
-void printxy (uint64_t gol[],uint64_t golg[]) {   /* print the game of life configuration */
-    int	ij, col, X, Y;
-    // https://stackoverflow.com/questions/27159322/rgb-values-of-the-colors-in-the-ansi-extended-colors-index-17-255
-    for (ij=0; ij<N2; ij++) {
-        if(gol[ij]>0){
-	        col = 32+((golg[ij]>>57)&0x7f);
-	        X = ij % N;
-	        Y = ij / N;
-	        printf("%d %d %d ",col,X,Y);
-      }
-    }
-    printf("\n");
 }
 
 int colorFunction = 1;
