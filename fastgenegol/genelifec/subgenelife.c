@@ -908,6 +908,20 @@ void delay(int milliseconds)
         now = clock();
 }
 
+void printxy (uint64_t gol[],uint64_t golg[]) {   /* print the game of life configuration */
+    int    ij, col, X, Y;
+    // https://stackoverflow.com/questions/27159322/rgb-values-of-the-colors-in-the-ansi-extended-colors-index-17-255
+    for (ij=0; ij<N2; ij++) {
+        if(gol[ij]>0){
+            col = 32+((golg[ij]>>57)&0x7f);
+            X = ij % N;
+            Y = ij / N;
+            printf("%d %d %d ",col,X,Y);
+      }
+    }
+    printf("\n");
+}
+
 int colorFunction = 1;
 
 void colorgenes(uint64_t gol[],uint64_t golg[], int cgolg[], int NN2) {
