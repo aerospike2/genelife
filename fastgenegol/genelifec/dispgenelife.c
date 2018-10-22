@@ -18,12 +18,7 @@
 
 int main (int argc, char *argv[]) {
     int	 i,k;
-<<<<<<< HEAD
     uint64_t *gol, *golg;
-=======
-    uint64_t *gol;
-    uint64_t *golg;
->>>>>>> gene_code_match_ham
 
     int myoffs[27] = {0,0,0,
 		  -1, 0, 0,
@@ -78,7 +73,8 @@ int main (int argc, char *argv[]) {
 
     fprintf(stderr,"Parameters:\n");
     fprintf(stderr,"rulemod-0-1\trepscheme=0-4\tselection=0-2\tnlog2pmut\tinitial1density\tinitialrdensity\n");
- fprintf(stderr,"%d\t\t%d\t\t%d\t\t%d\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\n",runparams[0],runparams[1],runparams[2],runparams[3],runparams[4],simparams[0],simparams[1],simparams[2],simparams[3],simparams[4]);
+ fprintf(stderr,"%d\t\t%d\t\t%d\t\t%d\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\n",runparams[0],runparams[1],runparams[2],runparams[3],runparams[4],
+         simparams[0],simparams[1],simparams[2],simparams[3],simparams[4]);
     fprintf(stderr,"ndisp\tnskip\n");
     fprintf(stderr,"%d\t\t%d\n",ndisp,nskip);
     initialize_planes(myoffs,Noff);

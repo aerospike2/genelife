@@ -65,7 +65,7 @@ uint64_t  emptysites = 0;           // cumulative number of empty sites during s
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
 int *livesites = NULL;              // dynamic array pointer for statistics of number of live sites over time
-int *genotypes = NULL;              // dynamic array pointer for statistics of number of 4 genotype classes over time
+int *genestats = NULL;              // dynamic array pointer for statistics of number of 4 genotype classes over time
 int *stepstats = NULL;              // dynamic array pointer for statistics of site update types over time
 
 int Noff = 9;                       // number of offsets
@@ -109,8 +109,6 @@ uint64_t golgstats[N2];             // 64 bit masks for different events during 
 #define F_golstate  0x100
 #define F_3g_same   0x200
 #define F_3_livenbs 0xff0000
-
-const uint64_t statbit[8] = {0x1,0x2,0x4,0x8,0x10,0x20,0x40,0x80};
 
                                     // Wikipedia "Xorshift" rewritten here as inline macro &
                                     // Vigna, Sebastiano. "xorshift*/xorshift+ generators and the PRNG shootout". Retrieved 2014-10-25.
@@ -251,7 +249,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
     uint64_t gs, nb1i, randnr, randnr2, r2;
     uint64_t nbmask, nbmaskr, nbmaskrm;
     uint64_t newgene, ancestor, livegenes[3];
-    uint64_t s2or3, birth;
+    uint64_t s2or3, birth, statflag;
     genedata gdata;
     HASHTABLE_U64 gene2hash;
     
@@ -350,6 +348,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 r2 = ((~pmutmask)||randnr2)?0L:1L;                          // 1 if lowest nlog2pmut bits of randnr are zero, else zero
                 nmut = (randnr >> 56) & 0x3f;                               // choose mutation position for length 64 gene : from bits 56:61 of randnr
                 // complete calculation of newgol and newgolg, including mutation
+                ancestor = newgene;
                 newgene = newgene ^ (r2<<nmut);                             // introduce single mutation with probability pmut = probmut
                 if(gol[ij]) {                                               // central old gene present: overwritten
                     gene2hash = (HASHTABLE_U64) golg[ij];
@@ -428,7 +427,7 @@ void tracestats(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int NN2) {
     if (totsteps == arraysize) {                              // relallocate memory for arrays : double size
         arraysize*=2;
         livesites = (int *)realloc(livesites, arraysize * sizeof(int));
-        genotypes = (int *)realloc(genotypes, arraysize * 4 * sizeof(int));
+        genestats = (int *)realloc(genestats, arraysize * 4 * sizeof(int));
         stepstats = (int *)realloc(stepstats, arraysize * 10 * sizeof(int));
     }
     for (ij=cnt=0;ij<NN2;ij++) {
@@ -453,7 +452,7 @@ void tracestats(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int NN2) {
     }
 
     livesites[totsteps] = cnt;
-    for(d=0;d<4;d++) genotypes[totsteps*4+d]=gt[d];
+    for(d=0;d<4;d++) genestats[totsteps*4+d]=gt[d];
     for(k=0;k<10;k++) stepstats[totsteps*10+k]=st[k];
 }
 
@@ -464,7 +463,7 @@ void get_stats(int outstats[], int outgtypes[], int outstepstats[], int numStats
         exit(1);
     }
     for(i=0; i<numStats; i++) outstats[i] = livesites[i];
-    for(i=0; i<4*numStats; i++) outgtypes[i] = genotypes[i];
+    for(i=0; i<4*numStats; i++) outgtypes[i] = genestats[i];
     for(i=0; i<10*numStats; i++) outstepstats[i] = stepstats[i];
 }
 
@@ -606,7 +605,7 @@ int writeFile(char *fileName)
 }
 
 void initialize (int runparams[], int nrunparams, int simparams[], int nsimparams) {
-    int ij,ij1,k,cnt,hcnt;
+    int ij,ij1,k,cnt,hcnt,icf;
     uint64_t g;
     uint64_t *gol;
     uint64_t *golg;
@@ -654,14 +653,14 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     if ( livesites !=NULL) {
         free(livesites);
         livesites = NULL;
-        free(genotypes);
-        genotypes = NULL;
+        free(genestats);
+        genestats = NULL;
         free(stepstats);
         stepstats = NULL;
     }
     arraysize = startarraysize;
     livesites = (int *) malloc(arraysize * sizeof(int));
-    genotypes = (int *) malloc(arraysize * 4 * sizeof(int));
+    genestats = (int *) malloc(arraysize * 4 * sizeof(int));
     stepstats = (int *) malloc(arraysize * 10 * sizeof(int));
 
     curPlane = 0;                                           // if we rerun initialize, we want to restart plane cycling from zero
@@ -672,9 +671,6 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     if(notfirst) hashtable_term(&genetable);
     hashtable_init(&genetable,sizeof(genedata),N2<<2,0);     // initialize dictionary for genes
     notfirst = 1;
-    if (Nf) {           // input from file
-        golgin=readFile("genepat.dat");
- 
     if (Nf) {           // input from file with max size of 32*32 characters
         golgin = (char *) malloc(32* 32 * sizeof(char));
         icf=readFile(golgin, "genepat.dat");
@@ -768,22 +764,10 @@ int cmpfunc1 ( const void *pa, const void *pb )
         return (int) (b[1] - a[1]);
 }
 
-void countspecies(uint64_t gol[], uint64_t golg[], int params[], int N2, int nparams) {  /* counts numbers of all different species using qsort first */
-    int ij, k, ijlast, nspecies, counts[N2], nones;
-    uint64_t gx, last, golgs[N2], fitness;
-    uint64_t golgsc[N2][2];
-    int selection = params[2];
-
-
-    for (ij=0; ij<N2; ij++) { golgs[ij] = golg[ij];  counts[ij] = 0;}  // initialize sorted gene & count arrays to zero
-
-    qsort(golgs, N2, sizeof(uint64_t), cmpfunc);              // sort in increasing gene order
-    for (ij=0,k=0,ijlast=0,last=golgs[0]; ij<N2; ij++) {               // count each new species in sorted list
-void countspecies(long unsigned int gol[], long unsigned int golg[], int runparams[]) {  /* counts numbers of all different species using qsort first */
+void countspecies(uint64_t gol[], uint64_t golg[], int N2) {  /* counts numbers of all different species using qsort first */
     int ij, k, ngenes, ijlast, nspecies, counts[N2], nones;
     uint64_t last, golgs[N2], fitness;
     uint64_t golgsc[N2][2];
-    int selection = runparams[2];
 
     for (ij=ngenes=0; ij<N2; ij++) {
         if(gol[ij]) golgs[ngenes++] = golg[ij];                   // only count active sites
@@ -849,11 +833,6 @@ void countspecies(long unsigned int gol[], long unsigned int golg[], int runpara
     fprintf(stdout,"%d\t%d\t\t%d\t\t%d\t\t%d\n",rulemod,repscheme,selection,overwritemask,survival);
     fprintf(stdout,"nlog2pmut\tinit1\tinitr\tncoding\tstartchoice\n");
     fprintf(stdout,"%d\t\t%d\t%d\t%d\t%d\n",nlog2pmut,initial1density,initialrdensity,ncoding,startgenechoice);
-        fprintf(stdout,"count species %d with gene %llx has counts %llu and %d ones, fitness %llu\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
-        fprintf(stdout,"count species %d with gene %llx has counts %llu and %d ones, fitness %llu\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
-
-    }
-    fprintf(stdout,"cumulative activity = %llu\n",(N2 * (uint64_t) totsteps) - emptysites);
 }
 
 int cmpfunc2 (const void * pa, const void * pb)
@@ -868,7 +847,7 @@ int cmpfunc3 (const void * pa, const void * pb)
 
 void countspecieshash( int params[], int nparams) {  /* counts numbers of all different species using qsort first */
     int k, golgs[N2], nspecies, nones;
-    uint64_t gx, last, fitness;
+    uint64_t last, fitness;
     int selection = params[2];
 
     nspecies = hashtable_count(&genetable);
