@@ -28,11 +28,11 @@
 #include "hashtable.h"
 hashtable_t genetable;
 typedef struct genedata {            // value of keys stored for each gene encountered in simulation
-            int popcount;
-            int firstbirthframe;
-            int lastextinctionframe;
-            int activity;
-            uint64_t firstancestor;
+            int popcount;            // initialized to 1
+            int firstbirthframe;     // initialized to 0
+            int lastextinctionframe; // this is initialized to -1, meaning no extinctions yet
+            int activity;            // initialized to 0
+            uint64_t firstancestor;  // this is initialized to a special gene seq not likely ever to occur
             } genedata;
 genedata ginitdata = {1,0,-1,0,0xfedcba9876543210};  // initialization data structure for gene data
 genedata *genedataptr;                      // pointer to a genedata instance
@@ -251,7 +251,6 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
     uint64_t newgene, ancestor, livegenes[3];
     uint64_t s2or3, birth, statflag;
     genedata gdata;
-    HASHTABLE_U64 gene2hash;
     
     totsteps++;
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
@@ -351,22 +350,21 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 ancestor = newgene;
                 newgene = newgene ^ (r2<<nmut);                             // introduce single mutation with probability pmut = probmut
                 if(gol[ij]) {                                               // central old gene present: overwritten
-                    gene2hash = (HASHTABLE_U64) golg[ij];
-                    if((genedataptr = (genedata *) hashtable_find(&genetable, gene2hash)) != NULL) {
+                    if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
                         genedataptr->popcount--;
                         // if(genedataptr->popcount == 0) genedataptr->lastextinctionframe = totsteps; // need to do this after whole frame
                     }
-                    else fprintf(stderr,"hash storage error 1, old gene %llx not stored\n",gene2hash);
+                    else fprintf(stderr,"hash storage error 1, old gene %llx not stored\n",golg[ij]);
                 }
-                gene2hash=(HASHTABLE_U64) newgene;
-                if((genedataptr = (genedata *) hashtable_find(&genetable, gene2hash)) != NULL) {
+
+                if((genedataptr = (genedata *) hashtable_find(&genetable, newgene)) != NULL) {
                     genedataptr->popcount++;
                 }
                 else {
                     gdata=ginitdata;
                     gdata.firstbirthframe = totsteps;
                     gdata.firstancestor = ancestor;
-                    hashtable_insert(&genetable,gene2hash,(genedata *) &gdata);
+                    hashtable_insert(&genetable, newgene,(genedata *) &gdata);
                 }
                 newgol[ij]  =  1L;                                          // new game of life cell value: alive
                 newgolg[ij] =  newgene;                                     // if birth then newgene
@@ -383,11 +381,10 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 }
                 else {
                     if(gol[ij]) {                                           // death : need to update hash table
-                        gene2hash = (HASHTABLE_U64) golg[ij];
-                        if((genedataptr = (genedata *) hashtable_find(&genetable, gene2hash)) != NULL) {
+                        if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
                             genedataptr->popcount--;
                         }
-                        else fprintf(stderr,"hash storage error 2, old gene %llx not stored\n",gene2hash);
+                        else fprintf(stderr,"hash storage error 2, old gene %llx not stored\n",golg[ij]);
                     }
                     newgol[ij]  = 0L;                                       // new game of life cell value dead
                     newgolg[ij] = 0L;                                       // gene dies or stays dead
@@ -397,11 +394,10 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
         }  // end if s2or3
         else {                                                              // else not birth or survival, 0 values for gol and gene
             if(gol[ij]) {                                                   // death : need to update hash table
-                gene2hash = (HASHTABLE_U64) golg[ij];
-                if((genedataptr = (genedata *) hashtable_find(&genetable, gene2hash)) != NULL) {
+                if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
                     genedataptr->popcount--;
                 }
-                else fprintf(stderr,"hash storage error 3, old gene %llx not stored\n",gene2hash);
+                else fprintf(stderr,"hash storage error 3, old gene %llx not stored\n",golg[ij]);
             }
 	        newgol[ij]  = 0L;                                                    // new game of life cell value
 	        newgolg[ij] = 0L;                                                    // gene dies
@@ -415,6 +411,12 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
     for (ij=0; ij<N2; ij++) {
 	    gol[ij] = newgol[ij];        // copy new gol config to old one
 	    golg[ij] = newgolg[ij];      // copy new genes to old genes
+        if(gol[ij]) {
+            if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
+                genedataptr->activity += genedataptr->popcount;
+            }
+            else fprintf(stderr,"gene %llx not recorded in hash table\n",golg[ij]);
+        }
     }
 }
 
@@ -720,11 +722,11 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
 
     for (ij=0; ij<N2; ij++) {
         if(gol[ij]) {
-            if((genedataptr = (genedata *) hashtable_find(&genetable, (HASHTABLE_U64) golg[ij])) != NULL) {
+            if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
                 genedataptr->popcount++;
             }
             else {
-                hashtable_insert(&genetable,(HASHTABLE_U64) golg[ij],(genedata *) &ginitdata);
+                hashtable_insert(&genetable, golg[ij], (genedata *) &ginitdata);
             }
         }
     }
@@ -796,7 +798,7 @@ void countspecies(uint64_t gol[], uint64_t golg[], int N2) {  /* counts numbers 
 
 
     for (k=1; k<nspecies; k++) {                            // check consistency of hash table data, assuming empty site gene is most frequent
-        if((genedataptr = (genedata *) hashtable_find(&genetable, (HASHTABLE_U64) golgsc[k][0])) != NULL) {
+        if((genedataptr = (genedata *) hashtable_find(&genetable, golgsc[k][0])) != NULL) {
                     if(genedataptr->popcount != golgsc[k][1])
                         fprintf(stderr,"popcount %llu <> %d hash error at k = %d\n",golgsc[k][1],genedataptr->popcount,k);
         }
@@ -883,7 +885,7 @@ void countspecieshash() {  /* counts numbers of all different species using qsor
              fitness = 999L;                                                // undefined, depends on competing sequence
         }
         else fprintf(stderr,"selection parameter %d out of range\n",selection);
-        if((genedataptr = (genedata *) hashtable_find(&genetable, (HASHTABLE_U64) last)) != NULL) {
+        if((genedataptr = (genedata *) hashtable_find(&genetable, last)) != NULL) {
             if(genedataptr->popcount)
                 fprintf(stdout,"count species %7d with gene %16llx has counts %7d and %3d ones, fitness %llu\n",k,last,
                     genedataptr->popcount,nones,fitness);
