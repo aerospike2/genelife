@@ -845,10 +845,9 @@ int cmpfunc3 (const void * pa, const void * pb)
    return ( geneitems[*(int*)pa].popcount < geneitems[*(int*)pb].popcount ? 1 : -1);
 }
 
-void countspecieshash( int params[], int nparams) {  /* counts numbers of all different species using qsort first */
+void countspecieshash() {  /* counts numbers of all different species using qsort first */
     int k, golgs[N2], nspecies, nones;
     uint64_t last, fitness;
-    int selection = params[2];
 
     nspecies = hashtable_count(&genetable);
     genotypes = hashtable_keys(&genetable);
