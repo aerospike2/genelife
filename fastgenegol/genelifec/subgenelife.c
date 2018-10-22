@@ -294,7 +294,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                   if (repscheme & 0x1) {                                    // execute selective replication of one of two otherwise unchosen live genes
                       for(k1=k=0;k<3;k++) {                                 // choice of two other live genes for possible ancestor
                           nbc=(nb1i>>(k<<2))&0x7;
-                          if(nb[nbc]!=nbch) livegenes[k1++]=golg[nbc];
+                          if(nb[nbc]!=nbch) livegenes[k1++]=golg[nb[nbc]];
                       }
                       selectone(s,&livegenes[0],nb,golg,&birth,&newgene);
                       if (birth==0L) {
