@@ -32,9 +32,10 @@ typedef struct genedata {            // value of keys stored for each gene encou
             int firstbirthframe;     // initialized to 0
             int lastextinctionframe; // this is initialized to -1, meaning no extinctions yet
             int activity;            // initialized to 0
+            int nextinctions;        // initialized to 0
             uint64_t firstancestor;  // this is initialized to a special gene seq not likely ever to occur
             } genedata;
-genedata ginitdata = {1,0,-1,0,0xfedcba9876543210};  // initialization data structure for gene data
+genedata ginitdata = {1,0,-1,0,0,0xfedcba9876543210};  // initialization data structure for gene data
 genedata *genedataptr;                      // pointer to a genedata instance
 HASHTABLE_SIZE_T const* genotypes;
 genedata* geneitems;
@@ -310,7 +311,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                     if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
                         genedataptr->popcount--;  // if 0 lastextinctionframe updated after whole frame calculated
                     }
-                    else fprintf(stderr,"hash storage error 1, old gene %llx not stored\n",golg[ij]);
+                    else fprintf(stderr,"hash storage error 1, gene %llx not stored\n",golg[ij]);
                 }
 
                 if((genedataptr = (genedata *) hashtable_find(&genetable, newgene)) != NULL) {
@@ -340,7 +341,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                         if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
                             genedataptr->popcount--;
                         }
-                        else fprintf(stderr,"hash storage error 2, old gene %llx not stored\n",golg[ij]);
+                        else fprintf(stderr,"hash storage error 2, gene %llx not stored\n",golg[ij]);
                     }
                     newgol[ij]  = 0L;                                       // new game of life cell value dead
                     newgolg[ij] = 0L;                                       // gene dies or stays dead
@@ -353,7 +354,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
                     genedataptr->popcount--;
                 }
-                else fprintf(stderr,"hash storage error 3, old gene %llx not stored\n",golg[ij]);
+                else fprintf(stderr,"hash storage error 3, gene %llx not stored\n",golg[ij]);
             }
 	        newgol[ij]  = 0L;                                                    // new game of life cell value
 	        newgolg[ij] = 0L;                                                    // gene dies
@@ -364,16 +365,26 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
         golgstats[ij] = statflag;
     }  // end for ij
 
-    for (ij=0; ij<N2; ij++) {
-	    gol[ij] = newgol[ij];        // copy new gol config to old one
-	    golg[ij] = newgolg[ij];      // copy new genes to old genes
+    for (ij=0; ij<N2; ij++) {       // complete missing hash table records including activities
         if(gol[ij]) {
             if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
-                genedataptr->activity += genedataptr->popcount;
-                if(genedataptr->popcount == 0) genedataptr->lastextinctionframe = totsteps;
+                if(genedataptr->popcount == 0) {
+                    genedataptr->lastextinctionframe = totsteps;
+                    genedataptr->nextinctions++;
+                }
             }
-            else fprintf(stderr,"gene %llx not recorded in hash table\n",golg[ij]);
+            else fprintf(stderr,"hash storage error 4, gene %llx not stored\n",golg[ij]);
         }
+        if(newgol[ij]) {
+            if((genedataptr = (genedata *) hashtable_find(&genetable, newgolg[ij])) != NULL)
+                genedataptr->activity ++;
+            else fprintf(stderr,"hash storage error 5, gene %llx not stored\n",newgolg[ij]);
+        }
+    }
+    
+    for (ij=0; ij<N2; ij++) {        // update lattices
+	    gol[ij] = newgol[ij];        // copy new gol config to old one
+	    golg[ij] = newgolg[ij];      // copy new genes to old genes
     }
 }
 
