@@ -308,8 +308,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 newgene = newgene ^ (r2<<nmut);                             // introduce single mutation with probability pmut = probmut
                 if(gol[ij]) {                                               // central old gene present: overwritten
                     if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
-                        genedataptr->popcount--;
-                        // if(genedataptr->popcount == 0) genedataptr->lastextinctionframe = totsteps; // need to do this after whole frame
+                        genedataptr->popcount--;  // if 0 lastextinctionframe updated after whole frame calculated
                     }
                     else fprintf(stderr,"hash storage error 1, old gene %llx not stored\n",golg[ij]);
                 }
@@ -371,6 +370,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
         if(gol[ij]) {
             if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
                 genedataptr->activity += genedataptr->popcount;
+                if(genedataptr->popcount == 0) genedataptr->lastextinctionframe = totsteps;
             }
             else fprintf(stderr,"gene %llx not recorded in hash table\n",golg[ij]);
         }
