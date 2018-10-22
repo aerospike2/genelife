@@ -130,49 +130,6 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
     xxxx = (xxxx + (xxxx >> 4)) & m4;        /* put count of each 8 bits into those 8 bits */ \
     val = (xxxx * h01) >> 56;}               /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
 
-void countconfigs(){		// count configs specified by offset array
-    // each row of the offset array becomes a bit in an address for the histo array.
-    int i,j,k,t,x,y;
-    uint64_t *pl, adr, bit;
-
-    for(i=0; i<N; i++){		// rows
-	    if(i<xL) continue;
-	    if(i>xR) continue;
-	    for(j=0; j<N; j++){	// columns
-	        if(j<yD) continue;
-	        if(j>yU) continue;
-	        adr = 0;
-	        for(k=0; k<Noff; k++){
-		        x = j+offsets[k][0];
-		        y = i+offsets[k][1];
-		        t = (curPlane+offsets[k][2]) % numPlane;
-		        pl = planes[t];
-		        bit = *(pl + y*N +x);
-		        if(bit!=1 || bit != 0){                                            // J nmodified check for unsigned values */
-		            fprintf(stderr,"Ack! bit = %llu != 0 or 1\n",bit);
-		            exit(1);
-		        }
-		        adr = (adr<<1) | bit;
-	        }
-	        histo[adr]++;
-	    }
-    }
-}
-
-void get_histo(uint64_t outhisto[],int numHistoC){
-    int i;
-    if(numHistoC != numHisto){
-	    fprintf(stderr,"Ack! numHisto = %d  != numHistoC = %d\n",numHisto,numHistoC);
-	    exit(1);
-    }
-    for(i=0; i<numHisto; i++) outhisto[i] = histo[i];
-}
-
-void init_histo(){     // initialize the history array to zero
-    int i;
-    for(i=0; i<numHisto; i++)        histo[i] = 0;
-}
-
 extern inline void selectone(int s, uint64_t livegenes[], int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene) {
 // birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene.
     unsigned int d0,d1,d2,d3,dd,swap;                   // number of ones in various gene combinations
@@ -469,6 +426,49 @@ void get_stats(int outstats[], int outgtypes[], int outstepstats[], int numStats
     for(i=0; i<10*numStats; i++) outstepstats[i] = stepstats[i];
 }
 
+void countconfigs(){        // count configs specified by offset array
+    // each row of the offset array becomes a bit in an address for the histo array.
+    int i,j,k,t,x,y;
+    uint64_t *pl, adr, bit;
+
+    for(i=0; i<N; i++){        // rows
+        if(i<xL) continue;
+        if(i>xR) continue;
+        for(j=0; j<N; j++){    // columns
+            if(j<yD) continue;
+            if(j>yU) continue;
+            adr = 0;
+            for(k=0; k<Noff; k++){
+                x = j+offsets[k][0];
+                y = i+offsets[k][1];
+                t = (curPlane+offsets[k][2]) % numPlane;
+                pl = planes[t];
+                bit = *(pl + y*N +x);
+                if(bit!=1 || bit != 0){                                            // J nmodified check for unsigned values */
+                    fprintf(stderr,"Ack! bit = %llu != 0 or 1\n",bit);
+                    exit(1);
+                }
+                adr = (adr<<1) | bit;
+            }
+            histo[adr]++;
+        }
+    }
+}
+
+void get_histo(uint64_t outhisto[],int numHistoC){
+    int i;
+    if(numHistoC != numHisto){
+        fprintf(stderr,"Ack! numHisto = %d  != numHistoC = %d\n",numHisto,numHistoC);
+        exit(1);
+    }
+    for(i=0; i<numHisto; i++) outhisto[i] = histo[i];
+}
+
+void init_histo(){     // initialize the history array to zero
+    int i;
+    for(i=0; i<numHisto; i++)        histo[i] = 0;
+}
+
 void genelife_update (int nsteps, int histoflag) {
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
@@ -476,40 +476,19 @@ void genelife_update (int nsteps, int histoflag) {
     uint64_t *gol, *newgol, *golg, *newgolg;
 
     for (t=0; t<nsteps; t++) {
-	    gol = planes[curPlane];
-	    newgol = planes[newPlane];
-	    golg = planesg[curPlane];
-	    newgolg = planesg[newPlane];
+        gol = planes[curPlane];
+        newgol = planes[newPlane];
+        golg = planesg[curPlane];
+        newgolg = planesg[newPlane];
 
-	    update(gol,golg,newgol,newgolg);
-	    if(histoflag) countconfigs();
+        update(gol,golg,newgol,newgolg);
+        if(histoflag) countconfigs();
         if(statsflag) tracestats(gol,golg,golgstats,N2);
 
-	    curPlane = (curPlane +1) % numPlane;
-	    newPlane = (newPlane +1) % numPlane;
+        curPlane = (curPlane +1) % numPlane;
+        newPlane = (newPlane +1) % numPlane;
     } /* for t ... */
 } /* genelife_update */
-
-
-void printscreen (uint64_t gol[], uint64_t golg[], int N, int N2) {   /* print the game of life configuration */
-	int	ij, col;
-    // https://stackoverflow.com/questions/27159322/rgb-values-of-the-colors-in-the-ansi-extended-colors-index-17-255
-    printf("\e[38;5;255;48;5;238m");
-	for (ij=0; ij<N2; ij++) {
-        col = 32+((golg[ij]>>57)&0x7f);
-		printf ("\e[38;5;%dm%c", col, gol[ij] ? '*' : ' ');
-		if ((ij % N) == N -1) printf ("\n");
-	}
-    printf("\e[38;5;238;48;5;255m");
-}
-
-void print_gol (uint64_t gol[], int N, int N2) {   /* print the game of life configuration */
-	int	ij;
-	for (ij=0; ij<N2; ij++) {
-		printf ("%c", gol[ij] ? '*' : ' ');
-		if ((ij % N) == N -1) printf ("\n");
-	}
-}
 
 void initialize_planes(int offs[],  int N) {
     int i,j,idx;
