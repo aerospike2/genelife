@@ -31,7 +31,7 @@ void printspecies(uint64_t golg[]) {  /* counts numbers of all different species
     
     for (ij=0; ij<N2; ij++) { golgs[ij] = golg[ij];  counts[ij] = 0;}  // initialize sorted gene & count arrays to zero
 
-    qsort(golgs, N2, sizeof(long unsigned int), cmpfunc);              // sort in increasing gene order
+    qsort(golgs, N2, sizeof(uint64_t), cmpfunc);              // sort in increasing gene order
     for (ij=0,k=0,ijlast=0,last=golgs[0]; ij<N2; ij++) {               // count each new species in sorted list
         if (golgs[ij] != last) {
             last = golgs[ij];

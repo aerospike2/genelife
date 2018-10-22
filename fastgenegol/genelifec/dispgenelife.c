@@ -18,7 +18,12 @@
 
 int main (int argc, char *argv[]) {
     int	 i,k;
+<<<<<<< HEAD
     uint64_t *gol, *golg;
+=======
+    uint64_t *gol;
+    uint64_t *golg;
+>>>>>>> gene_code_match_ham
 
     int myoffs[27] = {0,0,0,
 		  -1, 0, 0,

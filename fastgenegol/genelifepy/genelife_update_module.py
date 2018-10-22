@@ -40,6 +40,8 @@ libcd.get_curgol.restype = None
 libcd.get_curgol.argtypes = [uint64_array,c_int]
 libcd.get_curgolg.restype = None
 libcd.get_curgolg.argtypes = [uint64_array,c_int]
+libcd.get_stats.restype = None
+libcd.get_stats.argtypes = [int_array, int_array, int_array, c_int]
 libcd.colorgenes.argtypes = [uint64_array, uint64_array, int_array, c_int]
 
 def genelife_update(nsteps, histoflag):
@@ -71,6 +73,9 @@ def printscreen( gol, golg, N):
 
 def get_histo(gol):
     return libcd.getconfigs( histo, len(histo))
+
+def get_stats(livesites,genotypes,stepstats,nstats):
+    return libcd.get_stats(livesites,genotypes,stepstats,nstats)
 
 def colorgenes(gol, golg, cgolg):
     return libcd.colorgenes( gol, golg, cgolg, len(gol))
