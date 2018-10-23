@@ -29,9 +29,9 @@ int main (int argc, char *argv[]) {
 		  1, -1, 0,
 		  0, -1, 0,
 		  -1, -1, 0};
-    int runparams[5];
+    int runparams[7];
     int simparams[5];
-    int nrunparams=5; int nsimparams=5;
+    int nrunparams=7; int nsimparams=5;
     int nsteps = 10;	      // total number of steps to simulate GoL
     int ndisp  = 200;	      // display GoL ndisp steps
     int nskip = 1000;	      // skip this many
@@ -52,7 +52,8 @@ int main (int argc, char *argv[]) {
     runparams[2] = 1;        // 0-2 selection 
     runparams[3] = 0;        // NY updated
     runparams[4] = 0;        // NY updated
-    simparams[0] = 8;        // nlog2pmut: gene mutation probability
+    runparams[5] = 0;        // colorfunction 0 or 1
+    runparams[6] = 0;        // fileinit 0 or 1    simparams[0] = 8;        // nlog2pmut: gene mutation probability
     simparams[1] = 16384;    // initial1density: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
     simparams[2] = 32768;    // initialrdensity: 32768 makes all genomes active 16384 makes half active, etc.
     simparams[3] = 0;        // NY updated
@@ -68,8 +69,12 @@ int main (int argc, char *argv[]) {
     if (argc>8) simparams[2] = atoi(argv[8]); // if present update init rand density from command line
     if (argc>9) simparams[3] = atoi(argv[9]); // if present update init rand density from command line
     if (argc>10) simparams[4] = atoi(argv[10]); // if present update init rand density from command line
-    if (argc>11) ndisp = atoi(argv[11]); // if present update init rand density from command line
-    if (argc>12) nskip = atoi(argv[12]); // if present update init rand density from command line
+    if (argc>11) runparams[5] = atoi(argv[11]); // if present update colorfunction from command line
+    if (argc>12) runparams[6] = atoi(argv[12]); // if present update fileinit from command line
+    if (argc>13) ndisp = atoi(argv[13]); // if present update init rand density from command line
+    if (argc>14) nskip = atoi(argv[14]); // if present update init rand density from command line
+
+
 
     fprintf(stderr,"Parameters:\n");
     fprintf(stderr,"rulemod-0-1\trepscheme=0-4\tselection=0-2\tnlog2pmut\tinitial1density\tinitialrdensity\n");

@@ -68,9 +68,9 @@ int main (int argc, char *argv[]) {
 		  1, -1, 0,
 		  0, -1, 0,
 		  -1, -1, 0};
-    int runparams[5];
+    int runparams[7];
     int simparams[5];
-    int nrunparams=3; int nsimparams=4;
+    int nrunparams=7; int nsimparams=5;
 
     int opt;
     while ((opt = getopt(argc, argv, "h")) != -1) {
@@ -87,13 +87,15 @@ int main (int argc, char *argv[]) {
     runparams[0] = 1;        // 0,1 rulemod
     runparams[1] = 4;        // 3-4 repscheme 
     runparams[2] = 4;        // 0-4 selection
-    runparams[3] = 2;         // overwritemask = 2 bit mask
+    runparams[3] = 2;        // overwritemask = 2 bit mask
     runparams[4] = 0;        // survival mask for two (bit1) and three (bit0) params
+    runparams[5] = 0;        // colorfunction 0 or 1
+    runparams[6] = 0;        // fileinit 0 or 1
     simparams[0] = 8;        // nlog2pmut: gene mutation probability
     simparams[1] = 16384;    // initial1density: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
-    simparams[2] = 32768 ;    // initialrdensity: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
-    simparams[3]= 12;         // ncoding
-    simparams[4] = 8;         // initialize genes to 0-7 or 8=random
+    simparams[2] = 32768 ;   // initialrdensity: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
+    simparams[3]= 12;        // ncoding
+    simparams[4] = 8;        // initialize genes to 0-7 or 8=random
 
     if (argc>1) runparams[0] = atoi(argv[1]); // if present update rulemod from command line
     if (argc>2) runparams[1] = atoi(argv[2]); // if present update repscheme from command line
@@ -105,7 +107,9 @@ int main (int argc, char *argv[]) {
     if (argc>8) simparams[2] = atoi(argv[8]); // if present update init rand density from command line
     if (argc>9) simparams[3] = atoi(argv[9]); // if present update ncoding no of bits used to encode valid connection functions 1-16
     if (argc>10) simparams[4] = atoi(argv[10]); // if present update ncoding no of bits used to encode valid connection functions 1-16
- 
+    if (argc>11) runparams[5] = atoi(argv[11]); // if present update colorfunction from command line
+    if (argc>12) runparams[6] = atoi(argv[12]); // if present update fileinit from command line
+
     fprintf(stderr,"Parameters:\n");
     fprintf(stderr,"rulemod-0-1\trepscheme=3,4\tselection=0-4\toverwrite\tsurvival\n");
     fprintf(stderr,"%d\t\t%d\t\t%d\t\t%d\t\t%d\n",runparams[0],runparams[1],runparams[2],runparams[3],runparams[4]);

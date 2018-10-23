@@ -55,6 +55,8 @@ int selection = 1;                  // fitness of 2 live neighbours: integer val
 int repscheme = 1;                  // replication scheme: lowest 3 bits used to define 8 states: bit2 2ndnbs, bit1 not most difft, bit0 2select on 3
 int ncoding = 16;                   // maximal distances between sequences for fitness2 == 2
                                     // number of bits used to encode non zero bits in 2nd gene in sequence space for fitness2 == 3
+int colorfunction = 0;              // color function choice of hash(0) or functional (1, color classes depends on selection parameter)
+int fileinit = 0;                   // 0 input from random field of random or start genes, 1 input from file genepat.dat of 32x32 indexes to start genes
 int survival = 0x2;                 // survive mask for two (bit 1) and three (bit 0) live neighbours
 int overwritemask = 0x2;            // bit mask for 4 cases of overwrite: bit 0. s==3  bit 1. special birth s==2
 int initial1density = (1<<15)>>1;   // initial density of ones in gol as integer value, divide by 2^15 for true density
@@ -76,27 +78,32 @@ uint64_t *histo;
 int numHisto;
 
 // initialize planes:
-int curPlane = 0;
-int newPlane = 1;
-int numPlane = 8;
-uint64_t *planes[8];                // ring buffer planes of gol array states
-uint64_t *planesg[8];               // ring buffer planes of golg genes
+#define maxPlane 2
+int curPlane = 0;                   // current plane index
+int newPlane = 1;                   // new plane index
+int numPlane = maxPlane;            // number of planes must be power of 2 to allow efficient modulo plane
+uint64_t *planes[maxPlane];         // ring buffer planes of gol array states
+uint64_t *planesg[maxPlane];        // ring buffer planes of golg genes
 uint64_t plane0[N2];
 uint64_t plane1[N2];
+uint64_t planeg0[N2];
+uint64_t planeg1[N2];
+#if maxPlane >= 2
 uint64_t plane2[N2];
 uint64_t plane3[N2];
+uint64_t planeg2[N2];
+uint64_t planeg3[N2];
+#endif
+#if maxPlane >= 4
 uint64_t plane4[N2];
 uint64_t plane5[N2];
 uint64_t plane6[N2];
 uint64_t plane7[N2];
-uint64_t planeg0[N2];
-uint64_t planeg1[N2];
-uint64_t planeg2[N2];
-uint64_t planeg3[N2];
 uint64_t planeg4[N2];
 uint64_t planeg5[N2];
 uint64_t planeg6[N2];
 uint64_t planeg7[N2];
+#endif
 
 uint64_t golgstats[N2];             // 64 bit masks for different events during processing
 #define F_notgolrul 0x1
@@ -497,12 +504,12 @@ void countconfigs(){        // count configs specified by offset array
             if(j>yU) continue;
             adr = 0;
             for(k=0; k<Noff; k++){
-                x = j+offsets[k][0];
-                y = i+offsets[k][1];
-                t = (curPlane+offsets[k][2]) % numPlane;
+                x = (j+offsets[k][0]) & Nmask;                          // periodic boundary conditions for N power of 2
+                y = (i+offsets[k][1]) & Nmask;
+                t = (curPlane+offsets[k][2]) & (numPlane-1);            // periodic in numPlane if this is power of 2
                 pl = planes[t];
                 bit = *(pl + y*N +x);
-                if(bit!=1 || bit != 0){                                            // J nmodified check for unsigned values */
+                if(bit!= 1L || bit != 0L){                              // check for appropriate unsigned values */
                     fprintf(stderr,"Ack! bit = %llu != 0 or 1\n",bit);
                     exit(1);
                 }
@@ -568,11 +575,11 @@ void genelife_update (int nsteps, int histoflag) {
     } /* for t ... */
 } /* genelife_update */
 
-void initialize_planes(int offs[],  int N) {
+void initialize_planes(int offs[],  int No) {
     int i,j,idx;
 
-    if(N%3 !=0) fprintf(stderr,"Ouch!  Size of offsets array not a multiple of 3 as expected.");
-    Noff = N/3;		// Noff global
+    if(No%3 !=0) fprintf(stderr,"Ouch!  Size of offsets array not a multiple of 3 as expected.");
+    Noff = No/3;		// Noff global
     if(Noff>24){
         fprintf(stderr,"Too many offsets!  Max=24");
         exit(1);
@@ -591,44 +598,56 @@ void initialize_planes(int offs[],  int N) {
     }
     
     // compute number of planes from toff = 3rd element of each offest vec:
-    int tmx = 0;
-    int tmn = N;
-    int toff,tall;
+    int tall,tmx = 0;
+    int toff, tmn = No;
     for(i=0; i<Noff; i++){
 	    toff = offsets[i][2];
-	    if(toff>tmx) tmx = toff;
+	    // if(toff>tmx) tmx = toff; // it does not make sense to have +ve values (this would look into future) so tmx = 0
 	    if(toff<tmn) tmn = toff;
     }
-    //    fprintf(stderr,"----------------- txm = %d, tmn = %d",tmx,tmn);
+    //    fprintf(stderr,"----------------- tmx = %d, tmn = %d",tmx,tmn);
     tall = tmx-tmn;
-    numPlane = tall + 2;	// numPlane >= 2
+    // numPlane = 2 + tall;    // numPlane >= 2
+    if(tall>4) numPlane = 8;
+    else if (tall > 2) numPlane = 4;
+    else numPlane = 2;
+    if (numPlane>maxPlane) {
+        fprintf(stderr,"Not enough planes defined by maxPlane for given offsets (need > %d)\n",numPlane);
+        exit(1);
+    }
 
     // compute xR, xL, yU, yD border offsets from offsets matrix
     int mx;
     int mn;
     int off;
-    mn=N; mx=0;
+    mn=No; mx=0;
     for(i=0; i<Noff; i++){
 	    off = offsets[i][0];	// X
 	    if(off>mx) mx = off;
 	    if(off<mn) mn = off;
     }
     if(mn<0) xL = -mn; else xL=0;
-    if(mx>0) xR = N-mx; else xR=N;
-    mn=N; mx=0;
+    if(mx>0) xR = No-mx; else xR=No;
+    mn=No; mx=0;
     for(i=0; i<Noff; i++){
 	    off = offsets[i][1];	// Y
 	    if(off>mx) mx = off;
 	    if(off<mn) mn = off;
     }
     if(mn<0) yD = -mn; else yD = 0;
-    if(mx>0) yU = N-mx; else yU = N;
+    if(mx>0) yU = No-mx; else yU = No;
 
     // initialize plane pointers:
-    planes[0] = plane0;planes[1] = plane1;planes[2] = plane2;planes[3] = plane3;
-    planes[4] = plane4;planes[5] = plane5;planes[6] = plane6;planes[7] = plane7;
-    planesg[0] = planeg0;planesg[1] = planeg1;planesg[2] = planeg2;planesg[3] = planeg3;
-    planesg[4] = planeg4;planesg[5] = planeg5;planesg[6] = planeg6;planesg[7] = planeg7;
+    planes[0]  = plane0;  planes[1]  = plane1;
+    planesg[0] = planeg0; planesg[1] = planeg1;
+#if maxPlane > 2
+    planes[2]  = plane2;  planes[3]  = plane3;
+    planesg[2] = planeg2; planesg[3] = planeg3;
+#endif
+#if maxPlane >4
+    planes[4]  = plane4;  planes[5]  = plane5;  planes[6]  = plane6;  planes[7]  = plane7;
+    planesg[4] = planeg4; planesg[5] = planeg5; planesg[6] = planeg6; planesg[7] = planeg7;
+#endif
     curPlane = 0;
     newPlane = 1;
 }
@@ -674,7 +693,6 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
 
     uint64_t startgenes[8];
     
-    static int Nf = 0;
     char *golgin;
     
     srand(1234567);
@@ -688,6 +706,8 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     selection = runparams[2];
     overwritemask = runparams[3];
     survival = runparams[4];
+    colorfunction = runparams[5];
+    fileinit = runparams[6];
 
     nlog2pmut = simparams[0];
     if(nlog2pmut>56) nlog2pmut=0;                     // need to use top 6-8 bits of 64 bit random nr for position
@@ -698,14 +718,15 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     codingmask = (0x1L<<ncoding)-0x1L;
     startgenechoice = simparams[4];
     
-    fprintf(stdout,"runparams %d %d %d %d %d\n",runparams[0],runparams[1],runparams[2],runparams[3],runparams[4]);
+    fprintf(stdout,"runparams %d %d %d %d %d %d %d\n",runparams[0],runparams[1],runparams[2],
+                                         runparams[3],runparams[4],runparams[5],runparams[6]);
     fprintf(stdout,"simparams %d %d %d %d %d\n",simparams[0],simparams[1],simparams[2],simparams[3],simparams[4]);
     fprintf(stdout,"pmutmask %llu (NB 0 means no mutation)\n",pmutmask);
     
     switch (selection) {
         case 0: for (k=0;k<4;k++) {startgenes[k]=0xf0f0f0f0f0f0f0f0;startgenes[k+4]=0x0f0f0f0f0f0f0f0f;}; break;
         case 1: for (k=0;k<8;k++) startgenes[k]=((0x1L<<k*3)-1L)<<20;break;
-        case 2: for (k=0;k<8;k++) startgenes[k]=(((0x1L<<7*3)-1L)<<20)+((0x1L<<k)-0x1L);break;
+        case 2: for (k=0;k<8;k++) startgenes[k]=(((0x1L<<20)-1L)<<20)+((0x1L<<k)-0x1L);break;
         default: for (k=0;k<8;k++) startgenes[k]=((0x1L<<k*3)-1L)<<20;break;
     }
 
@@ -730,7 +751,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     if(notfirst) hashtable_term(&genetable);
     hashtable_init(&genetable,sizeof(genedata),N2<<2,0);     // initialize dictionary for genes
     notfirst = 1;
-    if (Nf) {           // input from file with max size of 32*32 characters
+    if (fileinit) {           // input from file genepat.dat with max size of 32*32 characters
         golgin = (char *) malloc(32* 32 * sizeof(char));
         icf=readFile(golgin, "genepat.dat");
         if (icf != 32*32) {
@@ -980,13 +1001,11 @@ void printxy (uint64_t gol[],uint64_t golg[]) {   /* print the game of life conf
     printf("\n");
 }
 
-int colorFunction = 1;
-
 void colorgenes(uint64_t gol[],uint64_t golg[], int cgolg[], int NN2) {
     uint64_t gene, gdiff, g2c, mask;
     int ij,d,d2;
 
-    if(colorFunction){
+    if(colorfunction){
 	    for (ij=0; ij<NN2; ij++) {
 	        if (gol[ij]) {
 		        gene = golg[ij];
