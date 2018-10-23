@@ -138,12 +138,58 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
     xxxx = (xxxx + (xxxx >> 4)) & m4;        /* put count of each 8 bits into those 8 bits */ \
     val = (xxxx * h01) >> 56;}               /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
 
+void colorgenes(uint64_t gol[],uint64_t golg[], int cgolg[], int NN2) {
+    uint64_t gene, gdiff, g2c, mask;
+    int ij,d,d2;
+
+    if(colorfunction){
+        for (ij=0; ij<NN2; ij++) {
+            if (gol[ij]) {
+                gene = golg[ij];
+                POPCOUNT64C(gene,d);                    // assigns number of ones in gene to d
+                switch (selection) {
+                        case 0 : mask = ((gene>>40)<<8)+0xff; break;
+                        case 1 : mask = ((d+(d<<6)+(d<<12)+(d<<18))<<8) + 0xff; break;
+                        case 6 :
+                        case 2 : d = d & 0x3; mask = d==3 ? 0xf0f0f0ff : ((0xff<<(d<<3))<<8)+0xff; break;
+                        case 3 : g2c = (1L<<ncoding)-1L;gdiff = gene^g2c; POPCOUNT64C(gdiff,d2);
+                                 mask = d<d2 ? (d<<26)+0xff : (d2<<10)+0xff; break;
+                        case 4 : mask = d < ncoding ? ((0xf^d)<<28)+0xff : ((64-d < ncoding) ? ((0xf^d)<<12)+0xff : 0xf0f0f0ff); break;
+                        case 5 : mask = d >= 32 ? ((0xf^(64-d))<<28)+0xff : ((0xf^d)<<20)+0xff; break;
+                        default  : mask = ((d+(d<<6)+(d<<12)+(d<<18))<<8) + 0xff;
+                }
+                cgolg[ij] = (int) mask;
+            }
+            else cgolg[ij] = 0;
+        }
+    }
+    else{
+        // for(d=0;d<256;d++) counts[d]=0;
+        // see https://stackoverflow.com/questions/6943493/hash-table-with-64-bit-values-as-key/33871291
+        for (ij=0; ij<NN2; ij++) {
+            if (gol[ij]) {
+                gene = golg[ij];
+                if (gene == 0L) gene = 11778L; // random color for gene==0
+                // mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
+                // mask = (gene * 11400714819323198549ul) >> (64 - 32);  // hash with optimal prime multiplicator down to 32 bits
+                mask = gene * 11400714819323198549ul;
+                mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
+                mask |= 0x808080ff; // ensure brighter color at risk of improbable redundancy, make alpha opaque
+                cgolg[ij] = (int) mask;
+            }
+            else cgolg[ij] = 0;
+        }
+    }
+    //for(d=0;d<256;d++)
+    //    if (counts[d]) fprintf(stderr,"counting hash table hash %d has %d counts\n",d,counts[d]);
+}
+
 extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene) {
 // birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene.
     unsigned int k,d0,d1,d2,d3,dd,swap;                   // number of ones in various gene combinations
     uint64_t livegenes[2],gdiff,gdiff0,gdiff1;                       // various gene combinations
     uint64_t gene2centre;                               // gene function centres in sequence space
-    int g0011,g0110,prey;
+    int g0011,g0110,prey,prey2;
 
     for(k=0;k<2;k++) livegenes[k] = golg[nb[(nb2i>>(k<<2))&0xf]];
     if (selection==0) {                                  // use integer value of sequence as fitness
@@ -189,18 +235,21 @@ extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], ui
             *newgene= g0011 ? ((d0<d3) ? livegenes[0] : livegenes[1]) : ((d2<d1) ? livegenes[0] : livegenes[1]);
         }
         else if (selection==4) {                         // birth if 2 genes obey 3 distance constraints < ncoding (NYW)
-            gdiff0 = ~livegenes[0];                      // find distance to 0x0 for gene 0
-            POPCOUNT64C(gdiff0,d0);                      // in d0
             gdiff=livegenes[0]^livegenes[1];
             POPCOUNT64C(gdiff,dd);
-            *birth = (dd<ncoding && d0<ncoding && d1<ncoding) ? 1L: 0L; // birth if 2 genes close enough (< has higher priority than &&)
-            *newgene= (d0>d1) ? livegenes[0] : (d0<d1 ? livegenes[1] : ((livegenes[0]>livegenes[1]) ?  livegenes[0] : livegenes[1]));
+            *birth = (dd<ncoding) && ((d0<ncoding && d1>64-ncoding)|| (d1<ncoding && d0>64-ncoding)) ? 1L: 0L; // birth if 2 genes close enough to targets
+            if (d0<ncoding) {if(d0>64-d1) swap=1;else swap=0;}
+            else {if(64-d0>d1) swap=1; else swap=0;}
+            *newgene= livegenes[swap];
         }
         else if (selection==5) {                         // predator prey model : prey evolves to all 0, predator to all 1
             gdiff=livegenes[0]^livegenes[1];
-            prey = d0<32 && d1<32;                       // 2 prey : newgene is one with less ones, 1 prey : predator wins
-            *birth = (gdiff && prey) ? 1L: 0L;           // birth if different and >=1 prey)
-            *newgene= (prey ? (d0<d1 ? livegenes[0] : livegenes[1]) : (d0<d1 ? livegenes[1] : livegenes[0]));
+            gdiff1=livegenes[0]^~(~livegenes[1]);
+            POPCOUNT64C(gdiff1,dd);
+            prey = d0<32 || d1<32;                       // prey present : newgene is one with less ones, 1 prey : predator wins
+            prey2 = d0<32 && d1<32;                       // 2 prey : newgene is one with less ones, 1 prey : predator wins
+            *birth = (gdiff && prey && dd<ncoding) ? 1L: 0L;           // birth if different and >=1 prey and close enough match)
+            *newgene= (prey2 ? (d0<d1 ? livegenes[0] : livegenes[1]) : (d0<32 ? livegenes[1] : livegenes[0]));
         }
         else if (selection==6) {                         // use next 4 color game on number ones mod 4
                                                          // red 0 green 1 blue 2 white 3
@@ -269,6 +318,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
 
     int s, k, k1, kmin, nmut;
     int nb[8], nbc, nbch, ij, i, j, jp1, jm1, ip1, im1;
+    unsigned int dbirth;
     uint64_t gs, nb1i, nb2i, randnr, randnr2, r2;
     uint64_t nbmask, nbmaskr, nbmaskrm;
     uint64_t newgene, ancestor, livegenes[3];
@@ -337,7 +387,8 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                       if ((repscheme>>2)&0x1) selectone_nbs(s,nb2i,nb,gol,golg,&birth,&newgene);
                       else selectone(s,nb2i,nb,golg,&birth,&newgene);
                       if (birth==0L) {                                      // must reset ancestor & birth if no ancestors chosen in selectone
-                        if((~repscheme>>3)&0x1|rulemod) {
+                        dbirth = ((~repscheme)>>3) & 0x1;
+                        if(dbirth||rulemod) {
                             newgene = golg[nbch];                           // ALTERED DYNAMICS : less birth for repscheme bit 3 on
                             birth = 1L;
                         }
@@ -747,8 +798,12 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     switch (selection) {
         case 0: for (k=0;k<4;k++) {startgenes[k]=0xf0f0f0f0f0f0f0f0;startgenes[k+4]=0x0f0f0f0f0f0f0f0f;}; break;
         case 1: for (k=0;k<8;k++) startgenes[k]=((0x1L<<k*3)-1L)<<20;break;
+        case 6:
         case 2: for (k=0;k<8;k++) startgenes[k]=(((0x1L<<20)-1L)<<20)+((0x1L<<k)-0x1L);break;
-        default: for (k=0;k<8;k++) startgenes[k]=((0x1L<<k*3)-1L)<<20;break;
+        case 3:
+        case 4:
+        case 5:
+        default: for (k=0;k<8;k++) startgenes[k]=(0x1L<<(4+k*8))-1L;break;
     }
 
     if ( livesites !=NULL) {
@@ -1021,48 +1076,4 @@ void printxy (uint64_t gol[],uint64_t golg[]) {   /* print the game of life conf
       }
     }
     printf("\n");
-}
-
-void colorgenes(uint64_t gol[],uint64_t golg[], int cgolg[], int NN2) {
-    uint64_t gene, gdiff, g2c, mask;
-    int ij,d,d2;
-
-    if(colorfunction){
-	    for (ij=0; ij<NN2; ij++) {
-	        if (gol[ij]) {
-		        gene = golg[ij];
-                POPCOUNT64C(gene,d);                    // assigns number of ones in gene to d
-                switch (selection) {
-                        case 0 : mask = ((gene>>40)<<8)+0xff; break;
-                        case 1 : mask = ((d+(d<<6)+(d<<12)+(d<<18))<<8) + 0xff; break;
-                        case 2 : d = d & 0x3; mask = d==3 ? 0xf0f0f0ff : ((0xff<<(d<<3))<<8)+0xff; break;
-                        case 6 : d = d & 0x3; mask = d==3 ? 0xf0f0f0ff : ((0xff<<(d<<3))<<8)+0xff; break;
-                        case 3 : g2c = (1L<<ncoding)-1L;gdiff = gene^g2c; POPCOUNT64C(gdiff,d2);
-                                 mask = d<d2 ? (d<<26)+0xff : (d2<<10)+0xff; break;
-                        default  : mask = ((d+(d<<6)+(d<<12)+(d<<18))<<8) + 0xff;
-                }
-		        cgolg[ij] = (int) mask;
-	        }
-	        else cgolg[ij] = 0;
-	    }
-    }
-    else{
-        // for(d=0;d<256;d++) counts[d]=0;
-        // see https://stackoverflow.com/questions/6943493/hash-table-with-64-bit-values-as-key/33871291
-        for (ij=0; ij<NN2; ij++) {
-            if (gol[ij]) {
-                gene = golg[ij];
-                if (gene == 0L) gene = 11778L; // random color for gene==0
-                // mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
-                // mask = (gene * 11400714819323198549ul) >> (64 - 32);  // hash with optimal prime multiplicator down to 32 bits
-                mask = gene * 11400714819323198549ul;
-                mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
-                mask |= 0x808080ff; // ensure brighter color at risk of improbable redundancy, make alpha opaque
-                cgolg[ij] = (int) mask;
-            }
-            else cgolg[ij] = 0;
-        }
-    }
-    //for(d=0;d<256;d++)
-    //    if (counts[d]) fprintf(stderr,"counting hash table hash %d has %d counts\n",d,counts[d]);
 }

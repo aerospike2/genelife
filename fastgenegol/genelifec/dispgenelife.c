@@ -47,13 +47,14 @@ int main (int argc, char *argv[]) {
     }
 
     Noff = 9;
-    runparams[0] = 1;          // 0,1 rulemod 
+    runparams[0] = 1;        // 0,1 rulemod
     runparams[1] = 3;        // 0-4 repscheme 
     runparams[2] = 1;        // 0-2 selection 
     runparams[3] = 0;        // NY updated
     runparams[4] = 0;        // NY updated
     runparams[5] = 0;        // colorfunction 0 or 1
-    runparams[6] = 0;        // fileinit 0 or 1    simparams[0] = 8;        // nlog2pmut: gene mutation probability
+    runparams[6] = 0;        // fileinit 0 or 1
+    simparams[0] = 0;        // nlog2pmut: gene mutation probability
     simparams[1] = 16384;    // initial1density: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
     simparams[2] = 32768;    // initialrdensity: 32768 makes all genomes active 16384 makes half active, etc.
     simparams[3] = 0;        // NY updated
@@ -74,11 +75,9 @@ int main (int argc, char *argv[]) {
     if (argc>13) ndisp = atoi(argv[13]); // if present update init rand density from command line
     if (argc>14) nskip = atoi(argv[14]); // if present update init rand density from command line
 
-
-
     fprintf(stderr,"Parameters:\n");
     fprintf(stderr,"rulemod-0-1\trepscheme=0-4\tselection=0-2\tnlog2pmut\tinitial1density\tinitialrdensity\n");
- fprintf(stderr,"%d\t\t%d\t\t%d\t\t%d\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\n",runparams[0],runparams[1],runparams[2],runparams[3],runparams[4],
+    fprintf(stderr,"%d\t\t%d\t\t%d\t\t%d\t%d\t\t%d\t\t%d\t\t%d\t\t%d\t\t%d\n",runparams[0],runparams[1],runparams[2],runparams[3],runparams[4],
          simparams[0],simparams[1],simparams[2],simparams[3],simparams[4]);
     fprintf(stderr,"ndisp\tnskip\n");
     fprintf(stderr,"%d\t\t%d\n",ndisp,nskip);
