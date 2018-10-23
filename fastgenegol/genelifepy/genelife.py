@@ -160,13 +160,14 @@ if __name__ == '__main__':
                 [ 0,-1, 0],
                 [-1,-1, 0]]
     cgrid = np.zeros((N,N),np.int32)    #  used to be np.uint
-    runparams = np.zeros(5,np.int32)    # 3 parameters passed to C
+    runparams = np.zeros(7,np.int32)    # 7 parameters passed to C
     rulemod = runparams[0] = 1          # 0,1 whether to allow modification of GoL rules
     repscheme = runparams[1] = 4        # 0-8 number of live neighbour rule to defer to second shell
     selection = runparams[2] = 1        # 0-8 initial startgene for non random genes (8 = rand choice of 0-7)
     overwritemask = runparams[3] = 2    # mask of 2 bits to overwrite instead of survival for 3(bit0) or 2(bit1) live nbs
     survival = runparams[4] = 2;        # survive mask for two (bit 1) and three (bit 0) live neighbours
-    
+    colorfunction = runparams[5] = 0;   # color function (0, hash) or (1, fnal)
+    fileinit = runparams[6] = 0;        # file initialization of gene patterns (0, none) or (1, from genepat.dat)
     simparams = np.zeros(5,np.int32)    # 5 parameters passed to C
     nlog2pmut = simparams[0] = 8        # gene mutation probability
     initial1density = simparams[1] = 16384   # nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
