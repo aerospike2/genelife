@@ -768,6 +768,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
             if (golgin[ij1] > 0)    {                   // if live cell
                 gol[ij] = 1L;
                 if(golgin[ij1] <= 8 ) golg[ij] = startgenes[golgin[ij1]-1];
+                else if (golgin[ij1]>='0' && golgin[ij1]<'8') golg[ij] = startgenes[golgin[ij1]-'0'];
                 else golg[ij] = startgenes[7];
                 cnt++;
             }
