@@ -154,8 +154,8 @@ void colorgenes(uint64_t gol[],uint64_t golg[], int cgolg[], int NN2) {
                         case 2 : d = d & 0x3; mask = d==3 ? 0xf0f0f0ff : ((0xff<<(d<<3))<<8)+0xff; break;
                         case 3 : g2c = (1L<<ncoding)-1L;gdiff = gene^g2c; POPCOUNT64C(gdiff,d2);
                                  mask = d<d2 ? (d<<26)+0xff : (d2<<10)+0xff; break;
-                        case 4 : mask = d < ncoding ? ((0xf^d)<<28)+0xff : ((64-d < ncoding) ? ((0xf^d)<<12)+0xff : 0xf0f0f0ff); break;
-                        case 5 : mask = d >= 32 ? ((0xf^(64-d))<<28)+0xff : ((0xf^d)<<20)+0xff; break;
+                        case 4 : mask = d < ncoding ? ((0x3f^d)<<20)+0xff : ((64-d < ncoding) ? ((0x3f^d)<<12)+0xff : 0xf0f0f0ff); break;
+                        case 5 : mask = d >= 32 ? ((0x3f^(64-d))<<12)+0xff : ((0x3f^d)<<20)+0xff; break;
                         default  : mask = ((d+(d<<6)+(d<<12)+(d<<18))<<8) + 0xff;
                 }
                 cgolg[ij] = (int) mask;
