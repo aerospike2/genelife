@@ -202,6 +202,24 @@ extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], ui
             *birth = (gdiff && prey) ? 1L: 0L;           // birth if different and >=1 prey)
             *newgene= (prey ? (d0<d1 ? livegenes[0] : livegenes[1]) : (d0<d1 ? livegenes[1] : livegenes[0]));
         }
+        else if (selection==6) {                         // use next 4 color game on number ones mod 4
+                                                         // red 0 green 1 blue 2 white 3
+                                                         // exception to numerical order: 0>3 birth only if diff=1
+            d0=d0&0x3;
+            d1=d1&0x3;
+            *birth = ((d0^d1)==1L) ? 1L: 0L;             // birth if 2 genes differ by 1 mod 4 in number of ones
+            if(*birth) {
+                swap = 0;
+                if (d0>d1) {                             // swap d0 and d1 so that smaller one comes first
+                    dd = d0;
+                    d0 = d1;
+                    d1 = dd;
+                    swap = 1;
+                }
+                *newgene = (d0==0 && d1==3) ? livegenes[swap^0] : livegenes[swap^1];
+            }
+            else *newgene = 0L;
+        }
         else fprintf(stderr,"Error: two live gene fitness value %d is not allowed\n",selection);
     }
 }
@@ -319,8 +337,10 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                       if ((repscheme>>2)&0x1) selectone_nbs(s,nb2i,nb,gol,golg,&birth,&newgene);
                       else selectone(s,nb2i,nb,golg,&birth,&newgene);
                       if (birth==0L) {                                      // must reset ancestor & birth if no ancestors chosen in selectone
-                        newgene = golg[nbch];
-                        birth = 1L;
+                        if((~repscheme>>3)&0x1|rulemod) {
+                            newgene = golg[nbch];                           // ALTERED DYNAMICS : less birth for repscheme bit 3 on
+                            birth = 1L;
+                        }
                       }
                       else statflag |= F_2select;                           // ancestor has been chosen in selectone
                   }
@@ -332,6 +352,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 else {
                     statflag |= F_3g_same;
                     newgene = livegenes[0];                                // genes all the same : copy first one
+                    if((repscheme>>3)&0x1&rulemod) birth = 0L;             // ALTERED DYNAMICS : no birth for 3 identical genes
                 }
               }
             }  // end if s==3
@@ -668,7 +689,7 @@ int readFile(char * code, char *fileName)
   return cnt;
 }
 
-int writeFile(char *fileName)
+int writeFile(char *fileName)     // initialize 32x32 genepat file with all empty sites
 {
     FILE *file;
     int ij,error;
@@ -894,8 +915,8 @@ void countspecies(uint64_t gol[], uint64_t golg[], int N2) {  /* counts numbers 
         else if (selection == 1) {                                          // 2-live neighbor fitness is number of ones
 	        fitness = (uint64_t) nones;
         }
-        else if (selection == 2){                                           // non-neutral model based on presence of replicase gene
-	        fitness = 999;                                                  // undefined, depends on competing sequence
+        else if ((selection == 2)||(selection == 6)) {                      // cyclic 4 species model
+	        fitness = nones&0x3;                                            // fitness is species class
         }
         else if (selection == 3){
              fitness = 999;                                                 // undefined, depends on competing sequence
@@ -951,8 +972,8 @@ void countspecieshash() {  /* counts numbers of all different species using qsor
         else if (selection == 1) {                                          // 2-live neighbor fitness is number of ones
             fitness = (uint64_t) nones;
         }
-        else if (selection == 2){                                           // non-neutral model based on presence of replicase gene
-            fitness = 999L;                                                 // undefined, depends on competing sequence
+        else if ((selection == 2)||(selection == 6)) {                      // cyclic 4 species model
+            fitness = nones&0x3;                                            // fitness is species class
         }
         else if (selection == 3){
              fitness = 999L;                                                // undefined, depends on competing sequence
@@ -1015,6 +1036,7 @@ void colorgenes(uint64_t gol[],uint64_t golg[], int cgolg[], int NN2) {
                         case 0 : mask = ((gene>>40)<<8)+0xff; break;
                         case 1 : mask = ((d+(d<<6)+(d<<12)+(d<<18))<<8) + 0xff; break;
                         case 2 : d = d & 0x3; mask = d==3 ? 0xf0f0f0ff : ((0xff<<(d<<3))<<8)+0xff; break;
+                        case 6 : d = d & 0x3; mask = d==3 ? 0xf0f0f0ff : ((0xff<<(d<<3))<<8)+0xff; break;
                         case 3 : g2c = (1L<<ncoding)-1L;gdiff = gene^g2c; POPCOUNT64C(gdiff,d2);
                                  mask = d<d2 ? (d<<26)+0xff : (d2<<10)+0xff; break;
                         default  : mask = ((d+(d<<6)+(d<<12)+(d<<18))<<8) + 0xff;
