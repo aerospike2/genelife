@@ -50,9 +50,10 @@ int nlog2pmut = 5;                  // pmut (prob of mutation) = 2^(-nlog2pmut),
 uint64_t pmutmask;                  // binary mask so that prob of choosing zero is pmut, assigned
 
 int totsteps=0;
-int rulemod = 1;                    // det: whether to modify GoL rule for 2 and 3 live neighbours : opposite outcome with small probability p0
+unsigned int rulemod = 1;           // det: whether to modify GoL rule for 2 and 3 live neighbours : opposite outcome with small probability p0
 int selection = 1;                  // fitness of 2 live neighbours: integer value (0), number of ones (1), Norman compete (2), 2 target coding (3)
-int repscheme = 1;                  // replication scheme: lowest 3 bits used to define 8 states: bit2 2ndnbs, bit1 not most difft, bit0 2select on 3
+unsigned int repscheme = 1;         // replication scheme: lowest 3 bits used to define 8 states: bit2 2ndnbs, bit1 not most difft, bit0 2select on 3
+                                    //                     next 2 bits to allow birth failure: bit3 for 3-live-nb and bit4 for 2-live-nb configs
 int ncoding = 16;                   // maximal distances between sequences for fitness2 == 2
                                     // number of bits used to encode non zero bits in 2nd gene in sequence space for fitness2 == 3
 int colorfunction = 0;              // color function choice of hash(0) or functional (1, color classes depends on selection parameter)
@@ -64,6 +65,12 @@ int initialrdensity = (1<<15)>>1;   // initial density of random genes in live s
 int startgenechoice = 8;            // selection for defined starting genes 0-8 (8 is random 0-7) otherwise choose only particular startgene
 uint64_t codingmask;                // mask for ncoding bits
 uint64_t  emptysites = 0;           // cumulative number of empty sites during simulation updates
+
+#define R_0_2sel_3live    0x1       // masks for named repscheme bits
+#define R_1_choose0nb     0x2
+#define R_2_2ndnbs        0x4
+#define R_3_enforce3birth 0x8
+#define R_4_enforce2birth 0x10
 
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
@@ -318,7 +325,6 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
 
     int s, k, k1, kmin, nmut;
     int nb[8], nbc, nbch, ij, i, j, jp1, jm1, ip1, im1;
-    unsigned int dbirth;
     uint64_t gs, nb1i, nb2i, randnr, randnr2, r2;
     uint64_t nbmask, nbmaskr, nbmaskrm;
     uint64_t newgene, ancestor, livegenes[3];
@@ -340,16 +346,16 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
         statflag = 0L;
         s2or3 = (s>>2) ? 0L : (s>>1);                                       // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
         if (s2or3) {                                                        // if 2 or 3 neighbours alive
-            if ((s<2)||(s>3)) fprintf(stderr,"s2or3 error s == %d\n",s);
+            // if ((s<2)||(s>3)) fprintf(stderr,"s2or3 error s == %d\n",s);
             birth = 0L;
             newgene = 0L;
-            if (s&0x1L) {  // s==3                                                 // birth (with possible overwrite)
-              statflag |= F_3_live;
+            if (s&0x1L) {  // s==3                                                 // allow birth (with possible overwrite)
+              statflag |= F_3_live;                                                // record instance of 3 live nbs
               if ((0x1L&overwritemask)|(0x1L&~gol[ij]) ) {                         // central site empty or overwrite mode
                 birth = 1L;                                                        // birth flag
                 for(k=0;k<s;k++) livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];      // live neighbour genes
                 for (k=7,nbmask=0L;k>=0;k--) nbmask = (nbmask << 1) + gol[nb[k]];  // 8-bit mask of GoL states of 8 nbs, clockwise from top left
-                statflag |= F_3_livenbs&(nbmask<<16);                              // record live neighbour pattern
+                statflag |= F_3_livenbs & (nbmask<<16);                            // record live neighbour pattern
                 if((livegenes[0]^livegenes[1])|(livegenes[0]^livegenes[2])) {      // genes not all same, need ancestor calculation
                   for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {               // compute canonical rotation (minimum) of this mask
                     nbmaskr = ((nbmaskr & 0x1L)<<7) + (nbmaskr>>1);                // 8 bit rotate right
@@ -358,8 +364,8 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                         kmin = k;                                                  // no of times rotated to right
                     }
                   }
-                  if ((repscheme>>1) & 0x1) nbch = nb[kmin];                       // 2,3,6,7... deterministic choice of ancestor: replication of live neigbour in bit 0 of canonical pos
-                  else {                                                           // repscheme = 0,1,4,5 for example
+                  if (repscheme & R_1_choose0nb) nbch = nb[kmin];                  // replication of live neigbour in bit 0 of canonical rotation
+                  else {                                                           // replication of live neighbour in most different position
                     switch (nbmaskrm) {                //              x07    x0b    x0d    x13    x15    x19    x25
                         case 0x07 : k = 1; break;      // 00000111    |012|  <-
                         case 0x0b : k = 0; break;      // 00001011    |...|  |01.|  <-
@@ -378,18 +384,17 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                     } //switch
                     nbch = nb[(kmin+k)&0x7];                                // rotate unique nb k left (kmin) back to orig nb pat
                   }
-                  if (repscheme & 0x1) {                                    // execute selective replication of one of two otherwise unchosen live genes
+                  if (repscheme & R_0_2sel_3live) {                         // execute selective replication of one of two otherwise unchosen live genes
                       nb2i = 0L;
                       for(k1=k=0;k<3;k++) {                                 // choice of two other live genes for possible ancestor
                           nbc=(nb1i>>(k<<2))&0x7;
                           if(nb[nbc]!=nbch) nb2i = (nbc<<(k1++<<2))+nb2i;
                       }
-                      if ((repscheme>>2)&0x1) selectone_nbs(s,nb2i,nb,gol,golg,&birth,&newgene);
+                      if (repscheme & R_2_2ndnbs) selectone_nbs(s,nb2i,nb,gol,golg,&birth,&newgene);
                       else selectone(s,nb2i,nb,golg,&birth,&newgene);
-                      if (birth==0L) {                                      // must reset ancestor & birth if no ancestors chosen in selectone
-                        dbirth = ((~repscheme)>>3) & 0x1;
-                        if(dbirth||rulemod) {
-                            newgene = golg[nbch];                           // ALTERED DYNAMICS : less birth for repscheme bit 3 on
+                      if (birth==0L) {                                      // optional reset of ancestor & birth if no ancestors chosen in selectone
+                        if((repscheme & R_3_enforce3birth)||rulemod)  {       // birth cannot fail or genes don't matter or no modification to gol rules
+                            newgene = golg[nbch];
                             birth = 1L;
                         }
                       }
@@ -398,27 +403,34 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                   else {
                       newgene = golg[nbch];
                   }
-                  if (newgene == 0L) fprintf(stderr,"step %d Error with new gene zero: nbmask %llx nbmaskrm %llx kmin %d gol %llx golg %llx newgene %llx ij %d\n",totsteps,nbmask,nbmaskrm,kmin,gol[nb[kmin]],golg[nb[kmin]],newgene,ij);
+                  // if (newgene == 0L) fprintf(stderr,"step %d Warning, new gene zero: nbmask %llx nbmaskrm %llx kmin %d gol %llx golg %llx newgene %llx ij %d\n",totsteps,nbmask,nbmaskrm,kmin,gol[nb[kmin]],golg[nb[kmin]],newgene,ij);
                 } // end if not all live neighbors the same
                 else {
                     statflag |= F_3g_same;
-                    newgene = livegenes[0];                                // genes all the same : copy first one
-                    if((repscheme>>3)&0x1&rulemod) birth = 0L;             // ALTERED DYNAMICS : no birth for 3 identical genes
+                    newgene = livegenes[0];                                 // genes all the same : copy first one
+                    if((~repscheme&R_3_enforce3birth) && rulemod) birth = 0L;   // no birth for 3 identical genes
                 }
               }
             }  // end if s==3
             else {  // s==2                                                 // possible birth as exception to GoL rule
                 statflag |= F_2_live;
-                if (rulemod) {                                              // special rule allowed if rulemod==1
-                    if ((0x1L&(overwritemask>>1))|(0x1L&~gol[ij])) {        // either overwrite on for s==2 or central site is empty
+                if (rulemod||gol[ij]) {                                     // rule departure from GOL allowed or possible overwrite
+                    if ((0x1L&(overwritemask>>1))||!gol[ij]) {              // either overwrite on for s==2 or central site is empty
                         //for (k=0;k<s;k++) livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]]; // live gene at neighbour site
-                        if ((repscheme>>2)&0x1) {
+                        if (repscheme & R_2_2ndnbs) {
                             selectone_nbs(s,nb1i,nb,gol,golg,&birth,&newgene);
                         }
                         else {    
                             selectone(s,nb1i,nb,golg,&birth,&newgene);
                         }
-                        if (birth) statflag |= F_notgolrul|F_2select;
+                        if(!birth && (repscheme&R_4_enforce2birth)) {         // if failure of 2-birth process not allowed choose first live nb
+                            birth = 1L;
+                            newgene = golg[nb[nb1i&0x7]];
+                        }
+                        if (birth) {
+                            statflag |= birth|F_2select;
+                            if(!gol[ij]) statflag |= F_notgolrul;
+                        }
                     }
                 }
             }
