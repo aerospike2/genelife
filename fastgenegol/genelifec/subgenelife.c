@@ -71,6 +71,7 @@ uint64_t  emptysites = 0;           // cumulative number of empty sites during s
 #define R_2_2ndnbs        0x4
 #define R_3_enforce3birth 0x8
 #define R_4_enforce2birth 0x10
+#define R_5_2uniquepos    0x20
 
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
@@ -198,7 +199,7 @@ extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], ui
     uint64_t gene2centre;                               // gene function centres in sequence space
     int g0011,g0110,prey,prey2;
 
-    for(k=0;k<2;k++) livegenes[k] = golg[nb[(nb2i>>(k<<2))&0xf]];
+    for(k=0;k<2;k++) livegenes[k] = golg[nb[(nb2i>>(k<<2))&0x7]];
     if (selection==0) {                                  // use integer value of sequence as fitness
         *birth = (livegenes[0]^livegenes[1]) ? 1L: 0L;   // birth condition is two genes different
         *newgene = livegenes[0]>livegenes[1] ?  livegenes[0] : livegenes[1]; // choose one with larger gene to replicate
@@ -319,6 +320,38 @@ extern inline void selectone_nbs(int s, uint64_t nb2i, int nb[], uint64_t gol[],
     }
 }
 
+extern inline void selectpos(uint64_t nb2i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene) {
+// selection based on asymmetric position, birth only for asymmetric 2 live nb configs
+    int k,kmin,nb0,nb1,nbch,asym;
+    uint64_t nbmask, nbmaskr, nbmaskrm;
+    nb0 = nb2i&0x7;
+    nb1 = (nb2i>>4)&0x7;
+    nbmask = (0x1L<<nb0) + (0x1L<<nb1);
+    for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {       // compute canonical rotation (minimum) of this mask
+        nbmaskr = ((nbmaskr & 0x1L)<<7) + (nbmaskr>>1);      // 8 bit rotate right
+        if (nbmaskr < nbmaskrm) {                            // choose minimal value of mask rotation
+            nbmaskrm = nbmaskr;                              // neighbor mask rotate min is current rotation
+            kmin = k;                                        // no of times rotated to right
+        }
+    }
+    asym = 0;
+    switch (nbmaskrm) {                          //              x03    x05    x09    x11
+        case 0x03 : k = 1; asym = 1; break;      // 00000011    |01.|  <-
+        case 0x05 : k = 2; break;                // 00000101    |...|  |0.2|  <-
+        case 0x09 : k = 3; asym = 1; break;      // 00001001    |...|  |...|  |0..|   <-
+        case 0x11 : k = 4; break;                // 00010001           |...|  |..3|  |0..|   <-
+        default  : {                             //                           |...|  |...|
+                                                 //                                  |..4|
+            fprintf(stderr,"Error in canonical rotation for three live neighbours \nnbmaskrm = %llx\n",nbmaskrm); k = 0;
+        } //default case
+    } //switch
+    if (repscheme & R_1_choose0nb) nbch = nb[kmin];           // replication of live nb in bit 0 of canonical rotation
+    else  nbch = nb[(kmin+k)&0x7];                            // replication of live nb in most different position
+    *newgene = golg[nbch];
+    if (asym) *birth = 1L;
+    else *birth = 0L;
+}
+
 void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
@@ -420,7 +453,10 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                         if (repscheme & R_2_2ndnbs) {
                             selectone_nbs(s,nb1i,nb,gol,golg,&birth,&newgene);
                         }
-                        else {    
+                        else if (repscheme & R_5_2uniquepos) {
+                            selectpos(nb1i,nb,golg,&birth,&newgene);
+                        }
+                        else {
                             selectone(s,nb1i,nb,golg,&birth,&newgene);
                         }
                         if(!birth && (repscheme&R_4_enforce2birth)) {         // if failure of 2-birth process not allowed choose first live nb
