@@ -697,7 +697,13 @@ void genelife_update (int nsteps, int histoflag) {
 
 void initialize_planes(int offs[],  int No) {
     int i,j,idx;
+    static int notfirst = 0;
 
+    curPlane = 0;
+    newPlane = 1;
+    if (notfirst)   return;     // need to fix memory free at two levels unless this fix
+    notfirst = 1;
+    
     if(No%3 !=0) fprintf(stderr,"Ouch!  Size of offsets array not a multiple of 3 as expected.");
     Noff = No/3;		// Noff global
     if(Noff>24){
@@ -770,8 +776,6 @@ void initialize_planes(int offs[],  int No) {
     planes[4]  = plane4;  planes[5]  = plane5;  planes[6]  = plane6;  planes[7]  = plane7;
     planesg[4] = planeg4; planesg[5] = planeg5; planesg[6] = planeg6; planesg[7] = planeg7;
 #endif
-    curPlane = 0;
-    newPlane = 1;
 }
 
 int readFile(char * code, char *fileName)
@@ -820,6 +824,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     srand(1234567);
     state[0] = rand();state[1] = rand();
     cnt = 0;
+    totsteps = 0;
     
     // writeFile("genepat.dat");
 
