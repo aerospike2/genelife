@@ -677,13 +677,12 @@ void initialize_planes(int offs[],  int No) {
 	    if(toff>tmx) tmx = toff; // it does not make sense to have +ve values (this would look into future) so tmx = 0
 	    if(toff<tmn) tmn = toff;
     }
-    if(tmx>0)   {
-        fprintf(stderr,"----------------- tmx = %d, tmn = %d",tmx,tmn);
+    if(tmx>0)   {                // exit if positive values of z in (x,y,z) offsets have been entered : these look into future
+        fprintf(stderr,"Error: offsets looking into future not allowed ------- tmx = %d, tmn = %d",tmx,tmn);
         exit(1);
-    }
-    tall = tmx-tmn;
+    }    tall = tmx-tmn;
     // numPlane = 2 + tall;    // numPlane >= 2
-    if(tall>4) numPlane = 8;
+    if(tall>4) numPlane = 8;                            // only numPlane values which are powers of two are allowed
     else if (tall > 2) numPlane = 4;
     else numPlane = 2;
     if (numPlane>maxPlane) {
