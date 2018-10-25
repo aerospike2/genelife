@@ -115,7 +115,8 @@ ndisp = 100
 def doanimation(nrun=1,         # number of CA iterations per animation time step
                 ndisp=100,      # number of display steps
                 nskip = 500,    # CA iterations to skip between display
-                niter=8):       # number of ndisp-nskip steps
+                niter=8,        # number of ndisp-nskip steps
+                nstat = 1):     # number of steps per statistic trace data point
     # use my_dpi for your monitor's dpi, to get cells to line up on pixel boundaries.
     # for my_dpi go to http://www.infobyip.com/detectmonitordpi.php
     my_dpi=96
@@ -134,7 +135,7 @@ def doanimation(nrun=1,         # number of CA iterations per animation time ste
         if cnt % ndisp == 0:  # insert the non-displayed iterations
             genelife.genelife_update(nskip, 0)
             cnt = cnt+nskip            # keep cnt as track of number of iterations
-        genelife.genelife_update(1, 0) # 1 should be nrun
+        genelife.genelife_update(1, 0, 0, 1) # 1 should be nrun
         genelife.get_curgol(gol)
         genelife.get_curgolg(golg)
         framenr = framenr+1         # 1 should be nrun
@@ -179,7 +180,7 @@ if __name__ == '__main__':
     genelife.initialize_planes(npoffsets)
     genelife.initialize(runparams,simparams)
 
-    doanimation(nrun=1,ndisp=100,nskip=1000,niter=10)
+    doanimation(nrun=1,ndisp=100,nskip=1000,niter=10,nstat=1)
 
 #    genelife.get_curgolg(golg)
 #    genelife.countspecies(golg, simparams)

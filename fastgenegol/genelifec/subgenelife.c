@@ -50,6 +50,7 @@ int nlog2pmut = 5;                  // pmut (prob of mutation) = 2^(-nlog2pmut),
 uint64_t pmutmask;                  // binary mask so that prob of choosing zero is pmut, assigned
 
 int totsteps=0;
+int statcnts=0;
 unsigned int rulemod = 1;           // det: whether to modify GoL rule for 2 and 3 live neighbours : opposite outcome with small probability p0
 int selection = 1;                  // fitness of 2 live neighbours: integer value (0), number of ones (1), Norman compete (2), 2 target coding (3)
 unsigned int repscheme = 1;         // replication scheme: lowest 3 bits used to define 8 states: bit2 2ndnbs, bit1 not most difft, bit0 2select on 3
@@ -699,7 +700,7 @@ void get_activities(uint64_t actgenes[],int activities[],int ngenesp[]) {
     ngenesp[0] = nlivegenes;
 }
 
-void genelife_update (int nsteps, int histoflag) {
+void genelife_update (int nsteps, int histoflag, int statsflag, int nstat) {
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
     int t;
@@ -713,7 +714,10 @@ void genelife_update (int nsteps, int histoflag) {
 
         update(gol,golg,newgol,newgolg);
         if(histoflag) countconfigs();
-        if(statsflag) tracestats(gol,golg,golgstats,N2);
+        if(statsflag && (t%nstat == 0) {
+            tracestats(gol,golg,golgstats,N2);
+            statcnt++;
+        }
 
         curPlane = (curPlane +1) % numPlane;
         newPlane = (newPlane +1) % numPlane;
@@ -850,6 +854,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     state[0] = rand();state[1] = rand();
     cnt = 0;
     totsteps = 0;
+    statcnts = 0;
     
     // writeFile("genepat.dat");
 

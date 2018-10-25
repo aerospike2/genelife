@@ -122,7 +122,7 @@ int main (int argc, char *argv[]) {
     for (i=0; i<nsteps; i++) {                  /* nsteps */
 	    golg = planesg[curPlane];
 	    printspecies(golg);
-	    genelife_update(1,0);
+	    genelife_update(1,0,0,1);
     }    
 }
 
