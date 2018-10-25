@@ -54,6 +54,7 @@ unsigned int rulemod = 1;           // det: whether to modify GoL rule for 2 and
 int selection = 1;                  // fitness of 2 live neighbours: integer value (0), number of ones (1), Norman compete (2), 2 target coding (3)
 unsigned int repscheme = 1;         // replication scheme: lowest 3 bits used to define 8 states: bit2 2ndnbs, bit1 not most difft, bit0 2select on 3
                                     //                     next 2 bits to allow birth failure: bit3 for 3-live-nb and bit4 for 2-live-nb configs
+                                    //                     next 2 bits to enableuniquepos case and masking of first neighbours respectively
 int ncoding = 16;                   // maximal distances between sequences for fitness2 == 2
                                     // number of bits used to encode non zero bits in 2nd gene in sequence space for fitness2 == 3
 int colorfunction = 0;              // color function choice of hash(0) or functional (1, color classes depends on selection parameter)
@@ -72,6 +73,7 @@ uint64_t  emptysites = 0;           // cumulative number of empty sites during s
 #define R_3_enforce3birth 0x8
 #define R_4_enforce2birth 0x10
 #define R_5_2uniquepos    0x20
+#define R_6_checkmasks    0x40
 
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
@@ -164,6 +166,9 @@ void colorgenes(uint64_t gol[],uint64_t golg[], int cgolg[], int NN2) {
                                  mask = d<d2 ? (d<<26)+0xff : (d2<<10)+0xff; break;
                         case 4 : mask = d < ncoding ? ((0x3f^d)<<20)+0xff : ((64-d < ncoding) ? ((0x3f^d)<<12)+0xff : 0xf0f0f0ff); break;
                         case 5 : mask = d >= 32 ? ((0x3f^(64-d))<<12)+0xff : ((0x3f^d)<<20)+0xff; break;
+                        case 7 : g2c = (gene>>8)&((1L<<ncoding)-1L);
+                                 gdiff = gene&0xff;POPCOUNT64C(gdiff,d2);d = d2>7? 7 : d2;
+                                 mask = g2c ? 0xf0f0f0ff : ((0x1f+(d<<5))<<8)+(gdiff<<24)+(((gdiff<<4)&0xf)<<16)+0xff; break;
                         default  : mask = ((d+(d<<6)+(d<<12)+(d<<18))<<8) + 0xff;
                 }
                 cgolg[ij] = (int) mask;
@@ -203,6 +208,10 @@ extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], ui
     if (selection==0) {                                  // use integer value of sequence as fitness
         *birth = (livegenes[0]^livegenes[1]) ? 1L: 0L;   // birth condition is two genes different
         *newgene = livegenes[0]>livegenes[1] ?  livegenes[0] : livegenes[1]; // choose one with larger gene to replicate
+    }
+    else if (selection==7) {                             // no special birth allowed
+        *birth = 0L;
+        *newgene = livegenes[0];
     }
     else {
         POPCOUNT64C(livegenes[0],d0);
@@ -356,15 +365,17 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
 
-    int s, k, k1, kmin, nmut;
+    int s, sm, k, k1, kmin, nmut;
+    unsigned int checkmasks;
     int nb[8], nbc, nbch, ij, i, j, jp1, jm1, ip1, im1;
-    uint64_t gs, nb1i, nb2i, randnr, randnr2, r2;
+    uint64_t g, gs, nb1i, nb2i, randnr, randnr2, r2;
     uint64_t nbmask, nbmaskr, nbmaskrm;
     uint64_t newgene, ancestor, livegenes[3];
     uint64_t s2or3, birth, statflag;
     genedata gdata;
     
     totsteps++;
+    checkmasks = repscheme & R_6_checkmasks;
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
 	    i = ij & Nmask;  j = ij >> log2N;                                   // row & column
 	    jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
@@ -378,6 +389,20 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
         }
         statflag = 0L;
         s2or3 = (s>>2) ? 0L : (s>>1);                                       // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
+        if(checkmasks && s>1) {                                             // recalculate effective new s as less than original s
+            for (k=0,nbmaskr=0;k<8;k++) {                                   // depending on rotated overlay of masks in live neighbour genes
+                if(gol[nb[k]]) {
+                    g= golg[nb[k]];                                         // fnal gene has ncoding 0s then 8 bit mask
+                    if(!((g>>8)&codingmask)) nbmaskr |= g&0xff;             // tried |=, &=, ^= ;
+                }
+                nbmaskr = ((nbmaskr & 0x1L)<<7) + (nbmaskr>>1);             // 8 bit rotate right
+            }
+            for (k=0,sm=0;k<8;k++)  if(gol[nb[k]] && !((nbmaskr>>k)&0x1)) sm++;  // is mask bit set, count as if dead
+            if(sm!=s) {
+                statflag |= F_notgolrul;
+                s= sm;
+            }
+        }
         if (s2or3) {                                                        // if 2 or 3 neighbours alive
             // if ((s<2)||(s>3)) fprintf(stderr,"s2or3 error s == %d\n",s);
             birth = 0L;
