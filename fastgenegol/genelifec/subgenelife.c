@@ -169,7 +169,7 @@ void colorgenes(uint64_t gol[],uint64_t golg[], int cgolg[], int NN2) {
                         case 5 : mask = d >= 32 ? ((0x3f^(64-d))<<12)+0xff : ((0x3f^d)<<20)+0xff; break;
                         case 7 : g2c = (gene>>8)&((1L<<ncoding)-1L);
                                  gdiff = gene&0xff;POPCOUNT64C(gdiff,d2);d = d2>7? 7 : d2;
-                                 mask = g2c ? 0xf0f0f0ff : ((0x1f+(d<<5))<<8)+(gdiff<<24)+(((gdiff<<4)&0xf)<<16)+0xff; break;
+                                 mask = g2c ? 0xf0f0f0ff : ((0x1f+(d<<5))<<8)+(((gdiff>>4)&0xf)<<27)+(((gdiff&0xf)<<4)<<16)+0xff; break;
                         default  : mask = ((d+(d<<6)+(d<<12)+(d<<18))<<8) + 0xff;
                 }
                 cgolg[ij] = (int) mask;
@@ -424,16 +424,17 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
         sm = s;
         statflag = nbmask = 0L;
         if(checkmasks && s>1) {                                             // recalculate effective new s as less than original sum sm
-            for (k=0,nbmaskr=0;k<8;k++) {                                   // depending on rotated overlay of masks in live neighbour genes
+            for (k=0,nbmaskr=0L;k<8;k++) {                                   // depending on rotated overlay of masks in live neighbour genes
                 if(gol[nb[k]]) {
                     g= golg[nb[k]];                                         // fnal gene has ncoding 0s then 8 bit mask
                     if(!((g>>8)&codingmask)) nbmaskr |= g&0xff;             // tried |=, &=, ^= ;
                 }
                 nbmaskr = ((nbmaskr & 0x1L)<<7) + (nbmaskr>>1);             // 8 bit rotate right
             }
-            for (k=0,s=0,nb1i=0,nbmask=0;k<8;k++) {                         // recalculate sum and nb1i using combined mask
+            //nbmaskr = 0L;       // DEBUG check that default behaviour if genes no influence : PASSED
+            for (k=0,s=0,nb1i=0L,nbmask=0L;k<8;k++) {                       // recalculate sum and nb1i using combined mask
                 gs =gol[nb[k]] & (((~nbmaskr)>>k)&0x1L);                    // if mask bit set, count as if dead
-                nbmask = (nbmask << 1) + gs;
+                nbmask |= gs<<k;                                            // also calculate nbmask for use below
                 s += gs;
                 nb1i = (nb1i << (gs<<2)) + (gs*k);
             }
@@ -449,7 +450,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
               if ((0x1L&overwritemask)|(0x1L&~gol[ij]) ) {                         // central site empty or overwrite mode
                 birth = 1L;                                                        // birth flag
                 for(k=0;k<s;k++) livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];      // live neighbour genes
-                if (!checkmasks) for (k=7,nbmask=0L;k>=0;k--) nbmask = (nbmask << 1) + gol[nb[k]];  // 8-bit mask of GoL states of 8 nbs, clockwise from top left
+                if (!checkmasks) for (k=0,nbmask=0L;k<8;k++) nbmask |= (gol[nb[k]]<<k);  // 8-bit mask of GoL states of 8 nbs, clockwise from top left
                 statflag |= F_3_livenbs & (nbmask<<16);                            // record live neighbour pattern
                 if((livegenes[0]^livegenes[1])|(livegenes[0]^livegenes[2])) {      // genes not all same, need ancestor calculation
                   selectdifft3(nbmask, nb, gol, &nbch);
@@ -1065,22 +1066,7 @@ void countspecies(uint64_t gol[], uint64_t golg[], int N2) {  /* counts numbers 
         else if ((selection == 2)||(selection == 6)) {                      // cyclic 4 species model
 	        fitness = nones&0x3;                                            // fitness is species class
         }
-        else if (selection == 3){
-             fitness = 999;                                                 // undefined, depends on competing sequence
-        }
-        else if (selection == 4){
-             fitness = 999;                                                 // undefined, depends on competing sequence
-        }
-        else if (selection == 5){
-             fitness = 999;                                                 // undefined, depends on competing sequence
-        }
-        else if (selection == 6){
-             fitness = 999L;                                                // undefined, depends on competing sequence
-        }
-        else if (selection == 7){
-             fitness = 999L;                                                // undefined, depends on competing sequence
-        }
-        else fprintf(stderr,"selection parameter %d out of range\n",selection);
+
         fprintf(stdout,"count species %d with gene %llx has counts %llu and %d ones, fitness %llu\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
     }
     fprintf(stdout,"at step %d cumulative activity = %llu\n",totsteps,(N2 * (uint64_t) totsteps) - emptysites);
@@ -1101,13 +1087,12 @@ int cmpfunc3 (const void * pa, const void * pb)
 }
 
 void countspecieshash() {  /* counts numbers of all different species using qsort first */
-    int k, golgs[N2], nspecies, nones;
+    int k, golgs[N2], nspecies, nspeciesnow, nones;
     uint64_t last, fitness;
 
     nspecies = hashtable_count(&genetable);
     genotypes = hashtable_keys(&genetable);
     geneitems = (genedata*) hashtable_items( &genetable );
-    fprintf(stdout,"Iteration %d .  The number of different species is %d\n",totsteps,nspecies);
     
     for (k=0; k<nspecies; k++) golgs[k] = k;  // initialize sorted genotype array to same order as hash table
 
@@ -1115,7 +1100,7 @@ void countspecieshash() {  /* counts numbers of all different species using qsor
     qsort(golgs, nspecies, sizeof(int), cmpfunc3);                     // sort in decreasing count order
 
     // for (k=0; k<nspecies; k++) fprintf(stdout,"in countspecieshash genotype %d is %llx\n", k, genotypes[k]);
-    for (k=0; k<nspecies; k++) {
+    for (k=0,nspeciesnow=0; k<nspecies; k++) {
         last = genotypes[golgs[k]];
         POPCOUNT64C(last, nones);
         fitness = 999L;
@@ -1128,27 +1113,13 @@ void countspecieshash() {  /* counts numbers of all different species using qsor
         else if ((selection == 2)||(selection == 6)) {                      // cyclic 4 species model
             fitness = nones&0x3;                                            // fitness is species class
         }
-        else if (selection == 3){
-             fitness = 999L;                                                // undefined, depends on competing sequence
-        }
-        else if (selection == 4){
-             fitness = 999L;                                                // undefined, depends on competing sequence
-        }
-        else if (selection == 5){
-             fitness = 999L;                                                // undefined, depends on competing sequence
-        }
-        else if (selection == 6){
-             fitness = 999L;                                                // undefined, depends on competing sequence
-        }
-        else if (selection == 7){
-             fitness = 999L;                                                // undefined, depends on competing sequence
-        }
 
-        else fprintf(stderr,"selection parameter %d out of range\n",selection);
         if((genedataptr = (genedata *) hashtable_find(&genetable, last)) != NULL) {
-            if(genedataptr->popcount)
+            if(genedataptr->popcount) {
                 fprintf(stdout,"count species %7d with gene %16llx has counts %7d and %3d ones, fitness %llu\n",k,last,
                     genedataptr->popcount,nones,fitness);
+                nspeciesnow++;
+            }
         }
         else {
             fprintf(stderr,"countspecieshash popcount error, no entry in hash table\n");
@@ -1156,6 +1127,9 @@ void countspecieshash() {  /* counts numbers of all different species using qsor
                     nones,fitness);
         }
     }
+    fprintf(stdout,"Iteration %d : %d different species of %d ever existed.\n",totsteps,nspeciesnow,nspecies);
+    fprintf(stdout,"_________________________________________________________________\n");
+
     // fprintf(stdout,"cumulative activity = %llu\n",(N2 * (uint64_t) totsteps) - emptysites);
 }
 
