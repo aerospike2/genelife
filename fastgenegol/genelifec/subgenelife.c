@@ -329,7 +329,7 @@ extern inline void selectone_nbs(int s, uint64_t nb2i, int nb[], uint64_t gol[],
     }
 }
 
-extern inline void selectpos(uint64_t nb2i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene) {
+extern inline void selectdifft2(uint64_t nb2i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene) {
 // selection based on asymmetric position, birth only for asymmetric 2 live nb configs
     int k,kmin,nb0,nb1,nbch,asym;
     uint64_t nbmask, nbmaskr, nbmaskrm;
@@ -351,25 +351,58 @@ extern inline void selectpos(uint64_t nb2i, int nb[], uint64_t golg[], uint64_t 
         case 0x11 : k = 4; break;                // 00010001           |...|  |..3|  |0..|   <-
         default  : {                             //                           |...|  |...|
                                                  //                                  |..4|
-            fprintf(stderr,"Error in canonical rotation for three live neighbours \nnbmaskrm = %llx\n",nbmaskrm); k = 0;
+            fprintf(stderr,"Error in canonical rotation for two live neighbours \nnbmaskrm = %llx\n",nbmaskrm); k = 0;
         } //default case
     } //switch
     if (repscheme & R_1_choose0nb) nbch = nb[kmin];           // replication of live nb in bit 0 of canonical rotation
-    else  nbch = nb[(kmin+k)&0x7];                            // replication of live nb in most different position
+    else  nbch = nb[(kmin+k)&0x7];                            // replication of live nb in other bit of canonical rotation
     *newgene = golg[nbch];
     if (asym) *birth = 1L;
     else *birth = 0L;
+}
+
+extern inline void selectdifft3(uint64_t nbmask, int nb[], uint64_t gol[], int *nbch) {
+    int k,kmin;
+    uint64_t nbmaskr,nbmaskrm;
+    
+    for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {               // compute canonical rotation (minimum) of this mask
+        nbmaskr = ((nbmaskr & 0x1L)<<7) + (nbmaskr>>1);                // 8 bit rotate right
+        if (nbmaskr < nbmaskrm) {                                      // choose minimal value of mask rotation
+            nbmaskrm = nbmaskr;                                        // neighbor mask rotate min is current rotation
+            kmin = k;                                                  // no of times rotated to right
+        }
+    }
+    if (repscheme & R_1_choose0nb) *nbch = nb[kmin];                  // replication of live neigbour in bit 0 of canonical rotation
+    else {                                                           // replication of live neighbour in most different position
+        switch (nbmaskrm) {                //              x07    x0b    x0d    x13    x15    x19    x25
+            case 0x07 : k = 1; break;      // 00000111    |012|  <-
+            case 0x0b : k = 0; break;      // 00001011    |...|  |01.|  <-
+            case 0x0d : k = 3; break;      // 00001101    |...|  |..3|  |0.2|   <-
+            case 0x13 : k = 1; break;      // 00010011           |...|  |..3|  |01.|   <-
+            case 0x15 : k = 2; break;      // 00010101                  |...|  |...|  |0.2|   <-
+            case 0x19 : k = 0; break;      // 00011001                         |..4|  |...|  |0..|   <-
+            case 0x25 : k = 5; break;      // 00100101                                |..4|  |..3|  |0.2|  <-
+            default  : {                   //                                                |..4|  |...|
+                                           //                                                       |.5.|
+                fprintf(stderr,"Error in canonical rotation for three live neighbours \nnbmaskrm = %llx\n",nbmaskrm); k = 0;
+                fprintf(stderr,"Raw Neighbor Pattern: %llx No neighbors %llx\n",
+                                nbmask, gol[nb[0]]+gol[nb[1]]+gol[nb[2]]+gol[nb[3]]+gol[nb[4]]+gol[nb[5]]+gol[nb[6]]+gol[nb[7]]);
+                fprintf(stderr,"\n");
+            } //default case
+        } //switch
+        *nbch = nb[(kmin+k)&0x7];                                // rotate unique nb k left (kmin) back to orig nb pat
+    }
 }
 
 void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
 
-    int s, sm, k, k1, kmin, nmut;
+    int s, sm, k, k1, nmut;
     unsigned int checkmasks;
     int nb[8], nbc, nbch, ij, i, j, jp1, jm1, ip1, im1;
     uint64_t g, gs, nb1i, nb2i, randnr, randnr2, r2;
-    uint64_t nbmask, nbmaskr, nbmaskrm;
+    uint64_t nbmask, nbmaskr;
     uint64_t newgene, ancestor, livegenes[3];
     uint64_t s2or3, birth, statflag;
     genedata gdata;
@@ -382,14 +415,14 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
 	    ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                         // toroidal i+1, i-1
         nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1;           // new order of nbs
         nb[4]=jp1+ip1; nb[5]=jp1+i; nb[6]=jp1+im1; nb[7]=j*N+im1;
-        for (s=0L,k=0,nb1i=0;k<8;k++) {                                     // packs non-zero nb indices in first up to 8*4 bits
+        for (k=0,s=0,nb1i=0;k<8;k++) {                                      // packs non-zero nb indices in first up to 8*4 bits
             gs=gol[nb[k]];                                                  // whether neighbor is alive
             s += gs;                                                        // s is number of live nbs
             nb1i = (nb1i << (gs<<2)) + (gs*k);                              // nb1i is packed list of live neighbour indices
         }
-        statflag = 0L;
-        s2or3 = (s>>2) ? 0L : (s>>1);                                       // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
-        if(checkmasks && s>1) {                                             // recalculate effective new s as less than original s
+        sm = s;
+        statflag = nbmask = 0L;
+        if(checkmasks && s>1) {                                             // recalculate effective new s as less than original sum sm
             for (k=0,nbmaskr=0;k<8;k++) {                                   // depending on rotated overlay of masks in live neighbour genes
                 if(gol[nb[k]]) {
                     g= golg[nb[k]];                                         // fnal gene has ncoding 0s then 8 bit mask
@@ -397,14 +430,17 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 }
                 nbmaskr = ((nbmaskr & 0x1L)<<7) + (nbmaskr>>1);             // 8 bit rotate right
             }
-            for (k=0,sm=0;k<8;k++)  if(gol[nb[k]] && !((nbmaskr>>k)&0x1)) sm++;  // is mask bit set, count as if dead
-            if(sm!=s) {
-                statflag |= F_notgolrul;
-                s= sm;
+            for (k=0,s=0,nb1i=0,nbmask=0;k<8;k++) {                         // recalculate sum and nb1i using combined mask
+                gs =gol[nb[k]] & (((~nbmaskr)>>k)&0x1L);                    // if mask bit set, count as if dead
+                nbmask = (nbmask << 1) + gs;
+                s += gs;
+                nb1i = (nb1i << (gs<<2)) + (gs*k);
             }
         }
+        s2or3 = (s>>2) ? 0L : (s>>1);                                       // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
         if (s2or3) {                                                        // if 2 or 3 neighbours alive
             // if ((s<2)||(s>3)) fprintf(stderr,"s2or3 error s == %d\n",s);
+            if(s!=sm) statflag |= F_notgolrul;
             birth = 0L;
             newgene = 0L;
             if (s&0x1L) {  // s==3                                                 // allow birth (with possible overwrite)
@@ -412,36 +448,10 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
               if ((0x1L&overwritemask)|(0x1L&~gol[ij]) ) {                         // central site empty or overwrite mode
                 birth = 1L;                                                        // birth flag
                 for(k=0;k<s;k++) livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];      // live neighbour genes
-                for (k=7,nbmask=0L;k>=0;k--) nbmask = (nbmask << 1) + gol[nb[k]];  // 8-bit mask of GoL states of 8 nbs, clockwise from top left
+                if (!checkmasks) for (k=7,nbmask=0L;k>=0;k--) nbmask = (nbmask << 1) + gol[nb[k]];  // 8-bit mask of GoL states of 8 nbs, clockwise from top left
                 statflag |= F_3_livenbs & (nbmask<<16);                            // record live neighbour pattern
                 if((livegenes[0]^livegenes[1])|(livegenes[0]^livegenes[2])) {      // genes not all same, need ancestor calculation
-                  for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {               // compute canonical rotation (minimum) of this mask
-                    nbmaskr = ((nbmaskr & 0x1L)<<7) + (nbmaskr>>1);                // 8 bit rotate right
-                    if (nbmaskr < nbmaskrm) {                                      // choose minimal value of mask rotation
-                        nbmaskrm = nbmaskr;                                        // neighbor mask rotate min is current rotation
-                        kmin = k;                                                  // no of times rotated to right
-                    }
-                  }
-                  if (repscheme & R_1_choose0nb) nbch = nb[kmin];                  // replication of live neigbour in bit 0 of canonical rotation
-                  else {                                                           // replication of live neighbour in most different position
-                    switch (nbmaskrm) {                //              x07    x0b    x0d    x13    x15    x19    x25
-                        case 0x07 : k = 1; break;      // 00000111    |012|  <-
-                        case 0x0b : k = 0; break;      // 00001011    |...|  |01.|  <-
-                        case 0x0d : k = 3; break;      // 00001101    |...|  |..3|  |0.2|   <-
-                        case 0x13 : k = 1; break;      // 00010011           |...|  |..3|  |01.|   <-
-                        case 0x15 : k = 2; break;      // 00010101                  |...|  |...|  |0.2|   <-
-                        case 0x19 : k = 0; break;      // 00011001                         |..4|  |...|  |0..|   <-
-                        case 0x25 : k = 5; break;      // 00100101                                |..4|  |..3|  |0.2|  <-
-                        default  : {                   //                                                |..4|  |...|
-                                                       //                                                       |.5.|
-                            fprintf(stderr,"Error in canonical rotation for three live neighbours \nnbmaskrm = %llx\n",nbmaskrm); k = 0;
-                            fprintf(stderr,"Raw Neighbor Pattern: %llx No neighbors %llx\n",
-                                nbmask, gol[nb[0]]+gol[nb[1]]+gol[nb[2]]+gol[nb[3]]+gol[nb[4]]+gol[nb[5]]+gol[nb[6]]+gol[nb[7]]);
-                            fprintf(stderr,"\n");
-                        } //case
-                    } //switch
-                    nbch = nb[(kmin+k)&0x7];                                // rotate unique nb k left (kmin) back to orig nb pat
-                  }
+                  selectdifft3(nbmask, nb, gol, &nbch);
                   if (repscheme & R_0_2sel_3live) {                         // execute selective replication of one of two otherwise unchosen live genes
                       nb2i = 0L;
                       for(k1=k=0;k<3;k++) {                                 // choice of two other live genes for possible ancestor
@@ -451,7 +461,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                       if (repscheme & R_2_2ndnbs) selectone_nbs(s,nb2i,nb,gol,golg,&birth,&newgene);
                       else selectone(s,nb2i,nb,golg,&birth,&newgene);
                       if (birth==0L) {                                      // optional reset of ancestor & birth if no ancestors chosen in selectone
-                        if((repscheme & R_3_enforce3birth)||rulemod)  {       // birth cannot fail or genes don't matter or no modification to gol rules
+                        if((repscheme & R_3_enforce3birth)||rulemod)  {     // birth cannot fail or genes don't matter or no modification to gol rules
                             newgene = golg[nbch];
                             birth = 1L;
                         }
@@ -479,12 +489,12 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                             selectone_nbs(s,nb1i,nb,gol,golg,&birth,&newgene);
                         }
                         else if (repscheme & R_5_2uniquepos) {
-                            selectpos(nb1i,nb,golg,&birth,&newgene);
+                            selectdifft2(nb1i,nb,golg,&birth,&newgene);
                         }
                         else {
                             selectone(s,nb1i,nb,golg,&birth,&newgene);
                         }
-                        if(!birth && (repscheme&R_4_enforce2birth)) {         // if failure of 2-birth process not allowed choose first live nb
+                        if(!birth && (repscheme&R_4_enforce2birth)) {       // if failure of 2-birth process not allowed choose first live nb
                             birth = 1L;
                             newgene = golg[nb[nb1i&0x7]];
                         }
@@ -1062,6 +1072,12 @@ void countspecies(uint64_t gol[], uint64_t golg[], int N2) {  /* counts numbers 
         else if (selection == 5){
              fitness = 999;                                                 // undefined, depends on competing sequence
         }
+        else if (selection == 6){
+             fitness = 999L;                                                // undefined, depends on competing sequence
+        }
+        else if (selection == 7){
+             fitness = 999L;                                                // undefined, depends on competing sequence
+        }
         else fprintf(stderr,"selection parameter %d out of range\n",selection);
         fprintf(stdout,"count species %d with gene %llx has counts %llu and %d ones, fitness %llu\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
     }
@@ -1119,6 +1135,13 @@ void countspecieshash() {  /* counts numbers of all different species using qsor
         else if (selection == 5){
              fitness = 999L;                                                // undefined, depends on competing sequence
         }
+        else if (selection == 6){
+             fitness = 999L;                                                // undefined, depends on competing sequence
+        }
+        else if (selection == 7){
+             fitness = 999L;                                                // undefined, depends on competing sequence
+        }
+
         else fprintf(stderr,"selection parameter %d out of range\n",selection);
         if((genedataptr = (genedata *) hashtable_find(&genetable, last)) != NULL) {
             if(genedataptr->popcount)
