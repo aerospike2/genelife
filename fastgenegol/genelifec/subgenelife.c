@@ -427,7 +427,9 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
             for (k=0,nbmaskr=0L;k<8;k++) {                                   // depending on rotated overlay of masks in live neighbour genes
                 if(gol[nb[k]]) {
                     g= golg[nb[k]];                                         // fnal gene has ncoding 0s then 8 bit mask
-                    if(!((g>>8)&codingmask)) nbmaskr |= g&0xff;             // tried |=, &=, ^= ;
+                    // if(!((g>>8)&codingmask)) nbmaskr |= g&0xff;             // tried |=, &=, ^= .
+                    if(!((g>>8)&codingmask)) nbmaskr |= (0x2L<<(g&0x7L))&0xff;  // only one bit on for gene masks in this version: not self, so 0x2L
+
                 }
                 nbmaskr = ((nbmaskr & 0x1L)<<7) + (nbmaskr>>1);             // 8 bit rotate right
             }
