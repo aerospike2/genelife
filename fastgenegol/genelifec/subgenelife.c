@@ -598,13 +598,11 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
     }
 }
 
-int statsflag = 1;
-
 void tracestats(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int NN2) { // trace various stats over time of the simulation
     int ij,cnt,k,d,dc,gt[4],st[10];
     uint64_t gene,statflag;
   
-    if (totsteps == arraysize) {                                            // relallocate memory for arrays : double size
+    if (statcnts == arraysize) {                                            // relallocate memory for arrays : double size
         arraysize*=2;
         livesites = (int *)realloc(livesites, arraysize * sizeof(int));
         genestats = (int *)realloc(genestats, arraysize * 4 * sizeof(int));
@@ -631,9 +629,10 @@ void tracestats(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int NN2) {
         }
     }
 
-    livesites[totsteps] = cnt;
-    for(d=0;d<4;d++) genestats[totsteps*4+d]=gt[d];
-    for(k=0;k<10;k++) stepstats[totsteps*10+k]=st[k];
+    livesites[statcnts] = cnt;
+    for(d=0;d<4;d++) genestats[statcnts*4+d]=gt[d];
+    for(k=0;k<10;k++) stepstats[statcnts*10+k]=st[k];
+    statcnts++;
 }
 
 void get_stats(int outstats[], int outgtypes[], int outstepstats[], int numStats ){
@@ -710,29 +709,26 @@ void get_activities(uint64_t actgenes[],int activities[],int ngenesp[]) {
     ngenesp[0] = nlivegenes;
 }
 
-void genelife_update (int nsteps, int histoflag, int statsflag, int nstat) {
+void genelife_update (int nsteps, int nhist, int nstat) {
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
     int t;
     uint64_t *gol, *newgol, *golg, *newgolg;
 
     for (t=0; t<nsteps; t++) {
-        gol = planes[curPlane];
+        gol = planes[curPlane];                         // get planes of gol,golg data
         newgol = planes[newPlane];
         golg = planesg[curPlane];
         newgolg = planesg[newPlane];
 
-        update(gol,golg,newgol,newgolg);
-        if(histoflag) countconfigs();
-        if(statsflag && (t%nstat == 0) {
-            tracestats(gol,golg,golgstats,N2);
-            statcnt++;
-        }
+        update(gol,golg,newgol,newgolg);                // calculate next iteration
+        if(nhist && (totsteps%nhist == 0)) countconfigs();                    // count configurations
+        if(nstat && (totsteps%nstat == 0)) tracestats(gol,golg,golgstats,N2); // time trace point
 
-        curPlane = (curPlane +1) % numPlane;
+        curPlane = (curPlane +1) % numPlane;            // update plane pointers to next cyclic position
         newPlane = (newPlane +1) % numPlane;
-    } /* for t ... */
-} /* genelife_update */
+    }
+}
 
 void initialize_planes(int offs[],  int No) {
     int i,j,idx;
@@ -898,6 +894,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
         case 3:
         case 4:
         case 5:
+        case 7:
         default: for (k=0;k<8;k++) startgenes[k]=(0x1L<<(4+k*8))-1L;break;
     }
 
@@ -1110,7 +1107,7 @@ void countspecieshash() {  /* counts numbers of all different species using qsor
     nspecies = hashtable_count(&genetable);
     genotypes = hashtable_keys(&genetable);
     geneitems = (genedata*) hashtable_items( &genetable );
-    fprintf(stdout,"The number of different species is %d\n",nspecies);
+    fprintf(stdout,"Iteration %d .  The number of different species is %d\n",totsteps,nspecies);
     
     for (k=0; k<nspecies; k++) golgs[k] = k;  // initialize sorted genotype array to same order as hash table
 

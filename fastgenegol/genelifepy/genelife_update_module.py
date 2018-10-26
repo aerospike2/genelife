@@ -19,7 +19,7 @@ libcd = npct.load_library("libgenelife", ".")
 
 # setup the return types and argument types
 libcd.genelife_update.restype = None
-libcd.genelife_update.argtypes = [ c_int, c_int, c_int, c_int]
+libcd.genelife_update.argtypes = [ c_int, c_int, c_int]
 libcd.initialize.restype = None
 libcd.initialize.argtypes = [int_array, c_int, int_array, c_int]
 libcd.initialize_planes.restype = None
@@ -46,8 +46,8 @@ libcd.get_activities.restype = None
 libcd.get_activities.argtypes = [uint64_array, int_array, int_array]
 libcd.colorgenes.argtypes = [uint64_array, uint64_array, int_array, c_int]
 
-def genelife_update(nsteps, histoflag, statsflag, nstat):
-    return libcd.genelife_update(nsteps, histoflag, statsflag, nstat )
+def genelife_update(nsteps, nhist, nstat):
+    return libcd.genelife_update(nsteps, nhist, nstat)
 
 def get_curgol(gol):
     return libcd.get_curgol(gol, int(len(gol)))

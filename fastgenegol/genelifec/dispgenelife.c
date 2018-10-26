@@ -88,10 +88,10 @@ int main (int argc, char *argv[]) {
 	        gol = planes[curPlane];
 	        golg = planesg[curPlane];
 	        printxy(gol,golg);
-	        genelife_update(1,0,0,1);
+	        genelife_update(1,0,0);
 	    }
 	    fprintf(stderr,"finished step %d.\n",i);
-	    genelife_update(nskip,0,0,1);
+	    genelife_update(nskip,0,0);
 	    fprintf(stderr,"step %d\n",i);
     }
 }
