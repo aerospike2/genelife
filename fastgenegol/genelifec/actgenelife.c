@@ -24,14 +24,33 @@
 
 #include <unistd.h>		// for command line parsing
 
+
+int cmp1 (const void * pa, const void * pb)
+{
+   // return ( *(int*)pa - *(int*)pb );
+   return ((*(uint64_t*)pa > *(uint64_t*)pb)  ? 1 : -1);
+}
+
+int cmp2 ( const void *pa, const void *pb )
+{
+    const uint64_t *a = pa;
+    const uint64_t *b = pb;
+    if(a[1] == b[1])
+        return a[0] > b[0] ? 1 : -1;
+    else
+        return (int) (b[1] - a[1]);
+}
+
+
 void printspecies(uint64_t golg[]) {  /* counts numbers of all different species using qsort first */
     int ij, k, ijlast, nspecies, counts[N2];
     uint64_t last, golgs[N2];
     uint64_t golgsc[N2][2];
     
+
     for (ij=0; ij<N2; ij++) { golgs[ij] = golg[ij];  counts[ij] = 0;}  // initialize sorted gene & count arrays to zero
 
-    qsort(golgs, N2, sizeof(uint64_t), cmpfunc);              // sort in increasing gene order
+    qsort(golgs, N2, sizeof(uint64_t), cmp1);              // sort in increasing gene order
     for (ij=0,k=0,ijlast=0,last=golgs[0]; ij<N2; ij++) {               // count each new species in sorted list
         if (golgs[ij] != last) {
             last = golgs[ij];
@@ -45,9 +64,8 @@ void printspecies(uint64_t golg[]) {  /* counts numbers of all different species
         golgs[k]=golgs[ij];
         ij = ij + counts[k];
     }
-    
     for (k=0; k<nspecies; k++) { golgsc[k][0] = golgs[k];  golgsc[k][1] = counts[k];}  // initialize joint gene & count array
-    qsort(golgsc, nspecies, sizeof(golgsc[0]), cmpfunc2);                   // sort in decreasing count order
+    qsort(golgsc, nspecies, sizeof(golgsc[0]), cmp2);                   // sort in decreasing count order
     for (k=0; k<nspecies; k++) {
         printf("%llx  %llu ",golgsc[k][0],golgsc[k][1]);
     }
