@@ -126,7 +126,9 @@ uint64_t golgstats[N2];             // 64 bit masks for different events during 
 #define F_survival  0x40
 #define F_death     0x80
 #define F_golstate  0x100
-#define F_3g_same   0x200
+#define F_golchange 0x200
+#define F_nongolchg 0x400
+#define F_3g_same   0x800
 #define F_3_livenbs 0xff0000
 
                                     // Wikipedia "Xorshift" rewritten here as inline macro &
@@ -403,7 +405,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
     unsigned int checkmasks;
     int nb[8], nbc, nbch, ij, i, j, jp1, jm1, ip1, im1;
     uint64_t g, gs, nb1i, nb2i, randnr, randnr2, r2;
-    uint64_t nbmask, nbmaskr;
+    unsigned char nbmask, nbmaskr;
     uint64_t newgene, ancestor, livegenes[3];
     uint64_t s2or3, birth, statflag;
     genedata gdata;
@@ -422,19 +424,20 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
             nb1i = (nb1i << (gs<<2)) + (gs*k);                              // nb1i is packed list of live neighbour indices
         }
         sm = s;
-        statflag = nbmask = 0L;
+        statflag = 0L;
+        nbmask = 0;
         if(checkmasks && s>1) {                                             // recalculate effective new s as less than original sum sm
-            for (k=0,nbmaskr=0L;k<8;k++) {                                   // depending on rotated overlay of masks in live neighbour genes
+            for (k=0,nbmaskr=0;k<8;k++) {                                   // depending on rotated overlay of masks in live neighbour genes
                 if(gol[nb[k]]) {
                     g= golg[nb[k]];                                         // fnal gene has ncoding 0s then 8 bit mask
-                    // if(!((g>>8)&codingmask)) nbmaskr |= g&0xff;             // tried |=, &=, ^= .
-                    if(!((g>>8)&codingmask)) nbmaskr |= (0x2L<<(g&0x7L))&0xff;  // only one bit on for gene masks in this version: not self, so 0x2L
+                    //if(!((g>>8)&codingmask)) nbmaskr |= g&0xff;             // tried |=, &=, ^= .
+                    if(!((g>>8)&codingmask)) nbmaskr |= (0x2<<(g&0x7L))&0xff;  // only one bit on for gene masks in this version: not self, so 0x2L
 
                 }
-                nbmaskr = ((nbmaskr & 0x1L)<<7) + (nbmaskr>>1);             // 8 bit rotate right
+                nbmaskr = ((nbmaskr & 0x1L)<<7) | (nbmaskr>>1);             // 8 bit rotate right
             }
             //nbmaskr = 0L;       // DEBUG check that default behaviour if genes no influence : PASSED
-            for (k=0,s=0,nb1i=0L,nbmask=0L;k<8;k++) {                       // recalculate sum and nb1i using combined mask
+            for (k=0,s=0,nb1i=0L,nbmask=0;k<8;k++) {                       // recalculate sum and nb1i using combined mask
                 gs =gol[nb[k]] & (((~nbmaskr)>>k)&0x1L);                    // if mask bit set, count as if dead
                 nbmask |= gs<<k;                                            // also calculate nbmask for use below
                 s += gs;
@@ -452,8 +455,8 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
               if ((0x1L&overwritemask)|(0x1L&~gol[ij]) ) {                         // central site empty or overwrite mode
                 birth = 1L;                                                        // birth flag
                 for(k=0;k<s;k++) livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];      // live neighbour genes
-                if (!checkmasks) for (k=0,nbmask=0L;k<8;k++) nbmask |= (gol[nb[k]]<<k);  // 8-bit mask of GoL states of 8 nbs, clockwise from top left
-                statflag |= F_3_livenbs & (nbmask<<16);                            // record live neighbour pattern
+                if (!checkmasks) for (k=0,nbmask=0;k<8;k++) nbmask |= (gol[nb[k]]<<k);  // 8-bit mask of GoL states of 8 nbs, clockwise from top left
+                statflag |= F_3_livenbs & (((uint64_t) nbmask)<<16);               // record live neighbour pattern
                 if((livegenes[0]^livegenes[1])|(livegenes[0]^livegenes[2])) {      // genes not all same, need ancestor calculation
                   selectdifft3(nbmask, nb, gol, &nbch);
                   if (repscheme & R_0_2sel_3live) {                         // execute selective replication of one of two otherwise unchosen live genes
@@ -482,7 +485,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                     newgene = livegenes[0];                                 // genes all the same : copy first one
                     if((~repscheme&R_3_enforce3birth) && rulemod) birth = 0L;   // no birth for 3 identical genes
                 }
-              }
+              } // end central site empty or overwrite mode
             }  // end if s==3
             else {  // s==2                                                 // possible birth as exception to GoL rule
                 statflag |= F_2_live;
@@ -574,6 +577,10 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
             if(gol[ij]) statflag |= F_death;
         }
         if(gol[ij]) statflag |= F_golstate;
+        if(gol[ij]^newgol[ij]) {
+            statflag |= F_golchange;
+            if(statflag&F_notgolrul) statflag |= F_nongolchg;
+        }
         emptysites = emptysites + newgol[ij];                               // keep track of empty sites, same information as total activity of occupied sites
         golgstats[ij] = statflag;
     }  // end for ij

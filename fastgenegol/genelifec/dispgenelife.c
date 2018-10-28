@@ -48,8 +48,8 @@ int main (int argc, char *argv[]) {
 
     Noff = 9;
     runparams[0] = 1;        // 0,1 rulemod
-    runparams[1] = 3;        // 0-4 repscheme 
-    runparams[2] = 1;        // 0-2 selection 
+    runparams[1] = 3;        // 0-0x4f repscheme 
+    runparams[2] = 1;        // 0-8 selection
     runparams[3] = 0;        // NY updated
     runparams[4] = 0;        // NY updated
     runparams[5] = 0;        // colorfunction 0 or 1
