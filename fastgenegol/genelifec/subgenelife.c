@@ -75,6 +75,7 @@ uint64_t  emptysites = 0;           // cumulative number of empty sites during s
 #define R_4_enforce2birth 0x10
 #define R_5_2uniquepos    0x20
 #define R_6_checkmasks    0x40
+#define R_7_nongolstat    0x80
 
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
@@ -401,8 +402,8 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
 
-    int s, sm, k, k1, nmut;
-    unsigned int checkmasks,rulemod1,rulemod2;
+    int s, sm, sng, k, k1, nmut;
+    unsigned int checkmasks,checknongol,rulemod1,rulemod2,rulemod1ij,rulemod2ij;
     int nb[8], nbc, nbch, ij, i, j, jp1, jm1, ip1, im1;
     uint64_t g, gs, nb1i, nb2i, randnr, randnr2, r2;
     unsigned char nbmask, nbmaskr;
@@ -414,6 +415,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
     rulemod1= rulemod & 0x1L;
     rulemod2= (rulemod & 0x2)>>1;
     checkmasks = rulemod2 & repscheme & R_6_checkmasks;
+    checknongol = repscheme & R_7_nongolstat;
 
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
 	    i = ij & Nmask;  j = ij >> log2N;                                   // row & column
@@ -428,8 +430,17 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
         }
         sm = s;
         statflag = 0L;
+        rulemod2ij = rulemod2;
+        rulemod1ij = rulemod1;
         nbmask = 0;
-        if(checkmasks && s>1) {                                             // recalculate effective new s as less than original sum sm
+        if(s>1) {
+          if(checknongol && s>1) {
+            for (k=0,sng=0;k<8;k++) {                                       // calc number of neighbours resulting from nongol rule change
+                sng += (golgstats[nb[k]]&F_nongolchg)?1:0;                   // neighbors with masks set
+            }
+            if(sng) rulemod2ij = rulemod1ij = 0L;
+          }
+          if(checkmasks&&rulemod2ij) {                                       // recalculate effective new s as less than original sum sm
             for (k=0,nbmaskr=0;k<8;k++) {                                   // depending on rotated overlay of masks in live neighbour genes
                 if(gol[nb[k]]) {
                     g= golg[nb[k]];                                         // fnal gene has ncoding 0s then 8 bit mask
@@ -446,6 +457,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 s += gs;
                 nb1i = (nb1i << (gs<<2)) + (gs*k);
             }
+          }
         }
         s2or3 = (s>>2) ? 0L : (s>>1);                                       // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
         if (s2or3) {                                                        // if 2 or 3 neighbours alive
@@ -471,7 +483,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                       if (repscheme & R_2_2ndnbs) selectone_nbs(s,nb2i,nb,gol,golg,&birth,&newgene);
                       else selectone(s,nb2i,nb,golg,&birth,&newgene);
                       if (birth==0L) {                                      // optional reset of ancestor & birth if no ancestors chosen in selectone
-                        if((repscheme & R_3_enforce3birth)||rulemod1)  {     // birth cannot fail or genes don't matter or no modification to gol rules
+                        if((repscheme & R_3_enforce3birth)||rulemod1ij)  {     // birth cannot fail or genes don't matter or no modification to gol rules
                             newgene = golg[nbch];
                             birth = 1L;
                         }
@@ -486,13 +498,13 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 else {
                     statflag |= F_3g_same;
                     newgene = livegenes[0];                                 // genes all the same : copy first one
-                    if((~repscheme&R_3_enforce3birth) && rulemod1) birth = 0L;   // no birth for 3 identical genes
+                    if((~repscheme&R_3_enforce3birth) && rulemod1ij) birth = 0L;   // no birth for 3 identical genes
                 }
               } // end central site empty or overwrite mode
             }  // end if s==3
             else {  // s==2                                                 // possible birth as exception to GoL rule
                 statflag |= F_2_live;
-                if (rulemod1||gol[ij]) {                                     // rule departure from GOL allowed or possible overwrite
+                if (rulemod1ij||gol[ij]) {                                     // rule departure from GOL allowed or possible overwrite
                     if ((0x1L&(overwritemask>>1))||!gol[ij]) {              // either overwrite on for s==2 or central site is empty
                         //for (k=0;k<s;k++) livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]]; // live gene at neighbour site
                         if (repscheme & R_2_2ndnbs) {
@@ -549,7 +561,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 // if(newgene==0L) fprintf(stderr,"error in writing newgene, previous = %llx, statflag = %llx\n",golg[ij],statflag);
             } // end birth
             else {
-                if ((survival&s&0x1L)|((survival>>1)&(~s)&0x1L)|((~rulemod1)&0x1L)) {// (surv bit 0 and s==3) or (surv bit 1 and s==2) or not rulemod1
+                if ((survival&s&0x1L)|((survival>>1)&(~s)&0x1L)|((~rulemod1ij)&0x1L)) {// (surv bit 0 and s==3) or (surv bit 1 and s==2) or not rulemod1ij
                 // if ((survival&s&0x1L)|((survival>>1)&(~s)&0x1L)) { // survival bit 0 and s==3, or (survival bit 1 and s==2)
                     newgol[ij]  = gol[ij];                                  // new game of life cell value same as old
                     newgolg[ij] = golg[ij];                                 // gene stays as before, live or not
