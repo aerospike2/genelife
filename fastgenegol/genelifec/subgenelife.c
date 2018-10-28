@@ -705,7 +705,7 @@ void get_activities(uint64_t actgenes[],int activities[],int ngenesp[]) {
     nspecies = hashtable_count(&genetable);
     genotypes = hashtable_keys(&genetable);
     geneitems = (genedata*) hashtable_items( &genetable );
-    fprintf(stdout,"The number of different species that have ever existed is %d\n",nspecies);
+    fprintf(stderr,"The number of different species that have ever existed is %d\n",nspecies);
     
     for (k=nlivegenes=0; k<nspecies; k++) {
         if((genedataptr = (genedata *) hashtable_find(&genetable, genotypes[k])) != NULL) {
@@ -891,10 +891,10 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     codingmask = (0x1L<<ncoding)-0x1L;
     startgenechoice = simparams[4];
     
-    fprintf(stdout,"runparams %d %d %d %d %d %d %d\n",runparams[0],runparams[1],runparams[2],
+    fprintf(stderr,"runparams %d %d %d %d %d %d %d\n",runparams[0],runparams[1],runparams[2],
                                          runparams[3],runparams[4],runparams[5],runparams[6]);
-    fprintf(stdout,"simparams %d %d %d %d %d\n",simparams[0],simparams[1],simparams[2],simparams[3],simparams[4]);
-    fprintf(stdout,"pmutmask %llu (NB 0 means no mutation)\n",pmutmask);
+    fprintf(stderr,"simparams %d %d %d %d %d\n",simparams[0],simparams[1],simparams[2],simparams[3],simparams[4]);
+    fprintf(stderr,"pmutmask %llu (NB 0 means no mutation)\n",pmutmask);
     
     switch (selection) {
         case 0: for (k=0;k<4;k++) {startgenes[k]=0xf0f0f0f0f0f0f0f0;startgenes[k+4]=0x0f0f0f0f0f0f0f0f;}; break;
@@ -1042,7 +1042,7 @@ void countspecies(uint64_t gol[], uint64_t golg[], int N2) {  /* counts numbers 
     }
     counts[k++]=ngenes-ijlast;
     nspecies = k;  // print including 0
-    fprintf(stdout,"The number of different species (countspecies) is %d\n",nspecies);
+    fprintf(stderr,"The number of different species (countspecies) is %d\n",nspecies);
 
     for (k=0,ij=0;k<nspecies;k++) {     // now condense array to give only different genes with counts
         // printf("species %4d with gene %x has counts %d\n",k, golgs[ij],counts[k]);
@@ -1076,13 +1076,13 @@ void countspecies(uint64_t gol[], uint64_t golg[], int N2) {  /* counts numbers 
 	        fitness = nones&0x3;                                            // fitness is species class
         }
 
-        fprintf(stdout,"count species %d with gene %llx has counts %llu and %d ones, fitness %llu\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
+        fprintf(stderr,"count species %d with gene %llx has counts %llu and %d ones, fitness %llu\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
     }
-    fprintf(stdout,"at step %d cumulative activity = %llu\n",totsteps,(N2 * (uint64_t) totsteps) - emptysites);
-    fprintf(stdout,"rulemod\trepscheme\tselection\toverwritemask\tsurvival\n");
-    fprintf(stdout,"%d\t%d\t\t%d\t\t%d\t\t%d\n",rulemod,repscheme,selection,overwritemask,survival);
-    fprintf(stdout,"nlog2pmut\tinit1\tinitr\tncoding\tstartchoice\n");
-    fprintf(stdout,"%d\t\t%d\t%d\t%d\t%d\n",nlog2pmut,initial1density,initialrdensity,ncoding,startgenechoice);
+    fprintf(stderr,"at step %d cumulative activity = %llu\n",totsteps,(N2 * (uint64_t) totsteps) - emptysites);
+    fprintf(stderr,"rulemod\trepscheme\tselection\toverwritemask\tsurvival\n");
+    fprintf(stderr,"%d\t%d\t\t%d\t\t%d\t\t%d\n",rulemod,repscheme,selection,overwritemask,survival);
+    fprintf(stderr,"nlog2pmut\tinit1\tinitr\tncoding\tstartchoice\n");
+    fprintf(stderr,"%d\t\t%d\t%d\t%d\t%d\n",nlog2pmut,initial1density,initialrdensity,ncoding,startgenechoice);
 }
 
 int cmpfunc2 (const void * pa, const void * pb)
@@ -1108,7 +1108,7 @@ void countspecieshash() {  /* counts numbers of all different species using qsor
     // qsort(golgs, nspecies, sizeof(int), cmpfunc2);                     // sort in increasing gene order
     qsort(golgs, nspecies, sizeof(int), cmpfunc3);                     // sort in decreasing count order
 
-    // for (k=0; k<nspecies; k++) fprintf(stdout,"in countspecieshash genotype %d is %llx\n", k, genotypes[k]);
+    // for (k=0; k<nspecies; k++) fprintf(stderr,"in countspecieshash genotype %d is %llx\n", k, genotypes[k]);
     for (k=0,nspeciesnow=0; k<nspecies; k++) {
         last = genotypes[golgs[k]];
         POPCOUNT64C(last, nones);
@@ -1125,21 +1125,21 @@ void countspecieshash() {  /* counts numbers of all different species using qsor
 
         if((genedataptr = (genedata *) hashtable_find(&genetable, last)) != NULL) {
             if(genedataptr->popcount) {
-                fprintf(stdout,"count species %7d with gene %16llx has counts %7d and %3d ones, fitness %llu\n",k,last,
+                fprintf(stderr,"count species %7d with gene %16llx has counts %7d and %3d ones, fitness %llu\n",k,last,
                     genedataptr->popcount,nones,fitness);
                 nspeciesnow++;
             }
         }
         else {
             fprintf(stderr,"countspecieshash popcount error, no entry in hash table\n");
-            fprintf(stdout,"count species %d with gene %llx has counts ?? and %d ones, fitness %llu\n",k,last,
+            fprintf(stderr,"count species %d with gene %llx has counts ?? and %d ones, fitness %llu\n",k,last,
                     nones,fitness);
         }
     }
-    fprintf(stdout,"Iteration %d : %d different species of %d ever existed.\n",totsteps,nspeciesnow,nspecies);
-    fprintf(stdout,"_________________________________________________________________\n");
+    fprintf(stderr,"Iteration %d : %d different species of %d ever existed.\n",totsteps,nspeciesnow,nspecies);
+    fprintf(stderr,"_________________________________________________________________\n");
 
-    // fprintf(stdout,"cumulative activity = %llu\n",(N2 * (uint64_t) totsteps) - emptysites);
+    // fprintf(stderr,"cumulative activity = %llu\n",(N2 * (uint64_t) totsteps) - emptysites);
 }
 
 void delay(int milliseconds)
