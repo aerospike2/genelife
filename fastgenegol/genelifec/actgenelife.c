@@ -8,7 +8,7 @@
 // actgengol.c
 // complile:
 // cc -o actgengol actgengol.c
-// modify output to stdout to ouput population counts
+// modify output to stdout to output population counts
 // to run with activity.py:
 // activity.py actgengol
 //

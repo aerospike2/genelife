@@ -402,7 +402,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
     /* encode without if structures for optimal vector treatment */
 
     int s, sm, k, k1, nmut;
-    unsigned int checkmasks;
+    unsigned int checkmasks,rulemod1,rulemod2;
     int nb[8], nbc, nbch, ij, i, j, jp1, jm1, ip1, im1;
     uint64_t g, gs, nb1i, nb2i, randnr, randnr2, r2;
     unsigned char nbmask, nbmaskr;
@@ -411,7 +411,10 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
     genedata gdata;
     
     totsteps++;
-    checkmasks = repscheme & R_6_checkmasks;
+    rulemod1= rulemod & 0x1L;
+    rulemod2= (rulemod & 0x2)>>1;
+    checkmasks = rulemod2 & repscheme & R_6_checkmasks;
+
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
 	    i = ij & Nmask;  j = ij >> log2N;                                   // row & column
 	    jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
@@ -468,7 +471,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                       if (repscheme & R_2_2ndnbs) selectone_nbs(s,nb2i,nb,gol,golg,&birth,&newgene);
                       else selectone(s,nb2i,nb,golg,&birth,&newgene);
                       if (birth==0L) {                                      // optional reset of ancestor & birth if no ancestors chosen in selectone
-                        if((repscheme & R_3_enforce3birth)||rulemod)  {     // birth cannot fail or genes don't matter or no modification to gol rules
+                        if((repscheme & R_3_enforce3birth)||rulemod1)  {     // birth cannot fail or genes don't matter or no modification to gol rules
                             newgene = golg[nbch];
                             birth = 1L;
                         }
@@ -483,13 +486,13 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 else {
                     statflag |= F_3g_same;
                     newgene = livegenes[0];                                 // genes all the same : copy first one
-                    if((~repscheme&R_3_enforce3birth) && rulemod) birth = 0L;   // no birth for 3 identical genes
+                    if((~repscheme&R_3_enforce3birth) && rulemod1) birth = 0L;   // no birth for 3 identical genes
                 }
               } // end central site empty or overwrite mode
             }  // end if s==3
             else {  // s==2                                                 // possible birth as exception to GoL rule
                 statflag |= F_2_live;
-                if (rulemod||gol[ij]) {                                     // rule departure from GOL allowed or possible overwrite
+                if (rulemod1||gol[ij]) {                                     // rule departure from GOL allowed or possible overwrite
                     if ((0x1L&(overwritemask>>1))||!gol[ij]) {              // either overwrite on for s==2 or central site is empty
                         //for (k=0;k<s;k++) livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]]; // live gene at neighbour site
                         if (repscheme & R_2_2ndnbs) {
@@ -546,7 +549,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 // if(newgene==0L) fprintf(stderr,"error in writing newgene, previous = %llx, statflag = %llx\n",golg[ij],statflag);
             } // end birth
             else {
-                if ((survival&s&0x1L)|((survival>>1)&(~s)&0x1L)|((~rulemod)&0x1L)) {// (surv bit 0 and s==3) or (surv bit 1 and s==2) or not rulemod
+                if ((survival&s&0x1L)|((survival>>1)&(~s)&0x1L)|((~rulemod1)&0x1L)) {// (surv bit 0 and s==3) or (surv bit 1 and s==2) or not rulemod1
                 // if ((survival&s&0x1L)|((survival>>1)&(~s)&0x1L)) { // survival bit 0 and s==3, or (survival bit 1 and s==2)
                     newgol[ij]  = gol[ij];                                  // new game of life cell value same as old
                     newgolg[ij] = golg[ij];                                 // gene stays as before, live or not
