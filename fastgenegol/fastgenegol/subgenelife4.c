@@ -76,7 +76,7 @@ const long unsigned int m3  = 0x0707070707070707; //for cumcount64c selects coun
 #define CUMCOUNT64C(x, val) {       /* Assumes gene specifies 8 8-bit counters each with max value 7 */  \
     val = ((x & m3) * h01) >> 56;}  /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
 
-void countconfigs(){		// count configs specified by offset array
+void countconfigs(){		// count configs specified by offset array in current plane
     // each row of the offset array becomes a bit in an address for the histo array.
     int i,j,k,t,x,y;
     unsigned long int *pl, adr, bit;
@@ -249,35 +249,36 @@ void print_gol (long unsigned int gol[], int N, int N2) {   /* print the game of
 
 
 
-void initialize_planes(int offs[],  int N) {
+void initialize_planes(int offs[],  int noffbits) {
     int i,j,idx;
 
-    if(N%3 !=0) fprintf(stderr,"Ouch!  Size of offsets array not a multiple of 3 as expected.");
-    Noff = N/3;		// Noff global
+    if(noffbits%3 !=0) fprintf(stderr,"Ouch!  Size of offsets array not a multiple of 3 as expected.");
+    Noff = noffbits/3;		// Noff global
     if(Noff>24){
-        fprintf(stderr,"Too many offsets!  Max=24");
+        fprintf(stderr,"Too many offsets!  Max=24");        // Norman why 24, John ??
         exit(1);}
-    numHisto = 1<<Noff;
+    
+    numHisto = 1<<Noff;                                     // this array already allocated up in python !
     histo = (long unsigned int *) calloc(numHisto,sizeof(long unsigned int));
 
-    // install offsets:
+    // install offsets as 2D C array :
     offsets = (int **) calloc(Noff,sizeof(int *));
     for(i=0; i<Noff; i++)
-	offsets[i] = (int *) calloc(3,sizeof(int)); // each containing xoff, yoff, toff.
+        offsets[i] = (int *) calloc(3,sizeof(int)); // each containing xoff, yoff, toff.
     for(idx=0,i=0; i<Noff; i++){
-	for(j=0; j<3; j++){
-	    offsets[i][j] = offs[idx];
-	    idx++;
-	}
+        for(j=0; j<3; j++){
+            offsets[i][j] = offs[idx];
+            idx++;
+        }
     }
     // compute number of planes from toff = 3rd element of each offest vec:
     int tmx = 0;
-    int tmn = N;
+    int tmn = noffbits;
     int toff,tall;
     for(i=0; i<Noff; i++){
-	toff = offsets[i][2];
-	if(toff>tmx) tmx = toff;
-	if(toff<tmn) tmn = toff;
+        toff = offsets[i][2];
+        if(toff>tmx) tmx = toff;
+        if(toff<tmn) tmn = toff;
     }
 //    fprintf(stderr,"----------------- txm = %d, tmn = %d",tmx,tmn);
     tall = tmx-tmn;
@@ -287,31 +288,31 @@ void initialize_planes(int offs[],  int N) {
     int mx;
     int mn;
     int off;
-    mn=N; mx=0;
+    mn=noffbits; mx=0;
     for(i=0; i<Noff; i++){
-	off = offsets[i][0];	// X
-	if(off>mx) mx = off;
-	if(off<mn) mn = off;
+        off = offsets[i][0];	// X
+        if(off>mx) mx = off;
+        if(off<mn) mn = off;
     }
     if(mn<0) xL = -mn; else xL=0;
-    if(mx>0) xR = N-mx; else xR=N;
-    mn=N; mx=0;
+    if(mx>0) xR = noffbits-mx; else xR=noffbits;
+    mn=noffbits; mx=0;
     for(i=0; i<Noff; i++){
-	off = offsets[i][1];	// Y
-	if(off>mx) mx = off;
-	if(off<mn) mn = off;
+        off = offsets[i][1];	// Y
+        if(off>mx) mx = off;
+        if(off<mn) mn = off;
     }
     if(mn<0) yD = -mn; else yD = 0;
-    if(mx>0) yU = N-mx; else yU = N;
+    if(mx>0) yU = noffbits-mx; else yU = noffbits;
     
 
     // initialize planes:
     planes = (long unsigned int **) calloc(numPlane,sizeof(long unsigned int *));
     for(i=0; i<numPlane; i++)
-	planes[i] = (long unsigned int *) calloc(N2,sizeof(long unsigned int));
+        planes[i] = (long unsigned int *) calloc(N2,sizeof(long unsigned int));
     planesg = (long unsigned int **) calloc(numPlane,sizeof(long unsigned int *));
     for(i=0; i<numPlane; i++)
-    planesg[i] = (long unsigned int *) calloc(N2,sizeof(long unsigned int));
+        planesg[i] = (long unsigned int *) calloc(N2,sizeof(long unsigned int));
     
 }
 

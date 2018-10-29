@@ -28,6 +28,8 @@ const int nlog2pmut = 5;            // pmut = probmut = 2 to the power of - nlog
 int nsteps = 10000;                 // total number of steps to simulate GoL
 int ndisp = 10000;                  // display GoL every ndisp steps
 int tdisp = 0;                      // extra time delay in ms betwene displays
+
+
 static long unsigned int  emptysites = 0;  // cumulative number of empty sites during simulation updates
 
 long unsigned int state[2];                  // State for xorshift pseudorandom number generation. The state must be seeded so that it is not zero
@@ -60,7 +62,7 @@ void update (long unsigned int gol[], long unsigned int golg[]) {
     static long unsigned int ngx = 0;
 
 
-	for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
+	for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N. Avoid if statements for optimization.
 		i = ij & Nmask;  j = ij >> log2N;                                   // row & column
 		jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
 		ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                         // toroidal i+1, i-1

@@ -14,9 +14,9 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "52416DA41F27425C00721D17"
-               BuildableName = "libcos_doubles.dylib"
-               BlueprintName = "cos_doubles"
+               BlueprintIdentifier = "528F91911F2F9895008DD596"
+               BuildableName = "probtest"
+               BlueprintName = "probtest"
                ReferencedContainer = "container:fastgenegol.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -29,6 +29,15 @@
       shouldUseLaunchSchemeArgsEnv = "YES">
       <Testables>
       </Testables>
+      <MacroExpansion>
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "528F91911F2F9895008DD596"
+            BuildableName = "probtest"
+            BlueprintName = "probtest"
+            ReferencedContainer = "container:fastgenegol.xcodeproj">
+         </BuildableReference>
+      </MacroExpansion>
       <AdditionalOptions>
       </AdditionalOptions>
    </TestAction>
@@ -42,15 +51,16 @@
       debugDocumentVersioning = "YES"
       debugServiceExtension = "internal"
       allowLocationSimulation = "YES">
-      <MacroExpansion>
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "52416DA41F27425C00721D17"
-            BuildableName = "libcos_doubles.dylib"
-            BlueprintName = "cos_doubles"
+            BlueprintIdentifier = "528F91911F2F9895008DD596"
+            BuildableName = "probtest"
+            BlueprintName = "probtest"
             ReferencedContainer = "container:fastgenegol.xcodeproj">
          </BuildableReference>
-      </MacroExpansion>
+      </BuildableProductRunnable>
       <AdditionalOptions>
       </AdditionalOptions>
    </LaunchAction>
@@ -60,18 +70,19 @@
       savedToolIdentifier = ""
       useCustomWorkingDirectory = "NO"
       debugDocumentVersioning = "YES">
-      <MacroExpansion>
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "52416DA41F27425C00721D17"
-            BuildableName = "libcos_doubles.dylib"
-            BlueprintName = "cos_doubles"
+            BlueprintIdentifier = "528F91911F2F9895008DD596"
+            BuildableName = "probtest"
+            BlueprintName = "probtest"
             ReferencedContainer = "container:fastgenegol.xcodeproj">
          </BuildableReference>
-      </MacroExpansion>
+      </BuildableProductRunnable>
    </ProfileAction>
    <AnalyzeAction
-      buildConfiguration = "Debug">
+      buildConfiguration = "Release">
    </AnalyzeAction>
    <ArchiveAction
       buildConfiguration = "Release"

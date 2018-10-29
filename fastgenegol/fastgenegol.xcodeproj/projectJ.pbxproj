@@ -7,36 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		521D1DBA1F59B3CE00F948EF /* subgenelife4.c in Sources */ = {isa = PBXBuildFile; fileRef = 0D2CB7311F568DC90013B2E4 /* subgenelife4.c */; };
 		521FDCF71F287EE800F08FFB /* fastgenelife.c in Sources */ = {isa = PBXBuildFile; fileRef = 521FDCF11F287E7100F08FFB /* fastgenelife.c */; };
-		522EB3CE2140760500E00539 /* fastgenelifed.c in Sources */ = {isa = PBXBuildFile; fileRef = 522EB3C2213FDE3700E00539 /* fastgenelifed.c */; };
-		52624301213D63ED00289CCE /* fastgolstat.c in Sources */ = {isa = PBXBuildFile; fileRef = 5283EAB1213D5BD500BC77F3 /* fastgolstat.c */; };
 		5275A12F1F292FA90062765F /* dispgenegol.c in Sources */ = {isa = PBXBuildFile; fileRef = 521FDCFE1F288F4F00F08FFB /* dispgenegol.c */; };
 		5275A1341F2930E90062765F /* cos_doubles.c in Sources */ = {isa = PBXBuildFile; fileRef = 5275A1301F2930E90062765F /* cos_doubles.c */; };
 		5275A1351F2930E90062765F /* cos_doubles.h in Headers */ = {isa = PBXBuildFile; fileRef = 5275A1311F2930E90062765F /* cos_doubles.h */; };
+		5275A1371F2A38C60062765F /* subgenelife2.c in Sources */ = {isa = PBXBuildFile; fileRef = 5275A1361F2A38C60062765F /* subgenelife2.c */; };
 		528F919D1F31E30E008DD596 /* probtestdispatch.c in Sources */ = {isa = PBXBuildFile; fileRef = 528F91941F2F9895008DD596 /* probtestdispatch.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
 		521FDCE01F287A6100F08FFB /* CopyFiles */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = /usr/share/man/man1/;
-			dstSubfolderSpec = 0;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 1;
-		};
-		522EB3C5214075AA00E00539 /* CopyFiles */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = /usr/share/man/man1/;
-			dstSubfolderSpec = 0;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 1;
-		};
-		526242F8213D636000289CCE /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = /usr/share/man/man1/;
@@ -66,13 +46,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		0D2CB72C1F53620A0013B2E4 /* subgenelife3.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = subgenelife3.c; path = fastgenegol/subgenelife3.c; sourceTree = SOURCE_ROOT; };
-		0D2CB7311F568DC90013B2E4 /* subgenelife4.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = subgenelife4.c; path = fastgenegol/subgenelife4.c; sourceTree = SOURCE_ROOT; };
-		0D2CB73A1F569D280013B2E4 /* libgene.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = libgene.h; sourceTree = "<group>"; };
-		0D2CB73C1F569D280013B2E4 /* libgene.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = libgene.m; sourceTree = "<group>"; };
-		0D2CB7481F569D9A0013B2E4 /* gene.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = gene.h; sourceTree = "<group>"; };
-		0D2CB74A1F569D9A0013B2E4 /* gene.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = gene.m; sourceTree = "<group>"; };
-		521D1DB91F59B3CB00F948EF /* genelifeN.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = genelifeN.py; path = fastgenegol/genelifeN.py; sourceTree = SOURCE_ROOT; };
 		521FDCE21F287A6100F08FFB /* fastgenegol */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = fastgenegol; sourceTree = BUILT_PRODUCTS_DIR; };
 		521FDCEA1F287DEE00F08FFB /* subgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = subgenelife.c; path = fastgenegol/subgenelife.c; sourceTree = SOURCE_ROOT; };
 		521FDCEB1F287DEE00F08FFB /* genelife.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = genelife.py; path = fastgenegol/genelife.py; sourceTree = SOURCE_ROOT; };
@@ -83,18 +56,16 @@
 		521FDCF51F287ECE00F08FFB /* batch.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = batch.py; path = fastgenegol/batch.py; sourceTree = SOURCE_ROOT; };
 		521FDCFE1F288F4F00F08FFB /* dispgenegol.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = dispgenegol.c; path = fastgenegol/dispgenegol.c; sourceTree = SOURCE_ROOT; };
 		521FDCFF1F288F4F00F08FFB /* display.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = display.py; path = fastgenegol/display.py; sourceTree = SOURCE_ROOT; };
-		522EB3C2213FDE3700E00539 /* fastgenelifed.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = fastgenelifed.c; path = fastgenegol/fastgenelifed.c; sourceTree = SOURCE_ROOT; };
-		522EB3C7214075AA00E00539 /* fastgenelifed */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = fastgenelifed; sourceTree = BUILT_PRODUCTS_DIR; };
+		523D802F1F5850400077BC8A /* subgenelife4.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = subgenelife4.c; path = fastgenegol/subgenelife4.c; sourceTree = SOURCE_ROOT; };
+		523D80331F59AB9A0077BC8A /* genelifeN.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = genelifeN.py; path = fastgenegol/genelifeN.py; sourceTree = SOURCE_ROOT; };
 		52416DA51F27425C00721D17 /* libcos_doubles.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libcos_doubles.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		52416DB61F27771500721D17 /* libgenelife.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libgenelife.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
-		526242FA213D636000289CCE /* fastgolstat */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = fastgolstat; sourceTree = BUILT_PRODUCTS_DIR; };
 		5275A1281F292FA40062765F /* dispgenegol */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = dispgenegol; sourceTree = BUILT_PRODUCTS_DIR; };
 		5275A1301F2930E90062765F /* cos_doubles.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = cos_doubles.c; path = fastgenegol/cos_doubles.c; sourceTree = SOURCE_ROOT; };
 		5275A1311F2930E90062765F /* cos_doubles.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = cos_doubles.h; path = fastgenegol/cos_doubles.h; sourceTree = SOURCE_ROOT; };
 		5275A1321F2930E90062765F /* cos.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = cos.py; path = fastgenegol/cos.py; sourceTree = SOURCE_ROOT; };
 		5275A1331F2930E90062765F /* cos_doubles.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = cos_doubles.py; path = fastgenegol/cos_doubles.py; sourceTree = SOURCE_ROOT; };
 		5275A1361F2A38C60062765F /* subgenelife2.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = subgenelife2.c; path = fastgenegol/subgenelife2.c; sourceTree = SOURCE_ROOT; };
-		5283EAB1213D5BD500BC77F3 /* fastgolstat.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgolstat.c; path = fastgenegol/fastgolstat.c; sourceTree = SOURCE_ROOT; };
 		528F91921F2F9895008DD596 /* probtest */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = probtest; sourceTree = BUILT_PRODUCTS_DIR; };
 		528F91941F2F9895008DD596 /* probtestdispatch.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.objc; path = probtestdispatch.c; sourceTree = "<group>"; };
 		528F919B1F31E05B008DD596 /* probtest.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = probtest.c; sourceTree = "<group>"; };
@@ -102,17 +73,11 @@
 		528F91A11F33306A008DD596 /* libswiftDispatch.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libswiftDispatch.tbd; path = System/Library/PrivateFrameworks/Swift/libswiftDispatch.tbd; sourceTree = SDKROOT; };
 		528F91A31F333095008DD596 /* SyncServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SyncServices.framework; path = System/Library/Frameworks/SyncServices.framework; sourceTree = SDKROOT; };
 		528F91A51F333143008DD596 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
+		528F91A71F3DDA3C008DD596 /* subgenelife3.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = subgenelife3.c; path = fastgenegol/subgenelife3.c; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		521FDCDF1F287A6100F08FFB /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		522EB3C4214075AA00E00539 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -127,13 +92,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		52416DB31F27771500721D17 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		526242F7213D636000289CCE /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -157,31 +115,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		0D2CB7391F569D280013B2E4 /* libgene */ = {
-			isa = PBXGroup;
-			children = (
-				0D2CB73A1F569D280013B2E4 /* libgene.h */,
-				0D2CB73C1F569D280013B2E4 /* libgene.m */,
-			);
-			path = libgene;
-			sourceTree = "<group>";
-		};
-		0D2CB7471F569D9A0013B2E4 /* gene */ = {
-			isa = PBXGroup;
-			children = (
-				0D2CB7481F569D9A0013B2E4 /* gene.h */,
-				0D2CB74A1F569D9A0013B2E4 /* gene.m */,
-			);
-			path = gene;
-			sourceTree = "<group>";
-		};
-		522EB3C8214075AA00E00539 /* fastgenelifed */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = fastgenelifed;
-			sourceTree = "<group>";
-		};
 		52416DAE1F274A7100721D17 /* cos */ = {
 			isa = PBXGroup;
 			children = (
@@ -197,11 +130,11 @@
 		52416DAF1F274AB000721D17 /* genelifepy */ = {
 			isa = PBXGroup;
 			children = (
-				0D2CB7311F568DC90013B2E4 /* subgenelife4.c */,
-				521D1DB91F59B3CB00F948EF /* genelifeN.py */,
-				0D2CB72C1F53620A0013B2E4 /* subgenelife3.c */,
 				521FDCEA1F287DEE00F08FFB /* subgenelife.c */,
 				5275A1361F2A38C60062765F /* subgenelife2.c */,
+				528F91A71F3DDA3C008DD596 /* subgenelife3.c */,
+				523D802F1F5850400077BC8A /* subgenelife4.c */,
+				523D80331F59AB9A0077BC8A /* genelifeN.py */,
 				521FDCEB1F287DEE00F08FFB /* genelife.py */,
 				521FDCEC1F287DEE00F08FFB /* genelife_update_module.py */,
 			);
@@ -217,9 +150,6 @@
 				525EB7AB1F18DCE4004078F1 /* genelifec */,
 				52416DAE1F274A7100721D17 /* cos */,
 				528F91931F2F9895008DD596 /* probtest */,
-				0D2CB7391F569D280013B2E4 /* libgene */,
-				0D2CB7471F569D9A0013B2E4 /* gene */,
-				522EB3C8214075AA00E00539 /* fastgenelifed */,
 				525EB7AA1F18DCE4004078F1 /* Products */,
 				528F919E1F33303D008DD596 /* Frameworks */,
 			);
@@ -233,8 +163,6 @@
 				521FDCE21F287A6100F08FFB /* fastgenegol */,
 				5275A1281F292FA40062765F /* dispgenegol */,
 				528F91921F2F9895008DD596 /* probtest */,
-				526242FA213D636000289CCE /* fastgolstat */,
-				522EB3C7214075AA00E00539 /* fastgenelifed */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -243,11 +171,9 @@
 			isa = PBXGroup;
 			children = (
 				521FDCF41F287ECE00F08FFB /* fastgol.c */,
-				5283EAB1213D5BD500BC77F3 /* fastgolstat.c */,
 				521FDCF51F287ECE00F08FFB /* batch.py */,
 				521FDCF01F287E7100F08FFB /* fastgenegol.c */,
 				521FDCF11F287E7100F08FFB /* fastgenelife.c */,
-				522EB3C2213FDE3700E00539 /* fastgenelifed.c */,
 			);
 			name = genelifec;
 			path = fastggenegol;
@@ -321,23 +247,6 @@
 			productReference = 521FDCE21F287A6100F08FFB /* fastgenegol */;
 			productType = "com.apple.product-type.tool";
 		};
-		522EB3C6214075AA00E00539 /* fastgenelifed */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 522EB3CB214075AA00E00539 /* Build configuration list for PBXNativeTarget "fastgenelifed" */;
-			buildPhases = (
-				522EB3C3214075AA00E00539 /* Sources */,
-				522EB3C4214075AA00E00539 /* Frameworks */,
-				522EB3C5214075AA00E00539 /* CopyFiles */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = fastgenelifed;
-			productName = fastgenelifed;
-			productReference = 522EB3C7214075AA00E00539 /* fastgenelifed */;
-			productType = "com.apple.product-type.tool";
-		};
 		52416DA41F27425C00721D17 /* cos_doubles */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 52416DA61F27425C00721D17 /* Build configuration list for PBXNativeTarget "cos_doubles" */;
@@ -371,23 +280,6 @@
 			productName = genelife;
 			productReference = 52416DB61F27771500721D17 /* libgenelife.dylib */;
 			productType = "com.apple.product-type.library.dynamic";
-		};
-		526242F9213D636000289CCE /* fastgolstat */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 52624300213D636000289CCE /* Build configuration list for PBXNativeTarget "fastgolstat" */;
-			buildPhases = (
-				526242F6213D636000289CCE /* Sources */,
-				526242F7213D636000289CCE /* Frameworks */,
-				526242F8213D636000289CCE /* CopyFiles */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = fastgolstat;
-			productName = fastfolstat;
-			productReference = 526242FA213D636000289CCE /* fastgolstat */;
-			productType = "com.apple.product-type.tool";
 		};
 		5275A1271F292FA40062765F /* dispgenegol */ = {
 			isa = PBXNativeTarget;
@@ -429,16 +321,11 @@
 		525EB7A11F18DCE4004078F1 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastSwiftUpdateCheck = 0940;
-				LastUpgradeCheck = 0940;
+				LastUpgradeCheck = 0830;
 				ORGANIZATIONNAME = "Ruhr Universität Bochum";
 				TargetAttributes = {
 					521FDCE11F287A6100F08FFB = {
 						CreatedOnToolsVersion = 8.3.3;
-						ProvisioningStyle = Automatic;
-					};
-					522EB3C6214075AA00E00539 = {
-						CreatedOnToolsVersion = 9.4.1;
 						ProvisioningStyle = Automatic;
 					};
 					52416DA41F27425C00721D17 = {
@@ -447,10 +334,6 @@
 					};
 					52416DB51F27771500721D17 = {
 						CreatedOnToolsVersion = 8.3.3;
-						ProvisioningStyle = Automatic;
-					};
-					526242F9213D636000289CCE = {
-						CreatedOnToolsVersion = 9.4.1;
 						ProvisioningStyle = Automatic;
 					};
 					5275A1271F292FA40062765F = {
@@ -480,8 +363,6 @@
 				521FDCE11F287A6100F08FFB /* fastgenegol */,
 				5275A1271F292FA40062765F /* dispgenegol */,
 				528F91911F2F9895008DD596 /* probtest */,
-				526242F9213D636000289CCE /* fastgolstat */,
-				522EB3C6214075AA00E00539 /* fastgenelifed */,
 			);
 		};
 /* End PBXProject section */
@@ -492,14 +373,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				521FDCF71F287EE800F08FFB /* fastgenelife.c in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		522EB3C3214075AA00E00539 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				522EB3CE2140760500E00539 /* fastgenelifed.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -515,15 +388,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				521D1DBA1F59B3CE00F948EF /* subgenelife4.c in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		526242F6213D636000289CCE /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				52624301213D63ED00289CCE /* fastgolstat.c in Sources */,
+				5275A1371F2A38C60062765F /* subgenelife2.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -570,34 +435,6 @@
 			};
 			name = Release;
 		};
-		522EB3CC214075AA00E00539 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
-				CLANG_ENABLE_OBJC_WEAK = YES;
-				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CODE_SIGN_STYLE = Automatic;
-				COPY_PHASE_STRIP = NO;
-				GCC_C_LANGUAGE_STANDARD = gnu11;
-				MACOSX_DEPLOYMENT_TARGET = 10.13;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-			};
-			name = Debug;
-		};
-		522EB3CD214075AA00E00539 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
-				CLANG_ENABLE_OBJC_WEAK = YES;
-				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CODE_SIGN_STYLE = Automatic;
-				COPY_PHASE_STRIP = NO;
-				GCC_C_LANGUAGE_STANDARD = gnu11;
-				MACOSX_DEPLOYMENT_TARGET = 10.13;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-			};
-			name = Release;
-		};
 		52416DA71F27425C00721D17 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -634,7 +471,6 @@
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				EXECUTABLE_PREFIX = lib;
-				"INSTALL_PATH[sdk=*]" = /usr/local/lib;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -649,28 +485,20 @@
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
-				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
 				CLANG_WARN_BOOL_CONVERSION = YES;
-				CLANG_WARN_COMMA = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
-				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
 				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CLANG_WARN_EMPTY_BODY = YES;
 				CLANG_WARN_ENUM_CONVERSION = YES;
 				CLANG_WARN_INFINITE_RECURSION = YES;
 				CLANG_WARN_INT_CONVERSION = YES;
-				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
-				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
-				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
-				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
-				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_IDENTITY = "-";
-				COPY_PHASE_STRIP = YES;
+				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -705,28 +533,20 @@
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
-				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
 				CLANG_WARN_BOOL_CONVERSION = YES;
-				CLANG_WARN_COMMA = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
-				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
 				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CLANG_WARN_EMPTY_BODY = YES;
 				CLANG_WARN_ENUM_CONVERSION = YES;
 				CLANG_WARN_INFINITE_RECURSION = YES;
 				CLANG_WARN_INT_CONVERSION = YES;
-				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
-				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
-				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
-				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
-				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_IDENTITY = "-";
-				COPY_PHASE_STRIP = YES;
+				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -741,39 +561,6 @@
 				MACOSX_DEPLOYMENT_TARGET = 10.12;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = macosx;
-			};
-			name = Release;
-		};
-		526242FE213D636000289CCE /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
-				CLANG_ENABLE_OBJC_WEAK = YES;
-				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CODE_SIGN_STYLE = Automatic;
-				COPY_PHASE_STRIP = NO;
-				GCC_C_LANGUAGE_STANDARD = gnu11;
-				MACOSX_DEPLOYMENT_TARGET = 10.13;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 4.0;
-			};
-			name = Debug;
-		};
-		526242FF213D636000289CCE /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
-				CLANG_ENABLE_OBJC_WEAK = YES;
-				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CODE_SIGN_STYLE = Automatic;
-				COPY_PHASE_STRIP = NO;
-				GCC_C_LANGUAGE_STANDARD = gnu11;
-				MACOSX_DEPLOYMENT_TARGET = 10.13;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule";
-				SWIFT_VERSION = 4.0;
 			};
 			name = Release;
 		};
@@ -848,15 +635,6 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		522EB3CB214075AA00E00539 /* Build configuration list for PBXNativeTarget "fastgenelifed" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				522EB3CC214075AA00E00539 /* Debug */,
-				522EB3CD214075AA00E00539 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		52416DA61F27425C00721D17 /* Build configuration list for PBXNativeTarget "cos_doubles" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -880,15 +658,6 @@
 			buildConfigurations = (
 				525EB7AE1F18DCE4004078F1 /* Debug */,
 				525EB7AF1F18DCE4004078F1 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		52624300213D636000289CCE /* Build configuration list for PBXNativeTarget "fastgolstat" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				526242FE213D636000289CCE /* Debug */,
-				526242FF213D636000289CCE /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

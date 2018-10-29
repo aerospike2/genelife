@@ -110,7 +110,12 @@ def update(N=1000,dohisto=1):                   # update without animation.
 
 cnt = 0
 framenr = 0
-def doanimation(nrun=1000,ndisp=100,niter=10):    
+def doanimation(nrun=1000,ndisp=100,niter=10):
+    """ total number of steps is niter*nrun (default 10000)
+        with the first ndisp steps of each iteration of nrun steps being displayed (so ndisp should be <= nrun)
+        this animation routine calls the C library function genelife_update 
+        via the intermediate module genelife_update_module.py
+    """
     fig, ax = plt.subplots()
     time_text = ax.text(0.05, 0.95,'',horizontalalignment='left',verticalalignment='top', transform=ax.transAxes)
     colorgrid(N)
@@ -122,8 +127,8 @@ def doanimation(nrun=1000,ndisp=100,niter=10):
         global cnt
         global framenr
         cnt = cnt+1
-        if cnt % ndisp == 0:  # insert the non-displayed iterations
-            genelife.genelife_update(gol, golg, log2N, nrun, simparams,0)
+        if cnt % ndisp == 0:  # insert the non-displayed iterations :
+            genelife.genelife_update(gol, golg, log2N, nrun-(ndisp-1), simparams,0)
             framenr = framenr+nrun
         genelife.genelife_update(gol, golg, log2N, 1, simparams,0)
         framenr = framenr+1
@@ -153,9 +158,9 @@ if __name__ == '__main__':
     cgrid = np.zeros((N,N),np.uint)
 
     flatoff =  [x for sublist in offsets for x in sublist]
-    npoffsets = np.array(flatoff,np.int32)
-    numHis = pow(2,len(offsets))
-    histo=np.zeros(numHis,np.uint64)
+    npoffsets = np.array(flatoff,np.int32)   # flattened numpy array of offsets
+    numHis = pow(2,len(offsets))             # number of elements in history array : 2^len(offsets)
+    histo=np.zeros(numHis,np.uint64)         # history array with elements initialized to zero
     genelife.initialize_planes(npoffsets)
 
     nlog2p0   = simparams[0] = 8

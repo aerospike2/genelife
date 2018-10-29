@@ -25,9 +25,9 @@ const int Nmask = N - 1;            // bit mask for side length, used instead of
 const int nlog2p0 = 5;              // p0 = 2 to the power of - nlog2p0
 const int nlog2pmut = 5;            // pmut = probmut = 2 to the power of - nlog2pmut
 
-int nsteps = 10000;                 // total number of steps to simulate GoL
+int nsteps = 100000;                // total number of steps to simulate GoL
 int ndisp  = 10000;                 // display GoL every ndisp steps
-int tdisp  = 0;                     // extra time delay in ms betwene displays
+int tdisp  = 0;                     // extra time delay in ms between displays
 int rule2mod = 1;                   // whether to modify two live nb rule as well or only three nb rule
 int selection = 1;                  // fitness model: 0 neutral 1 selected gene prob of rule departure 2 presence of replicase gene
 static long unsigned int  emptysites = 0;  // cumulative number of empty sites during simulation updates
@@ -68,12 +68,12 @@ void update (long unsigned int gol[], long unsigned int golg[]) {
 
 
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
-	i = ij & Nmask;  j = ij >> log2N;                                   // row & column
-	jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
-	ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                         // toroidal i+1, i-1
+	    i = ij & Nmask;  j = ij >> log2N;                                   // row & column
+	    jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
+	    ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                         // toroidal i+1, i-1
         nb[0]=j*N+ip1; nb[1]=j*N+im1; nb[2]=jp1+i; nb[3]=jp1+ip1; nb[4]=jp1+im1; nb[5]=jm1+i; nb[6]=jm1+ip1; nb[7]=jm1+im1; //nbs
         for (k=0,nb1i=0;k<8;k++) nb1i = (nb1i << (gol[nb[k]]<<2)) + (gol[nb[k]]*k);   // packs non-zero nb indices in first up to 8*4 bits
-	s = gol[nb[0]]+gol[nb[1]]+gol[nb[2]]+gol[nb[3]]+gol[nb[4]]+gol[nb[5]]+gol[nb[6]]+gol[nb[7]]; // number of live nbs
+	    s = gol[nb[0]]+gol[nb[1]]+gol[nb[2]]+gol[nb[3]]+gol[nb[4]]+gol[nb[5]]+gol[nb[6]]+gol[nb[7]]; // number of live nbs
         s2or3 = (1 - (((s>>3)&1) | ((s>>2)&1))) * (s>>1 & 1);               // 1 if 2 or 3 neighbors are alive
         if (s2or3 == 1) {                                                   // if 2 or 3 neighbors alive
             RAND128P(randnr);                                                 // expansion inline so compiler recognizes auto-vectorization options

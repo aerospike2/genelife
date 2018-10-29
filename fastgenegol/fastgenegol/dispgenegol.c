@@ -38,15 +38,15 @@ const int N = 0x1 << log2N;
 const int N2 = N*N;                 // number of sites in toroidal array
 const int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
 
-const int nlog2p0 = 10;              // p0 = 2 to the power of - nlog2p0
+const int nlog2p0 = 10;             // p0 = 2 to the power of - nlog2p0
 const int nlog2pmut = 5;            // pmut = probmut = 2 to the power of - nlog2pmut
 
-int nsteps = 200;                 // total number of steps to simulate GoL = nsteps*(nskip+ndisp)
+int nsteps = 200;                   // total number of steps to simulate GoL = nsteps*(nskip+ndisp)
 int nskip = 1000;
-int ndisp = 200;                  // display GoL every step for ndisp steps
+int ndisp = 200;                    // display GoL every step for ndisp steps
 int tdisp = 0;                      // extra time delay in ms betwene displays
 
-long unsigned int state[2];                  // State for xorshift pseudorandom number generation. The state must be seeded so that it is not zero
+long unsigned int state[2];         // State for xorshift pseudorandom number generation. The state must be seeded so that it is not zero
                                     // Wikipedia "Xorshift" rewritten here as inline macro &
                                     // Vigna, Sebastiano. "xorshift*/xorshift+ generators and the PRNG shootout". Retrieved 2014-10-25.
 #define RAND128P(val) {                                                       \
@@ -123,14 +123,15 @@ void print (long unsigned int gol[], long unsigned int golg[]) {   /* print the 
 }
 
 void printxy (long unsigned int gol[],long unsigned int golg[]) {   /* print the game of life configuration */
+                                                                    /* prints only live cells, saving for sparse cases */
     int	ij, col, X, Y;
     // https://stackoverflow.com/questions/27159322/rgb-values-of-the-colors-in-the-ansi-extended-colors-index-17-255
     for (ij=0; ij<N2; ij++) {
       if(gol[ij]>0){
-	col = 32+((golg[ij]>>57)&0x7f);
-	X = ij % N;
-	Y = ij / N;
-	printf("%d %d %d ",col,X,Y);
+	    col = 32+((golg[ij]>>57)&0x7f);
+	    X = ij % N;
+	    Y = ij / N;
+	    printf("%d %d %d ",col,X,Y);
       }
     }
     printf("\n");
@@ -261,8 +262,8 @@ int main (int argc, char *argv[]) {
     initialize_genes (golg,gol);                /* random initial genes */
     
     for (i=0; i<nsteps; i++) {                  /* nsteps */
-	for(k=0; k< ndisp; k++){
-	    printxy(gol,golg);
+    for(k=0; k< ndisp; k++){
+        printxy(gol,golg);
 	    update (gol, golg);
 	}
 	for(k=0; k< nskip; k++){
