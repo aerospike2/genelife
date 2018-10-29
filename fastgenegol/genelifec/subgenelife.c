@@ -172,7 +172,7 @@ void colorgenes(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[
                         case 3 : g2c = (1L<<ncoding)-1L;gdiff = gene^g2c; POPCOUNT64C(gdiff,d2);
                                  mask = d<d2 ? (d<<26)+0xff : (d2<<10)+0xff; break;
                         case 4 : mask = d < ncoding ? ((0x3f^d)<<20)+0xff : ((64-d < ncoding) ? ((0x3f^d)<<12)+0xff : 0xf0f0f0ff); break;
-                        case 5 : mask = d >= 32 ? ((0x3f^(64-d))<<12)+0xff : ((0x3f^d)<<20)+0xff; break;
+                        case 5 : mask = d >= 32 ? ((0x3f^(64-d))<<10)+0xff : ((0x3f^d)<<18)+0xff; break;
                         case 7 : g2c = (gene>>8)&((1L<<ncoding)-1L);
                                  gdiff = gene&0xff;POPCOUNT64C(gdiff,d2);d = d2>7? 7 : d2;
                                  mask = g2c ? 0xf0f0f0ff : ((0x1f+(d<<5))<<8)+(((gdiff>>4)&0xf)<<27)+(((gdiff&0xf)<<4)<<16)+0xff; break;
@@ -274,12 +274,13 @@ extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], ui
         }
         else if (selection==5) {                         // predator prey model : prey evolves to all 0, predator to all 1
             gdiff=livegenes[0]^livegenes[1];
-            gdiff1=livegenes[0]^~(~livegenes[1]);
+            gdiff1=livegenes[0]^(~livegenes[1]);
             POPCOUNT64C(gdiff1,dd);
-            prey = d0<32 || d1<32;                       // prey present : newgene is one with less ones, 1 prey : predator wins
-            prey2 = d0<32 && d1<32;                       // 2 prey : newgene is one with less ones, 1 prey : predator wins
-            *birth = (gdiff && prey && dd<ncoding) ? 1L: 0L;           // birth if different and >=1 prey and close enough match)
-            *newgene= (prey2 ? (d0<d1 ? livegenes[0] : livegenes[1]) : (d0<32 ? livegenes[1] : livegenes[0]));
+            prey = (d0<32) || (d1<32);                        // prey present : newgene is one with less ones, 1 prey : predator wins
+            prey2 = (d0<32) && (d1<32);                       // 2 prey : newgene is one with less ones, 1 prey : predator wins
+            // *birth = (gdiff && prey && dd<ncoding) ? 1L: 0L;           // birth if different and >=1 prey and close enough match)
+            *birth = ((gdiff && prey2) || (prey && (!prey2) && (dd<ncoding))) ? 1L: 0L; // birth if different and >=1 prey and close enough match)
+            *newgene= (prey2 ? ((d0<d1) ? livegenes[0] : livegenes[1]) : ((d0<32) ? livegenes[1] : livegenes[0]));
         }
         else if (selection==6) {                         // use next 4 color game on number ones mod 4
                                                          // red 0 green 1 blue 2 white 3
@@ -546,11 +547,12 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 RAND128P(randnr);                                           // inline exp so compiler recognizes auto-vec,
                 // compute random events for single bit mutation, as well as mutation position nmut
                 randnr2 = (randnr & pmutmask);                // extract bits from randnr for random trial for 0 on pmutmask
-                r2 = ((~pmutmask)||randnr2)?0L:1L;                          // 1 if lowest nlog2pmut bits of randnr are zero, else zero
+                r2 = (!pmutmask||randnr2)?0L:1L;                            // 1 if lowest nlog2pmut bits of randnr are zero, else zero
                 nmut = (randnr >> 56) & 0x3f;                               // choose mutation position for length 64 gene : from bits 56:61 of randnr
                 // complete calculation of newgol and newgolg, including mutation
                 ancestor = newgene;
                 newgene = newgene ^ (r2<<nmut);                             // introduce single mutation with probability pmut = probmut
+                // if(newgene^ancestor) fprintf(stderr,"newgene %llu written at step %d with ancestor %llu\n",newgene, totsteps,ancestor);     // DEBUG
                 if(gol[ij]) {                                               // central old gene present: overwritten
                     if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
                         genedataptr->popcount--;  // if 0 lastextinctionframe updated after whole frame calculated
@@ -926,16 +928,16 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     fprintf(stderr,"runparams %d %d %d %d %d %d %d\n",runparams[0],runparams[1],runparams[2],
                                          runparams[3],runparams[4],runparams[5],runparams[6]);
     fprintf(stderr,"simparams %d %d %d %d %d\n",simparams[0],simparams[1],simparams[2],simparams[3],simparams[4]);
-    fprintf(stderr,"pmutmask %llu (NB 0 means no mutation)\n",pmutmask);
+    fprintf(stderr,"pmutmask %llx (NB 0 means no mutation)\n",pmutmask);
     
     switch (selection) {
         case 0: for (k=0;k<4;k++) {startgenes[k]=0xf0f0f0f0f0f0f0f0;startgenes[k+4]=0x0f0f0f0f0f0f0f0f;}; break;
         case 1: for (k=0;k<8;k++) startgenes[k]=((0x1L<<k*3)-1L)<<20;break;
         case 6:
         case 2: for (k=0;k<8;k++) startgenes[k]=(((0x1L<<20)-1L)<<20)+((0x1L<<k)-0x1L);break;
+        case 5:  for (k=0;k<8;k++) {g = 0xf0L + k; startgenes[k]= k<4 ? g : (~g)|(0xfL<<16);} break;
         case 3:
         case 4:
-        case 5:
         case 7:
         default: for (k=0;k<8;k++) startgenes[k]=(0x1L<<(4+k*8))-1L;break;
     }
