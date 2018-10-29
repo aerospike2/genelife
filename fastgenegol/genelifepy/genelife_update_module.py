@@ -39,12 +39,14 @@ libcd.init_histo.argtypes = None
 libcd.get_curgol.restype = None
 libcd.get_curgol.argtypes = [uint64_array,c_int]
 libcd.get_curgolg.restype = None
+libcd.get_curgolgstats.argtypes = [uint64_array,c_int]
+libcd.get_curgolgstats.restype = None
 libcd.get_curgolg.argtypes = [uint64_array,c_int]
 libcd.get_stats.restype = None
 libcd.get_stats.argtypes = [int_array, int_array, int_array, c_int]
 libcd.get_activities.restype = None
 libcd.get_activities.argtypes = [uint64_array, int_array, int_array]
-libcd.colorgenes.argtypes = [uint64_array, uint64_array, int_array, c_int]
+libcd.colorgenes.argtypes = [uint64_array, uint64_array, uint64_array, int_array, c_int]
 
 def genelife_update(nsteps, nhist, nstat):
     return libcd.genelife_update(nsteps, nhist, nstat)
@@ -54,6 +56,9 @@ def get_curgol(gol):
 
 def get_curgolg(golg):
     return libcd.get_curgolg(golg, int(len(golg)))
+
+def get_curgolgstats(golgstats):
+    return libcd.get_curgolgstats(golgstats, int(len(golgstats)))
 
 def initialize(runparams,simparams):
     return libcd.initialize(runparams, len(runparams), simparams, len(simparams))
@@ -82,5 +87,5 @@ def get_stats(livesites,genotypes,stepstats,nstats):
 def get_activities(actgenes,activities,ngenesp):
     return libcd.get_activities(actgenes,activities,ngenesp)
 
-def colorgenes(gol, golg, cgolg):
-    return libcd.colorgenes( gol, golg, cgolg, len(gol))
+def colorgenes(gol, golg, golgstats, cgolg):
+    return libcd.colorgenes( gol, golg, golgstats, cgolg, len(gol))
