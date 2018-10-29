@@ -119,6 +119,8 @@ uint64_t planeg7[N2];
 #endif
 
 uint64_t golgstats[N2];             // 64 bit masks for different events during processing
+uint64_t newgolgstats[N2];             // 64 bit masks for different events during processing
+
 #define F_notgolrul 0x1
 #define F_2_live    0x2
 #define F_3_live    0x4
@@ -610,7 +612,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
         }
         else if (golgstats[ij]&F_nongolchg) statflag |= F_nongolchg;        // maintain non-GoL chg status until state changed by GoL rule
         emptysites = emptysites + newgol[ij];                               // keep track of empty sites, same information as total activity of occupied sites
-        golgstats[ij] = statflag;
+        newgolgstats[ij] = statflag;
     }  // end for ij
 
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records including activities
@@ -633,6 +635,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
     for (ij=0; ij<N2; ij++) {        // update lattices
 	    gol[ij] = newgol[ij];        // copy new gol config to old one
 	    golg[ij] = newgolg[ij];      // copy new genes to old genes
+        golgstats[ij] = newgolgstats[ij]; // copy new golg stat flags to old genes
     }
 }
 
