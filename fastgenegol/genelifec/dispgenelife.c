@@ -53,7 +53,7 @@ int main (int argc, char *argv[]) {
     runparams[3] = 0;        // NY updated
     runparams[4] = 0;        // NY updated
     runparams[5] = 0;        // colorfunction 0 or 1
-    runparams[6] = 0;        // fileinit 0 or 1
+    runparams[6] = 0;        // fileinit 0 or 1, if >1 then size of random init array
     simparams[0] = 0;        // nlog2pmut: gene mutation probability
     simparams[1] = 16384;    // initial1density: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
     simparams[2] = 32768;    // initialrdensity: 32768 makes all genomes active 16384 makes half active, etc.

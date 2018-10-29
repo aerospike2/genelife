@@ -108,7 +108,7 @@ int main (int argc, char *argv[]) {
     runparams[3] = 2;        // overwritemask = 2 bit mask
     runparams[4] = 0;        // survival mask for two (bit1) and three (bit0) params
     runparams[5] = 0;        // colorfunction 0 or 1
-    runparams[6] = 0;        // fileinit 0 or 1
+    runparams[6] = 0;        // fileinit 0 or 1, if >1 then size of random init array
     simparams[0] = 8;        // nlog2pmut: gene mutation probability
     simparams[1] = 16384;    // initial1density: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
     simparams[2] = 32768 ;   // initialrdensity: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
