@@ -431,30 +431,34 @@ void hashtable_term( hashtable_t* table )
 
 
 // from https://gist.github.com/badboy/6267743
+// Hash fn key code by Thomas Wang http://web.archive.org/web/20071223173210/http://www.concentric.net/~Ttwang/tech/inthash.htm
 static HASHTABLE_U32 hashtable_internal_calculate_hash( HASHTABLE_U64 key )
     {
-    HASHTABLE_U64 oldkey;
-    int count;                  // JSMcCaskill modified to avoid zero is some cases
-    count = 0;                  // JSMcCaskill modified to avoid zero is some cases
-    oldkey= key;                // JSMcCaskill modified to avoid zero is some cases
-    while (1) {                 // JSMcCaskill modified to avoid zero is some cases
+    HASHTABLE_U64 firstkey,oldkey;
+    int count;                                          // JSMcCaskill modified to avoid zero in some cases
+    count = 0;                                          // JSMcCaskill modified to avoid zero in some cases
+    oldkey = firstkey = key;                            // JSMcCaskill modified to avoid zero in some cases
+    while (1) {                                         // JSMcCaskill modified to avoid zero in some cases
         key = ( ~key ) + ( key << 18 );
         key = key ^ ( key >> 31 );
         key = key * 21;
         key = key ^ ( key >> 11 );
         key = key + ( key << 6 );
         key = key ^ ( key >> 22 );
-        if(key != 0L) break;    // JSMcCaskill modified to avoid zero is some cases
-        count++;                // JSMcCaskill modified to avoid zero is some cases
-        oldkey += (oldkey+1ul) * 11400714819323198549ul; // JSMcCaskill modified to avoid zero is some cases
-        if(count>10) break;     // JSMcCaskill modified to avoid zero is some cases
-    }                           // JSMcCaskill modified to avoid zero is some cases
-    if (key == 0L) fprintf(stderr,"for input %llx key is zero in hashtable.h line 442\n",oldkey);
+        if((HASHTABLE_U32) key) break;                  // JSMcCaskill modified to avoid zero in some cases
+        count++;                                        // JSMcCaskill modified to avoid zero in some cases
+        key = (oldkey+1ull) * 11400714819323198549ull;  // JSMcCaskill modified to avoid zero in some cases
+        if(count>10) break;                             // JSMcCaskill modified to avoid zero in some cases
+    }                                                   // JSMcCaskill modified to avoid zero in some cases
+    if (count!=0) fprintf(stderr,"hash zero key corrected for key %llx with count %d\n",firstkey,count);
+    if (!(HASHTABLE_U32) key) {                         // JSMcCaskill modified to avoid zero in some cases
+        fprintf(stderr,"stopping for input %llx key is zero in hashtable.h line 442\n",firstkey);
+        exit(1);
+    }
     HASHTABLE_ASSERT( key );
     
     return (HASHTABLE_U32) key;
     }
-
 
 static int hashtable_internal_find_slot( hashtable_t const* table, HASHTABLE_U64 key )
     {
@@ -548,9 +552,10 @@ void hashtable_insert( hashtable_t* table, HASHTABLE_U64 key, void const* item )
     {
     HASHTABLE_ASSERT( hashtable_internal_find_slot( table, key ) < 0 );
 
-    if( table->count >= ( table->slot_capacity - table->slot_capacity / 3 ) )
+    if( table->count >= ( table->slot_capacity - table->slot_capacity / 3 ) ) {
+        fprintf(stderr,"Expanding hash table slots at table count %d\n",table->count);   // JSMcCaskill debug
         hashtable_internal_expand_slots( table );
-        
+    }
     int const slot_mask = table->slot_capacity - 1;
     HASHTABLE_U32 const hash = hashtable_internal_calculate_hash( key );
 
@@ -572,8 +577,10 @@ void hashtable_insert( hashtable_t* table, HASHTABLE_U64 key, void const* item )
     while( table->slots[ slot ].key_hash )
         slot = ( slot + 1 ) & slot_mask;
 
-    if( table->count >= table->item_capacity )
+    if( table->count >= table->item_capacity ) {
+        fprintf(stderr,"Expanding hash table items at table count %d\n",table->count);   // JSMcCaskill debug
         hashtable_internal_expand_items( table );
+    }
 
     HASHTABLE_ASSERT( !table->slots[ slot ].key_hash && ( hash & (HASHTABLE_U32) slot_mask ) == (HASHTABLE_U32) base_slot );
     HASHTABLE_ASSERT( hash );
