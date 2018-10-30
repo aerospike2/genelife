@@ -95,9 +95,9 @@ def rand_cmap(nlabels, type='bright', first_color_black=True, last_color_black=F
 
 def colorgrid():
     """ colors array according to grid and genegrid using colormethod"""
-    global gol,cgrid,golg,golgstats,cgolg,N
+    global cgrid,cgolg,N
     
-    genelife.colorgenes(gol,golg,golgstats,cgolg)
+    genelife.colorgenes(cgolg)
     for i in xrange(N):
         for j in xrange(N):
             ij = i+j*N
@@ -131,7 +131,8 @@ def doanimation(nrun=1,         # number of CA iterations per animation time ste
     time_text = ax.text(0.05, 0.95,'',horizontalalignment='left',verticalalignment='top', transform=ax.transAxes)
     colorgrid(N)
     def update_anim(data):
-        global gol, golg, golgstats, cgrid
+        # global gol, golg, golgstats
+        global cgrid
         global cnt
         global framenr
         cnt = cnt+1
@@ -139,9 +140,9 @@ def doanimation(nrun=1,         # number of CA iterations per animation time ste
             genelife.genelife_update(nskip, nhist, nstat)
             cnt = cnt+nskip            # keep cnt as track of number of iterations
         genelife.genelife_update(1, nhist, nstat)
-        genelife.get_curgol(gol)
-        genelife.get_curgolg(golg)
-        genelife.get_curgolgstats(golgstats)
+        #genelife.get_curgol(gol)
+        #genelife.get_curgolg(golg)
+        #genelife.get_curgolgstats(golgstats)
         framenr = framenr+1         # 1 should be nrun
         colorgrid(N)                # sets cgrid from gol, golg
         mat.set_data(cgrid)

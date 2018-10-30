@@ -24,8 +24,10 @@ libcd.initialize.restype = None
 libcd.initialize.argtypes = [int_array, c_int, int_array, c_int]
 libcd.initialize_planes.restype = None
 libcd.initialize_planes.argtypes = [int_array, c_int]
+libcd.countspecies1.restype = None
+libcd.countspecies1.argtypes = [uint64_array, uint64_array, c_int]
 libcd.countspecies.restype = None
-libcd.countspecies.argtypes = [uint64_array, uint64_array, c_int]
+libcd.countspecies.argtypes = None
 libcd.countspecieshash.restype = None
 libcd.countspecieshash.argtypes = None
 #libcd.print_gol.restype = None
@@ -46,7 +48,10 @@ libcd.get_stats.restype = None
 libcd.get_stats.argtypes = [int_array, int_array, int_array, c_int]
 libcd.get_activities.restype = None
 libcd.get_activities.argtypes = [uint64_array, int_array, int_array]
-libcd.colorgenes.argtypes = [uint64_array, uint64_array, uint64_array, int_array, c_int]
+libcd.colorgenes1.restype = None
+libcd.colorgenes1.argtypes = [uint64_array, uint64_array, uint64_array, int_array, c_int]
+libcd.colorgenes.restype = None
+libcd.colorgenes.argtypes = [int_array, c_int]
 
 def genelife_update(nsteps, nhist, nstat):
     return libcd.genelife_update(nsteps, nhist, nstat)
@@ -66,8 +71,11 @@ def initialize(runparams,simparams):
 def initialize_planes(offsets):
     return libcd.initialize_planes(offsets, int(len(offsets)))
 
-def countspecies(gol, golg):
-    return libcd.countspecies(gol, golg,  len(golg))
+def countspecies1(gol, golg):
+    return libcd.countspecies1(gol, golg,  len(golg))
+
+def countspecies():
+    return libcd.countspecies()
 
 def countspecieshash():
     return libcd.countspecieshash()
@@ -87,5 +95,8 @@ def get_stats(livesites,genotypes,stepstats,nstats):
 def get_activities(actgenes,activities,ngenesp):
     return libcd.get_activities(actgenes,activities,ngenesp)
 
-def colorgenes(gol, golg, golgstats, cgolg):
-    return libcd.colorgenes( gol, golg, golgstats, cgolg, len(gol))
+def colorgenes1(gol, golg, golgstats, cgolg):
+    return libcd.colorgenes1( gol, golg, golgstats, cgolg, len(gol))
+
+def colorgenes(cgolg):
+    return libcd.colorgenes( cgolg, len(cgolg))

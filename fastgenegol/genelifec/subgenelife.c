@@ -120,8 +120,9 @@ uint64_t planeg6[N2];
 uint64_t planeg7[N2];
 #endif
 
+uint64_t *gol, *golg;               // pointers to gol and golg arrays at one of the plane cycle locations
 uint64_t golgstats[N2];             // 64 bit masks for different events during processing
-uint64_t newgolgstats[N2];             // 64 bit masks for different events during processing
+uint64_t newgolgstats[N2];          // 64 bit masks for different events during processing
 
 #define F_notgolrul 0x1
 #define F_2_live    0x2
@@ -157,7 +158,7 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
     xxxx = (xxxx + (xxxx >> 4)) & m4;        /* put count of each 8 bits into those 8 bits */ \
     val = (xxxx * h01) >> 56;}               /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
 
-void colorgenes(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2) {
+void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2) {
     uint64_t gene, gdiff, g2c, mask;
     int ij,d,d2;
 
@@ -210,6 +211,10 @@ void colorgenes(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[
     }
     //for(d=0;d<256;d++)
     //    if (counts[d]) fprintf(stderr,"counting hash table hash %d has %d counts\n",d,counts[d]);
+}
+
+void colorgenes(int cgolg[], int NN2) {
+    colorgenes1(gol, golg, golgstats, cgolg, NN2);
 }
 
 extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene) {
@@ -760,12 +765,10 @@ void genelife_update (int nsteps, int nhist, int nstat) {
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
     int t;
-    uint64_t *gol, *newgol, *golg, *newgolg;
+    uint64_t *newgol, *newgolg;
 
     for (t=0; t<nsteps; t++) {
-        gol = planes[curPlane];                         // get planes of gol,golg data
         newgol = planes[newPlane];
-        golg = planesg[curPlane];
         newgolg = planesg[newPlane];
 
         update(gol,golg,newgol,newgolg);                // calculate next iteration
@@ -774,6 +777,8 @@ void genelife_update (int nsteps, int nhist, int nstat) {
 
         curPlane = (curPlane +1) % numPlane;            // update plane pointers to next cyclic position
         newPlane = (newPlane +1) % numPlane;
+        gol = planes[curPlane];                         // get planes of gol,golg data
+        golg = planesg[curPlane];
     }
 }
 
@@ -893,8 +898,7 @@ int writeFile(char *fileName)     // initialize 32x32 genepat file with all empt
 void initialize (int runparams[], int nrunparams, int simparams[], int nsimparams) {
     int ij,ij1,i0,j0,i,j,Nf,k,cnt,icf;
     uint64_t g;
-    uint64_t *gol;
-    uint64_t *golg;
+
 #ifdef HASH
     int hcnt;
 #endif
@@ -1088,7 +1092,7 @@ int cmpfunc1 ( const void *pa, const void *pb )
         return (int) (b[1] - a[1]);
 }
 
-void countspecies(uint64_t gol[], uint64_t golg[], int N2) {  /* counts numbers of all different species using qsort first */
+void countspecies1(uint64_t gol[], uint64_t golg[], int N2) {  /* counts numbers of all different species using qsort first */
     int ij, k, ngenes, ijlast, nspecies, counts[N2], nones;
     uint64_t last, golgs[N2], fitness;
     uint64_t golgsc[N2][2];
@@ -1149,6 +1153,10 @@ void countspecies(uint64_t gol[], uint64_t golg[], int N2) {  /* counts numbers 
     fprintf(stderr,"%d\t%d\t\t%d\t\t%d\t\t%d\n",rulemod,repscheme,selection,overwritemask,survival);
     fprintf(stderr,"nlog2pmut\tinit1\tinitr\tncoding\tstartchoice\n");
     fprintf(stderr,"%d\t\t%d\t%d\t%d\t%d\n",nlog2pmut,initial1density,initialrdensity,ncoding,startgenechoice);
+}
+
+void countspecies() {
+    countspecies1(gol, golg, N2);
 }
 
 #ifdef HASH
