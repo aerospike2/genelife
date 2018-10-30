@@ -169,13 +169,13 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 POPCOUNT64C(gene,d);                    // assigns number of ones in gene to d
                 switch (selection) {
                         case 0 : mask = ((gene>>40)<<8)+0xff; break;
-                        case 1 : mask = ((d+(d<<6)+(d<<12)+(d<<18))<<8) + 0xff; break;
-                        case 6 :
-                        case 2 : d = d & 0x3; mask = d==3 ? 0xf0f0f0ff : ((0xff<<(d<<3))<<8)+0xff; break;
-                        case 3 : g2c = (1L<<ncoding)-1L;gdiff = gene^g2c; POPCOUNT64C(gdiff,d2);
+                        case 1 : mask = d==64? 0xffffffff : ((((d&3)<<22)+(((d>>2)&3)<<14)+(((d>>4)&3)<<6))<<8) + 0xff; break;  // number of ones color gradient from black to white
+                        case 2 :
+                        case 3 : d = d & 0x3; mask = d==3 ? 0xf0f0f0ff : ((0xff<<(d<<3))<<8)+0xff; break;  // scissors-stone-well-paper: red-green-blue-white
+                        case 4 : mask = d < ncoding ? ((0x3f^d)<<19)+0xff : ((64-d < ncoding) ? ((0x3f^d)<<11)+0xff : 0xf0f0f0ff); break; // near 0 green, near 1 red, others white
+                        case 5 : mask = d >= 32 ? ((0x3f^(64-d))<<11)+0xff : ((0x3f^d)<<19)+0xff; break;  //predators green, prey red
+                        case 6 : g2c = (1L<<ncoding)-1L;gdiff = gene^g2c; POPCOUNT64C(gdiff,d2);
                                  mask = d<d2 ? (d<<26)+0xff : (d2<<10)+0xff; break;
-                        case 4 : mask = d < ncoding ? ((0x3f^d)<<20)+0xff : ((64-d < ncoding) ? ((0x3f^d)<<12)+0xff : 0xf0f0f0ff); break;
-                        case 5 : mask = d >= 32 ? ((0x3f^(64-d))<<10)+0xff : ((0x3f^d)<<18)+0xff; break;
                         case 7 : g2c = (gene>>8)&((1L<<ncoding)-1L);
                                  gdiff = gene&0xff;POPCOUNT64C(gdiff,d2);d = d2>7? 7 : d2;
                                  mask = g2c ? 0xf0f0f0ff : ((0x1f+(d<<5))<<8)+(((gdiff>>4)&0xf)<<27)+(((gdiff&0xf)<<4)<<16)+0xff; break;
@@ -219,77 +219,40 @@ void colorgenes(int cgolg[], int NN2) {
 
 extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene) {
 // birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene.
-    unsigned int k,d0,d1,d2,d3,dd,swap;                   // number of ones in various gene combinations
-    uint64_t livegenes[2],gdiff,gdiff0,gdiff1;                       // various gene combinations
-    uint64_t gene2centre;                               // gene function centres in sequence space
+    unsigned int k,d0,d1,d2,d3,dd,swap;                  // number of ones in various gene combinations
+    uint64_t livegenes[2],gdiff,gdiff0,gdiff1;           // various gene combinations
+    uint64_t gene2centre;                                // gene function centres in sequence space
     int g0011,g0110,prey,prey2;
 
     for(k=0;k<2;k++) livegenes[k] = golg[nb[(nb2i>>(k<<2))&0x7]];
-    if (selection==0) {                                  // use integer value of sequence as fitness
-        *birth = (livegenes[0]^livegenes[1]) ? 1L: 0L;   // birth condition is two genes different
-        *newgene = livegenes[0]>livegenes[1] ?  livegenes[0] : livegenes[1]; // choose one with larger gene to replicate
-    }
-    else if (selection==7) {                             // no special birth allowed
-        *birth = 0L;
-        *newgene = livegenes[0];
-    }
-    else {
-        POPCOUNT64C(livegenes[0],d0);
-        POPCOUNT64C(livegenes[1],d1);
-        if (selection==1) {                              // use number of ones in sequence as fitness
-            *birth = (d0^d1) ? 1L: 0L;                   // birth condition if two genes different in number of ones
+    POPCOUNT64C(livegenes[0],d0);
+    POPCOUNT64C(livegenes[1],d1);
+    switch (selection) {
+        case 0:                                          // integer value of sequence as fitness
+            *birth = (livegenes[0]^livegenes[1]) ? 1L: 0L; // birth condition is two genes different
+            *newgene = livegenes[0]>livegenes[1] ?  livegenes[0] : livegenes[1]; // choose one with larger gene to replicate
+            break;
+
+        case 1:                                          // number of ones in sequence as fitness
+            *birth = (d0^d1) ? 1L: 0L;                   // birth condition is two genes different in number of ones
             *newgene= (d0>d1) ? livegenes[0] : livegenes[1];
-        }
-        else if (selection==2) {                         // use scissors-stone-well-paper game on number ones mod 4
+            break;
+        case 2:                                          // scissors-stone-well-paper game on number ones mod 4
                                                          // scissors 0 stone 1 well 2 paper 3
                                                          // exception to numerical order: sc>pa
-            d0=d0&0x3;
-            d1=d1&0x3;
+            d0=d0&0x3;d1=d1&0x3;
             *birth = (d0^d1) ? 1L: 0L;                   // birth if 2 genes differ mod 4 in number of ones
             if(*birth) {
                 swap = 0;
                 if (d0>d1) {                             // swap d0 and d1 so that smaller one comes first
-                    dd = d0;
-                    d0 = d1;
-                    d1 = dd;
-                    swap = 1;
+                    dd = d0; d0 = d1; d1 = dd; swap = 1;
                 }
                 *newgene = (d0==0 && d1==3) ? livegenes[swap^0] : livegenes[swap^1];
             }
             else *newgene = 0L;
-        }
-        else if (selection==3) {                         // birth if 2 genes differently functional (Not Yet Working)
-            gene2centre = (1L<<ncoding)-1L;              // first ncoding 1s in this sequence
-            gdiff  = livegenes[0]^livegenes[1];
-            gdiff0 = livegenes[0]^gene2centre;
-            gdiff1 = livegenes[1]^gene2centre;
-            POPCOUNT64C(gdiff,dd);
-            POPCOUNT64C(gdiff0,d2);
-            POPCOUNT64C(gdiff1,d3);
-            g0011 = d0<dd && d3<dd;
-            g0110 = d2<dd && d1<dd;
-            *birth = (g0011 != g0110)  ? 1L: 0L;         // birth if 2 genes closer to two different targets than each other
-            *newgene= g0011 ? ((d0<d3) ? livegenes[0] : livegenes[1]) : ((d2<d1) ? livegenes[0] : livegenes[1]);
-        }
-        else if (selection==4) {                         // birth if 2 genes obey 3 distance constraints < ncoding (NYW)
-            gdiff=livegenes[0]^livegenes[1];
-            POPCOUNT64C(gdiff,dd);
-            *birth = (dd<ncoding) && ((d0<ncoding && d1>64-ncoding)|| (d1<ncoding && d0>64-ncoding)) ? 1L: 0L; // birth if 2 genes close enough to targets
-            if (d0<ncoding) {if(d0>64-d1) swap=1;else swap=0;}
-            else {if(64-d0>d1) swap=1; else swap=0;}
-            *newgene= livegenes[swap];
-        }
-        else if (selection==5) {                         // predator prey model : prey evolves to all 0, predator to all 1
-            gdiff=livegenes[0]^livegenes[1];
-            gdiff1=livegenes[0]^(~livegenes[1]);
-            POPCOUNT64C(gdiff1,dd);
-            prey = (d0<32) || (d1<32);                        // prey present : newgene is one with less ones, 1 prey : predator wins
-            prey2 = (d0<32) && (d1<32);                       // 2 prey : newgene is one with less ones, 1 prey : predator wins
-            // *birth = (gdiff && prey && dd<ncoding) ? 1L: 0L;           // birth if different and >=1 prey and close enough match)
-            *birth = ((gdiff && prey2) || (prey && (!prey2) && (dd<ncoding))) ? 1L: 0L; // birth if different and >=1 prey and close enough match)
-            *newgene= (prey2 ? ((d0<d1) ? livegenes[0] : livegenes[1]) : ((d0<32) ? livegenes[1] : livegenes[0]));
-        }
-        else if (selection==6) {                         // use next 4 color game on number ones mod 4
+            break;
+
+        case 3:                                          // 4 color game (next color wins) on number of ones mod 4
                                                          // red 0 green 1 blue 2 white 3
                                                          // exception to numerical order: 0>3 birth only if diff=1
             d0=d0&0x3;
@@ -306,8 +269,45 @@ extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], ui
                 *newgene = (d0==0 && d1==3) ? livegenes[swap^0] : livegenes[swap^1];
             }
             else *newgene = 0L;
-        }
-        else fprintf(stderr,"Error: two live gene fitness value %d is not allowed\n",selection);
+            break;
+        case 4:                                          // birth if 2 genes obey 3 distance constraints < ncoding (NYW)
+            gdiff=livegenes[0]^livegenes[1];
+            POPCOUNT64C(gdiff,dd);
+            *birth = (dd<ncoding) && ((d0<ncoding && d1>64-ncoding)|| (d1<ncoding && d0>64-ncoding)) ? 1L: 0L; // birth if 2 genes close enough to targets
+            if (d0<ncoding) {if(d0>64-d1) swap=1;else swap=0;}
+            else {if(64-d0>d1) swap=1; else swap=0;}
+            *newgene= livegenes[swap];
+            break;
+        case 5:                                          // predator prey model: prey-prey evolves to all 0, predator to complement of prey
+            gdiff=livegenes[0]^livegenes[1];
+            gdiff1=livegenes[0]^(~livegenes[1]);
+            POPCOUNT64C(gdiff1,dd);
+            prey = (d0<32) || (d1<32);                   // prey present : newgene is one with less ones, 1 prey : predator wins
+            prey2 = (d0<32) && (d1<32);                  // 2 prey : newgene is one with less ones, 1 prey : predator wins
+            // *birth = (gdiff && prey && dd<ncoding) ? 1L: 0L;  // birth if different and >=1 prey and close enough match)
+            *birth = ((gdiff && prey2) || (prey && (!prey2) && (dd<ncoding))) ? 1L: 0L; // birth if different and >=1 prey and close enough match)
+            *newgene= (prey2 ? ((d0<d1) ? livegenes[0] : livegenes[1]) : ((d0<32) ? livegenes[1] : livegenes[0]));
+            break;
+        case 6:                                         // birth if 2 genes differently functional (Not Yet Working)
+            gene2centre = (1L<<ncoding)-1L;              // first ncoding 1s in this sequence
+            gdiff  = livegenes[0]^livegenes[1];
+            gdiff0 = livegenes[0]^gene2centre;
+            gdiff1 = livegenes[1]^gene2centre;
+            POPCOUNT64C(gdiff,dd);
+            POPCOUNT64C(gdiff0,d2);
+            POPCOUNT64C(gdiff1,d3);
+            g0011 = d0<dd && d3<dd;
+            g0110 = d2<dd && d1<dd;
+            *birth = (g0011 != g0110)  ? 1L: 0L;         // birth if 2 genes closer to two different targets than each other
+            *newgene= g0011 ? ((d0<d3) ? livegenes[0] : livegenes[1]) : ((d2<d1) ? livegenes[0] : livegenes[1]);
+            break;
+        case 7:
+            *birth = 1L;
+            *newgene = livegenes[0];                      // asymmetric, needs fix
+            break;
+        default:
+            fprintf(stderr,"Error: two live gene fitness value %d is not allowed\n",selection);
+            exit(1);
     }
 }
 
@@ -667,10 +667,11 @@ void tracestats(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int NN2) {
         if(gol[ij]) {
             gene=golg[ij];
             POPCOUNT64C(gene,d);
-            switch(selection) {
+            switch (selection) {
                 case 0: if(d==64) d--; dc=(d>>4)&0x3;break;
                 case 1: if(d==64) d--; dc=(d>>4)&0x3;break;
-                case 2: dc=d&0x3;break;
+                case 2:
+                case 3: dc=d&0x3;break;
                 default:if(d==64) d--; dc=(d>>4)&0x3;
             }
             gt[dc]++;
@@ -942,15 +943,15 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     fprintf(stderr,"pmutmask %llx (NB 0 means no mutation)\n",pmutmask);
     
     switch (selection) {
-        case 0: for (k=0;k<4;k++) {startgenes[k]=0xf0f0f0f0f0f0f0f0;startgenes[k+4]=0x0f0f0f0f0f0f0f0f;}; break;
-        case 1: for (k=0;k<8;k++) startgenes[k]=((0x1L<<k*3)-1L)<<20;break;
+        case 0: for (k=0;k<4;k++) {startgenes[k]=0xf0f0f0f0f0f0f0f0;startgenes[k+4]=0x0f0f0f0f0f0f0f0f;} break;
+        case 1: for (k=0;k<8;k++) startgenes[k]=((0x1ull<<k*3)-1ull)<<20;break;
+        case 2:
+        case 3: for (k=0;k<8;k++) startgenes[k]=(((0x1ull<<20)-1ull)<<20)+((0x1ull<<k)-0x1L);break;
+        case 4: for (k=0;k<8;k++) {g = 0xfffff0ull + k; startgenes[k] = k<4 ? g : ~g;} break;
+        case 5: for (k=0;k<8;k++) {g = 0xf0ull + k; startgenes[k]= k<4 ? g : (~g)|(0xfull<<16);} break;
         case 6:
-        case 2: for (k=0;k<8;k++) startgenes[k]=(((0x1L<<20)-1L)<<20)+((0x1L<<k)-0x1L);break;
-        case 5:  for (k=0;k<8;k++) {g = 0xf0L + k; startgenes[k]= k<4 ? g : (~g)|(0xfL<<16);} break;
-        case 3:
-        case 4:
         case 7:
-        default: for (k=0;k<8;k++) startgenes[k]=(0x1L<<(4+k*8))-1L;break;
+        default: for (k=0;k<8;k++) startgenes[k]=(0x1L<<(4+k*8))-1L;
     }
 
     if ( livesites !=NULL) {
@@ -1142,7 +1143,7 @@ void countspecies1(uint64_t gol[], uint64_t golg[], int N2) {  /* counts numbers
         else if (selection == 1) {                                          // 2-live neighbor fitness is number of ones
 	        fitness = (uint64_t) nones;
         }
-        else if ((selection == 2)||(selection == 6)) {                      // cyclic 4 species model
+        else if ((selection == 2)||(selection == 3)) {                      // cyclic 4 species model
 	        fitness = nones&0x3;                                            // fitness is species class
         }
 
@@ -1197,7 +1198,7 @@ void countspecieshash() {  /* counts numbers of all different species using qsor
         else if (selection == 1) {                                          // 2-live neighbor fitness is number of ones
             fitness = (uint64_t) nones;
         }
-        else if ((selection == 2)||(selection == 6)) {                      // cyclic 4 species model
+        else if ((selection == 2)||(selection == 3)) {                      // cyclic 4 species model
             fitness = nones&0x3;                                            // fitness is species class
         }
 
