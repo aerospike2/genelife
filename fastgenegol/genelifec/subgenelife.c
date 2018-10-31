@@ -17,7 +17,59 @@
 #include <time.h>
 #include <math.h>
 
-#define HASH                        // commenting out this line removes all hash table stuff
+//-----------------------------------------------------------size of array -------------------------------------------------------------------------
+const int log2N = 9;                // toroidal array of side length N = 2 to the power of log2N
+const int N = 0x1 << log2N;         // only side lengths powers of 2 allowed to enable efficient implementation of periodic boundaries
+const int N2 = N*N;                 // number of sites in square-toroidal array
+const int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
+//--------------------------------------------------------- main parameters of model ----------------------------------------------------------------
+unsigned int rulemod = 1;           // det: whether to modify GoL rule for 2 and 3 live neighbours : opposite outcome with small probability p0
+int selection = 1;                  // fitness of 2 live neighbours: 0. integer value   1. number of ones  2. scissors-stone-well-paper: wins over left 1-1-2-2
+                                    // 3. scissors-stone-well-paper 1-1-1-1 4. 5. predator prey 6.2 target coding 7. no result
+unsigned int repscheme = 1;         // replication scheme: lowest 3 bits used to define 8 states: bit2 2ndnbs, bit1 not most difft, bit0 2select on 3
+                                    //                     next 2 bits to allow birth failure: bit3 for 3-live-nb and bit4 for 2-live-nb configs
+                                    //                     next 2 bits to enableuniquepos case and masking of first neighbours respectively
+int survival = 0x2;                 // survive mask for two (bit 1) and three (bit 0) live neighbours
+int overwritemask = 0x2;            // bit mask for 4 cases of overwrite: bit 0. s==3  bit 1. special birth s==2
+int ncoding = 16;                   // maximal distances between sequences for fitness2 == 2
+                                    // number of bits used to encode non zero bits in 2nd gene in sequence space for fitness2 == 3
+int nlog2pmut = 5;                  // pmut (prob of mutation) = 2^(-nlog2pmut), minimum non-zero pmut = 2^-56.
+uint64_t pmutmask;                  // binary mask so that prob of choosing zero is pmut, assigned
+//-----------------------------------------------------------initialization and color parameters------------------------------------------------------
+int initial1density = (1<<15)>>1;   // initial density of ones in gol as integer value, divide by 2^15 for true density
+int initialrdensity = (1<<15)>>1;   // initial density of random genes in live sites, divide by 2^15 for true density
+int startgenechoice = 8;            // selection for defined starting genes 0-8 (8 is random 0-7) otherwise choose only particular startgene
+int inittype = 0;                   // 0 input from random field of random or start genes, 1 input from file genepat.dat of 32x32 indexes to start genes
+                                    // value i>1: initialized to random field on central ixi block only, outside this zero.
+int colorfunction = 0;              // color function choice of 0: hash or 1: functional (color classes depends on selection parameter)
+                                    // 2: as in 1 but color sites where last step was non GoL rule yellow, 3: as in 2 but yellow if state produced by non GoL
+#define ASCII_ESC 27                /* escape for printing terminal commands, such as cursor repositioning : only used in non-graphic version */
+//-----------------------------------------masks for named repscheme bits--------------------------------------------------------------------------------
+#define R_0_2sel_3live    0x1       /* 1: employ selection on two least different live neighbours for ancestor with 3 live neighbours */
+#define R_1_choose0nb     0x2       /* 1: choose most difft position, 0: choose live neighbour at zero bit in canonical rotation, */
+#define R_2_2ndnbs        0x4       /* 1: execute genetically encoded 2nd neighbours of live neighbours to determine birth & ancestor */
+#define R_3_enforce3birth 0x8       /* 1: enforce birth for 3 live nbs (with ancestor most difft) in case 2-select fails (req. R_0_2sel_3live==1 for effect) */
+#define R_4_enforce2birth 0x10      /* 1: enforce birth for 2 live nbs : choose 1st live nb from top left as ancestor (asym!) */
+#define R_5_2uniquepos    0x20      /* 1: for 2-live-nb birth, choose clockwise or anticlockwise (for R_1_choose0nb) elt of canonical bunched pair */
+#define R_6_checkmasks    0x40      /* 1: check genetically encoded masks to mask out certain live nb pos's: rule as if these not there */
+#define R_7_nongolstat    0x80      /* 1: enforce GoL rule if state of central cell was last changed by a non GoL rule */
+#define R_8_nongolstatnbs 0x100     /* 1: enforce GoL rule if state of any cell in nbs was last changed by a non GoL rule */
+//----------------------------------------status flag bits for recording site status in golgstats array---------------------------------------------------
+#define F_notgolrul 0x1             /* last step not a GoL rule*/
+#define F_2_live    0x2             /* 1 if exactly 2 live neighbours */
+#define F_3_live    0x4             /* 1 if exactly 3 live neighbours */
+#define F_birth     0x8             /* 1 if birth (includes overwriting of genes for some parameter values) */
+#define F_mutation  0x10            /* 1 if a mutation event occured */
+#define F_2select   0x20            /* 1 if the 2 live neighbour selection routine was employed */
+#define F_survival  0x40            /* 1 if last step was a 1->1 gol survival */
+#define F_death     0x80            /* 1 if last step involved the death of a gene ie 1->0 gol transition */
+#define F_golstate  0x100           /* copy of gol state */
+#define F_golchange 0x200           /* 1 if state changed at last step */
+#define F_nongolchg 0x400           /* 1 if state when produced (ie changed to) was made by a non GoL rule */
+#define F_3g_same   0x800           /* if exactly 3 live nbs and all 3 have same gene */
+#define F_3_livenbs 0xff0000        /* mask for storing configuration of 3 live neighbours : clockwise from top-left neighbour (NW) */
+//----------------------------------------------------------hash table implementation of python style dictionary---------------------------------------
+#define HASH                        /* commenting out this line removes all hash table stuff */
 #ifdef HASH                         // required for countspecieshash() and get_activities(...), otherwise empty routines
                                     // use Mattias Gustavsson's hashtable (github) for unsigned 64 bit key dictionary
 #define HASHTABLE_IMPLEMENTATION
@@ -25,7 +77,7 @@
 #define HASHTABLE_U32 uint32_t
 #define HASHTABLE_U64 uint64_t
 #define HASHTABLE_SIZE_T uint64_t
-#include "hashtable.h"
+#include "hashtable.h"              // Gustavsson's file was modified because the 64bit to 32bit key compression code produces 0 for some values
 hashtable_t genetable;
 typedef struct genedata {           // value of keys stored for each gene encountered in simulation
             int popcount;           // initialized to 1
@@ -40,60 +92,29 @@ genedata *genedataptr;              // pointer to a genedata instance
 HASHTABLE_SIZE_T const* genotypes;  // pointer to stored hash table keys (which are the genotypes)
 genedata* geneitems;                // list of genedata structured items stored in hash table
 #endif
-
-#define ASCII_ESC 27                // escape for printing terminal commands, such as cursor repositioning
-
-const int log2N = 9;                // toroidal array of side length N = 2 to the power of log2N
-const int N = 0x1 << log2N;
-const int N2 = N*N;                 // number of sites in toroidal array
-const int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
-
-int nlog2pmut = 5;                  // pmut (prob of mutation) = 2^(-nlog2pmut), minimum non-zero pmut = 2^-56.
-uint64_t pmutmask;                  // binary mask so that prob of choosing zero is pmut, assigned
-
+//-------------------------------------------------------------------------------------------------------------------------------------------------------
 int totsteps=0;                     // total number of simulation steps
 int statcnts=0;                     // total number of statistic timepts counted
-unsigned int rulemod = 1;           // det: whether to modify GoL rule for 2 and 3 live neighbours : opposite outcome with small probability p0
-int selection = 1;                  // fitness of 2 live neighbours: integer value (0), number of ones (1), Norman compete (2), 2 target coding (3)
-unsigned int repscheme = 1;         // replication scheme: lowest 3 bits used to define 8 states: bit2 2ndnbs, bit1 not most difft, bit0 2select on 3
-                                    //                     next 2 bits to allow birth failure: bit3 for 3-live-nb and bit4 for 2-live-nb configs
-                                    //                     next 2 bits to enableuniquepos case and masking of first neighbours respectively
-int ncoding = 16;                   // maximal distances between sequences for fitness2 == 2
-                                    // number of bits used to encode non zero bits in 2nd gene in sequence space for fitness2 == 3
-int colorfunction = 0;              // color function choice of hash(0) or functional (1, color classes depends on selection parameter)
-int fileinit = 0;                   // 0 input from random field of random or start genes, 1 input from file genepat.dat of 32x32 indexes to start genes
-int survival = 0x2;                 // survive mask for two (bit 1) and three (bit 0) live neighbours
-int overwritemask = 0x2;            // bit mask for 4 cases of overwrite: bit 0. s==3  bit 1. special birth s==2
-int initial1density = (1<<15)>>1;   // initial density of ones in gol as integer value, divide by 2^15 for true density
-int initialrdensity = (1<<15)>>1;   // initial density of random genes in live sites, divide by 2^15 for true density
-int startgenechoice = 8;            // selection for defined starting genes 0-8 (8 is random 0-7) otherwise choose only particular startgene
-uint64_t codingmask;                // mask for ncoding bits
+uint64_t codingmask;                // ncoding derived mask for ncoding bits
 uint64_t  emptysites = 0;           // cumulative number of empty sites during simulation updates
-                                    // masks for named repscheme bits
-#define R_0_2sel_3live    0x1       // 1: employ selection on two least different live neighbours for ancestor with 3 live neighbours
-#define R_1_choose0nb     0x2       // 1: choose most difft position, 0: choose live neighbour at zero bit in canonical rotation,
-#define R_2_2ndnbs        0x4       // 1: execute genetically encoded 2nd neighbours of live neighbours to determine birth & ancestor
-#define R_3_enforce3birth 0x8       // 1: enforce birth for 3 live nbs (with ancestor most difft) in case 2-select fails (req. R_0_2sel_3live==1 for effect)
-#define R_4_enforce2birth 0x10      // 1: enforce birth for 2 live nbs : choose 1st live nb from top left as ancestor (asym!)
-#define R_5_2uniquepos    0x20      // 1: for 2-live-nb birth, choose clockwise or anticlockwise (for R_1_choose0nb) elt of canonical bunched pair
-#define R_6_checkmasks    0x40      // 1: check genetically encoded masks to mask out certain live nb pos's: rule as if these not there
-#define R_7_nongolstat    0x80      // 1: enforce GoL rule if state of central cell was last changed by a non GoL rule
-#define R_8_nongolstatnbs 0x100     // 1: enforce GoL rule if state of any cell in nbs was last changed by a non GoL rule
-
+//---------------------------------------------------------main arrays in simulation---------------------------------------------------------------------
+uint64_t *gol, *golg;               // pointers to gol and golg arrays at one of the plane cycle locations
+uint64_t golgstats[N2];             // 64 bit masks for different events during processing
+uint64_t newgolgstats[N2];          // 64 bit masks for different events during processing
+//------------------------------------------------ arrays for time tracing -----------------------------------------------------------------------------
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
 int *livesites = NULL;              // dynamic array pointer for statistics of number of live sites over time
 int *genestats = NULL;              // dynamic array pointer for statistics of number of 4 genotype classes over time
 int *stepstats = NULL;              // dynamic array pointer for statistics of site update types over time
-
+//------------------------------------------------ planes and configuration offsets----------------------------------------------------------------------
 int Noff = 9;                       // number of offsets
 int **offsets;                      // array of offsets (2D + time) for planes
 int xL=0,xR=0,yU=0,yD=0;            // offsets for border of stats
 uint64_t *histo;
 int numHisto;
-
 // initialize planes:
-#define maxPlane 2
+#define maxPlane 2                  /* maximum number of planes allowed : values 2,4,8 allowed */
 int curPlane = 0;                   // current plane index
 int newPlane = 1;                   // new plane index
 int numPlane = maxPlane;            // number of planes must be power of 2 to allow efficient modulo plane
@@ -119,25 +140,7 @@ uint64_t planeg5[N2];
 uint64_t planeg6[N2];
 uint64_t planeg7[N2];
 #endif
-
-uint64_t *gol, *golg;               // pointers to gol and golg arrays at one of the plane cycle locations
-uint64_t golgstats[N2];             // 64 bit masks for different events during processing
-uint64_t newgolgstats[N2];          // 64 bit masks for different events during processing
-
-#define F_notgolrul 0x1
-#define F_2_live    0x2
-#define F_3_live    0x4
-#define F_birth     0x8
-#define F_mutation  0x10
-#define F_2select   0x20
-#define F_survival  0x40
-#define F_death     0x80
-#define F_golstate  0x100
-#define F_golchange 0x200
-#define F_nongolchg 0x400
-#define F_3g_same   0x800
-#define F_3_livenbs 0xff0000
-
+//------------------------------------------------------- fast macro random number generator ------------------------------------------------------------
                                     // Wikipedia "Xorshift" rewritten here as inline macro &
                                     // Vigna, Sebastiano. "xorshift*/xorshift+ generators and the PRNG shootout". Retrieved 2014-10-25.
 static uint64_t state[2];           // State for xorshift pseudorandom number generation. The state must be seeded so that it is not zero
@@ -157,6 +160,7 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
     xxxx = (xxxx & m2) + ((xxxx >> 2) & m2); /* put count of each 4 bits into those 4 bits */ \
     xxxx = (xxxx + (xxxx >> 4)) & m4;        /* put count of each 8 bits into those 8 bits */ \
     val = (xxxx * h01) >> 56;}               /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
+//----------------------------------------------------- begin of subroutines -----------------------------------------------------------------------------
 
 void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2) {
     uint64_t gene, gdiff, g2c, mask;
@@ -301,9 +305,9 @@ extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], ui
             *birth = (g0011 != g0110)  ? 1L: 0L;         // birth if 2 genes closer to two different targets than each other
             *newgene= g0011 ? ((d0<d3) ? livegenes[0] : livegenes[1]) : ((d2<d1) ? livegenes[0] : livegenes[1]);
             break;
-        case 7:
-            *birth = 1L;
-            *newgene = livegenes[0];                      // asymmetric, needs fix
+        case 7:                                          // no special birth via selection allowed
+            *birth = 0L;
+            *newgene = livegenes[0];                     // dummy choice not used
             break;
         default:
             fprintf(stderr,"Error: two live gene fitness value %d is not allowed\n",selection);
@@ -926,7 +930,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     overwritemask = runparams[3];
     survival = runparams[4];
     colorfunction = runparams[5];
-    fileinit = runparams[6];
+    inittype = runparams[6];
 
     nlog2pmut = simparams[0];
     if(nlog2pmut>56) nlog2pmut=0;                     // need to use top 6-8 bits of 64 bit random nr for position
@@ -977,7 +981,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     hashtable_init(&genetable,sizeof(genedata),N2<<2,0);     // initialize dictionary for genes
 #endif
     notfirst = 1;
-    if (fileinit==1) {           // input from file genepat.dat with max size of 32*32 characters
+    if (inittype==1) {           // input from file genepat.dat with max size of 32*32 characters
         golgin = (char *) malloc(32* 32 * sizeof(char));
         icf=readFile(golgin, "genepat.dat");
         if (icf != 32*32) {
@@ -1008,8 +1012,8 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
         }
 
     }
-    else {  // fileinit gives linear size of random block for initialization (0 => full frame, as before)
-        Nf = fileinit;
+    else {  // inittype gives linear size of random block for initialization (0 => full frame, as before)
+        Nf = inittype;
         if (Nf==0 || Nf>N) Nf=N;
         for (ij=0; ij<N2; ij++) {
             gol[ij] = 0L;
