@@ -109,7 +109,6 @@ int *configstats = NULL;            // dynamic array pointer for statistics of g
 //------------------------------------------------ planes and configuration offsets----------------------------------------------------------------------
 int Noff = 9;                       // number of offsets
 int **offsets;                      // array of offsets (2D + time) for planes
-int xL=0,xR=0,yU=0,yD=0;            // offsets for border of stats
 int *histo;
 int numHisto;
 // initialize planes:
@@ -171,7 +170,6 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
 // get_stats            get the traced statistics from python
 // countconfigs         count the configs with pthon specified offsets in (x,y,t)
 // get_hist             get the histogram from python
-// init_histo           initialize the histogram of count configs
 // get_activities       get the activity statistics from python
 // genelife_update      call update, collect statistics if required and rotate planes
 // initialize_planes    initialize periodic sequence of planes to record rolling time window of up to maxPlanes time points (≤8)
@@ -732,31 +730,39 @@ void get_stats(int outstats[], int outgtypes[], int outstepstats[], int outconfi
     if (nhistG==nstatG) for(i=0; i<Noff*numStats; i++) outconfigstats[i] = configstats[i];
 }
 
-void countconfigs(){        // count configs specified by offset array
-    // each row of the offset array becomes a bit in an address for the histo array.
-    int i,j,k,t,x,y;
-    uint64_t *pl, adr, bit;
+void countconfigs(){        // count translated configs specified by offset array
+    // for non zero nb patterns we count if the same pattern occurs at the central site and its offset address in space time
+    int ij,i,j,k,t,ip1,im1,jp1,jm1,o,ij1,i1,j1;
+    uint64_t nbmask1,nbmask2;
+    int nb[9];
+    uint64_t *pl, *pl0;
 
-    for(i=0; i<N; i++){        // rows
-        if(i<xL) continue;
-        if(i>xR) continue;
-        for(j=0; j<N; j++){    // columns
-            if(j<yD) continue;
-            if(j>yU) continue;
-            adr = 0;
-            for(k=0; k<Noff; k++){
-                x = (j+offsets[k][0]) & Nmask;                              // periodic boundary conditions for N power of 2
-                y = (i+offsets[k][1]) & Nmask;
-                t = (curPlane+offsets[k][2]) & (numPlane-1);                // periodic in numPlane if this is power of 2
+    for (o=0;o<Noff;o++) histo[o] = 0;
+
+    pl0 = planes[curPlane];
+    for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
+        i = ij & Nmask;  j = ij >> log2N;                                   // row & column
+        jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
+        ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                         // toroidal i+1, i-1
+        nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1;           // new order of nbs
+        nb[4]=jp1+ip1; nb[5]=jp1+i; nb[6]=jp1+im1; nb[7]=j*N+im1;
+        nb[8]=ij;
+        for (k=0,nbmask1=0ull;k<9;k++) nbmask1 |= (*(pl0+nb[k]))<<k;            // calculate nbmask for comparison below
+        if(nbmask1) {
+            for (o=0;o<Noff;o++) {
+                i1 = (i+offsets[o][0]) & Nmask;                              // periodic boundary conditions for N power of 2
+                j1 = (j+offsets[o][1]) & Nmask;
+                t = (curPlane+offsets[o][2]) & (numPlane-1);                // periodic in numPlane if this is power of 2
                 pl = planes[t];
-                bit = *(pl + y*N +x);
-                if(bit!= 1ull || bit != 0ull){                              // check for appropriate unsigned values */
-                    fprintf(stderr,"Ack! bit = %llu != 0 or 1\n",bit);
-                    exit(1);
-                }
-                adr = (adr<<1) | bit;
+                ij1 = i1 + j1*N;
+                jp1 = ((j1+1) & Nmask)*N; jm1 = ((j1-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
+                ip1 =  (i1+1) & Nmask; im1 =  (i1-1) & Nmask;                         // toroidal i+1, i-1
+                nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1;           // new order of nbs
+                nb[4]=jp1+ip1; nb[5]=jp1+i; nb[6]=jp1+im1; nb[7]=j*N+im1;
+                nb[8]=ij1;
+                for (k=0,nbmask2=0ull;k<9;k++) nbmask2 |= (*(pl+nb[k]))<<k;                          // also calculate nbmask for use below
+                if(nbmask1==nbmask2) histo[o]++;
             }
-            histo[adr]++;
         }
     }
 }
@@ -768,11 +774,6 @@ void get_histo(int outhisto[],int numHistoC){
         exit(1);
     }
     for(i=0; i<numHisto; i++) outhisto[i] = histo[i];
-}
-
-void init_histo(){     // initialize the history array to zero
-    int i;
-    for(i=0; i<numHisto; i++)        histo[i] = 0;
 }
 
 #ifdef HASH
@@ -837,7 +838,7 @@ void initialize_planes(int offs[],  int No) {
         fprintf(stderr,"Too many offsets!  Max=24");
         exit(1);
     }
-    numHisto = 1<<Noff;
+    numHisto = Noff;
     histo = (int *) calloc(numHisto,sizeof(int));
 
     // install offsets:
@@ -870,27 +871,6 @@ void initialize_planes(int offs[],  int No) {
         fprintf(stderr,"Not enough planes defined by maxPlane for given offsets (need > %d)\n",numPlane);
         exit(1);
     }
-
-    // compute xR, xL, yU, yD border offsets from offsets matrix
-    int mx;
-    int mn;
-    int off;
-    mn=No; mx=0;
-    for(i=0; i<Noff; i++){
-	    off = offsets[i][0];	// X
-	    if(off>mx) mx = off;
-	    if(off<mn) mn = off;
-    }
-    if(mn<0) xL = -mn; else xL=0;
-    if(mx>0) xR = No-mx; else xR=No;
-    mn=No; mx=0;
-    for(i=0; i<Noff; i++){
-	    off = offsets[i][1];	// Y
-	    if(off>mx) mx = off;
-	    if(off<mn) mn = off;
-    }
-    if(mn<0) yD = -mn; else yD = 0;
-    if(mx>0) yU = No-mx; else yU = No;
 
     // initialize plane pointers:
     planes[0]  = plane0;  planes[1]  = plane1;
