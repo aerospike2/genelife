@@ -35,7 +35,7 @@ libcd.countspecieshash.argtypes = None
 #libcd.printscreen.restype = None
 #libcd.printscreen.argtypes = [uint64_array, uint64_array, c_int, c_int]
 libcd.get_histo.restype = None
-libcd.get_histo.argtypes = [uint64_array, c_int]
+libcd.get_histo.argtypes = [int_array, c_int]
 libcd.init_histo.restype = None
 libcd.init_histo.argtypes = None
 libcd.get_curgol.restype = None
@@ -45,7 +45,7 @@ libcd.get_curgolgstats.argtypes = [uint64_array,c_int]
 libcd.get_curgolgstats.restype = None
 libcd.get_curgolg.argtypes = [uint64_array,c_int]
 libcd.get_stats.restype = None
-libcd.get_stats.argtypes = [int_array, int_array, int_array, c_int]
+libcd.get_stats.argtypes = [int_array, int_array, int_array, int_array, c_int]
 libcd.get_activities.restype = None
 libcd.get_activities.argtypes = [uint64_array, int_array, int_array]
 libcd.colorgenes1.restype = None
@@ -89,8 +89,8 @@ def countspecieshash():
 def get_histo(gol):
     return libcd.getconfigs( histo, len(histo))
 
-def get_stats(livesites,genotypes,stepstats,nstats):
-    return libcd.get_stats(livesites,genotypes,stepstats,nstats)
+def get_stats(livesites,genotypes,stepstats,configstats,nstats):
+    return libcd.get_stats(livesites,genotypes,stepstats,configstats,nstats)
 
 def get_activities(actgenes,activities,ngenesp):
     return libcd.get_activities(actgenes,activities,ngenesp)
