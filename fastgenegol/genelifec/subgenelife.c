@@ -1,13 +1,10 @@
-// Subsequent fix of new integer types and error in {} structure John McCaskill, Sep 4, 2017
-// 
-// From subgenelife.c
-// Modified by John McCaskill for coded departures from GoL Sep 21, 2018
+// subgenelife.c
+// Written by John S. McCaskill and Norman H. Packard
 //
-//  subgenelife_codedep.c
-//  fastgenegol
+// Project fastgenegol
 //
-//  Created by John McCaskill on 14.07.17.
-//  Copyright © 2017 European Center for Living Technology. All rights reserved.
+// Created by John McCaskill on 14.07.17.
+// Copyright © 2017,2018 European Center for Living Technology. All rights reserved.
 //
 
 #include <stdio.h>
@@ -16,7 +13,6 @@
 #include <inttypes.h>
 #include <time.h>
 #include <math.h>
-
 //-----------------------------------------------------------size of array -------------------------------------------------------------------------
 const int log2N = 9;                // toroidal array of side length N = 2 to the power of log2N
 const int N = 0x1 << log2N;         // only side lengths powers of 2 allowed to enable efficient implementation of periodic boundaries
@@ -55,18 +51,18 @@ int colorfunction = 0;              // color function choice of 0: hash or 1: fu
 #define R_7_nongolstat    0x80      /* 1: enforce GoL rule if state of central cell was last changed by a non GoL rule */
 #define R_8_nongolstatnbs 0x100     /* 1: enforce GoL rule if state of any cell in nbs was last changed by a non GoL rule */
 //----------------------------------------status flag bits for recording site status in golgstats array---------------------------------------------------
-#define F_notgolrul 0x1             /* last step not a GoL rule*/
-#define F_2_live    0x2             /* 1 if exactly 2 live neighbours */
-#define F_3_live    0x4             /* 1 if exactly 3 live neighbours */
-#define F_birth     0x8             /* 1 if birth (includes overwriting of genes for some parameter values) */
-#define F_mutation  0x10            /* 1 if a mutation event occured */
-#define F_2select   0x20            /* 1 if the 2 live neighbour selection routine was employed */
-#define F_survival  0x40            /* 1 if last step was a 1->1 gol survival */
-#define F_death     0x80            /* 1 if last step involved the death of a gene ie 1->0 gol transition */
-#define F_golstate  0x100           /* copy of gol state */
-#define F_golchange 0x200           /* 1 if state changed at last step */
-#define F_nongolchg 0x400           /* 1 if state when produced (ie changed to) was made by a non GoL rule */
-#define F_3g_same   0x800           /* if exactly 3 live nbs and all 3 have same gene */
+#define F_notgolrul 0x1             /* bit is 1 if last step not a GoL rule*/
+#define F_2_live    0x2             /* bit is 1 if exactly 2 live neighbours */
+#define F_3_live    0x4             /* bit is 1 if exactly 3 live neighbours */
+#define F_birth     0x8             /* bit is 1 if birth (includes overwriting of genes for some parameter values) */
+#define F_mutation  0x10            /* bit is 1 if a mutation event occured */
+#define F_2select   0x20            /* bit is 1 if the 2 live neighbour selection routine was employed */
+#define F_survival  0x40            /* bit is 1 if last step was a 1->1 gol survival */
+#define F_death     0x80            /* bit is 1 if last step involved the death of a gene ie 1->0 gol transition */
+#define F_golstate  0x100           /* bit is 1 if gol state is 1 */
+#define F_golchange 0x200           /* bit is 1 if state changed at last step */
+#define F_nongolchg 0x400           /* bit is 1 if state when produced (ie changed to) was made by a non GoL rule */
+#define F_3g_same   0x800           /* bit is 1 if exactly 3 live nbs and all 3 have same gene */
 #define F_3_livenbs 0xff0000        /* mask for storing configuration of 3 live neighbours : clockwise from top-left neighbour (NW) */
 //----------------------------------------------------------hash table implementation of python style dictionary---------------------------------------
 #define HASH                        /* commenting out this line removes all hash table stuff */
@@ -85,7 +81,7 @@ typedef struct genedata {           // value of keys stored for each gene encoun
             int lastextinctionframe;// this is initialized to -1, meaning no extinctions yet
             int activity;           // initialized to 0
             int nextinctions;       // initialized to 0
-            uint64_t firstancestor; // this is initialized to a special gene seq not likely ever to occur
+            uint64_t firstancestor; // this is initialized to a special gene seq not likely ever to occur for starting genes
             } genedata;
 genedata ginitdata = {1,0,-1,0,0,0xfedcba9876543210};  // initialization data structure for gene data
 genedata *genedataptr;              // pointer to a genedata instance
@@ -160,6 +156,37 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
     xxxx = (xxxx & m2) + ((xxxx >> 2) & m2); /* put count of each 4 bits into those 4 bits */ \
     xxxx = (xxxx + (xxxx >> 4)) & m4;        /* put count of each 8 bits into those 8 bits */ \
     val = (xxxx * h01) >> 56;}               /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
+//----------------------------------------------------- list of subroutines -----------------------------------------------------------------------------
+// colorgenes1          colour genes specified as input parameters
+// colorgenes           colour genes specified at current time point
+// selectone            select one (or none) of two genes based on selection model parameter selection :  returns birth and newgene
+// selectone_nbs        select one of two genes based on pattern of their live 2nd shell neighbours and their genetic encoding
+// selectdifft2         select the left or right most difft of two genes bunched with least number of empty genes between them
+// selectdifft3         select the unique most different (by symmetry) of three live neighbours
+// update               update the arrays gol, golg, golgstats for a single synchronous time step
+// tracestats           record the current stats in time trace
+// get_stats            get the traced statistics from python
+// countconfigs         count the configs with pthon specified offsets in (x,y,t)
+// get_hist             get the histogram from python
+// init_histo           initialize the histogram of count configs
+// get_activities       get the activity statistics from python
+// genelife_update      call update, collect statistics if required and rotate planes
+// initialize_planes    initialize periodic sequence of planes to record rolling time window of up to maxPlanes time points (≤8)
+// readFile             read file of gol/golg array (32x32) data
+// writeFile            write file of gol/golg array (32x32) data
+// initialize           initialize simulation parameters and arrays
+// get_curgol           get current gol array from python
+// get_curgolg          get current golg array from python
+// get_curgolgstats     get current golgstats array from python
+// cmpfunc              compare gene values as numerical unsigned numbers
+// cmpfunc1             compare gene counts in population
+// countspecies1        count genes with gene array specified as input parameters
+// countspecies         count different genes with genes specified at current time point
+// cmpfunc2             compare gene values corresponding to given number index in hash table
+// cmpfunc3             compare population counts of hash stored genes
+// countspecieshash     count different genes in current population from record of all species that have existed
+// delay                time delay in ms for graphics
+// printxy              terminal screen print of array on xterm
 //----------------------------------------------------- begin of subroutines -----------------------------------------------------------------------------
 
 void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2) {
