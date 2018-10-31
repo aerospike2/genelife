@@ -103,16 +103,16 @@ int main (int argc, char *argv[]) {
     state[0] = rand();state[1] = rand();
     Noff = 9;
     runparams[0] = 1;        // 0,1 rulemod
-    runparams[1] = 4;        // 3-4 repscheme 
-    runparams[2] = 4;        // 0-4 selection
-    runparams[3] = 2;        // overwritemask = 2 bit mask
+    runparams[1] = 0x19;        // 3-4 repscheme 
+    runparams[2] = 1;        // 0-4 selection
+    runparams[3] = 3;        // overwritemask = 2 bit mask
     runparams[4] = 0;        // survival mask for two (bit1) and three (bit0) params
-    runparams[5] = 0;        // colorfunction 0 or 1
-    runparams[6] = 0;        // fileinit 0 or 1, if >1 then size of random init array
+    runparams[5] = 1;        // colorfunction 0 or 1
+    runparams[6] = 200;        // fileinit 0 or 1, if >1 then size of random init array
     simparams[0] = 8;        // nlog2pmut: gene mutation probability
     simparams[1] = 16384;    // initial1density: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
-    simparams[2] = 32768 ;   // initialrdensity: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
-    simparams[3]= 12;        // ncoding
+    simparams[2] = 0 ;   // initialrdensity: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
+    simparams[3]= 24;        // ncoding
     simparams[4] = 8;        // initialize genes to 0-7 or 8=random
 
     if (argc>1) runparams[0] = atoi(argv[1]); // if present update rulemod from command line
