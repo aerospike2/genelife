@@ -100,6 +100,7 @@ int nstatG = 0;                     // interval for collecting other statistical
 uint64_t *gol, *golg;               // pointers to gol and golg arrays at one of the plane cycle locations
 uint64_t golgstats[N2];             // 64 bit masks for different events during processing
 uint64_t newgolgstats[N2];          // 64 bit masks for different events during processing
+uint64_t golmix[N2];                // array for calculating coupling of genes between planes for multiplane genelife
 //------------------------------------------------ arrays for time tracing -----------------------------------------------------------------------------
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
@@ -166,6 +167,9 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
 // selectone_nbs        select one of two genes based on pattern of their live 2nd shell neighbours and their genetic encoding
 // selectdifft2         select the left or right most difft of two genes bunched with least number of empty genes between them
 // selectdifft3         select the unique most different (by symmetry) of three live neighbours
+// pack2neighbors       pack all 16 2nd neighbour gol states into a single word bit map, for future use of all 2nd neighbours
+// update_gol64         update version for 64 parallel gol planes, currently without genetic coupling (routine not yet used)
+// update_gol16         update version for 16 parallel gol planes, coupled by a joint gene for all planes
 // update               update the arrays gol, golg, golgstats for a single synchronous time step
 // tracestats           record the current stats in time trace
 // get_stats            get the traced statistics from python
@@ -218,7 +222,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 }
                 if(colorfunction==2) {
                     if(golgstats[ij]&F_nongolchg) mask = 0x00ffffff;  // color states changed by non GoL rule yellow
-                    if(selection==10) {
+                    if(selection>=10) {
                         for (d=0,mask=0;d<16;d++) {
                             d2=((gol[ij]>>(d<<2))&0x1ull);
                             mask+=(d2*0x2a)<<((d%3)<<3);
@@ -456,9 +460,7 @@ extern inline void selectdifft3(uint64_t nbmask, int nb[], uint64_t gol[], int *
     }
 }
 
-uint64_t golp[N2];
-
-void pack2neighbors(uint64_t gol[], uint64_t golp[]) {
+void pack2neighbors(uint64_t gol[], uint64_t golp[]) {           // routine for future use of all 2nd neighbours
 #define deltaxy(ij,x,y)  (ij - (ij&Nmask) + ((ij+(x)&Nmask) + (y)*N)) & N2mask
     unsigned int ij,k,s;
     uint64_t gs;
@@ -472,13 +474,13 @@ void pack2neighbors(uint64_t gol[], uint64_t golp[]) {
         for(k=s=0;k<16;k++) {
             gs=gol[deltaxy(ij,nb2x[k],nb2y[k])];
             // golp[ij] |= gs<<(k+1);
-            golp[ij] |= (k*gs) << (s<<2);
+            golmix[ij] |= (k*gs) << (s<<2);
             s+=gs;
         }
     }
 }
 
-void update_gol64() {
+void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]) {                                           // routine for 64x-gol packed update, not yet used
 #define deltaxy(ij,x,y)  (ij - (ij&Nmask) + ((ij+(x)&Nmask) + (y)*N)) & N2mask
     unsigned int ij,k;
     uint64_t gs,newgs,sums00,sums10,sums01,sums11,sums02,sums12,sums16[4];
@@ -522,6 +524,8 @@ void update_gol64() {
             sgol=(s2or3&(gol[ij]|s3))&r1;
             newgs|=sgol<<k;
         }
+        newgol[ij]=newgs;
+        
         //for (k=0;k<64;k++) {                                                    // explicit loop over 64 bits
         //    s = (sums16[k&0x3]>>(k>>2))&0xf;
         //    s2or3 = (s>>2) ? 0ull : (s>>1);                                     // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
@@ -533,11 +537,12 @@ void update_gol64() {
 void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]) {
 // genes specify on which of 16 planes the gol states at that site are visible: specified by 16 bits 0,4,8,... in gene
 // when multiple copy processes are active for gol states, the one with the lowest bit position is applied to most difft gene copying
+// gol states looked up for neighbors are the OR of the current plane gol value with gol values on planes specified by the gene
 // optionally genes also specify a unique copy plane for a gene: it can only be copied by a rule active on this plane
 // in this optional case, copy plane could be lowest non zero bit in gene at pos m for which m%4 == 1 (if none then gene is not copied)
 #define deltaxy(ij,x,y)  (ij - (ij&Nmask) + ((ij+(x)&Nmask) + (y)*N)) & N2mask
-    unsigned int ij,ij1,k,kmin,p,nmut,debcnt;
-    uint64_t s,su,s3,sg3,s2or3,nbmask,nbmaskr,nbmaskrm,ancestor,newgene,golsh,golmix[N2];
+    unsigned int ij,ij1,k,kmin,p,nmut,debcnt,mask;
+    uint64_t s,su,s3,sg3,s2or3,nbmask,nbmaskr,nbmaskrm,ancestor,newgene,golsh;
     uint64_t randnr, randnr2, rand2, statflag;
     int nb1x[8] = {-1,0,1,1,1,0,-1,-1};
     int nb1y[8] = {-1,-1,-1,0,1,1,1,0};
@@ -547,13 +552,26 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
     genedata gdata;
 #endif
 
-    for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
-        for (p=0,golsh=0ull;p<16;p++) {                                     // gene encodes possible partner plane for each plane
-            golsh |= ((gol[ij]>>((golg[ij]>>(p<<2))<<2))<<(p<<2));
+    if (selection == 10) {
+        for (ij=0; ij<N2; ij++) {                                            // loop over all sites of 2D torus with side length N
+            for (p=0,golsh=0ull;p<16;p++) {                                  // gene encodes possible partner plane for each plane
+                golsh |= ((gol[ij]>>((golg[ij]>>(p<<2))<<2))<<(p<<2));
+            }
+            golmix[ij] = golsh|gol[ij];
         }
-        golmix[ij] = golsh|gol[ij];
     }
-
+    else { // selection == 11,  coding for 4 nearest plane neighbour masks
+        for (ij=0; ij<N2; ij++) {                                            // loop over all sites of 2D torus with side length N
+            for (p=0,golsh=0ull;p<16;p++) {                                  // gene encodes possible partner plane for each plane
+                mask = (golg[ij]>>(p<<2))&0xf;
+                for (k=0;k<4;k++) {
+                    if((mask>>k)&0x1) golsh |= ((gol[ij]>>(((p+k)&0xf)<<2))<<(p<<2));
+                }
+            }
+            golmix[ij] = golsh|gol[ij];
+        }
+    }
+    
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
         for(k=0,s=0ull;k<8;k++) {
             ij1=deltaxy(ij,nb1x[k],nb1y[k]);
@@ -1162,6 +1180,9 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
         case 10: nstartgenes=16;for (k=0;k<16;k++) {
                     for (p=0,g=0ull;p<16;p++) g|= ((p+k)&0xfull)<<(p<<2);
                     startgenes[k] = g; } break;
+        case 11: nstartgenes=16;for (k=0;k<16;k++) {
+                    for (p=0,g=0ull;p<16;p++) g|= (0x1&0xfull)<<(p<<2);
+                    startgenes[k] = g; } break;
         case 6:
         case 7:
         default: for (k=0;k<8;k++) startgenes[k]=(0x1ull<<(4+k*8))-1ull;
@@ -1231,6 +1252,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
         for (ij=0; ij<N2; ij++) {
             gol[ij] = 0ull;
             golgstats[ij] = 0;
+            golmix[ij] = 0;
         }
         i0 = j0 = (N>>1)-(Nf>>1);
         for (i=0; i<Nf; i++) {
@@ -1257,7 +1279,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
 
 #ifdef HASH
     for (ij=0; ij<N2; ij++) {
-        if(gol[ij]||(selection==10)) {
+        if(gol[ij]||(selection>=10)) {
             if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
                 genedataptr->popcount++;
             }
