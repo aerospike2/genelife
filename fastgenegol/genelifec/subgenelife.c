@@ -225,7 +225,8 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                     if(selection>=10) {                               // color as superposition of multiplane gol states
                         for (d=0,mask=0;d<16;d++) {
                             d2=((gol[ij]>>(d<<2))&0x1ull);
-                            mask+=(d2*0x2a)<<((d%3)<<3);
+                            //mask+=(d2*0x2a)<<((d%3)<<3);
+                            mask+=(d2*(0x10+((d>>2)<<3)))<<((d%3)<<3);
                         }
                         mask = (mask<<8)+0x7f7f7fff;  // 0x2a is 42, approx 1/6 (ie <16/3) of 255
                     }
@@ -543,6 +544,7 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
 #define deltaxy(ij,x,y)  (ij - (ij&Nmask) + ((ij+(x)&Nmask) + (y)*N)) & N2mask
     unsigned int ij,ij1,k,kmin,p,p1,nmut,debcnt,mask;
     uint64_t s,su,s3,sg3,s2or3,nbmask,nbmaskr,nbmaskrm,ancestor,newgene,golsh;
+    //uint64_t s0,sm;
     uint64_t randnr, randnr2, rand2, statflag;
     int nb1x[8] = {-1,0,1,1,1,0,-1,-1};
     int nb1y[8] = {-1,-1,-1,0,1,1,1,0};
@@ -551,40 +553,44 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
 #ifdef HASH
     genedata gdata;
 #endif
+
+    totsteps++;
+    if(!(totsteps%10)) fprintf(stderr,"iteration step %d\r",totsteps);
     if(rulemod) {
-      fprintf(stderr,"inside rulemod %d code\n",rulemod);
-      if (selection == 10) {                                                   // gene codes for one secondary plane for each plane
+      if (selection == 10) {                                                 // gene codes for one secondary plane for each plane  (OLD 10)
         for (ij=0; ij<N2; ij++) {                                            // loop over all sites of 2D torus with side length N
             for (p=0,golsh=0ull;p<16;p++) {                                  // 16 different planes, one every 4 bits in gol,golg
                 p1 = (golg[ij]>>(p<<2))&0xf;
                 golsh |= ((gol[ij]>>(p1<<2))&1ull)<<(p<<2);                  // collect active bits from 2nd planes pointed to by gene
+                // golsh |= (gol[ij]>>((golg[ij]>>(p<<2))<<2))<<(p<<2);      // erroneous earlier version of commit 61a7463 giving exploration waves
             }
-            golmix[ij] = golsh|gol[ij];                                      // bits either active from primary or secondary plane
+            golmix[ij] = golsh/*|gol[ij]*/;                                  // bits active from secondary plane (or primary if or with gol)
         }
       }
-      else { // selection == 11                                                // gene codes for 4 nearest plane neighbour masks
+      else { // selection == 11                                              // gene codes for 4(2) nearest plane neighbour masks
         for (ij=0; ij<N2; ij++) {                                            // loop over all sites of 2D torus with side length N
             for (p=0,golsh=0ull;p<16;p++) {                                  // 16 different planes, one every 4 bits in gol,golg
                 mask = (golg[ij]>>(p<<2))&0xf;                               // bit mask indicating which nearby planes visible from plane
-                for (k=0;k<4;k++) {
+                for (k=1;k<3;k++) {                                          // 2 nearest planes variant
+                //for (k=0;k<4;k++) {                                        // 4 nearest planes variant
                     if((mask>>k)&0x1) {
                         p1 = (p+k+(k>>1)-2)&0xf;
-                        golsh |= ((gol[ij]>>(p1<<2))&0x1ull)<<(p<<2);        // nearby planes p1=p+{-2,-1,1,2} for k 0,1,2,3
+                        golsh ^= ((gol[ij]>>(p1<<2))&0x1ull)<<(p<<2);        // nearby planes p1=p+{-2,-1,1,2} for k 0,1,2,3   or p+{-1,1} for k 1,2
                     }
                 }
             }
-            golmix[ij] = golsh|gol[ij];                                      // bits either active from primary or four secondary planes
+            golmix[ij] = golsh/*|gol[ij]*/;                                      // bits either active from primary or four secondary planes
         }
       }
     }
     else { // no gol rule modification, independent planes
          for (ij=0; ij<N2; ij++) golmix[ij] = gol[ij];                       // loop over all sites of 2D torus with side length N
     }
-    for (ij=0; ij<N2; ij++) if ((golmix[ij]&r1) != golmix[ij]) fprintf("error in gol state %llx\n",golmix[ij]);
+    for (ij=0; ij<N2; ij++) if ((golmix[ij]&r1) != golmix[ij]) fprintf(stderr,"error in golmix calculation %llx",golmix[ij]);
+    
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
         for(k=0,s=0ull;k<8;k++) {
             ij1=deltaxy(ij,nb1x[k],nb1y[k]);
-            // s += gol[ij1]&golg[ij1]&r1;
             s +=golmix[ij1];
         }
         su = s&rc;
@@ -592,8 +598,8 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
         s2or3 = (~sg3)&(s>>1)&r1;
         s3 = s2or3&s&r1;
         newgol[ij]=s2or3&(gol[ij]|s3)&r1;
+        newgolg[ij]=golg[ij];
         statflag = 0ull;
-        // s3_4 = (s3&0x11111111) ? (s3&0x11111111) : s3>>32;
         for(p=0;p<16;p++) {
             if((s3>>(p<<2))&1ull) {
                 for(k=0,nbmask=0ull;k<8;k++) {
@@ -636,7 +642,7 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
                 if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) { // central old gene present: overwritten
                     genedataptr->popcount--;  // if 0 lastextinctionframe updated after whole frame calculated
                 }
-                else fprintf(stderr,"hash storage error 1, gene %llx not stored\n",golg[ij]);
+                else fprintf(stderr,"step %d hash storage error 1 in update_gol16, gene %llx at %d not stored\n",totsteps,golg[ij],ij);
                 if((genedataptr = (genedata *) hashtable_find(&genetable, newgene)) != NULL) {
                     genedataptr->popcount++;
                 }
@@ -656,6 +662,20 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
         golg[ij] = newgolg[ij];      // copy new genes to old genes
         golgstats[ij] = newgolgstats[ij]; // copy new golg stat flags to old genes
     }
+#ifdef HASH
+    for (ij=0; ij<N2; ij++) {       // complete missing hash table records including activities
+        if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
+            if(genedataptr->popcount == 0) {
+                genedataptr->lastextinctionframe = totsteps;
+                genedataptr->nextinctions++;
+            }
+        }
+        else fprintf(stderr,"step %d hash storage error 2 in update_gol16, gene %llx at %d not stored\n",totsteps,golg[ij],ij);
+        if((genedataptr = (genedata *) hashtable_find(&genetable, newgolg[ij])) != NULL)
+            genedataptr->activity ++;
+        else fprintf(stderr,"step %d hash storage error 3 in update_gol16, gene %llx at %d not stored\n",totsteps,golg[ij],ij);
+    }
+#endif
 
 }
 
@@ -674,7 +694,6 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
     genedata gdata;
 #endif
 
-    //pack2neighbors(gol,golp);
     totsteps++;
     if(!(totsteps%10)) fprintf(stderr,"iteration step %d\r",totsteps);
     rulemod1= rulemod & 0x1ull;                                             // allow GoL rule modification
@@ -1186,8 +1205,9 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
         case 3: for (k=0;k<8;k++) startgenes[k]=(((0x1ull<<20)-1ull)<<20)+((0x1ull<<k)-0x1ull);break;
         case 4: for (k=0;k<8;k++) {g = 0xfffff0ull + k; startgenes[k] = k<4 ? g : ~g;} break;
         case 5: for (k=0;k<8;k++) {g = 0xf0ull + k; startgenes[k]= k<4 ? g : (~g)|(0xfull<<16);} break;
-        case 10: for (k=0;k<16;k++) {for (p=0,g=0ull;p<16;p++) g|= ((p+k)&0xfull)<<(p<<2);startgenes[k] = g;} break;
-        case 11: for (k=0;k<16;k++) {for (p=0,g=0ull;p<16;p++) g|= (k&3ull)<<(p<<2);startgenes[k] = g;} break;
+        case 10: for (p=0,g=0ull;p<16;p++) g|= (p&0xfull)<<(p<<2);for (k=0;k<16;k++) startgenes[k] = g; // first set all startgenes as uncoupled
+         for (k=0;k<16;k++) startgenes[k] = (startgenes[k] & (~(0xfull<<(k<<2)))) | ((k+1)&0xfull)<<(k<<2);break; // couple plane k+1 to k in startgene k
+        case 11: for (k=0;k<16;k++) {for (p=0,g=0ull;p<16;p++) g|= (k&0xfull)<<(p<<2);startgenes[k] = g;} break;
         case 6:
         case 7:
         default: for (k=0;k<8;k++) startgenes[k]=(0x1ull<<(4+k*8))-1ull;
@@ -1230,6 +1250,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
         for (ij=0; ij<N2; ij++) {
             gol[ij] = 0;
             golg[ij] = 0;
+            if (selection == 10) golg[ij]=0xfedcba9876543210;
         }
         for (ij1=0; ij1<32*32; ij1++) {
             if(N<32) {fprintf(stderr,"Error, array dim %d too small for file array dim %d\n",N,32);break;}
@@ -1245,6 +1266,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
             else {
                 gol[ij] = 0;
                 golg[ij] = 0;
+                if (selection == 10) golg[ij]=0xfedcba9876543210;
                 golgstats[ij] = 0;
             }
             // if (golg[ij] == 0 && gol[ij] != 0) fprintf(stderr,"zero gene at %d\n",ij);
@@ -1257,8 +1279,8 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
         for (ij=0; ij<N2; ij++) {
             gol[ij] = 0ull;
             golg[ij] = 0ull;
+            if (selection == 10) golg[ij]=0xfedcba9876543210;
             golgstats[ij] = 0;
-            golmix[ij] = 0;
         }
         i0 = j0 = (N>>1)-(Nf>>1);
         for (i=0; i<Nf; i++) {
