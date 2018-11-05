@@ -101,6 +101,7 @@ uint64_t *gol, *golg;               // pointers to gol and golg arrays at one of
 uint64_t golgstats[N2];             // 64 bit masks for different events during processing
 uint64_t newgolgstats[N2];          // 64 bit masks for different events during processing
 uint64_t golmix[N2];                // array for calculating coupling of genes between planes for multiplane genelife
+uint64_t gene0;                     // uncoupled planes background gene, non zero for selection==10
 //------------------------------------------------ arrays for time tracing -----------------------------------------------------------------------------
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
@@ -579,28 +580,29 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
                     }
                 }
             }
-            golmix[ij] = golsh/*|gol[ij]*/;                                      // bits either active from primary or four secondary planes
+            golmix[ij] = golsh/*|gol[ij]*/;                                  // bits active from (primary or) two(four) secondary planes
         }
       }
     }
     else { // no gol rule modification, independent planes
          for (ij=0; ij<N2; ij++) golmix[ij] = gol[ij];                       // loop over all sites of 2D torus with side length N
     }
-    for (ij=0; ij<N2; ij++) if ((golmix[ij]&r1) != golmix[ij]) fprintf(stderr,"error in golmix calculation %llx",golmix[ij]);
+    // for (ij=0; ij<N2; ij++) if ((golmix[ij]&r1) != golmix[ij]) fprintf(stderr,"error in golmix calculation %llx",golmix[ij]);
     
-    for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
-        for(k=0,s=0ull;k<8;k++) {
+    for (ij=0; ij<N2; ij++) {                                                   // loop over all sites of 2D torus with side length N
+        for(k=0,s=0ull;k<8;k++) {                                               // compute no of live neighbours using golmix (coupled plane neighbours)
             ij1=deltaxy(ij,nb1x[k],nb1y[k]);
             s +=golmix[ij1];
         }
-        su = s&rc;
-        sg3 = (((su>>1)|su)>>2) & r1;
-        s2or3 = (~sg3)&(s>>1)&r1;
-        s3 = s2or3&s&r1;
-        newgol[ij]=s2or3&(gol[ij]|s3)&r1;
-        newgolg[ij]=golg[ij];
+        su = s&rc;                                                              // upper 2 bits (3,2) of sum of live neighbours : non zero if sum 4-8
+        sg3 = (((su>>1)|su)>>2) & r1;                                           // for each plane 1 if sum is gt 3
+        s2or3 = (~sg3)&(s>>1)&r1;                                               // sum is 2 or 3 for each plane, ie not gt 3 and bit 2 is 1
+        s3 = s2or3&s&r1;                                                        // sum is 3 for each plane (s2or3 and bit 0 is 1)
+        newgol[ij]=s2or3&(gol[ij]|s3)&r1;                                       // parallel gol rule with coupled sum s for each plane
         statflag = 0ull;
-        for(p=0;p<16;p++) {
+        if((golmix[ij]^gol[ij])&s2or3) statflag |= F_notgolrul;                 // not gol rule in at least one plane
+        if (s3) {                                                               // birth in at least one plane
+          for(p=0;p<16;p++) {
             if((s3>>(p<<2))&1ull) {
                 for(k=0,nbmask=0ull;k<8;k++) {
                     ij1=deltaxy(ij,nb1x[k],nb1y[k]);
@@ -656,6 +658,29 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
                 p=16;                                                             // break from loop at first birth
             } //if 3 live nbs at p
         } // for p
+      }  // if (s3)
+      else {
+        newgolg[ij]=gene0;
+#ifdef HASH
+        if(golg[ij]!= gene0) {
+            newgene= gene0;                                                     // default is relax to uncoupled gene
+
+            if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) { // central old gene present: overwritten
+                    genedataptr->popcount--;  // if 0 lastextinctionframe updated after whole frame calculated
+            }
+            else fprintf(stderr,"step %d hash storage error 1 in update_gol16, gene %llx at %d not stored\n",totsteps,golg[ij],ij);
+            if((genedataptr = (genedata *) hashtable_find(&genetable, newgene)) != NULL) {
+                genedataptr->popcount++;
+            }
+            else {
+                gdata=ginitdata;
+                gdata.firstbirthframe = totsteps;
+                gdata.firstancestor = gene0;
+                hashtable_insert(&genetable, newgene,(genedata *) &gdata);
+            }
+        }
+#endif
+      } // end else (s3)
     } // for ij
     for (ij=0; ij<N2; ij++) {        // update lattices
         gol[ij] = newgol[ij];        // copy new gol config to old one
@@ -1196,6 +1221,9 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     fprintf(stderr,"simparams %d %d %d %d %d\n",simparams[0],simparams[1],simparams[2],simparams[3],simparams[4]);
     fprintf(stderr,"pmutmask %llx (NB 0 means no mutation)\n",pmutmask);
     
+    if (selection == 10) gene0=0xfedcba9876543210;
+    else gene0=0x0ull;
+    
     nstartgenes = 8;
     if (selection >= 10) nstartgenes = 16;
     switch (selection) {
@@ -1266,7 +1294,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
             else {
                 gol[ij] = 0;
                 golg[ij] = 0;
-                if (selection == 10) golg[ij]=0xfedcba9876543210;
+                if (selection == 10) golg[ij]=gene0;
                 golgstats[ij] = 0;
             }
             // if (golg[ij] == 0 && gol[ij] != 0) fprintf(stderr,"zero gene at %d\n",ij);
@@ -1279,7 +1307,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
         for (ij=0; ij<N2; ij++) {
             gol[ij] = 0ull;
             golg[ij] = 0ull;
-            if (selection == 10) golg[ij]=0xfedcba9876543210;
+            if (selection == 10) golg[ij]=gene0;
             golgstats[ij] = 0;
         }
         i0 = j0 = (N>>1)-(Nf>>1);
