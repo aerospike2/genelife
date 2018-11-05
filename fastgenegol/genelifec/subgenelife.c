@@ -199,7 +199,7 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
 void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2) {
     uint64_t gene, gdiff, g2c, mask;
     int ij,d,d2;
-
+    static int numones[16]={0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4};
     if(colorfunction){
         for (ij=0; ij<NN2; ij++) {
             if (gol[ij]) {
@@ -217,12 +217,23 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                         case 7 : g2c = (gene>>8)&((1ull<<ncoding)-1ull);
                                  gdiff = gene&0xff;POPCOUNT64C(gdiff,d2);d = d2>7? 7 : d2;
                                  mask = g2c ? 0xf0f0f0ff : ((0x1f+(d<<5))<<8)+(((gdiff>>4)&0xf)<<27)+(((gdiff&0xf)<<4)<<16)+0xff; break;
-                        case 10: for (d=0,mask=0;d<16;d++) {d2=(gene>>(d<<2))&0xf;d2=(d2!=d)?1:0;mask+=(d2*0x2a)<<((d%3)<<3);}
+                        case 10: for (d=0,mask=0;d<16;d++) {d2=(gene>>(d<<2))&0xf;d2=(d2!=0)?1:0;mask+=(d2*0x2a)<<((d%3)<<3);}
+                                mask = (mask<<8)+0x7f7f7fff;break;  // 0x2a is 42, approx 1/6 (ie <16/3) of 255
+                        case 11: for (d=0,mask=0;d<16;d++) {d2=(gene>>(d<<2))&0xf;d2=numones[d2];mask+=(d2*0xb)<<((d%3)<<3);}
+                                mask = (mask<<8)+0x7f7f7fff;break;  // 0x2a is 42, approx 1/6 (ie <16/3) of 255
+                        case 12: for (d=0,mask=0;d<64;d++) {d2=(gene>>d)&0x1;mask+=(d2*0x3)<<((d%3)<<3);}
                                 mask = (mask<<8)+0x7f7f7fff;break;  // 0x2a is 42, approx 1/6 (ie <16/3) of 255
                         default  : mask = ((d+(d<<6)+(d<<12)+(d<<18))<<8) + 0xff;
                 }
                 if(colorfunction==2) {
                     if(golgstats[ij]&F_nongolchg) mask = 0x00ffffff;  // color states changed by non GoL rule yellow
+                    if(selection>=12) {                               // color as superposition of multiplane gol states
+                        for (d=0,mask=0;d<64;d++) {
+                            d2=((gol[ij]>>d)&0x1ull);
+                            mask+=(d2*0x3)<<((d%3)<<3);
+                        }
+                        mask = (mask<<8)+0x7f7f7fff;  // 0x2a is 42, approx 1/6 (ie <16/3) of 255
+                    }
                     if(selection>=10) {                               // color as superposition of multiplane gol states
                         for (d=0,mask=0;d<16;d++) {
                             d2=((gol[ij]>>(d<<2))&0x1ull);
@@ -489,13 +500,14 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
     uint64_t s,su,sg3,s3,s2or3,sgol;
     int nb1x[8] = {-1,0,1,1,1,0,-1,-1};
     int nb1y[8] = {-1,-1,-1,0,1,1,1,0};
-    
     const uint64_t r1= 0x1111111111111111;
     const uint64_t r3= 0x3333333333333333;
     const uint64_t r5= 0x5555555555555555;
     const uint64_t ra= 0xaaaaaaaaaaaaaaaa;
     const uint64_t rc= 0xcccccccccccccccc;
     
+    totsteps++;
+    if(!(totsteps%10)) fprintf(stderr,"iteration step %d\r",totsteps);
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
         sums00 = sums10 = sums01 = sums11 = sums02 = sums12 = 0ull;
         for(k=0;k<3;k++) {
@@ -526,13 +538,17 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
             sgol=(s2or3&(gol[ij]|s3))&r1;
             newgs|=sgol<<k;
         }
-        newgol[ij]=newgs;
-        
         //for (k=0;k<64;k++) {                                                    // explicit loop over 64 bits
         //    s = (sums16[k&0x3]>>(k>>2))&0xf;
         //    s2or3 = (s>>2) ? 0ull : (s>>1);                                     // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
         //    newgs |= (s2or3 & (gol[ij] |(s&0x1ull)))<<k;                        // GoL standard calculation next state
         //}
+        newgol[ij]=newgs;
+        newgolg[ij]=golg[ij];                                                     // currently no gene changes
+    }
+    for (ij=0; ij<N2; ij++) {        // update lattices
+        gol[ij] = newgol[ij];        // copy new gol config to old one
+        golg[ij] = newgolg[ij];      // copy new genes to old genes
     }
 }
 
@@ -543,6 +559,9 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
 // optionally genes also specify a unique copy plane for a gene: it can only be copied by a rule active on this plane
 // in this optional case, copy plane could be lowest non zero bit in gene at pos m for which m%4 == 1 (if none then gene is not copied)
 #define deltaxy(ij,x,y)  (ij - (ij&Nmask) + ((ij+(x)&Nmask) + (y)*N)) & N2mask
+#ifdef HASH
+    genedata gdata;
+#endif
     unsigned int ij,ij1,k,kmin,p,p1,nmut,debcnt,mask;
     uint64_t s,su,s3,sg3,s2or3,nbmask,nbmaskr,nbmaskrm,ancestor,newgene,golsh;
     //uint64_t s0,sm;
@@ -551,9 +570,6 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
     int nb1y[8] = {-1,-1,-1,0,1,1,1,0};
     const uint64_t r1= 0x1111111111111111;
     const uint64_t rc= 0xcccccccccccccccc;
-#ifdef HASH
-    genedata gdata;
-#endif
 
     totsteps++;
     if(!(totsteps%10)) fprintf(stderr,"iteration step %d\r",totsteps);
@@ -1073,7 +1089,8 @@ void genelife_update (int nsteps, int nhist, int nstat) {
         newgolg = planesg[newPlane];
 
         if (selection<10) update(gol,golg,newgol,newgolg);                    // calculate next iteration with selection
-        else update_gol16(gol,golg,newgol,newgolg);                           // calculate next iteration for multiplane version
+        else if (selection <12) update_gol16(gol,golg,newgol,newgolg);        // calculate next iteration for 16x multiplane version
+        else update_gol64(gol,golg,newgol,newgolg);                           // calculate next iteration for 64x multiplane version
         if(nhist && (totsteps%nhist == 0)) countconfigs();                    // count configurations
         if(nstat && (totsteps%nstat == 0)) tracestats(gol,golg,golgstats,N2); // time trace point
 
