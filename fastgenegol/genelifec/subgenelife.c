@@ -572,22 +572,20 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
 #ifdef HASH
     genedata gdata;
 #endif
-    unsigned int ij,ij1,k,kmin,p,p1,nmut,debcnt,mask,np,npmask;
+    unsigned int ij,ij1,k,kmin,p,p1,nmut,debcnt,mask,np,npmask,npsmask;
     uint64_t s,su,s3,sg3,s2or3,nbmask,nbmaskr,nbmaskrm,ancestor,newgene,golsh,pmask;
     //uint64_t s0,sm;
     uint64_t randnr, randnr2, rand2, statflag;
     int nb1x[8] = {-1,0,1,1,1,0,-1,-1};
     int nb1y[8] = {-1,-1,-1,0,1,1,1,0};
+    int npmasks[17] = {1,1,3,3,7,7,7,7,0xf,0xf,0xf,0xf,0xf,0xf,0xf,0xf,0xf};
     const uint64_t r1= 0x1111111111111111;
     const uint64_t rc= 0xcccccccccccccccc;
 
     totsteps++;
     
     np = (repscheme && repscheme<=16) ? repscheme : 16;                      // number of planes used, 16 if 0
-    if (np>=8) npmask = 0xf;                                                 // mask for other plane index
-    else if (np>=4) npmask = 0x7;
-    else if (np>=2) npmask = 0x3;
-    else npmask = 0x1;
+    npmask = npmasks[np-1];                                                 // mask for other plane index
     pmask = np==16 ? 0xffffffffffffffff : (1ull<<(np<<2))-1;                // mask for bits included in np planes
     
     if(!(totsteps%10)) fprintf(stderr,"iteration step %d\r",totsteps);
@@ -596,6 +594,7 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
         for (ij=0; ij<N2; ij++) {                                            // loop over all sites of 2D torus with side length N
             for (p=0,golsh=0ull;p<np;p++) {                                  // 16 different planes, one every 4 bits in gol,golg
                 p1 = (golg[ij]>>(p<<2))&npmask;
+                p1 &= ncoding ? npmasks[p+1] : 0xf;                          // 1st implementation of Norman's idea to grow plane community
                 golsh |= ((gol[ij]>>(p1<<2))&1ull)<<(p<<2);                  // collect active bits from 2nd planes pointed to by gene
             }
             golsh &= pmask;
