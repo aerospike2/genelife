@@ -50,6 +50,8 @@ libcd.colorgenes1.restype = None
 libcd.colorgenes1.argtypes = [uint64_array, uint64_array, uint64_array, int_array, c_int]
 libcd.colorgenes.restype = None
 libcd.colorgenes.argtypes = [int_array, c_int]
+libcd.set_colorfunction.restype = None
+libcd.set_colorfunction.argtypes = [c_int]
 
 def genelife_update(nsteps, nhist, nstat):
     return libcd.genelife_update(nsteps, nhist, nstat)
@@ -98,3 +100,6 @@ def colorgenes1(gol, golg, golgstats, cgolg):
 
 def colorgenes(cgolg):
     return libcd.colorgenes( cgolg, len(cgolg))
+
+def set_colorfunction(colorfunctionval):
+    return libcd.set_colorfunction(colorfunctionval)

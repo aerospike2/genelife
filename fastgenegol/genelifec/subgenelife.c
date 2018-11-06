@@ -221,26 +221,36 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                                 mask = (mask<<8)+0x7f7f7fff;break;  // 0x2a is 42, approx 1/6 (ie <16/3) of 255
                         case 11: for (d=0,mask=0;d<16;d++) {d2=(gene>>(d<<2))&0xf;d2=numones[d2];mask+=(d2*0xb)<<((d%3)<<3);}
                                 mask = (mask<<8)+0x7f7f7fff;break;  // 0x2a is 42, approx 1/6 (ie <16/3) of 255
-                        case 12: for (d=0,mask=0;d<64;d++) {d2=(gene>>d)&0x1;mask+=(d2*0x3)<<((d%3)<<3);}
-                                mask = (mask<<8)+0x7f7f7fff;break;  // 0x2a is 42, approx 1/6 (ie <16/3) of 255
+                        case 12:
+                                d2= (d>>5) ? 5*32 + d-32 : ((d>>4) ? 4*32 + (d-16)*2
+                                                         : ((d>>3) ? 3*32 + (d-8)*4
+                                                         : ((d>>2) ? 2*32 + (d-4)*8
+                                                         : ((d>>1) ? 32 + (d-2)*16
+                                                         : d*32))));
+                                mask = gene * 11400714819323198549ul;mask = mask >> (64 - 16);
+                                mask = ((d2+62)<<8)+(mask<<16)+0xff;break;
                         default  : mask = ((d+(d<<6)+(d<<12)+(d<<18))<<8) + 0xff;
                 }
                 if(colorfunction==2) {
                     if(golgstats[ij]&F_nongolchg) mask = 0x00ffffff;  // color states changed by non GoL rule yellow
                     if(selection>=12) {                               // color as superposition of multiplane gol states
-                        for (d=0,mask=0;d<64;d++) {
-                            d2=((gol[ij]>>d)&0x1ull);
-                            mask+=(d2*0x3)<<((d%3)<<3);
-                        }
-                        mask = (mask<<8)+0x7f7f7fff;  // 0x2a is 42, approx 1/6 (ie <16/3) of 255
+                        POPCOUNT64C(gol[ij],d);
+                        d2= (d>>5) ? 5*32 + d-32 : ((d>>4) ? 4*32 + (d-16)*2
+                                                 : ((d>>3) ? 3*32 + (d-8)*4
+                                                 : ((d>>2) ? 2*32 + (d-4)*8
+                                                 : ((d>>1) ? 32 + (d-2)*16
+                                                 : d*32))));
+                        mask = gol[ij] * 11400714819323198549ul;mask = mask >> (64 - 16);
+                        mask = ((d2+62)<<8)+(mask<<16)+0xff;
                     }
-                    if(selection>=10) {                               // color as superposition of multiplane gol states
-                        for (d=0,mask=0;d<16;d++) {
-                            d2=((gol[ij]>>(d<<2))&0x1ull);
-                            //mask+=(d2*0x2a)<<((d%3)<<3);
-                            mask+=(d2*(0x10+((d>>2)<<3)))<<((d%3)<<3);
-                        }
-                        mask = (mask<<8)+0x7f7f7fff;  // 0x2a is 42, approx 1/6 (ie <16/3) of 255
+                    else if(selection>=10) {                               // color as superposition of multiplane gol states
+                        POPCOUNT64C(gol[ij],d);
+                        d2= (d>>3) ? 3*32 + (d-8)*4
+                                    : ((d>>2) ? 2*32 + (d-4)*8
+                                    : ((d>>1) ? 32 + (d-2)*16
+                                    : d*32));
+                        mask = gol[ij] * 11400714819323198549ul;mask = mask >> (64 - 16);
+                        mask = ((d2+62)<<8)+(mask<<16)+0xff;
                     }
                 }
                 else if (colorfunction==3) {
@@ -1386,6 +1396,11 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
 
     fprintf(stderr,"population size %d with %d different genes\n",cnt,hcnt);
 #endif
+}
+
+void set_colorfunction(int colorfunctionval) {
+    if(colorfunction>3) fprintf(stderr,"error colorfunction value passed %d too large\n",colorfunctionval);
+    else     colorfunction = colorfunctionval;
 }
 
 void get_curgol(uint64_t outgol[], int NN){
