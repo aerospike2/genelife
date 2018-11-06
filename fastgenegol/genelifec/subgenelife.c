@@ -581,7 +581,8 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
                 golsh |= ((gol[ij]>>(p1<<2))&1ull)<<(p<<2);                  // collect active bits from 2nd planes pointed to by gene
                 // golsh |= (gol[ij]>>((golg[ij]>>(p<<2))<<2))<<(p<<2);      // erroneous earlier version of commit 61a7463 giving exploration waves
             }
-            golmix[ij] = golsh/*|gol[ij]*/;                                  // bits active from secondary plane (or primary if or with gol)
+            if (survival)   golmix[ij] = golsh;                              // bits active from secondary plane (or primary if or with gol)
+            else golmix[ij] = golsh|gol[ij];
         }
       }
       else { // selection == 11                                              // gene codes for 4(2) nearest plane neighbour masks
@@ -596,7 +597,8 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
                     }
                 }
             }
-            golmix[ij] = golsh/*|gol[ij]*/;                                  // bits active from (primary or) two(four) secondary planes
+            if (survival)   golmix[ij] = golsh;                              // bits active from secondary plane (or primary if or with gol)
+            else golmix[ij] = golsh|gol[ij];
         }
       }
     }
@@ -614,6 +616,7 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
         sg3 = (((su>>1)|su)>>2) & r1;                                           // for each plane 1 if sum is gt 3
         s2or3 = (~sg3)&(s>>1)&r1;                                               // sum is 2 or 3 for each plane, ie not gt 3 and bit 2 is 1
         s3 = s2or3&s&r1;                                                        // sum is 3 for each plane (s2or3 and bit 0 is 1)
+        // if (survival)
         newgol[ij]=s2or3&(gol[ij]|s3)&r1;                                       // parallel gol rule with coupled sum s for each plane
         statflag = 0ull;
         if((golmix[ij]^gol[ij])&s2or3) statflag |= F_notgolrul;                 // not gol rule in at least one plane
@@ -1253,6 +1256,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
         case 10: for (p=0,g=0ull;p<16;p++) g|= (p&0xfull)<<(p<<2);for (k=0;k<16;k++) startgenes[k] = g; // first set all startgenes as uncoupled
          for (k=0;k<16;k++) startgenes[k] = (startgenes[k] & (~(0xfull<<(k<<2)))) | ((k+1)&0xfull)<<(k<<2);break; // couple plane k+1 to k in startgene k
         case 11: for (k=0;k<16;k++) {for (p=0,g=0ull;p<16;p++) g|= (k&0xfull)<<(p<<2);startgenes[k] = g;} break;
+        case 12: for (k=0;k<16;k++) startgenes[k] = 0x3ull<<(k<<2);break;
         case 6:
         case 7:
         default: for (k=0;k<8;k++) startgenes[k]=(0x1ull<<(4+k*8))-1ull;
