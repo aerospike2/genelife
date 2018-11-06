@@ -562,8 +562,8 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
 #ifdef HASH
     genedata gdata;
 #endif
-    unsigned int ij,ij1,k,kmin,p,p1,nmut,debcnt,mask;
-    uint64_t s,su,s3,sg3,s2or3,nbmask,nbmaskr,nbmaskrm,ancestor,newgene,golsh;
+    unsigned int ij,ij1,k,kmin,p,p1,nmut,debcnt,mask,np,npmask;
+    uint64_t s,su,s3,sg3,s2or3,nbmask,nbmaskr,nbmaskrm,ancestor,newgene,golsh,pmask;
     //uint64_t s0,sm;
     uint64_t randnr, randnr2, rand2, statflag;
     int nb1x[8] = {-1,0,1,1,1,0,-1,-1};
@@ -572,33 +572,42 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
     const uint64_t rc= 0xcccccccccccccccc;
 
     totsteps++;
+    
+    np = (repscheme && repscheme<=16) ? repscheme : 16;                      // number of planes used, 16 if 0
+    if (np>=8) npmask = 0xf;                                                 // mask for other plane index
+    else if (np>=4) npmask = 0x7;
+    else if (np>=2) npmask = 0x3;
+    else npmask = 0x1;
+    pmask = np==16 ? 0xffffffffffffffff : (1ull<<(np<<2))-1;                // mask for bits included in np planes
+    
     if(!(totsteps%10)) fprintf(stderr,"iteration step %d\r",totsteps);
     if(rulemod) {
       if (selection == 10) {                                                 // gene codes for one secondary plane for each plane  (OLD 10)
         for (ij=0; ij<N2; ij++) {                                            // loop over all sites of 2D torus with side length N
-            for (p=0,golsh=0ull;p<16;p++) {                                  // 16 different planes, one every 4 bits in gol,golg
-                p1 = (golg[ij]>>(p<<2))&0xf;
+            for (p=0,golsh=0ull;p<np;p++) {                                  // 16 different planes, one every 4 bits in gol,golg
+                p1 = (golg[ij]>>(p<<2))&npmask;
                 golsh |= ((gol[ij]>>(p1<<2))&1ull)<<(p<<2);                  // collect active bits from 2nd planes pointed to by gene
-                // golsh |= (gol[ij]>>((golg[ij]>>(p<<2))<<2))<<(p<<2);      // erroneous earlier version of commit 61a7463 giving exploration waves
             }
-            if (survival)   golmix[ij] = golsh;                              // bits active from secondary plane (or primary if or with gol)
-            else golmix[ij] = golsh|gol[ij];
+            golsh &= pmask;
+            if (survival&0x1)   golmix[ij] = golsh|gol[ij];                  // bits active from secondary plane or primary plane
+            else golmix[ij] = golsh;                                         // bits active from secondary plane only
         }
       }
       else { // selection == 11                                              // gene codes for 4(2) nearest plane neighbour masks
         for (ij=0; ij<N2; ij++) {                                            // loop over all sites of 2D torus with side length N
-            for (p=0,golsh=0ull;p<16;p++) {                                  // 16 different planes, one every 4 bits in gol,golg
+            for (p=0,golsh=0ull;p<np;p++) {                                  // 16 different planes, one every 4 bits in gol,golg
                 mask = (golg[ij]>>(p<<2))&0xf;                               // bit mask indicating which nearby planes visible from plane
                 for (k=1;k<3;k++) {                                          // 2 nearest planes variant
                 //for (k=0;k<4;k++) {                                        // 4 nearest planes variant
                     if((mask>>k)&0x1) {
-                        p1 = (p+k+(k>>1)-2)&0xf;
+                        p1 = (p+k+(k>>1)-2)&npmask;
                         golsh ^= ((gol[ij]>>(p1<<2))&0x1ull)<<(p<<2);        // nearby planes p1=p+{-2,-1,1,2} for k 0,1,2,3   or p+{-1,1} for k 1,2
                     }
                 }
             }
-            if (survival)   golmix[ij] = golsh;                              // bits active from secondary plane (or primary if or with gol)
-            else golmix[ij] = golsh|gol[ij];
+            golsh &= pmask;
+            if (survival&0x1)   golmix[ij] = golsh|gol[ij];                  // bits active from secondary plane or primary plane
+            else golmix[ij] = golsh;                                         // bits active from secondary plane only
         }
       }
     }
@@ -616,12 +625,14 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
         sg3 = (((su>>1)|su)>>2) & r1;                                           // for each plane 1 if sum is gt 3
         s2or3 = (~sg3)&(s>>1)&r1;                                               // sum is 2 or 3 for each plane, ie not gt 3 and bit 2 is 1
         s3 = s2or3&s&r1;                                                        // sum is 3 for each plane (s2or3 and bit 0 is 1)
-        // if (survival)
-        newgol[ij]=s2or3&(gol[ij]|s3)&r1;                                       // parallel gol rule with coupled sum s for each plane
+        if (survival&0x2)
+            newgol[ij]=s2or3&(gol[ij]|s3)&r1;                                   // parallel gol rule with coupled sum s for each plane
+        else
+            newgol[ij]=s2or3&(s3)&r1;
         statflag = 0ull;
         if((golmix[ij]^gol[ij])&s2or3) statflag |= F_notgolrul;                 // not gol rule in at least one plane
         if (s3) {                                                               // birth in at least one plane
-          for(p=0;p<16;p++) {
+          for(p=0;p<np;p++) {
             if((s3>>(p<<2))&1ull) {
                 for(k=0,nbmask=0ull;k<8;k++) {
                     ij1=deltaxy(ij,nb1x[k],nb1y[k]);
@@ -652,7 +663,7 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
                 RAND128P(randnr);                                                 // inline exp so compiler recognizes auto-vec,
                 randnr2 = (randnr & pmutmask);                                    // extract bits from randnr for random trial for 0 on pmutmask
                 rand2 = (!pmutmask||randnr2)?0ull:1ull;                           // 1 if lowest nlog2pmut bits of randnr are zero, else zero
-                nmut = (randnr >> 56) & 0x3f;                                     // choose mutation position for length 64 gene : from bits 56:61 of randnr
+                nmut = (randnr >> 56) & (0x3|(npmask<<2));                        // choose mutation pos for length np*4 gene : from bits 56:61 of randnr
                 ancestor = newgene;
                 newgene = newgene ^ (rand2<<nmut);                                // introduce single mutation with probability pmut = probmut
                 newgolg[ij]=newgene;
@@ -674,7 +685,7 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
                     hashtable_insert(&genetable, newgene,(genedata *) &gdata);
                 }
 #endif
-                p=16;                                                             // break from loop at first birth
+                p=np;                                                             // break from loop at first birth
             } //if 3 live nbs at p
         } // for p
       }  // if (s3)
@@ -1197,12 +1208,12 @@ int writeFile(char *fileName)     // initialize 32x32 genepat file with all empt
 }
 
 void initialize (int runparams[], int nrunparams, int simparams[], int nsimparams) {
-    int ij,ij1,i0,j0,i,j,Nf,k,cnt,icf,p,nstartgenes;
-    uint64_t g;
-
 #ifdef HASH
     int hcnt;
 #endif
+    int ij,ij1,i0,j0,i,j,Nf,k,cnt,icf,p,nstartgenes;
+    unsigned int np;
+    uint64_t g,pmask;
 
     static unsigned int rmask = (1 << 15) - 1;
     static int notfirst = 0;
@@ -1240,10 +1251,13 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
                                          runparams[3],runparams[4],runparams[5],runparams[6]);
     fprintf(stderr,"simparams %d %d %d %d %d\n",simparams[0],simparams[1],simparams[2],simparams[3],simparams[4]);
     fprintf(stderr,"pmutmask %llx (NB 0 means no mutation)\n",pmutmask);
-    
-    if (selection == 10) gene0=0xfedcba9876543210;
+                                                                                 // not yet useable with selection==12
+    np = (repscheme && repscheme<=16) ? repscheme : 16;                      // number of planes used, 16 if 0
+    pmask = (np==16) ? 0xffffffffffffffff : (1ull<<(np<<2))-1;                // mask for bits included in np planes
+
+    if (selection == 10) gene0=0xfedcba9876543210&pmask;
     else gene0=0x0ull;
-    
+
     nstartgenes = 8;
     if (selection >= 10) nstartgenes = 16;
     switch (selection) {
@@ -1253,10 +1267,11 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
         case 3: for (k=0;k<8;k++) startgenes[k]=(((0x1ull<<20)-1ull)<<20)+((0x1ull<<k)-0x1ull);break;
         case 4: for (k=0;k<8;k++) {g = 0xfffff0ull + k; startgenes[k] = k<4 ? g : ~g;} break;
         case 5: for (k=0;k<8;k++) {g = 0xf0ull + k; startgenes[k]= k<4 ? g : (~g)|(0xfull<<16);} break;
-        case 10: for (p=0,g=0ull;p<16;p++) g|= (p&0xfull)<<(p<<2);for (k=0;k<16;k++) startgenes[k] = g; // first set all startgenes as uncoupled
-         for (k=0;k<16;k++) startgenes[k] = (startgenes[k] & (~(0xfull<<(k<<2)))) | ((k+1)&0xfull)<<(k<<2);break; // couple plane k+1 to k in startgene k
-        case 11: for (k=0;k<16;k++) {for (p=0,g=0ull;p<16;p++) g|= (k&0xfull)<<(p<<2);startgenes[k] = g;} break;
-        case 12: for (k=0;k<16;k++) startgenes[k] = 0x3ull<<(k<<2);break;
+        case 10:for (k=0;k<16;k++) startgenes[k] = gene0; // first set all startgenes as uncoupled
+                for (k=0;k<np;k++) startgenes[k] = (startgenes[k] & (~(0xfull<<(k<<2)))) | ((k+1)&0xfull)<<(k<<2);break; // couple plane k+1 to k in startgene k
+        case 11:for (k=0;k<16;k++) startgenes[k] = gene0; // first set all startgenes as uncoupled
+                for (k=0;k<np;k++) {for (p=0,g=0ull;p<np;p++) g|= (k&0xfull)<<(p<<2);startgenes[k] = g;} break;
+        case 12:for (k=0;k<16;k++) startgenes[k] = 0x3ull<<(k<<2);break;
         case 6:
         case 7:
         default: for (k=0;k<8;k++) startgenes[k]=(0x1ull<<(4+k*8))-1ull;
