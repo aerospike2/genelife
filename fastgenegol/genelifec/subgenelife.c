@@ -91,6 +91,7 @@ genedata* geneitems;                // list of genedata structured items stored 
 #endif
 //-------------------------------------------------------------------------------------------------------------------------------------------------------
 int totsteps=0;                     // total number of simulation steps
+int totdisp=0;                      // total number of displayed steps
 int statcnts=0;                     // total number of statistic timepts counted
 uint64_t codingmask;                // ncoding derived mask for ncoding bits
 uint64_t  emptysites = 0;           // cumulative number of empty sites during simulation updates
@@ -109,6 +110,7 @@ int *livesites = NULL;              // dynamic array pointer for statistics of n
 int *genestats = NULL;              // dynamic array pointer for statistics of number of 4 genotype classes over time
 int *stepstats = NULL;              // dynamic array pointer for statistics of site update types over time
 int *configstats = NULL;            // dynamic array pointer for statistics of gol site configurations (x,y,t) offsets
+int actcoltrace[N2];                // scrolled trace of last N time points of activity colour trace
 //------------------------------------------------ planes and configuration offsets----------------------------------------------------------------------
 int Noff = 9;                       // number of offsets
 int **offsets;                      // array of offsets (2D + time) for planes
@@ -200,7 +202,24 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
     uint64_t gene, gdiff, g2c, mask;
     int ij,d,d2;
     static int numones[16]={0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4};
-    if(colorfunction){
+
+    if(colorfunction==0) { // colorfunction based on multiplicative hash
+        // see https://stackoverflow.com/questions/6943493/hash-table-with-64-bit-values-as-key/33871291
+        for (ij=0; ij<NN2; ij++) {
+            if (gol[ij]) {
+                gene = golg[ij];
+                if (gene == 0ull) gene = 11778L; // random color for gene==0
+                // mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
+                // mask = (gene * 11400714819323198549ul) >> (64 - 32);  // hash with optimal prime multiplicator down to 32 bits
+                mask = gene * 11400714819323198549ul;
+                mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
+                mask |= 0x808080ff; // ensure brighter color at risk of improbable redundancy, make alpha opaque
+                cgolg[ij] = (int) mask;
+            }
+            else cgolg[ij] = 0;
+        }
+    }
+    else if(colorfunction<4){
         for (ij=0; ij<NN2; ij++) {
             if (gol[ij]) {
                 gene = golg[ij];
@@ -262,25 +281,11 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
             else cgolg[ij] = 0;
         }
     }
-    else{
-        // for(d=0;d<256;d++) counts[d]=0;
-        // see https://stackoverflow.com/questions/6943493/hash-table-with-64-bit-values-as-key/33871291
+    else if(colorfunction==4){                    //activities
         for (ij=0; ij<NN2; ij++) {
-            if (gol[ij]) {
-                gene = golg[ij];
-                if (gene == 0ull) gene = 11778L; // random color for gene==0
-                // mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
-                // mask = (gene * 11400714819323198549ul) >> (64 - 32);  // hash with optimal prime multiplicator down to 32 bits
-                mask = gene * 11400714819323198549ul;
-                mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
-                mask |= 0x808080ff; // ensure brighter color at risk of improbable redundancy, make alpha opaque
-                cgolg[ij] = (int) mask;
-            }
-            else cgolg[ij] = 0;
+            cgolg[ij]=actcoltrace[ij];
         }
     }
-    //for(d=0;d<256;d++)
-    //    if (counts[d]) fprintf(stderr,"counting hash table hash %d has %d counts\n",d,counts[d]);
 }
 
 void colorgenes(int cgolg[], int NN2) {
@@ -572,7 +577,7 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
 #ifdef HASH
     genedata gdata;
 #endif
-    unsigned int ij,ij1,k,kmin,p,p1,nmut,debcnt,mask,np,npmask,npsmask;
+    unsigned int ij,ij1,k,kmin,p,p1,nmut,debcnt,mask,np,npmask;
     uint64_t s,su,s3,sg3,s2or3,nbmask,nbmaskr,nbmaskrm,ancestor,newgene,golsh,pmask;
     //uint64_t s0,sm;
     uint64_t randnr, randnr2, rand2, statflag;
@@ -721,11 +726,6 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
 #endif
       } // end else (s3)
     } // for ij
-    for (ij=0; ij<N2; ij++) {        // update lattices
-        gol[ij] = newgol[ij];        // copy new gol config to old one
-        golg[ij] = newgolg[ij];      // copy new genes to old genes
-        golgstats[ij] = newgolgstats[ij]; // copy new golg stat flags to old genes
-    }
 #ifdef HASH
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records including activities
         if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
@@ -740,6 +740,12 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
         else fprintf(stderr,"step %d hash storage error 3 in update_gol16, gene %llx at %d not stored\n",totsteps,golg[ij],ij);
     }
 #endif
+    for (ij=0; ij<N2; ij++) {        // update lattices
+        gol[ij] = newgol[ij];        // copy new gol config to old one
+        golg[ij] = newgolg[ij];      // copy new genes to old genes
+        golgstats[ij] = newgolgstats[ij]; // copy new golg stat flags to old genes
+    }
+
 
 }
 
@@ -1104,6 +1110,9 @@ void genelife_update (int nsteps, int nhist, int nstat) {
     /* encode without if structures for optimal vector treatment */
     int t;
     uint64_t *newgol, *newgolg;
+    int *activities,*gindices,nspecies;
+    uint64_t *genes;
+    void activitieshash(int gindices[], uint64_t genes[], int activities[], int *nspeciesact);   /* count activities of all currently active species */
 
     nhistG = nhist;
     nstatG = nstat;
@@ -1116,11 +1125,16 @@ void genelife_update (int nsteps, int nhist, int nstat) {
         else update_gol64(gol,golg,newgol,newgolg);                           // calculate next iteration for 64x multiplane version
         if(nhist && (totsteps%nhist == 0)) countconfigs();                    // count configurations
         if(nstat && (totsteps%nstat == 0)) tracestats(gol,golg,golgstats,N2); // time trace point
+        gindices=NULL;activities=NULL;genes=NULL;                             // these arrays are mallocated in activitieshash
+        activitieshash(gindices, genes, activities, &nspecies);               // colors actcoltrace and returns current population arrays
+        // possible further use of returned current gene population data here
+        free(gindices);free(activities);free(genes);                          // free arrays after use
 
         curPlane = (curPlane +1) % numPlane;            // update plane pointers to next cyclic position
         newPlane = (newPlane +1) % numPlane;
         gol = planes[curPlane];                         // get planes of gol,golg data
         golg = planesg[curPlane];
+        totdisp++;                                      // currently every step is counted for display in activities
     }
 }
 
@@ -1235,6 +1249,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
     state[0] = rand();state[1] = rand();
     cnt = 0;
     totsteps = 0;
+    totdisp = 0;
     statcnts = 0;
     
     // writeFile("genepat.dat");
@@ -1260,8 +1275,8 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
                                          runparams[3],runparams[4],runparams[5],runparams[6]);
     fprintf(stderr,"simparams %d %d %d %d %d\n",simparams[0],simparams[1],simparams[2],simparams[3],simparams[4]);
     fprintf(stderr,"pmutmask %llx (NB 0 means no mutation)\n",pmutmask);
-                                                                                 // not yet useable with selection==12
-    np = (repscheme && repscheme<=16) ? repscheme : 16;                      // number of planes used, 16 if 0
+                                                                              // not yet useable with selection==12
+    np = (repscheme && repscheme<=16) ? repscheme : 16;                       // number of planes used, 16 if 0
     pmask = (np==16) ? 0xffffffffffffffff : (1ull<<(np<<2))-1;                // mask for bits included in np planes
 
     if (selection == 10) gene0=0xfedcba9876543210&pmask;
@@ -1377,7 +1392,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
         }
         // for (ij=0; ij<40; ij++) fprintf(stderr,"gene at %d %llx\n",ij,golg[ij]);   // test first 40
     }
-
+    for (ij=0; ij<N2; ij++) actcoltrace[ij]=0x3f3f3fff;                 // initialize activity color traces to all grey
 #ifdef HASH
     for (ij=0; ij<N2; ij++) {
         if(gol[ij]||(selection>=10)) {
@@ -1398,7 +1413,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
 }
 
 void set_colorfunction(int colorfunctionval) {
-    if(colorfunction>3) fprintf(stderr,"error colorfunction value passed %d too large\n",colorfunctionval);
+    if(colorfunction>4) fprintf(stderr,"error colorfunction value passed %d too large\n",colorfunctionval);
     else     colorfunction = colorfunctionval;
 }
 
@@ -1502,7 +1517,7 @@ void countspecies1(uint64_t gol[], uint64_t golg[], int N2) {     /* counts numb
     fprintf(stderr,"%d\t\t%d\t%d\t%d\t%d\n",nlog2pmut,initial1density,initialrdensity,ncoding,startgenechoice);
 }
 
-void countspecies() {
+void countspecies() {                                                       // counts current species without using hash tables
     countspecies1(gol, golg, N2);
 }
 
@@ -1569,6 +1584,76 @@ void countspecieshash() {  /* counts numbers of all different species using qsor
 }
 #else
 void countspecieshash() {}  /* dummy routine, no effect */
+#endif
+
+#ifdef HASH
+void activitieshash(int gindices[], uint64_t genes[], int activities[], int *nspeciesact) {  /* count activities of all currently active species */
+    int k, j, ij, ij1, x, nspecies, nspeciesnow;
+    const int maxact = 10000;
+    int color;
+    static int ymax = 1000;
+    int ymax1;
+    uint64_t gene, mask;
+    
+    nspecies = hashtable_count(&genetable);
+    genotypes = hashtable_keys(&genetable);
+    geneitems = (genedata*) hashtable_items( &genetable );
+
+    if(gindices != NULL) free(gindices);
+    for (k=0,nspeciesnow=0; k<nspecies; k++)
+        if(geneitems[k].popcount) nspeciesnow++;
+    gindices = (int *) malloc(nspeciesnow*sizeof(int));
+    for (k=j=0; k<nspecies; k++) {
+        if(geneitems[k].popcount) {
+            gindices[j]=k;
+            j++;
+        }
+    }
+    if (nspeciesnow > maxact) {                                              //sort with in order of decreasing population
+        qsort(gindices, nspeciesnow, sizeof(int), cmpfunc3);                 // sort in decreasing count order
+        nspeciesnow = maxact;
+    }
+    genes = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
+    activities = (int *) malloc(nspeciesnow*sizeof(int));
+
+    for (k=0; k<nspeciesnow; k++) {
+        genes[k]=genotypes[gindices[k]];
+        activities[k]=geneitems[gindices[k]].activity;
+    }
+    *nspeciesact = nspeciesnow;
+    
+    if (totdisp>=N) {                                               // 1 pixel to left scroll when full
+        for(ij=0;ij<N2;ij++) {
+            ij1 = ((ij+1)&Nmask)+((ij>>log2N)<<log2N);                  // (i+1)%N+j*N;
+            if(ij1>=N2) fprintf(stderr,"error in scroll of actcoltrace\n");
+            actcoltrace[ij]=actcoltrace[ij1];
+        }
+        x=N-1;
+    }
+    else {
+        x=totdisp;
+    }
+    for(k=0;k<N;k++) actcoltrace[x+k*N]=0x3f3f3fff;             // set column gray
+    for(k=ymax1=0;k<nspeciesnow;k++)
+        ymax1 = activities[k]>ymax1 ? activities[k] : ymax1;
+    if (ymax1>ymax) ymax = ymax*2;
+    for(k=0;k<nspeciesnow;k++) {
+        activities[k] = N - (activities[k] * N) / ymax;
+        gene = genes[k];
+        if (gene == 0ull) gene = 11778L; // random color for gene==0
+        mask = gene * 11400714819323198549ul;
+        mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
+        mask |= 0x808080ff; // ensure brighter color at risk of improbable redundancy, make alpha opaque
+        color = (int) mask;
+        ij = (x&Nmask)+activities[k]*N;
+        if(ij > 0 && ij<N2)
+            actcoltrace[ij] = color;
+        //else
+        //     fprintf(stderr,"activity out of range\n");
+    }
+}
+#else
+void activitieshash(int gindices[], uint64_t genes[], int activities[],int *nspeciesact) {}  /* dummy routine, no effect */
 #endif
 
 void delay(int milliseconds)

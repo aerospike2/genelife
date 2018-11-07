@@ -19,17 +19,18 @@ import subprocess as sp
 # import pdb;
 
 # set to None if you want to skip writing data out...
-datfile = '/tmp/activity.dat'
+# datfile = '/tmp/activity.dat'
+datfile = None
 if datfile is not None:
     datout = open(datfile,'w')
     
 maxact = 10000                            # max number of activity traces in graph...
-Width = 1000
-Height = 500
+Width = 512                        # default 1000
+Height = 512                        # default 500
 ymax = 10000
 ncount = 0                          # number of calls to trace
 
-def trace(screen, colvalvec):            # eachcolval = [key,activityvalue]
+def trace(screen, colvalvec):            # eachcolval = [key,activityvalue] #  SCREEN
                                          #        self.traceinit()
     cnt = 0
     cnt1 = 0
@@ -54,20 +55,20 @@ def trace(screen, colvalvec):            # eachcolval = [key,activityvalue]
             x = ncount
             y = yvals[i]
             col = cols[i]
-            screen.set_at((x,y),col)
+            screen.set_at((x,y),col)                                      #  SCREEN
     else:                                 #  then scroll when full
         yvals = [Height - y * Height / ymax
                  for y in yvals]
-        screen.scroll(-1,0)    # -1 => 1 pixel to left
+        screen.scroll(-1,0)    # -1 => 1 pixel to left                    #  SCREEN
         draw.line(screen,[10,10,10], # grey line first
                   (Width-1,Height),(Width-1,0))
         for i in range(len(yvals)):
             x = Width-1
             y = yvals[i]
             col = cols[i]
-            screen.set_at((x,y),col)
+            screen.set_at((x,y),col)                                        #  SCREEN
     ncount += 1
-    display.update()
+    display.update()                                                        #  SCREEN
 
 
 import os
@@ -133,10 +134,10 @@ def main():
     
 
     # foo = Graph(0,250,Width,Height,"Activity")
-    screen = display.set_mode([Width, Height])
-    display.set_caption("Activity")
-    draw.rect(screen, [10, 10, 10],(0, 0 , Width, Height + 1), 0)
-    display.update()
+    screen = display.set_mode([Width, Height])                     #  SCREEN
+    display.set_caption("Activity")                                #  SCREEN
+    draw.rect(screen, [10, 10, 10],(0, 0 , Width, Height + 1), 0)  #  SCREEN
+    display.update()                                               #  SCREEN
     actcnt = 0;
     colors = {}
     cnt = 0;
