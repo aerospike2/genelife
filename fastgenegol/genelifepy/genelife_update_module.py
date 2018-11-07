@@ -52,6 +52,9 @@ libcd.colorgenes.restype = None
 libcd.colorgenes.argtypes = [int_array, c_int]
 libcd.set_colorfunction.restype = None
 libcd.set_colorfunction.argtypes = [c_int]
+libcd.setget_act_ymax.restype = c_int
+libcd.setget_act_ymax.argtypes = [c_int]
+
 
 def genelife_update(nsteps, nhist, nstat):
     return libcd.genelife_update(nsteps, nhist, nstat)
@@ -103,3 +106,6 @@ def colorgenes(cgolg):
 
 def set_colorfunction(colorfunctionval):
     return libcd.set_colorfunction(colorfunctionval)
+
+def setget_act_ymax(ymax):
+    return libcd.setget_act_ymax(ymax)

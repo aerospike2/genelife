@@ -111,6 +111,7 @@ int *genestats = NULL;              // dynamic array pointer for statistics of n
 int *stepstats = NULL;              // dynamic array pointer for statistics of site update types over time
 int *configstats = NULL;            // dynamic array pointer for statistics of gol site configurations (x,y,t) offsets
 int actcoltrace[N2];                // scrolled trace of last N time points of activity colour trace
+int ymax = 1000;                    // activity scale max for plotting : will be adjusted dynamically or by keys
 //------------------------------------------------ planes and configuration offsets----------------------------------------------------------------------
 int Noff = 9;                       // number of offsets
 int **offsets;                      // array of offsets (2D + time) for planes
@@ -1417,6 +1418,13 @@ void set_colorfunction(int colorfunctionval) {
     else     colorfunction = colorfunctionval;
 }
 
+setget_act_ymax(int actymax) {                  // sets ymax for activities only if argument nonzero, reads old value
+    int ymaxold;
+    ymaxold = ymax;
+    ymax = actymax;
+    return(ymaxold);
+}
+
 void get_curgol(uint64_t outgol[], int NN){
     int ij;
     for (ij=0; ij<NN; ij++) {
@@ -1591,7 +1599,6 @@ void activitieshash(int gindices[], uint64_t genes[], int activities[], int *nsp
     int k, j, ij, ij1, x, nspecies, nspeciesnow;
     const int maxact = 10000;
     int color;
-    static int ymax = 1000;
     int ymax1;
     uint64_t gene, mask;
     
@@ -1636,7 +1643,8 @@ void activitieshash(int gindices[], uint64_t genes[], int activities[], int *nsp
     for(k=0;k<N;k++) actcoltrace[x+k*N]=0x3f3f3fff;             // set column gray
     for(k=ymax1=0;k<nspeciesnow;k++)
         ymax1 = activities[k]>ymax1 ? activities[k] : ymax1;
-    if (ymax1>ymax) ymax = ymax*2;
+    // if (ymax1>ymax) ymax = ymax*2;     // autoscale of activities
+    // if (ymax1<ymax/2) ymax = ymax/2;   // autoscale of activities
     for(k=0;k<nspeciesnow;k++) {
         activities[k] = N - (activities[k] * N) / ymax;
         gene = genes[k];
