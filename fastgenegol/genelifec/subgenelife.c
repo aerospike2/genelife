@@ -84,7 +84,8 @@ typedef struct genedata {           // value of keys stored for each gene encoun
             int nextinctions;       // initialized to 0
             uint64_t firstancestor; // this is initialized to a special gene seq not likely ever to occur for starting genes
             } genedata;
-genedata ginitdata = {1,0,-1,0,0,0xfedcba9876543210};  // initialization data structure for gene data
+const uint64_t rootgene = 0xfedcba9876543210; // initial special gene as root for genealogies
+genedata ginitdata = {1,0,-1,0,0,rootgene};  // initialization data structure for gene data
 genedata *genedataptr;              // pointer to a genedata instance
 HASHTABLE_SIZE_T const* genotypes;  // pointer to stored hash table keys (which are the genotypes)
 genedata* geneitems;                // list of genedata structured items stored in hash table
@@ -112,6 +113,7 @@ int *stepstats = NULL;              // dynamic array pointer for statistics of s
 int *configstats = NULL;            // dynamic array pointer for statistics of gol site configurations (x,y,t) offsets
 int actcoltrace[N2];                // scrolled trace of last N time points of activity colour trace
 int ymax = 1000;                    // activity scale max for plotting : will be adjusted dynamically or by keys
+int genealogytrace[N2];             // scrolled trace of genealogies
 //------------------------------------------------ planes and configuration offsets----------------------------------------------------------------------
 int Noff = 9;                       // number of offsets
 int **offsets;                      // array of offsets (2D + time) for planes
@@ -285,6 +287,11 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
     else if(colorfunction==4){                    //activities
         for (ij=0; ij<NN2; ij++) {
             cgolg[ij]=actcoltrace[ij];
+        }
+    }
+    else if(colorfunction==5){                    //genealogies
+        for (ij=0; ij<NN2; ij++) {
+            cgolg[ij]=genealogytrace[ij];
         }
     }
 }
@@ -1111,10 +1118,11 @@ void genelife_update (int nsteps, int nhist, int nstat) {
     /* encode without if structures for optimal vector treatment */
     int t;
     uint64_t *newgol, *newgolg;
-    int *activities,*gindices,*popln,nspecies;
+    int *activities,*gindices,*popln,*birthsteps,nspecies,ngenealogydeep;
     uint64_t *genes;
     int activitieshash(int gindices[], uint64_t genes[], int popln[], int activities[],int col);   /* count activities of all currently active species */
-
+    int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[], int birthsteps[]);   /* genealogies of all currently active species */
+    
     nhistG = nhist;
     nstatG = nstat;
     for (t=0; t<nsteps; t++) {
@@ -1127,10 +1135,15 @@ void genelife_update (int nsteps, int nhist, int nstat) {
         if(nhist && (totsteps%nhist == 0)) countconfigs();                    // count configurations
         if(nstat && (totsteps%nstat == 0)) tracestats(gol,golg,golgstats,N2); // time trace point
 
-        gindices=NULL;activities=NULL;genes=NULL;popln=NULL;                  // these arrays are mallocated in activitieshash
+        gindices=NULL;activities=NULL;genes=NULL;popln=NULL;birthsteps=NULL;  // these arrays are mallocated in activitieshash or genealogies
         nspecies=activitieshash(gindices, genes, popln, activities,1);        // colors actcoltrace and returns current population arrays
+        free(gindices);free(activities);free(genes);free(popln);free(birthsteps);// free arrays after use
         // possible further use of returned current gene population data here
-        free(gindices);free(activities);free(genes);free(popln);              // free arrays after use
+        
+        gindices=NULL;activities=NULL;genes=NULL;popln=NULL;birthsteps=NULL;  // these arrays are mallocated in activitieshash or genealogies
+        ngenealogydeep=genealogies(gindices, genes, popln, activities,birthsteps); // colors genealogytrace
+        // possible further use of returned current gene population data here
+        free(gindices);free(activities);free(genes);free(popln);free(birthsteps);// free arrays after use
 
         curPlane = (curPlane +1) % numPlane;            // update plane pointers to next cyclic position
         newPlane = (newPlane +1) % numPlane;
@@ -1415,7 +1428,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
 }
 
 void set_colorfunction(int colorfunctionval) {
-    if(colorfunction>4) fprintf(stderr,"error colorfunction value passed %d too large\n",colorfunctionval);
+    if(colorfunction>5) fprintf(stderr,"error colorfunction value passed %d too large\n",colorfunctionval);
     else     colorfunction = colorfunctionval;
 }
 
@@ -1692,6 +1705,86 @@ int get_sorted_popln_act( int gindices[], uint64_t genes[], int popln[], int act
     return(nspecies);
 }
 
+#ifdef HASH
+int cmpfunc4 (const void * pa, const void * pb)
+{
+   return ( geneitems[*(int*)pa].firstbirthframe > geneitems[*(int*)pb].firstbirthframe ? 1 : -1);
+}
+int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[], int birthsteps[]) {  /* genealogies of all currently active species */
+    int k, j, ij, ij1, x, nspecies, nspeciesnow, root;
+    const int maxact = 10000;
+    int color;
+    int ymax1;
+    uint64_t gene, mask, *ancgenes;
+    
+    nspecies = hashtable_count(&genetable);
+    genotypes = hashtable_keys(&genetable);
+    geneitems = (genedata*) hashtable_items( &genetable );
+
+    if(gindices != NULL) free(gindices);
+    gindices = (int *) malloc(nspecies*sizeof(int));
+    for (k=0,nspeciesnow=0; k<nspecies; k++)
+        if(geneitems[k].popcount) nspeciesnow++;
+
+    for (k=j=0; k<nspecies; k++) {
+        if(geneitems[k].popcount) {
+            gindices[j]=k;
+            j++;
+        }
+        else gindices[nspeciesnow+k-j]=k;
+    }
+    qsort(gindices, nspeciesnow, sizeof(int), cmpfunc4);// sort in increasing birthstep order
+    if (nspeciesnow>N) nspeciesnow=N;               // can only display at most N species, chose oldest
+
+    genes = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
+    ancgenes = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
+    popln = (int *) malloc(nspeciesnow*sizeof(int));
+    activities = (int *) malloc(nspeciesnow*sizeof(int));
+    birthsteps = (int *) malloc(nspeciesnow*sizeof(int));
+
+    for (k=0; k<nspeciesnow; k++) {
+        genes[k]=genotypes[gindices[k]];
+        popln[k]=geneitems[gindices[k]].popcount;
+        activities[k]=geneitems[gindices[k]].activity;
+        birthsteps[k]=geneitems[gindices[k]].firstbirthframe;
+    }
+    
+    for(ij=0;ij<N2;ij++) genealogytrace[ij]=0x3f3f3fff;             // set field gray
+
+    for (j=0;j<N;j++) {  // go back at most N links in genealogy
+        for (k=0,root=1; k<nspeciesnow; k++) {
+            if(j) {
+                gene=ancgenes[k];
+                if(gene==rootgene) ancgenes[k] = rootgene;
+                else {
+                    if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL)
+                        ancgenes[k]=genedataptr->firstancestor;
+                    else fprintf(stderr,"ancestor not found in genealogies\n");
+                }
+            }
+            else  {
+                gene=genes[k];
+                ancgenes[k]=geneitems[gindices[k]].firstancestor;
+            }
+            if (gene!= rootgene) root=0;
+            if (gene == 0ull) gene = 11778L; // random color for gene==0
+            if (gene == rootgene) color = 0; // random color for gene==0
+            else {
+                mask = gene * 11400714819323198549ul;
+                mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
+                mask |= 0x808080ff; // ensure brighter color at risk of improbable redundancy, make alpha opaque
+                color = (int) mask;
+            }
+            ij = ((N-1-k)&Nmask)+j*N;
+            genealogytrace[ij]=color;
+        }
+        if(root) break;
+    }
+    return(j);
+}
+#else
+int activitieshash(int gindices[], uint64_t genes[], int popln[], int activities[]) {return(0)}  /* dummy routine, no effect */
+#endif
 void delay(int milliseconds)
 {
     long pause;
