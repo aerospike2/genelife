@@ -1780,6 +1780,8 @@ int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[],
         }
         if(root) break;
     }
+    // actually need to create a dictionary at each ancestral level and sort genes according to common ancestors
+    // then we should get a tree : make branches thick (keep copies) to see branching   NYI
     return(j);
 }
 #else
