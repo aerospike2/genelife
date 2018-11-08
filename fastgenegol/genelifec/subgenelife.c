@@ -113,7 +113,7 @@ int *stepstats = NULL;              // dynamic array pointer for statistics of s
 int *configstats = NULL;            // dynamic array pointer for statistics of gol site configurations (x,y,t) offsets
 uint64_t acttrace[N2];              // scrolled trace of last N time points of activity gene trace
 int ymax = 1000;                    // activity scale max for plotting : will be adjusted dynamically or by keys
-int genealogytrace[N2];             // scrolled trace of genealogies
+uint64_t genealogytrace[N2];             // scrolled trace of genealogies
 //------------------------------------------------ planes and configuration offsets----------------------------------------------------------------------
 int Noff = 9;                       // number of offsets
 int **offsets;                      // array of offsets (2D + time) for planes
@@ -244,7 +244,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                         case 7 : g2c = (gene>>8)&((1ull<<ncoding)-1ull);
                                  gdiff = gene&0xff;POPCOUNT64C(gdiff,d2);d = d2>7? 7 : d2;
                                  mask = g2c ? 0xf0f0f0ff : ((0x1f+(d<<5))<<8)+(((gdiff>>4)&0xf)<<27)+(((gdiff&0xf)<<4)<<16)+0xff; break;
-                        case 10: for (d=0,mask=0;d<16;d++) {d2=(gene>>(d<<2))&0xf;d2=(d2!=0)?1:0;mask+=(d2*0x2a)<<((d%3)<<3);}
+                        case 10: for (d=0,mask=0;d<16;d++) {d2=(gene>>(d<<2))&0xf;d2=(d2!=d)?1:0;mask+=(d2*0x2a)<<((d%3)<<3);}
                                 mask = (mask<<8)+0x7f7f7fff;break;  // 0x2a is 42, approx 1/6 (ie <16/3) of 255
                         case 11: for (d=0,mask=0;d<16;d++) {d2=(gene>>(d<<2))&0xf;d2=numones[d2];mask+=(d2*0xb)<<((d%3)<<3);}
                                 mask = (mask<<8)+0x7f7f7fff;break;  // 0x2a is 42, approx 1/6 (ie <16/3) of 255
@@ -292,17 +292,27 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
     else if(colorfunction==4){                    //activities
         for (ij=0; ij<NN2; ij++) {
             gene=acttrace[ij];
-            if (gene == 0ull) gene = 11778L; // random color for gene==0
-            mask = gene * 11400714819323198549ul;
-            mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
-            mask |= 0x808080ff; // ensure brighter color at risk of improbable redundancy, make alpha opaque
             if (gene == rootgene) mask = 0x3f3f3fff;          // grey color for background, all root genes
+            else {
+                if (gene == 0ull) gene = 11778L; // random color for gene==0
+                mask = gene * 11400714819323198549ul;
+                mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
+                mask |= 0x808080ff; // ensure brighter color at risk of improbable redundancy, make alpha opaque
+            }
             cgolg[ij]= (int) mask;
         }
     }
     else if(colorfunction==5){                    //genealogies
         for (ij=0; ij<NN2; ij++) {
-            cgolg[ij]=genealogytrace[ij];
+            gene=genealogytrace[ij];
+            if (gene == rootgene) mask = 0x000000ff;                // black color for root
+            else {
+                if (gene == 0ull) gene = 11778L;                    // random color for gene==0
+                mask = gene * 11400714819323198549ul;
+                mask = mask >> (64 - 32);                           // hash with optimal prime multiplicator down to 32 bits
+                mask |= 0x808080ff;                                 // ensure brighter color at risk of improbable redundancy, make alpha opaque
+            }
+            cgolg[ij]=(int) mask;
         }
     }
 }
@@ -597,7 +607,8 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
     genedata gdata;
 #endif
     unsigned int ij,ij1,k,kmin,p,p1,nmut,debcnt,mask,np,npmask;
-    uint64_t s,su,s3,sg3,s2or3,nbmask,nbmaskr,nbmaskrm,ancestor,newgene,golsh,pmask;
+    uint64_t s,sm,sm3,s3sm3,su,s2,s3,sg3,s2or3,nbmask,nbmaskr,nbmaskrm,ancestor,newgene,golsh,pmask;
+    uint64_t *golm;
     //uint64_t s0,sm;
     uint64_t randnr, randnr2, rand2, statflag;
     int nb1x[8] = {-1,0,1,1,1,0,-1,-1};
@@ -650,26 +661,32 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
     // for (ij=0; ij<N2; ij++) if ((golmix[ij]&r1) != golmix[ij]) fprintf(stderr,"error in golmix calculation %llx",golmix[ij]);
     
     for (ij=0; ij<N2; ij++) {                                                   // loop over all sites of 2D torus with side length N
-        for(k=0,s=0ull;k<8;k++) {                                               // compute no of live neighbours using golmix (coupled plane neighbours)
+        for(k=0,s=0ull,sm=0ull;k<8;k++) {                                               // compute no of live neighbours using golmix (coupled plane neighbours)
             ij1=deltaxy(ij,nb1x[k],nb1y[k]);
-            s +=golmix[ij1];
+            sm +=golmix[ij1];
+            s +=gol[ij1];
         }
+        sm3 = (~sm>>3)&(~sm>>2)&(sm>>1)&sm&r1;                                  // sum of golmix bits is exactly 3, calculated for each plane
         su = s&rc;                                                              // upper 2 bits (3,2) of sum of live neighbours : non zero if sum 4-8
         sg3 = (((su>>1)|su)>>2) & r1;                                           // for each plane 1 if sum is gt 3
         s2or3 = (~sg3)&(s>>1)&r1;                                               // sum is 2 or 3 for each plane, ie not gt 3 and bit 2 is 1
-        s3 = s2or3&s&r1;                                                        // sum is 3 for each plane (s2or3 and bit 0 is 1)
+        s3 = s2or3&s;                                                           // sum is 3 (s2or3 and bit 0 is 1) calculated for each plane
+        s3sm3 = s3|sm3;
         if (survival&0x2)
-            newgol[ij]=s2or3&(gol[ij]|s3)&r1;                                   // parallel gol rule with coupled sum s for each plane
+            newgol[ij]=s2or3&(gol[ij]|s3sm3);                                  // parallel gol rule with coupled sum s for each plane
         else
-            newgol[ij]=s2or3&(s3)&r1;
+            newgol[ij]=s2or3&(s3sm3);                                          // no survival only birth
         statflag = 0ull;
-        if((golmix[ij]^gol[ij])&s2or3) statflag |= F_notgolrul;                 // not gol rule in at least one plane
-        if (s3) {                                                               // birth in at least one plane
+        //if((golmix[ij]^gol[ij])&s2or3) statflag |= F_notgolrul;               // not gol rule in at least one plane
+        if((s3^sm3)&s2or3) statflag |= F_notgolrul;                             // not gol rule in at least one plane
+        if (s3sm3) {                                                           // birth in at least one plane, implement for lowest such birth plane
           for(p=0;p<np;p++) {
-            if((s3>>(p<<2))&1ull) {
+            if((s3sm3>>(p<<2))&1ull) {
+                if((s3>>(p<<2))&1ull) golm = gol;
+                else golm = golmix;
                 for(k=0,nbmask=0ull;k<8;k++) {
                     ij1=deltaxy(ij,nb1x[k],nb1y[k]);
-                    nbmask |= (((golmix[ij1])>>(p<<2))&1ull)<<k;
+                    nbmask |= ((golm[ij1]>>(p<<2))&1ull)<<k;
                 }
                 POPCOUNT64C(nbmask,debcnt);
                 if(debcnt!=3) fprintf(stderr,"Error with nbmask %llx at p %d with s3 %llx s %llx\n",nbmask,p,s3,s);
@@ -1307,7 +1324,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
                                                                               // not yet useable with selection==12
     np = (repscheme && repscheme<=16) ? repscheme : 16;                       // number of planes used, 16 if 0
     pmask = (np==16) ? 0xffffffffffffffff : (1ull<<(np<<2))-1;                // mask for bits included in np planes
-
+    if(selection<10) np = 64;
     if (selection == 10) gene0=0xfedcba9876543210&pmask;
     else gene0=0x0ull;
 
@@ -1320,10 +1337,10 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         case 3: for (k=0;k<8;k++) startgenes[k]=(((0x1ull<<20)-1ull)<<20)+((0x1ull<<k)-0x1ull);break;
         case 4: for (k=0;k<8;k++) {g = 0xfffff0ull + k; startgenes[k] = k<4 ? g : ~g;} break;
         case 5: for (k=0;k<8;k++) {g = 0xf0ull + k; startgenes[k]= k<4 ? g : (~g)|(0xfull<<16);} break;
-        case 10:for (k=0;k<16;k++) startgenes[k] = gene0; // first set all startgenes as uncoupled
-                for (k=0;k<np;k++) startgenes[k] = (startgenes[k] & (~(0xfull<<(k<<2)))) | ((k+1)&0xfull)<<(k<<2);break; // couple plane k+1 to k in startgene k
-        case 11:for (k=0;k<16;k++) startgenes[k] = gene0; // first set all startgenes as uncoupled
-                for (k=0;k<np;k++) {for (p=0,g=0ull;p<np;p++) g|= (k&0xfull)<<(p<<2);startgenes[k] = g;} break;
+        case 10:for (k=0;k<16;k++) startgenes[k] = gene0;                     // first set all startgenes as uncoupled
+                for (k=0;k<np;k++) startgenes[k] = (startgenes[k] & (~(0xfull<<(k<<2)))) | ((k+1)%np)<<(k<<2);break; // couple plane k+1 to k in startgene k
+        case 11:for (k=0;k<16;k++) startgenes[k] = gene0;                     // first set all startgenes as uncoupled
+                for (k=0;k<np;k++) startgenes[k] = 6<<(k<<2); break;          // coupled to neighbour plane before and after
         case 12:for (k=0;k<16;k++) startgenes[k] = 0x3ull<<(k<<2);break;
         case 6:
         case 7:
@@ -1404,13 +1421,13 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
             for (j=0; j<Nf; j++) {
                 ij=i0+i+N*(j0+j);
                 if(selection<10) gol[ij] = ((rand() & rmask) < initial1density)?1ull:0ull;
-                else for (k=0;k<16;k++) gol[ij] |= ((rand() & rmask) < initial1density)?(1ull<<(k<<2)):0ull;
+                else for (k=0;k<np;k++) gol[ij] |= ((rand() & rmask) < initial1density)?(1ull<<(k<<2)):0ull;
             }
         }
         for (ij=0; ij<N2; ij++) {
             g = 0ull;
             if (gol[ij]||(selection>=10)) { // if live cell or multiplane, fill with random genome g or randomly chosen startgene depending on initialrdensity
-                if (((unsigned) rand() & rmask) < initialrdensity) for (k=0; k<64; k++) g = (g << 1) | (rand() & 0x1);
+                if (((unsigned) rand() & rmask) < initialrdensity) {for (k=0; k<((np>16)?np:(np<<2)); k++) g = (g << 1) | (rand() & 0x1);g=gene0^g;}  // all 64 for selection<10 or np=16
                 else if (startgenechoice == nstartgenes) g = startgenes[0xf & rand() & (nstartgenes-1)];
                 else if (startgenechoice > nstartgenes) fprintf(stderr,"startgenechoice %d out of range\n",startgenechoice);
                 else g = startgenes[0xf & startgenechoice & (nstartgenes-1)];
@@ -1728,9 +1745,9 @@ int cmpfunc4 (const void * pa, const void * pb)
    return ( geneitems[*(int*)pa].firstbirthframe > geneitems[*(int*)pb].firstbirthframe ? 1 : -1);
 }
 int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[], int birthsteps[]) {  /* genealogies of all currently active species */
-    int k, j, ij, nspecies, nspeciesnow, root;
-    int color;
-    uint64_t gene, mask, *ancgenes;
+    int k, j, jmax, ij, nspecies, nspeciesnow, root, birthstep;
+    // int j1, j2, j3;
+    uint64_t gene, ancgene;
     
     nspecies = hashtable_count(&genetable);
     genotypes = hashtable_keys(&genetable);
@@ -1752,7 +1769,6 @@ int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[],
     if (nspeciesnow>N) nspeciesnow=N;               // can only display at most N species, chose oldest
 
     genes = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
-    ancgenes = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
     popln = (int *) malloc(nspeciesnow*sizeof(int));
     activities = (int *) malloc(nspeciesnow*sizeof(int));
     birthsteps = (int *) malloc(nspeciesnow*sizeof(int));
@@ -1764,37 +1780,44 @@ int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[],
         birthsteps[k]=geneitems[gindices[k]].firstbirthframe;
     }
     
-    for(ij=0;ij<N2;ij++) genealogytrace[ij]=0x3f3f3fff;             // set field gray
-
-    for (j=0;j<N;j++) {  // go back at most N links in genealogy
-        for (k=0,root=1; k<nspeciesnow; k++) {
+    for(ij=0;ij<N2;ij++) genealogytrace[ij]=rootgene;             // set field to rootgene black
+    ancgene=rootgene;                                             // never really used, but included to avoid unitialized warning
+    birthstep=0;
+    for (k=jmax=0; k<nspeciesnow; k++) {
+        root=1;
+        //j1=0;
+        for (j=0;j<N;j++) {  // go back at most N links in genealogy
             if(j) {
-                gene=ancgenes[k];
-                if(gene==rootgene) ancgenes[k] = rootgene;
+                gene=ancgene;
+                if(gene==rootgene) {
+                    ancgene = rootgene;
+                    birthstep = 0;
+                }
                 else {
-                    if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL)
-                        ancgenes[k]=genedataptr->firstancestor;
+                    if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
+                        ancgene=genedataptr->firstancestor;
+                        birthstep = genedataptr->firstbirthframe;
+                    }
                     else fprintf(stderr,"ancestor not found in genealogies\n");
                 }
             }
             else  {
                 gene=genes[k];
-                ancgenes[k]=geneitems[gindices[k]].firstancestor;
+                ancgene=geneitems[gindices[k]].firstancestor;
+                birthstep=geneitems[gindices[k]].firstbirthframe;
             }
-
-            if (gene == rootgene) color = 0x000000ff; // black color for root
-            else {
-                root = 0; // not yet reached root
-                if (gene == 0ull) gene = 11778L; // random color for gene==0
-                mask = gene * 11400714819323198549ul;
-                mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
-                mask |= 0x808080ff; // ensure brighter color at risk of improbable redundancy, make alpha opaque
-                color = (int) mask;
-            }
+            if (gene != rootgene) root = 0;                         // not yet reached root
             ij = ((N-1-k)&Nmask)+j*N;
-            genealogytrace[ij]=color;
+            genealogytrace[ij]=gene;
+            //j2 = (totsteps-birthstep)*N/totsteps;
+            //for (j3=j1;j3<j2;j3++) {
+            //ij = ((N-1-k)&Nmask)+j3*N;
+            //genealogytrace[ij]=gene;
+            //}
+            //j1 = j2;
+            if(root) break;
         }
-        if(root) break;
+        if (j>jmax) jmax=j;
     }
     // actually need to create a dictionary at each ancestral level and sort genes according to common ancestors
     // then we should get a tree : make branches thick (keep copies) to see branching   NYI
