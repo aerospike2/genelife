@@ -1148,12 +1148,15 @@ void genelife_update (int nsteps, int nhist, int nstat) {
 
         gindices=NULL;activities=NULL;genes=NULL;popln=NULL;birthsteps=NULL;  // these arrays are mallocated in activitieshash or genealogies
         nspecies=activitieshash(gindices, genes, popln, activities,1);        // colors acttrace and returns current population arrays
-        free(gindices);free(activities);free(genes);free(popln);free(birthsteps);// free arrays after use
         // possible further use of returned current gene population data here
+        if(nspecies<0) fprintf(stderr,"error returned from activitieshash\n");
+        free(gindices);free(activities);free(genes);free(popln);free(birthsteps);// free arrays after use
+
         
         gindices=NULL;activities=NULL;genes=NULL;popln=NULL;birthsteps=NULL;  // these arrays are mallocated in activitieshash or genealogies
         ngenealogydeep=genealogies(gindices, genes, popln, activities,birthsteps); // colors genealogytrace
         // possible further use of returned current gene population data here
+        if(ngenealogydeep<0) fprintf(stderr,"error returned from genealogies\n");
         free(gindices);free(activities);free(genes);free(popln);free(birthsteps);// free arrays after use
 
         curPlane = (curPlane +1) % numPlane;            // update plane pointers to next cyclic position
@@ -1256,7 +1259,7 @@ int writeFile(char *fileName)     // initialize 32x32 genepat file with all empt
     return error;
 }
 
-void initialize (int runparams[], int nrunparams, int simparams[], int nsimparams) {
+void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams) {
 #ifdef HASH
     int hcnt;
 #endif
@@ -1418,7 +1421,10 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
         }
         // for (ij=0; ij<40; ij++) fprintf(stderr,"gene at %d %llx\n",ij,golg[ij]);   // test first 40
     }
-    for (ij=0; ij<N2; ij++) acttrace[ij]=rootgene;                 // initialize activity color traces to all grey
+    for (ij=0; ij<N2; ij++) {
+        acttrace[ij]=rootgene;                 // initialize activity traces to root gene
+        genealogytrace[ij] = 0x3f3f3fff;
+    }
 #ifdef HASH
     for (ij=0; ij<N2; ij++) {
         if(gol[ij]||(selection>=10)) {
@@ -1643,9 +1649,8 @@ void countspecieshash() {}  /* dummy routine, no effect */
 int activitieshash(int gindices[], uint64_t genes[], int popln[], int activities[], int col) {  /* count activities of all currently active species */
     int k, j, ij, ij1, x, nspecies, nspeciesnow;
     const int maxact = 10000;
-    int color;
     // int ymax1;
-    uint64_t gene, mask;
+    uint64_t gene;
     
     nspecies = hashtable_count(&genetable);
     genotypes = hashtable_keys(&genetable);
@@ -1658,7 +1663,7 @@ int activitieshash(int gindices[], uint64_t genes[], int popln[], int activities
     else if (nspeciesnow>10000) return(-1);                        // exit with error need to allocate more space in python
     for (k=j=0; k<nspecies; k++) {
         if(geneitems[k].popcount) {
-            gindices[j]=k;
+            gindices[j]=k;                                         // if col is 0 then the array gindices must be passed with sufficient length
             j++;
         }
     }
@@ -1723,10 +1728,8 @@ int cmpfunc4 (const void * pa, const void * pb)
    return ( geneitems[*(int*)pa].firstbirthframe > geneitems[*(int*)pb].firstbirthframe ? 1 : -1);
 }
 int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[], int birthsteps[]) {  /* genealogies of all currently active species */
-    int k, j, ij, ij1, x, nspecies, nspeciesnow, root;
-    const int maxact = 10000;
+    int k, j, ij, nspecies, nspeciesnow, root;
     int color;
-    int ymax1;
     uint64_t gene, mask, *ancgenes;
     
     nspecies = hashtable_count(&genetable);
@@ -1778,10 +1781,11 @@ int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[],
                 gene=genes[k];
                 ancgenes[k]=geneitems[gindices[k]].firstancestor;
             }
-            if (gene!= rootgene) root=0;
-            if (gene == 0ull) gene = 11778L; // random color for gene==0
-            if (gene == rootgene) color = 0; // random color for gene==0
+
+            if (gene == rootgene) color = 0x000000ff; // black color for root
             else {
+                root = 0; // not yet reached root
+                if (gene == 0ull) gene = 11778L; // random color for gene==0
                 mask = gene * 11400714819323198549ul;
                 mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
                 mask |= 0x808080ff; // ensure brighter color at risk of improbable redundancy, make alpha opaque

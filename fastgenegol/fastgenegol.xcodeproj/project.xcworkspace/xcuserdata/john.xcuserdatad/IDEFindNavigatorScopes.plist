@@ -34,5 +34,37 @@
 			<string>workspace</string>
 		</dict>
 	</dict>
+	<dict>
+		<key>name</key>
+		<string>My Scope</string>
+		<key>predicate</key>
+		<dict>
+			<key>path-components</key>
+			<array/>
+			<key>rule</key>
+			<string>workspace-location</string>
+		</dict>
+		<key>source</key>
+		<dict>
+			<key>file-source</key>
+			<string>workspace</string>
+		</dict>
+	</dict>
+	<dict>
+		<key>name</key>
+		<string>My Scope 1</string>
+		<key>predicate</key>
+		<dict>
+			<key>path-components</key>
+			<array/>
+			<key>rule</key>
+			<string>workspace-location</string>
+		</dict>
+		<key>source</key>
+		<dict>
+			<key>file-source</key>
+			<string>workspace</string>
+		</dict>
+	</dict>
 </array>
 </plist>
