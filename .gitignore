@@ -1,0 +1,16 @@
+**/*.pyc
+project (N).pbxproj
+projectJ.pbxproj
+fastgenegol.profdata
+piecewiselinearexp.nb
+IDEWorkspaceChecks.plist
+cos_doubles.xcscheme
+dispgenegol.xcscheme
+fastggenegol.xcscheme
+genelife.xcscheme
+probtest.xcscheme
+dispgenegoltest
+libgenelife.dylib
+dispgenegol
+**/*.xcuserstate
+

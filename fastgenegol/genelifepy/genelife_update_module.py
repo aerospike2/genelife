@@ -1,7 +1,9 @@
-""" Wrapping a C library function that does update of long unsigned int arrays gol, golg
+""" 
+Wrapping a C library function that does update of long unsigned int arrays gol, golg
     input using the numpy.ctypeslib.
     Method gleaned from 
-    http://www.scipy-lectures.org/advanced/interfacing_with_c/interfacing_with_c.html"""
+    http://www.scipy-lectures.org/advanced/interfacing_with_c/interfacing_with_c.html
+"""
 
 import numpy as np
 import numpy.ctypeslib as npct
@@ -17,9 +19,9 @@ libcd = npct.load_library("libgenelife", ".")
 
 # setup the return types and argument types
 libcd.genelife_update.restype = None
-libcd.genelife_update.argtypes = [uint64_array, uint64_array, c_int, c_int, int_array, c_int, c_int, c_int]
+libcd.genelife_update.argtypes = [ c_int, c_int]
 libcd.initialize.restype = None
-libcd.initialize.argtypes = [int_array, c_int]
+libcd.initialize.argtypes = [int_array, c_int, int_array, c_int]
 libcd.initialize_genes.restype = None
 libcd.initialize_genes.argtypes = [int_array, c_int]
 libcd.initialize_planes.restype = None
@@ -34,13 +36,22 @@ libcd.get_histo.restype = None
 libcd.get_histo.argtypes = [uint64_array, c_int]
 libcd.init_histo.restype = None
 libcd.init_histo.argtypes = None
+libcd.get_curgol.restype = None
+libcd.get_curgol.argtypes = [uint64_array,c_int]
+libcd.get_curgolg.restype = None
+libcd.get_curgolg.argtypes = [uint64_array,c_int]
 
+def genelife_update(nsteps, histoflag):
+    return libcd.genelife_update(nsteps, histoflag )
 
-def genelife_update(gol, golg, log2N, ndsteps, simparams, histoflag):
-    return libcd.genelife_update(gol, golg, log2N, ndsteps, simparams, len(gol), len(simparams), histoflag )
+def get_curgol(gol):
+    return libcd.get_curgol(gol, int(len(gol)))
 
-def initialize(simparams):
-    return libcd.initialize(simparams, len(simparams))
+def get_curgolg(golg):
+    return libcd.get_curgolg(golg, int(len(golg)))
+
+def initialize(runparams,simparams):
+    return libcd.initialize(runparams, len(runparams), simparams, len(simparams))
 
 def initialize_genes(simparams):
     return libcd.initialize_genes(simparams, len(simparams))
@@ -57,5 +68,6 @@ def print_gol( gol, N):
 def printscreen( gol, golg, N):
     return libcd.printscreen( gol, golg, N, len(gol))
 
-def getconfigs( histo ):
+
+def get_histo(gol):
     return libcd.getconfigs( histo, len(histo))
