@@ -48,6 +48,8 @@ libcd.get_stats.restype = None
 libcd.get_stats.argtypes = [int_array, int_array, int_array, int_array, c_int]
 libcd.get_activities.restype = None
 libcd.get_activities.argtypes = [uint64_array, int_array, int_array]
+libcd.get_acttrace.restype = None
+libcd.get_acttrace.argtypes = [uint64_array,c_int]
 libcd.get_sorted_popln_act.restype = c_int
 libcd.get_sorted_popln_act.argtypes = [int_array, uint64_array, int_array, int_array]
 libcd.colorgenes1.restype = None
@@ -104,6 +106,9 @@ def get_stats(livesites,genotypes,stepstats,configstats,nstats):
 
 def get_activities(actgenes,activities,ngenesp):
     return libcd.get_activities(actgenes,activities,ngenesp)
+
+def get_acttrace(acttrace):
+    return libcd.get_acttrace(acttrace, int(len(acttrace)))
 
 def get_sorted_popln_act( gindices, genes, popcnts, activities):
     return libcd.get_sorted_popln_act(gindices, genes, popcnts, activities)

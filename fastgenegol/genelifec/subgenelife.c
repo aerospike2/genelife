@@ -111,7 +111,7 @@ int *livesites = NULL;              // dynamic array pointer for statistics of n
 int *genestats = NULL;              // dynamic array pointer for statistics of number of 4 genotype classes over time
 int *stepstats = NULL;              // dynamic array pointer for statistics of site update types over time
 int *configstats = NULL;            // dynamic array pointer for statistics of gol site configurations (x,y,t) offsets
-int actcoltrace[N2];                // scrolled trace of last N time points of activity colour trace
+uint64_t acttrace[N2];              // scrolled trace of last N time points of activity gene trace
 int ymax = 1000;                    // activity scale max for plotting : will be adjusted dynamically or by keys
 int genealogytrace[N2];             // scrolled trace of genealogies
 //------------------------------------------------ planes and configuration offsets----------------------------------------------------------------------
@@ -189,6 +189,7 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
 // initialize           initialize simulation parameters and arrays
 // get_curgol           get current gol array from python
 // get_curgolg          get current golg array from python
+// get_acttrace         get current acttrace array from python
 // get_curgolgstats     get current golgstats array from python
 // cmpfunc              compare gene values as numerical unsigned numbers
 // cmpfunc1             compare gene counts in population
@@ -197,6 +198,10 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
 // cmpfunc2             compare gene values corresponding to given number index in hash table
 // cmpfunc3             compare population counts of hash stored genes
 // countspecieshash     count different genes in current population from record of all species that have existed
+// activitieshash       calculate array of current activities and update acttrace array of genes in activity plot format
+// cmpfunc4             compare birth times of hash stored genes
+// genealogies          calculate and display genealogies
+// get_sorted_popln_act return sorted population and activities (sorted by current population numbers)
 // delay                time delay in ms for graphics
 // printxy              terminal screen print of array on xterm
 //----------------------------------------------------- begin of subroutines -----------------------------------------------------------------------------
@@ -286,7 +291,13 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
     }
     else if(colorfunction==4){                    //activities
         for (ij=0; ij<NN2; ij++) {
-            cgolg[ij]=actcoltrace[ij];
+            gene=acttrace[ij];
+            if (gene == 0ull) gene = 11778L; // random color for gene==0
+            mask = gene * 11400714819323198549ul;
+            mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
+            mask |= 0x808080ff; // ensure brighter color at risk of improbable redundancy, make alpha opaque
+            if (gene == rootgene) mask = 0x3f3f3fff;          // grey color for background, all root genes
+            cgolg[ij]= (int) mask;
         }
     }
     else if(colorfunction==5){                    //genealogies
@@ -1136,7 +1147,7 @@ void genelife_update (int nsteps, int nhist, int nstat) {
         if(nstat && (totsteps%nstat == 0)) tracestats(gol,golg,golgstats,N2); // time trace point
 
         gindices=NULL;activities=NULL;genes=NULL;popln=NULL;birthsteps=NULL;  // these arrays are mallocated in activitieshash or genealogies
-        nspecies=activitieshash(gindices, genes, popln, activities,1);        // colors actcoltrace and returns current population arrays
+        nspecies=activitieshash(gindices, genes, popln, activities,1);        // colors acttrace and returns current population arrays
         free(gindices);free(activities);free(genes);free(popln);free(birthsteps);// free arrays after use
         // possible further use of returned current gene population data here
         
@@ -1407,7 +1418,7 @@ void initialize (int runparams[], int nrunparams, int simparams[], int nsimparam
         }
         // for (ij=0; ij<40; ij++) fprintf(stderr,"gene at %d %llx\n",ij,golg[ij]);   // test first 40
     }
-    for (ij=0; ij<N2; ij++) actcoltrace[ij]=0x3f3f3fff;                 // initialize activity color traces to all grey
+    for (ij=0; ij<N2; ij++) acttrace[ij]=rootgene;                 // initialize activity color traces to all grey
 #ifdef HASH
     for (ij=0; ij<N2; ij++) {
         if(gol[ij]||(selection>=10)) {
@@ -1452,6 +1463,13 @@ void get_curgolg(uint64_t outgolg[], int NN){
     int ij;
     for (ij=0; ij<NN; ij++) {
 	    outgolg[ij] = planesg[curPlane][ij];
+    }
+}
+
+void get_acttrace(uint64_t outgolg[], int NN){
+    int ij;
+    for (ij=0; ij<NN; ij++) {
+        outgolg[ij] = acttrace[ij];
     }
 }
 
@@ -1626,7 +1644,7 @@ int activitieshash(int gindices[], uint64_t genes[], int popln[], int activities
     int k, j, ij, ij1, x, nspecies, nspeciesnow;
     const int maxact = 10000;
     int color;
-    int ymax1;
+    // int ymax1;
     uint64_t gene, mask;
     
     nspecies = hashtable_count(&genetable);
@@ -1637,15 +1655,15 @@ int activitieshash(int gindices[], uint64_t genes[], int popln[], int activities
     for (k=0,nspeciesnow=0; k<nspecies; k++)
         if(geneitems[k].popcount) nspeciesnow++;
     if (col) gindices = (int *) malloc(nspeciesnow*sizeof(int));
-    else if (nspeciesnow>10000) return(-1);               // exit with error need to allocate more space in python
+    else if (nspeciesnow>10000) return(-1);                        // exit with error need to allocate more space in python
     for (k=j=0; k<nspecies; k++) {
         if(geneitems[k].popcount) {
             gindices[j]=k;
             j++;
         }
     }
-    if (nspeciesnow > maxact || !col) {                                              //sort with in order of decreasing population
-        qsort(gindices, nspeciesnow, sizeof(int), cmpfunc3);                 // sort in decreasing count order
+    if (nspeciesnow > maxact || !col) {                             //sort with in order of decreasing population
+        qsort(gindices, nspeciesnow, sizeof(int), cmpfunc3);        // sort in decreasing count order
     }
     if (nspeciesnow > maxact) nspeciesnow = maxact;
 
@@ -1665,31 +1683,25 @@ int activitieshash(int gindices[], uint64_t genes[], int popln[], int activities
     
     if (totdisp>=N) {                                               // 1 pixel to left scroll when full
         for(ij=0;ij<N2;ij++) {
-            ij1 = ((ij+1)&Nmask)+((ij>>log2N)<<log2N);                  // (i+1)%N+j*N;
-            if(ij1>=N2) fprintf(stderr,"error in scroll of actcoltrace\n");
-            actcoltrace[ij]=actcoltrace[ij1];
+            ij1 = ((ij+1)&Nmask)+((ij>>log2N)<<log2N);              // (i+1)%N+j*N;
+            if(ij1>=N2) fprintf(stderr,"error in scroll of acttrace\n");
+            acttrace[ij]=acttrace[ij1];
         }
         x=N-1;
     }
-    else {
-        x=totdisp;
-    }
-    for(k=0;k<N;k++) actcoltrace[x+k*N]=0x3f3f3fff;             // set column gray
-    for(k=ymax1=0;k<nspeciesnow;k++)
-        ymax1 = activities[k]>ymax1 ? activities[k] : ymax1;
+    else x=totdisp;
+
+    for(k=0;k<N;k++) acttrace[x+k*N]=rootgene;                  // set column gray
+    //for(k=ymax1=0;k<nspeciesnow;k++)
+    //    ymax1 = activities[k]>ymax1 ? activities[k] : ymax1;
     // if (ymax1>ymax) ymax = ymax*2;     // autoscale of activities
     // if (ymax1<ymax/2) ymax = ymax/2;   // autoscale of activities
     for(k=0;k<nspeciesnow;k++) {
         activities[k] = N - (activities[k] * N) / ymax;
         gene = genes[k];
-        if (gene == 0ull) gene = 11778L; // random color for gene==0
-        mask = gene * 11400714819323198549ul;
-        mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
-        mask |= 0x808080ff; // ensure brighter color at risk of improbable redundancy, make alpha opaque
-        color = (int) mask;
         ij = (x&Nmask)+activities[k]*N;
         if(ij > 0 && ij<N2)
-            actcoltrace[ij] = color;
+            acttrace[ij] = gene;
         //else
         //     fprintf(stderr,"activity out of range\n");
     }
@@ -1701,7 +1713,7 @@ int activitieshash(int gindices[], uint64_t genes[], int popln[], int activities
 
 int get_sorted_popln_act( int gindices[], uint64_t genes[], int popln[], int activities[]) {
     int nspecies;
-    nspecies=activitieshash(gindices, genes, popln, activities, 0);        // colors actcoltrace and returns current population arrays
+    nspecies=activitieshash(gindices, genes, popln, activities, 0);        // sets acttrace and returns current population arrays
     return(nspecies);
 }
 
@@ -1785,7 +1797,7 @@ int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[],
     return(j);
 }
 #else
-int activitieshash(int gindices[], uint64_t genes[], int popln[], int activities[]) {return(0)}  /* dummy routine, no effect */
+int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[], int birthsteps[]) {return(0)}  /* dummy routine, no effect */
 #endif
 void delay(int milliseconds)
 {
