@@ -98,6 +98,7 @@ uint64_t codingmask;                // ncoding derived mask for ncoding bits
 uint64_t  emptysites = 0;           // cumulative number of empty sites during simulation updates
 int nhistG = 0;                     // interval for collecting config histogram data : 0 no collection, nstatG collection with time
 int nstatG = 0;                     // interval for collecting other statistical trace data : 0 no collection
+int genealogydepth = 0;             // depth of genealogies in current population
 //---------------------------------------------------------main arrays in simulation---------------------------------------------------------------------
 uint64_t *gol, *golg;               // pointers to gol and golg arrays at one of the plane cycle locations
 uint64_t golgstats[N2];             // 64 bit masks for different events during processing
@@ -302,7 +303,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
             cgolg[ij]= (int) mask;
         }
     }
-    else if(colorfunction==5){                    //genealogies
+    else if(colorfunction<7){                    //genealogies
         for (ij=0; ij<NN2; ij++) {
             gene=genealogytrace[ij];
             if (gene == rootgene) mask = 0x000000ff;                // black color for root
@@ -607,7 +608,7 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
     genedata gdata;
 #endif
     unsigned int ij,ij1,k,kmin,p,p1,nmut,debcnt,mask,np,npmask;
-    uint64_t s,sm,sm3,s3sm3,su,s2,s3,sg3,s2or3,nbmask,nbmaskr,nbmaskrm,ancestor,newgene,golsh,pmask;
+    uint64_t s,sm,sm3,s3sm3,su,s3,sg3,s2or3,nbmask,nbmaskr,nbmaskrm,ancestor,newgene,golsh,pmask;
     uint64_t *golm;
     //uint64_t s0,sm;
     uint64_t randnr, randnr2, rand2, statflag;
@@ -1169,7 +1170,6 @@ void genelife_update (int nsteps, int nhist, int nstat) {
         if(nspecies<0) fprintf(stderr,"error returned from activitieshash\n");
         free(gindices);free(activities);free(genes);free(popln);free(birthsteps);// free arrays after use
 
-        
         gindices=NULL;activities=NULL;genes=NULL;popln=NULL;birthsteps=NULL;  // these arrays are mallocated in activitieshash or genealogies
         ngenealogydeep=genealogies(gindices, genes, popln, activities,birthsteps); // colors genealogytrace
         // possible further use of returned current gene population data here
@@ -1280,7 +1280,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
 #ifdef HASH
     int hcnt;
 #endif
-    int ij,ij1,i0,j0,i,j,Nf,k,cnt,icf,p,nstartgenes;
+    int ij,ij1,i0,j0,i,j,Nf,k,cnt,icf,nstartgenes;
     unsigned int np;
     uint64_t g,pmask;
 
@@ -1462,7 +1462,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
 }
 
 void set_colorfunction(int colorfunctionval) {
-    if(colorfunction>5) fprintf(stderr,"error colorfunction value passed %d too large\n",colorfunctionval);
+    if(colorfunction>6) fprintf(stderr,"error colorfunction value passed %d too large\n",colorfunctionval);
     else     colorfunction = colorfunctionval;
 }
 
@@ -1493,6 +1493,13 @@ void get_acttrace(uint64_t outgolg[], int NN){
     int ij;
     for (ij=0; ij<NN; ij++) {
         outgolg[ij] = acttrace[ij];
+    }
+}
+
+void get_genealogytrace(uint64_t outgolg[], int NN){
+    int ij;
+    for (ij=0; ij<NN; ij++) {
+        outgolg[ij] = genealogytrace[ij];
     }
 }
 
@@ -1664,7 +1671,7 @@ void countspecieshash() {}  /* dummy routine, no effect */
 
 #ifdef HASH
 int activitieshash(int gindices[], uint64_t genes[], int popln[], int activities[], int col) {  /* count activities of all currently active species */
-    int k, j, ij, ij1, x, nspecies, nspeciesnow;
+    int i, j, ij, ij1, x, nspecies, nspeciesnow;
     const int maxact = 10000;
     // int ymax1;
     uint64_t gene;
@@ -1674,13 +1681,13 @@ int activitieshash(int gindices[], uint64_t genes[], int popln[], int activities
     geneitems = (genedata*) hashtable_items( &genetable );
 
     if(gindices != NULL && col) free(gindices);
-    for (k=0,nspeciesnow=0; k<nspecies; k++)
-        if(geneitems[k].popcount) nspeciesnow++;
+    for (i=0,nspeciesnow=0; i<nspecies; i++)
+        if(geneitems[i].popcount) nspeciesnow++;
     if (col) gindices = (int *) malloc(nspeciesnow*sizeof(int));
     else if (nspeciesnow>10000) return(-1);                        // exit with error need to allocate more space in python
-    for (k=j=0; k<nspecies; k++) {
-        if(geneitems[k].popcount) {
-            gindices[j]=k;                                         // if col is 0 then the array gindices must be passed with sufficient length
+    for (i=j=0; i<nspecies; i++) {
+        if(geneitems[i].popcount) {
+            gindices[j]=i;                                         // if col is 0 then the array gindices must be passed with sufficient length
             j++;
         }
     }
@@ -1695,10 +1702,10 @@ int activitieshash(int gindices[], uint64_t genes[], int popln[], int activities
         activities = (int *) malloc(nspeciesnow*sizeof(int));
     }
 
-    for (k=0; k<nspeciesnow; k++) {
-        genes[k]=genotypes[gindices[k]];
-        popln[k]=geneitems[gindices[k]].popcount;
-        activities[k]=geneitems[gindices[k]].activity;
+    for (i=0; i<nspeciesnow; i++) {
+        genes[i]=genotypes[gindices[i]];
+        popln[i]=geneitems[gindices[i]].popcount;
+        activities[i]=geneitems[gindices[i]].activity;
     }
     
     if(!col) return(nspeciesnow);                                   // exit here unless doing display
@@ -1713,15 +1720,15 @@ int activitieshash(int gindices[], uint64_t genes[], int popln[], int activities
     }
     else x=totdisp;
 
-    for(k=0;k<N;k++) acttrace[x+k*N]=rootgene;                  // set column gray
-    //for(k=ymax1=0;k<nspeciesnow;k++)
-    //    ymax1 = activities[k]>ymax1 ? activities[k] : ymax1;
+    for(i=0;i<N;i++) acttrace[x+i*N]=rootgene;                  // set column gray
+    //for(i=ymax1=0;i<nspeciesnow;i++)
+    //    ymax1 = activities[i]>ymax1 ? activities[i] : ymax1;
     // if (ymax1>ymax) ymax = ymax*2;     // autoscale of activities
     // if (ymax1<ymax/2) ymax = ymax/2;   // autoscale of activities
-    for(k=0;k<nspeciesnow;k++) {
-        activities[k] = N - (activities[k] * N) / ymax;
-        gene = genes[k];
-        ij = (x&Nmask)+activities[k]*N;
+    for(i=0;i<nspeciesnow;i++) {
+        activities[i] = N - (activities[i] * N) / ymax;
+        gene = genes[i];
+        ij = (x&Nmask)+activities[i]*N;
         if(ij > 0 && ij<N2)
             acttrace[ij] = gene;
         //else
@@ -1744,10 +1751,25 @@ int cmpfunc4 (const void * pa, const void * pb)
 {
    return ( geneitems[*(int*)pa].firstbirthframe > geneitems[*(int*)pb].firstbirthframe ? 1 : -1);
 }
+
+int cmpfunc5 (const void * pa, const void * pb)                 // sort according to ancestry in genealogytrace
+{
+   int i1,i2,ij1,ij2,j;
+   uint64_t gene1,gene2;
+   i1=*(int*)pa; i2=*(int*)pb;
+   for (j=0;j<genealogydepth;j++) {
+        ij1 = i1+j*N; ij2 = i2+j*N;
+        gene1=genealogytrace[ij1]; gene2=genealogytrace[ij2];
+        if(gene1!=gene2) return((((gene1 > gene2) && (gene1!=rootgene)) || (gene2==rootgene)) ? 1 : -1);
+    }
+    return(0);
+}
+
+
 int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[], int birthsteps[]) {  /* genealogies of all currently active species */
-    int k, j, jmax, ij, nspecies, nspeciesnow, root, birthstep;
-    // int j1, j2, j3;
-    uint64_t gene, ancgene;
+    int j, jmax, i, ij, nspecies, nspeciesnow, birthstep, *gorder;
+    int j1, j2, j3;
+    uint64_t gene, ancgene, nextgene, *genealogytrace1;
     
     nspecies = hashtable_count(&genetable);
     genotypes = hashtable_keys(&genetable);
@@ -1755,17 +1777,19 @@ int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[],
 
     if(gindices != NULL) free(gindices);
     gindices = (int *) malloc(nspecies*sizeof(int));
-    for (k=0,nspeciesnow=0; k<nspecies; k++)
-        if(geneitems[k].popcount) nspeciesnow++;
+    for (i=nspeciesnow=0; i<nspecies; i++)
+        if(geneitems[i].popcount) nspeciesnow++;
 
-    for (k=j=0; k<nspecies; k++) {
-        if(geneitems[k].popcount) {
-            gindices[j]=k;
+    for (i=j=0; i<nspecies; i++) {
+        if(geneitems[i].popcount) {
+            gindices[j]=i;
             j++;
         }
-        else gindices[nspeciesnow+k-j]=k;
+        else gindices[nspeciesnow+i-j]=i;
     }
-    qsort(gindices, nspeciesnow, sizeof(int), cmpfunc4);// sort in increasing birthstep order
+    // qsort(gindices, nspeciesnow, sizeof(int), cmpfunc4);// sort in increasing birthstep order
+    qsort(gindices, nspeciesnow, sizeof(int), cmpfunc3);// sort in decreasing population size order
+    
     if (nspeciesnow>N) nspeciesnow=N;               // can only display at most N species, chose oldest
 
     genes = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
@@ -1773,18 +1797,17 @@ int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[],
     activities = (int *) malloc(nspeciesnow*sizeof(int));
     birthsteps = (int *) malloc(nspeciesnow*sizeof(int));
 
-    for (k=0; k<nspeciesnow; k++) {
-        genes[k]=genotypes[gindices[k]];
-        popln[k]=geneitems[gindices[k]].popcount;
-        activities[k]=geneitems[gindices[k]].activity;
-        birthsteps[k]=geneitems[gindices[k]].firstbirthframe;
+    for (i=0; i<nspeciesnow; i++) {
+        genes[i]=genotypes[gindices[i]];
+        popln[i]=geneitems[gindices[i]].popcount;
+        activities[i]=geneitems[gindices[i]].activity;
+        birthsteps[i]=geneitems[gindices[i]].firstbirthframe;
     }
     
     for(ij=0;ij<N2;ij++) genealogytrace[ij]=rootgene;             // set field to rootgene black
     ancgene=rootgene;                                             // never really used, but included to avoid unitialized warning
     birthstep=0;
-    for (k=jmax=0; k<nspeciesnow; k++) {
-        root=1;
+    for (i=jmax=0; i<nspeciesnow; i++) {
         //j1=0;
         for (j=0;j<N;j++) {  // go back at most N links in genealogy
             if(j) {
@@ -1802,26 +1825,75 @@ int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[],
                 }
             }
             else  {
-                gene=genes[k];
-                ancgene=geneitems[gindices[k]].firstancestor;
-                birthstep=geneitems[gindices[k]].firstbirthframe;
+                gene=genes[i];
+                ancgene=geneitems[gindices[i]].firstancestor;
+                birthstep=geneitems[gindices[i]].firstbirthframe;
             }
-            if (gene != rootgene) root = 0;                         // not yet reached root
-            ij = ((N-1-k)&Nmask)+j*N;
+            if (gene == rootgene) break;                            // reached root, exit j loop
+            ij = i+j*N;
             genealogytrace[ij]=gene;
-            //j2 = (totsteps-birthstep)*N/totsteps;
-            //for (j3=j1;j3<j2;j3++) {
-            //ij = ((N-1-k)&Nmask)+j3*N;
-            //genealogytrace[ij]=gene;
-            //}
-            //j1 = j2;
-            if(root) break;
         }
         if (j>jmax) jmax=j;
     }
-    // actually need to create a dictionary at each ancestral level and sort genes according to common ancestors
-    // then we should get a tree : make branches thick (keep copies) to see branching   NYI
-    return(j);
+    genealogydepth = jmax;
+    
+                                                                    //reverse ancestries to allow comparison at same number of speciations
+    for (i=0; i<nspeciesnow; i++) {
+        for(j=0;j<N;j++) {
+            if (genealogytrace[i+j*N]==rootgene) break;
+        }
+        for(j1=0;j1<(j>>1);j1++) {
+            gene=genealogytrace[i+(j-j1-1)*N];
+            genealogytrace[i+(j-j1-1)*N]=genealogytrace[i+j1*N];
+            genealogytrace[i+j1*N]=gene;
+        }
+    }
+    gorder = (int *) malloc(N*sizeof(int));
+    for (i=0; i<N; i++) gorder[i]=i;
+    qsort(gorder, nspeciesnow, sizeof(int), cmpfunc5);              // sort according to ancestral lines
+    for (i=0;i<N;i++) if((gorder[i]<0)||(gorder[i]>=N)) fprintf(stderr,"step %d error in gorder out of bounds at i = %d with value %d\n",totsteps,i,gorder[i]);
+
+    genealogytrace1 = (uint64_t *) malloc(N*jmax*sizeof(uint64_t)); // allocate copy array of genetrace to allow sorting and modifications
+    for(ij=0;ij<N*jmax;ij++) genealogytrace1[ij]=genealogytrace[ij];// copy active portion of genealogytrace to new array genealogytrace1
+    for(ij=0;ij<N2;ij++) genealogytrace[ij]=rootgene;               // reinitialize genealogytrace to root gene before redrawing part of it
+
+    if(colorfunction==6) {                                          // time trace of genealogies
+      for(i=0;i<nspeciesnow;i++) {
+        for(j=0,j1=0;j<jmax;j++) {
+            if(gorder[i]>=nspeciesnow) fprintf(stderr,"error in genealogies gorder at i=%d, order value %d out of range\n",i,gorder[i]);
+            ij = gorder[i]+j*N;
+            gene = genealogytrace1[ij];
+            ij+=N;
+            if(ij<N2) {
+                nextgene = genealogytrace1[ij];
+                if(nextgene==rootgene) birthstep=totsteps;
+                else {
+                    if((genedataptr = (genedata *) hashtable_find(&genetable, nextgene)) != NULL) birthstep = genedataptr->firstbirthframe;
+                    else fprintf(stderr,"ancestor not found in genealogies during birthstep extraction\n");
+                }
+            }
+            else birthstep=totsteps;
+            j2 = birthstep*N/totsteps;
+            for (j3=j1;j3<j2;j3++) {
+                ij = i+j3*N;
+                genealogytrace[ij]=gene;
+            }
+            j1 = j2;
+        }
+      }
+      for(i=nspeciesnow;i<N;i++) for(j=0;j<N;j++) genealogytrace[gorder[i]+j*N]=rootgene;
+    }
+    else {                                                          // species changes only trace (colorfunction == 5)
+      for(i=0;i<nspeciesnow;i++) {
+        for(j=0;j<jmax;j++) {
+            ij=i+j*N;
+            genealogytrace[ij]=genealogytrace1[gorder[i]+j*N];
+        }
+      }
+    }
+    free(gorder);free(genealogytrace1);
+
+    return(jmax);
 }
 #else
 int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[], int birthsteps[]) {return(0)}  /* dummy routine, no effect */
