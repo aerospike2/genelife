@@ -46,11 +46,13 @@ int colorfunction = 0;              // color function choice of 0: hash or 1: fu
 #define R_1_choose0nb     0x2       /* 1: choose most difft position, 0: choose live neighbour at zero bit in canonical rotation, */
 #define R_2_2ndnbs        0x4       /* 1: execute genetically encoded 2nd neighbours of live neighbours to determine birth & ancestor */
 #define R_3_enforce3birth 0x8       /* 1: enforce birth for 3 live nbs (with ancestor most difft) in case 2-select fails (req. R_0_2sel_3live==1 for effect) */
-#define R_4_enforce2birth 0x10      /* 1: enforce birth for 2 live nbs : choose 1st live nb from top left as ancestor (asym!) */
+#define R_4_enforce2birth 0x10      /* 1: enforce birth for 2 live nbs : choose 1st live nb from top left of canonical config as ancestor (asym!) */
 #define R_5_2uniquepos    0x20      /* 1: for 2-live-nb birth, choose clockwise or anticlockwise (for R_1_choose0nb) elt of canonical bunched pair */
 #define R_6_checkmasks    0x40      /* 1: check genetically encoded masks to mask out certain live nb pos's: rule as if these not there */
 #define R_7_nongolstat    0x80      /* 1: enforce GoL rule if state of central cell was last changed by a non GoL rule */
 #define R_8_nongolstatnbs 0x100     /* 1: enforce GoL rule if state of any cell in nbs was last changed by a non GoL rule */
+#define R_9_2birth_k0     0x200     /* 1: bit position at start of k1-4 mask for selective subset of 2-births */
+#define R_9_12_2birth_k1_4 0x1e00   /* 1: enforce birth for 2 live nbs canonical config for one of k= 1,2,3,4, next 4 bits: choose 1st live nb from TL (asym!) */
 //----------------------------------------status flag bits for recording site status in golgstats array---------------------------------------------------
 #define F_notgolrul 0x1             /* bit is 1 if last step not a GoL rule*/
 #define F_2_live    0x2             /* bit is 1 if exactly 2 live neighbours */
@@ -491,7 +493,7 @@ extern inline void selectdifft2(uint64_t nb2i, int nb[], uint64_t golg[], uint64
         case 0x03L : k = 1; break;                // 00000011    |01.|  <-
         case 0x05L : k = 2; break;                // 00000101    |...|  |0.2|  <-
         case 0x09L : k = 3; break;                // 00001001    |...|  |...|  |0..|   <-
-        case 0x11ull : k = 4; break;                // 00010001           |...|  |..3|  |0..|   <-
+        case 0x11ull : k = 4; break;              // 00010001           |...|  |..3|  |0..|   <-
         default  : {                              //                           |...|  |...|
                                                   //                                  |..4|
             fprintf(stderr,"Error in canonical rotation for two live neighbours \nnbmaskrm = %llx\n",nbmaskrm); k = 0;
@@ -500,7 +502,11 @@ extern inline void selectdifft2(uint64_t nb2i, int nb[], uint64_t golg[], uint64
     if (repscheme & R_1_choose0nb) nbch = nb[kmin];           // replication of live nb in bit 0 of canonical rotation
     else  nbch = nb[(kmin+k)&0x7];                            // replication of live nb in other bit of canonical rotation
     *newgene = golg[nbch];
-    *birth = 1ull;
+    if(repscheme & R_9_12_2birth_k1_4) {
+        if(repscheme & (R_9_2birth_k0<<(k-1))) *birth = 1ull;
+        else *birth = 0ull;
+    }
+    else *birth = 1ull;
 }
 
 extern inline void selectdifft3(uint64_t nbmask, int nb[], uint64_t gol[], int *nbch) {
@@ -1922,6 +1928,7 @@ int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[],
 #else
 int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[], int birthsteps[]) {return(0)}  /* dummy routine, no effect */
 #endif
+
 void delay(int milliseconds)
 {
     long pause;
