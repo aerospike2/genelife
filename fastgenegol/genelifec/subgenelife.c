@@ -810,6 +810,148 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
 
 }
 
+void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){
+    /* update GoL for toroidal field which has side length which is a binary power of 2 */
+    /* encode without if structures for optimal vector treatment */
+    /**********
+        0 <= s <= 8
+        genome =
+        8 bits for each possible s value for birth (center site 0)
+        9 bits for each possible s value for survival/death (center site 1)
+        (assume s = 0 => 0 always)
+        using b0 for s=0, b1 for s=1, etc
+        GOL = 00001000|000001100
+            = 0 0001 0000 0000 1100
+            = 0x100c
+    ***********/
+
+    int s, k, nmut, new, idx;
+    int nb[8],  ij, i, j, jp1, jm1, ip1, im1;
+    uint64_t g, gs, nb1i, randnr, randnr2, r2;
+    uint64_t newgene, ancestor, livegenes[8];
+    uint64_t  birth, statflag;
+    genedata gdata;
+    
+    totsteps++;
+    for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
+        g = golg[ij];
+        i = ij & Nmask;  j = ij >> log2N;                                   // row & column
+        jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
+        ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                         // toroidal i+1, i-1
+        nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1;           // new order of nbs
+        nb[4]=jp1+ip1; nb[5]=jp1+i; nb[6]=jp1+im1; nb[7]=j*N+im1;
+        for (s=0L,k=0,nb1i=0;k<8;k++) {                                     // packs non-zero nb indices in first up to 8*4 bits
+            gs=gol[nb[k]];                                                  // whether neighbor is alive
+            s += gs;                                                        // s is number of live nbs
+            nb1i = (nb1i << (gs<<2)) + (gs*k);                              // nb1i is packed list of live neighbour indices
+        }
+        statflag = 0L;
+
+        birth = 0;
+        new = 0;
+        if(g>0){                                                            // death/survival
+            if((g>>s) & 0x1L){                                              // survive
+                new = 1;
+                statflag |= F_survival;
+            }
+            else{                                                           // gene bit = 0 => death
+                new = 0;
+                statflag |= F_death;
+            }
+        }
+        else{                                                               // birth/nobirth
+            if(s==3)                                                        // birth
+                birth = 1; new = 1;
+            statflag |= F_birth;
+        }
+        // figure out newgene by random choice for now
+        if(new){                                                            // birth or survive
+            RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
+            for(k=0;k<s;k++) livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];   // live neighbour genes
+            idx = (randnr & ancmask)>>52;                                   // choose random for now
+            idx = idx % s;
+//            if(ij<40)
+//                fprintf(stderr,"birth = %llu  new = %d  idx = %d\n",birth,new,idx);
+            newgene = livegenes[idx];
+            if(birth | (0x1L&overwritemask)){
+                // compute random events for single bit mutation, as well as mutation position nmut
+                randnr2 = (randnr & pmutmask);                              // extract bits from randnr for random trial for 0 on pmutmask
+                r2 = randnr2?0L:1L;                          // 1 if lowest nlog2pmut bits of randnr are zero, else zero
+                nmut = (randnr >> 57) & 0x3f;                               // choose mutation position for length 64 gene : from bits 57:62 of randnr
+                // nmut = nmut & NGENE;          CHANGED
+                // complete calculation of newgol and newgolg, including mutation
+                ancestor = newgene;
+                newgene = newgene ^ (r2<<nmut);                             // introduce single mutation with probability pmut = probmut
+/**
+                if(gol[ij]) {                                               // central old gene present: overwritten
+                    if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
+                        genedataptr->popcount--;  // if 0 lastextinctionframe updated after whole frame calculated
+                    }
+                    else fprintf(stderr,"hash storage error 1, gene %llx not stored\n",golg[ij]);
+                }
+
+                if((genedataptr = (genedata *) hashtable_find(&genetable, newgene)) != NULL) {
+                    genedataptr->popcount++;
+                }
+                else {
+                    gdata=ginitdata;
+                    gdata.firstbirthframe = totsteps;
+                    gdata.firstancestor = ancestor;
+                    hashtable_insert(&genetable, newgene,(genedata *) &gdata);
+                }
+**/
+                newgol[ij]  =  1L;                                          // new game of life cell value: alive
+                newgolg[ij] =  newgene;                                     // if birth then newgene
+                statflag = statflag | F_birth;
+                if (r2) statflag = statflag | F_mutation;
+                // if(newgene==0L) fprintf(stderr,"error in writing newgene, previous = %llx, statflag = %llx\n",golg[ij],statflag);
+            } // end birth
+        }
+        else {
+
+            if(gol[ij]) {                                                   // death : need to update hash table
+/**
+                if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
+                    genedataptr->popcount--;
+                }
+                else fprintf(stderr,"hash storage error 3, gene %llx not stored\n",golg[ij]);
+**/
+            }
+
+            newgol[ij]  = 0L;                                               // new game of life cell value
+            newgolg[ij] = 0L;                                               // gene dies
+            if(gol[ij]) statflag |= F_death;
+
+        } // end no birth
+        if(gol[ij]) statflag |= F_golstate;
+        emptysites = emptysites + newgol[ij];                               // keep track of empty sites, same information as total activity of occupied sites
+        golgstats[ij] = statflag;
+    }  // end for ij
+
+/**
+    for (ij=0; ij<N2; ij++) {       // complete missing hash table records including activities
+        if(gol[ij]) {
+            if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
+                if(genedataptr->popcount == 0) {
+                    genedataptr->lastextinctionframe = totsteps;
+                    genedataptr->nextinctions++;
+                }
+            }
+            else fprintf(stderr,"hash storage error 4, gene %llx not stored\n",golg[ij]);
+        }
+        if(newgol[ij]) {
+            if((genedataptr = (genedata *) hashtable_find(&genetable, newgolg[ij])) != NULL)
+                genedataptr->activity ++;
+            else fprintf(stderr,"hash storage error 5, gene %llx not stored\n",newgolg[ij]);
+        }
+    }
+**/
+    for (ij=0; ij<N2; ij++) {        // update lattices
+        gol[ij] = newgol[ij];        // copy new gol config to old one
+        golg[ij] = newgolg[ij];      // copy new genes to old genes
+    }
+}
+
 void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
