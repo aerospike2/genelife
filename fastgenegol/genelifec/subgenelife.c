@@ -131,25 +131,25 @@ int newPlane = 1;                   // new plane index
 int numPlane = maxPlane;            // number of planes must be power of 2 to allow efficient modulo plane
 uint64_t *planes[maxPlane];         // ring buffer planes of gol array states
 uint64_t *planesg[maxPlane];        // ring buffer planes of golg genes
-uint64_t plane0[N2];
-uint64_t plane1[N2];
-uint64_t planeg0[N2];
-uint64_t planeg1[N2];
+uint64_t plane0[N2];                // gol  0
+uint64_t plane1[N2];                // gol  1
+uint64_t planeg0[N2];               // golg 0
+uint64_t planeg1[N2];               // golg 1
 #if maxPlane >= 2
-uint64_t plane2[N2];
-uint64_t plane3[N2];
-uint64_t planeg2[N2];
-uint64_t planeg3[N2];
+uint64_t plane2[N2];                // gol  2
+uint64_t plane3[N2];                // gol  3
+uint64_t planeg2[N2];               // golg 2
+uint64_t planeg3[N2];               // golg 3
 #endif
 #if maxPlane >= 4
-uint64_t plane4[N2];
-uint64_t plane5[N2];
-uint64_t plane6[N2];
-uint64_t plane7[N2];
-uint64_t planeg4[N2];
-uint64_t planeg5[N2];
-uint64_t planeg6[N2];
-uint64_t planeg7[N2];
+uint64_t plane4[N2];                // gol  4
+uint64_t plane5[N2];                // gol  5
+uint64_t plane6[N2];                // gol  6
+uint64_t plane7[N2];                // gol  7
+uint64_t planeg4[N2];               // golg 4
+uint64_t planeg5[N2];               // golg 5
+uint64_t planeg6[N2];               // golg 6
+uint64_t planeg7[N2];               // golg 7
 #endif
 //------------------------------------------------------- fast macro random number generator ------------------------------------------------------------
                                     // Wikipedia "Xorshift" rewritten here as inline macro &
@@ -211,7 +211,7 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
 // delay                time delay in ms for graphics
 // printxy              terminal screen print of array on xterm
 //----------------------------------------------------- begin of subroutines -----------------------------------------------------------------------------
-
+//------------------------------------------------------- colorgenes -------------------------------------------------------------------------------------
 void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2) {
     uint64_t gene, gdiff, g2c, mask;
     int ij,d,d2,activity;
@@ -267,8 +267,18 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                         default  : mask = ((d+(d<<6)+(d<<12)+(d<<18))<<8) + 0xff;
                 }
                 if(colorfunction==2) {
-                    if(golgstats[ij]&F_nongolchg) mask = 0x00ffffff;  // color states changed by non GoL rule yellow
-                    if(selection==12) {                               // color as superposition of multiplane gol states
+                    if(golgstats[ij]&F_nongolchg) mask = 0x00ffffff;        // color states changed by non GoL rule yellow
+                    if(selection==13) {                                     // color as superposition of biplane gol states
+                        if (gol[ij]>>1) {
+                            gene = golg[ij];
+                            if (gene == 0ull) gene = 11778L; // random color for gene==0
+                            mask = gene * 11400714819323198549ul;
+                            mask = mask >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
+                        }
+                        else mask = 0;
+                        mask = ((0xff*(gol[ij]&1ull))<<24)+((0xff*((gol[ij]>>1)&1ull))<<16)+(mask<<8)+0xff;
+                    }
+                    else if(selection==12) {                               // color as superposition of multiplane gol states
                         POPCOUNT64C(gol[ij],d);
                         d2= (d>>5) ? 5*32 + d-32 : ((d>>4) ? 4*32 + (d-16)*2
                                                  : ((d>>3) ? 3*32 + (d-8)*4
@@ -344,7 +354,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
 void colorgenes(int cgolg[], int NN2) {
     colorgenes1(gol, golg, golgstats, cgolg, NN2);
 }
-
+//------------------------------------------------------- selectone ------------------------------------------------------------
 extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene) {
 // birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene.
     unsigned int k,d0,d1,d2,d3,dd,swap;                  // number of ones in various gene combinations
@@ -438,7 +448,7 @@ extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], ui
             exit(1);
     }
 }
-
+//------------------------------------------------------- selectone_nbs -------------------------------------------------------------------------------------
 extern inline void selectone_nbs(int s, uint64_t nb2i, int nb[], uint64_t gol[], uint64_t golg[], uint64_t * birth, uint64_t *newgene) {
 // birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene.
     int k, kanc, l, nb1[8], ij1, i1, j1, j1p1, j1m1, i1p1, i1m1;
@@ -478,7 +488,7 @@ extern inline void selectone_nbs(int s, uint64_t nb2i, int nb[], uint64_t gol[],
     }
 }
 
-
+//------------------------------------------------------- selectdifft2 -------------------------------------------------------------------------------------
 extern inline void selectdifft2(uint64_t nbmask, int nb[], uint64_t gol[], unsigned int *kch) {
 // selection based on canonical rotation to bunched pair, choose clockwise or anti-clockwise one (for R_1_choose0nb)
     int k,kmin;
@@ -505,6 +515,7 @@ extern inline void selectdifft2(uint64_t nbmask, int nb[], uint64_t gol[], unsig
     else  *kch = (kmin+k)&0x7;                            // replication of live nb in other bit of canonical rotation
 }
 
+//------------------------------------------------------- selectdifft3 -------------------------------------------------------------------------------------
 extern inline void selectdifft3(uint64_t nbmask, int nb[], uint64_t gol[], unsigned int *kch) {
     int k,kmin;
     uint64_t nbmaskr,nbmaskrm;
@@ -538,6 +549,62 @@ extern inline void selectdifft3(uint64_t nbmask, int nb[], uint64_t gol[], unsig
     }
 }
 
+//------------------------------------------------------- hash gene inline fns ----------------------------------------------------------------------
+extern inline void hashaddgene(uint64_t gene,uint64_t ancestor) {
+#ifdef HASH
+        genedata gdata;
+        if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) genedataptr->popcount++;
+        else {
+            gdata=ginitdata;
+            gdata.firstbirthframe = totsteps;
+            gdata.firstancestor = ancestor;
+            hashtable_insert(&genetable, gene,(genedata *) &gdata);
+        }
+#endif
+}
+
+extern inline void hashdeletegene(uint64_t gene,char errorformat[]) {
+#ifdef HASH
+        if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) genedataptr->popcount--;
+        else fprintf(stderr,errorformat,totsteps,gene);
+#endif
+}
+
+extern inline void hashreplacegene(uint64_t gene1,uint64_t gene2,uint64_t ancestor,char errorformat[]) {
+#ifdef HASH
+        genedata gdata;
+        if((genedataptr = (genedata *) hashtable_find(&genetable, gene1)) != NULL) genedataptr->popcount--;
+        else fprintf(stderr,errorformat,totsteps,gene1);
+        if((genedataptr = (genedata *) hashtable_find(&genetable, gene2)) != NULL) genedataptr->popcount++;
+        else {
+            gdata=ginitdata;
+            gdata.firstbirthframe = totsteps;
+            gdata.firstancestor = ancestor;
+            hashtable_insert(&genetable, gene2,(genedata *) &gdata);
+        }
+#endif
+}
+
+extern inline void hashgeneextinction(uint64_t gene,char errorformat[]) {
+#ifdef HASH
+        if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
+            if(genedataptr->popcount == 0) {
+                genedataptr->lastextinctionframe = totsteps;
+                genedataptr->nextinctions++;
+            }
+        }
+        else fprintf(stderr,errorformat,3,totsteps,gene);
+#endif
+}
+
+extern inline void hashgeneactivity(uint64_t gene,char errorformat[]) {
+#ifdef HASH
+        if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) genedataptr->activity ++;
+        else fprintf(stderr,errorformat,4,totsteps,gene);
+#endif
+}
+
+//------------------------------------------------------- pack2neighbors ----------------------------------------------------------------------------------
 void pack2neighbors(uint64_t gol[], uint64_t golp[]) {              // routine for future use of all 2nd neighbours
 #define deltaxy(ij,x,y)  (ij - (ij&Nmask) + ((ij+(x)&Nmask) + (y)*N)) & N2mask
     unsigned int ij,k,s;
@@ -558,7 +625,8 @@ void pack2neighbors(uint64_t gol[], uint64_t golp[]) {              // routine f
     }
 }
 
-void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]) {                                           // routine for 64x-gol packed update, not yet used
+//------------------------------------------------------- update_gol64 -----------------------------------------------------------------------------------
+void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]) {  // routine for 64x-gol packed update, no plane coupling
 #define deltaxy(ij,x,y)  (ij - (ij&Nmask) + ((ij+(x)&Nmask) + (y)*N)) & N2mask
     unsigned int ij,k;
     uint64_t gs,newgs,sums00,sums10,sums01,sums11,sums02,sums12,sums16[4];
@@ -617,20 +685,17 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
     }
 }
 
+//------------------------------------------------------- update_gol2 -----------------------------------------------------------------------------------
 void update_gol2(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]) {
 // gol states on one plane interact with genes hard coupled to the gol states on a second plane
 // this may also be viewed simply as genes with gol dynamics interacting with non-genetic entities with gol dynamics
 // both gol planes are coded as two bottom bits in the gol[i,j] array
 // coupling between the two planes occurs through complementary (1<->0) exact matching of the local Moore neighborhoods (8-sites)
 // survival and/or birth rules are negated (opposite outcome) when coupling is established
-
 #define deltaxy(ij,x,y)  (ij - (ij&Nmask) + ((ij+(x)&Nmask) + (y)*N)) & N2mask
-#ifdef HASH
-    genedata gdata;
-#endif
     unsigned int ij,ij1,k,kch,nmut;
     uint64_t s0,s1,s0_2or3,s1_2or3,nbmask0,nbmask1,ancestor,newgene;
-    uint64_t gol0,gol1,newgol0,newgol1;
+    uint64_t golmix,gol0,gol1,newgol1;
     uint64_t randnr, randnr2, rand2, statflag;
     int nb[8];
     int nb1x[8] = {-1,0,1,1,1,0,-1,-1};
@@ -640,42 +705,31 @@ void update_gol2(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t new
     totsteps++;
     if(!(totsteps%10)) fprintf(stderr,"iteration step %d\r",totsteps);
     
-    if(rulemod) {                                                               // precalculate whether coupling condition is met at each site
-        for (ij=0; ij<N2; ij++) {
-            for(k=0,nbmask0=nbmask1=0ull;k<8;k++) {
-                ij1=deltaxy(ij,nb1x[k],nb1y[k]);
-                nbmask0 |= (gol[ij1]&1ull)<<k;
-                nbmask1 |= ((gol[ij1]>>1)&1ull)<<k;
-            }
-            if(nbmask0==~nbmask1) golmix[ij]=1ull;
-            else golmix[ij]=0ull;
-        }
-    }
-    else { // no gol rule modification, no coupling
-         for (ij=0; ij<N2; ij++) golmix[ij] = 0ull;                             // loop over all sites of 2D torus with side length N
-    }
-    
     for (ij=0; ij<N2; ij++) {                                                   // loop over all sites of 2D torus with side length N
-        for(k=0,s0=s1=nbmask1=0ull;k<8;k++) {                                           // compute no of live neighbours using golmix (coupled plane neighbours)
+        for(k=0,s0=s1=nbmask0=nbmask1=0ull;k<8;k++) {                           // compute no of live neighbours using golmix (coupled plane neighbours)
             ij1=nb[k]=deltaxy(ij,nb1x[k],nb1y[k]);
-            s0  += gol[ij1]&1ull;
-            s1 += (gol[ij1]>>1)&1ull;
-            nbmask1 |= ((gol[ij1]>>1)&1ull)<<k;
+            gol0=gol[ij1]&1ull;
+            gol1=(gol[ij1]>>1)&1ull;
+            s0 += gol0;
+            s1 += gol1;
+            nbmask0 |= (gol0<<k);
+            nbmask1 |= (gol1<<k);
         }
         gol0=gol[ij]&1ull;
         gol1=(gol[ij]>>1)&1ull;
+        if(rulemod && (nbmask0==nbmask1)) golmix=1ull;                          // also tried ==~nbmask1 but virtually no coupling
+        else golmix=0ull;
         s0_2or3 = (s0>>2) ? 0ull : (s0>>1);                                     // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
         s1_2or3 = (s1>>2) ? 0ull : (s1>>1);                                     // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
-        newgol0 = s0_2or3 ? (gol0 ? 1ull : (s0&0x1ull ? 1ull : 0ull )) : 0ull;  // GoL standard calculation next state for non-genentic gol plane
-        newgol1 = s1_2or3 ? (gol1 ? 1ull : (s1&0x1ull ? 1ull : 0ull )) : 0ull;  // GoL standard calculation next state for genetic gol plane
-        newgol[ij]  = s0_2or3 ? (golmix[ij] | newgol0) : newgol0;               // coupling for non-genetic plane
-        newgol[ij] |= (s1_2or3 ? (golmix[ij] | newgol1) : newgol1)<<1;          // coupling for genetic plane
+        newgol[ij] = s0_2or3 ? (gol0 ? 1ull : (s0&1ull ? 1ull : golmix )) : 0ull;  // GoL calculation next state for non-genetic gol plane
+        newgol1    = s1_2or3 ? (gol1 ? 1ull : (s1&1ull ? 1ull : golmix )) : 0ull;  // GoL calculation next state for genetic gol plane
+        newgol[ij] |= (newgol1<<1);                                               // combine gol planes
         statflag = 0ull;
-        if(golmix[ij]&(s0_2or3|s1_2or3)) statflag |= F_notgolrul;               // not gol rule
-        if (s1_2or3 & 1ull & ((s1&~golmix[ij])|(~s1&golmix[ij]))) {             // birth in gene plane
-            if(s1&~golmix[ij])
+        if(golmix&(s0_2or3|s1_2or3)) statflag |= F_notgolrul;                   // not gol rule
+        if (newgol1&(~gol1)&1ull) {                                             // birth in gene plane without overwrite
+            if(s1&1ull)    // 3 nbs
                 selectdifft3(nbmask1, nb, gol, &kch);
-            else
+            else      // 2 nbs
                 selectdifft2(nbmask1, nb, gol, &kch);
             ij1=deltaxy(ij,nb1x[kch],nb1y[kch]);
             newgene = golg[ij1];
@@ -688,69 +742,37 @@ void update_gol2(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t new
             newgolg[ij]=newgene;
             statflag = statflag | F_birth;
             if (rand2) statflag = statflag | F_mutation;
-            newgolgstats[ij] = statflag;
-#ifdef HASH
-            if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) { // central old gene present: overwritten
-                genedataptr->popcount--;  // if 0 lastextinctionframe updated after whole frame calculated
-            }
-            else fprintf(stderr,"step %d hash storage error 1 in update_gol16, gene %llx at %d not stored\n",totsteps,golg[ij],ij);
-            if((genedataptr = (genedata *) hashtable_find(&genetable, newgene)) != NULL) {
-                genedataptr->popcount++;
-            }
-            else {
-                gdata=ginitdata;
-                gdata.firstbirthframe = totsteps;
-                gdata.firstancestor = ancestor;
-                hashtable_insert(&genetable, newgene,(genedata *) &gdata);
-            }
-#endif
-        } //if birth
-      else {
-        newgolg[ij]=gene0;
-#ifdef HASH
-        if(golg[ij]!= gene0) {
-            newgene= gene0;                                                     // default is relax to uncoupled gene
-
-            if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) { // central old gene present: overwritten
-                    genedataptr->popcount--;  // if 0 lastextinctionframe updated after whole frame calculated
-            }
-            else fprintf(stderr,"step %d hash storage error 1 in update_gol16, gene %llx at %d not stored\n",totsteps,golg[ij],ij);
-            if((genedataptr = (genedata *) hashtable_find(&genetable, newgene)) != NULL) {
-                genedataptr->popcount++;
-            }
-            else {
-                gdata=ginitdata;
-                gdata.firstbirthframe = totsteps;
-                gdata.firstancestor = gene0;
-                hashtable_insert(&genetable, newgene,(genedata *) &gdata);
-            }
+            if(statflag&F_notgolrul) statflag |= F_nongolchg;
+            hashaddgene(newgene,ancestor);
+        } //end if birth
+        else if (newgol1) {                                                     // gene survival
+            newgolg[ij]=golg[ij];
+            statflag = statflag | F_survival;
         }
-#endif
-      } // end else (s3)
+        else {                                                                  // gene death if alive
+            if(gol1) {                                                          // site with gene
+                hashdeletegene(golg[ij],"step %d hash storage error 2 in update_gol2, gene %llx not stored\n");
+                newgolg[ij]=gene0;
+                statflag = statflag | F_death;
+            }
+            else newgolg[ij]=golg[ij];                                          // stays dead
+        } // end else
+        newgolgstats[ij] = statflag;
     } // for ij
-#ifdef HASH
+
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records including activities
-        if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
-            if(genedataptr->popcount == 0) {
-                genedataptr->lastextinctionframe = totsteps;
-                genedataptr->nextinctions++;
-            }
-        }
-        else fprintf(stderr,"step %d hash storage error 2 in update_gol2, gene %llx at %d not stored\n",totsteps,golg[ij],ij);
-        if((genedataptr = (genedata *) hashtable_find(&genetable, newgolg[ij])) != NULL)
-            genedataptr->activity ++;
-        else fprintf(stderr,"step %d hash storage error 3 in update_gol2, gene %llx at %d not stored\n",totsteps,golg[ij],ij);
+        if(gol[ij]>>1) hashgeneextinction(golg[ij],"hash storage error 3 in update_gol2, gene %llx not stored\n");
+        if(newgol[ij]>>1) hashgeneactivity(newgolg[ij],"hash storage error 4 in update_gol2, gene %llx not stored\n");
     }
-#endif
+
     for (ij=0; ij<N2; ij++) {        // update lattices
         gol[ij] = newgol[ij];        // copy new gol config to old one
         golg[ij] = newgolg[ij];      // copy new genes to old genes
         golgstats[ij] = newgolgstats[ij]; // copy new golg stat flags to old genes
     }
-
-
 }
 
+//------------------------------------------------------- update_gol16 -----------------------------------------------------------------------------------
 void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]) {
 // genes specify on which of 16 planes the gol states at that site are visible: specified by 16 bits 0,4,8,... in gene
 // when multiple copy processes are active for gol states, the one with the lowest bit position is applied to most difft gene copying
@@ -758,9 +780,6 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
 // optionally genes also specify a unique copy plane for a gene: it can only be copied by a rule active on this plane
 // in this optional case, copy plane could be lowest non zero bit in gene at pos m for which m%4 == 1 (if none then gene is not copied)
 #define deltaxy(ij,x,y)  (ij - (ij&Nmask) + ((ij+(x)&Nmask) + (y)*N)) & N2mask
-#ifdef HASH
-    genedata gdata;
-#endif
     unsigned int ij,ij1,k,kmin,p,p1,nmut,debcnt,mask,np,npmask;
     uint64_t s,sm,sm3,s3sm3,su,s3,sg3,s2or3,nbmask,nbmaskr,nbmaskrm,ancestor,newgene,golsh,pmask;
     uint64_t *golm;
@@ -875,62 +894,25 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
                 statflag = statflag | F_birth;
                 if (rand2) statflag = statflag | F_mutation;
                 newgolgstats[ij] = statflag;
-#ifdef HASH
-                if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) { // central old gene present: overwritten
-                    genedataptr->popcount--;  // if 0 lastextinctionframe updated after whole frame calculated
-                }
-                else fprintf(stderr,"step %d hash storage error 1 in update_gol16, gene %llx at %d not stored\n",totsteps,golg[ij],ij);
-                if((genedataptr = (genedata *) hashtable_find(&genetable, newgene)) != NULL) {
-                    genedataptr->popcount++;
-                }
-                else {
-                    gdata=ginitdata;
-                    gdata.firstbirthframe = totsteps;
-                    gdata.firstancestor = ancestor;
-                    hashtable_insert(&genetable, newgene,(genedata *) &gdata);
-                }
-#endif
+                hashreplacegene(golg[ij],newgene,ancestor,"step %d hash storage error 1 in update_gol16, gene %llx not stored\n");
                 p=np;                                                             // break from loop at first birth
             } //if 3 live nbs at p
         } // for p
       }  // if (s3)
       else {
         newgolg[ij]=gene0;
-#ifdef HASH
         if(golg[ij]!= gene0) {
             newgene= gene0;                                                     // default is relax to uncoupled gene
-
-            if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) { // central old gene present: overwritten
-                    genedataptr->popcount--;  // if 0 lastextinctionframe updated after whole frame calculated
-            }
-            else fprintf(stderr,"step %d hash storage error 1 in update_gol16, gene %llx at %d not stored\n",totsteps,golg[ij],ij);
-            if((genedataptr = (genedata *) hashtable_find(&genetable, newgene)) != NULL) {
-                genedataptr->popcount++;
-            }
-            else {
-                gdata=ginitdata;
-                gdata.firstbirthframe = totsteps;
-                gdata.firstancestor = gene0;
-                hashtable_insert(&genetable, newgene,(genedata *) &gdata);
-            }
+            hashreplacegene(golg[ij],newgene,rootgene,"step %d hash storage error 1 in update_gol16, gene %llx not stored\n");
         }
-#endif
       } // end else (s3)
     } // for ij
-#ifdef HASH
-    for (ij=0; ij<N2; ij++) {       // complete missing hash table records including activities
-        if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
-            if(genedataptr->popcount == 0) {
-                genedataptr->lastextinctionframe = totsteps;
-                genedataptr->nextinctions++;
-            }
-        }
-        else fprintf(stderr,"step %d hash storage error 2 in update_gol16, gene %llx at %d not stored\n",totsteps,golg[ij],ij);
-        if((genedataptr = (genedata *) hashtable_find(&genetable, newgolg[ij])) != NULL)
-            genedataptr->activity ++;
-        else fprintf(stderr,"step %d hash storage error 3 in update_gol16, gene %llx at %d not stored\n",totsteps,golg[ij],ij);
+    
+    for (ij=0; ij<N2; ij++) {       // complete missing hash table records including activities, NB all sites have genes in gol16 but don't record activity for zerogene
+        hashgeneextinction(golg[ij],"hash storage error 4 in update_gol16, gene %llx not stored\n");
+        if(newgolg[ij]!=gene0) hashgeneactivity(newgolg[ij],"hash storage error 5 in update_gol16, gene %llx not stored\n");
     }
-#endif
+
     for (ij=0; ij<N2; ij++) {        // update lattices
         gol[ij] = newgol[ij];        // copy new gol config to old one
         golg[ij] = newgolg[ij];      // copy new genes to old genes
@@ -939,7 +921,7 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
 
 
 }
-
+//------------------------------------------------------- update_lut_sum -----------------------------------------------------------------------------------
 void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
@@ -1031,6 +1013,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
     }
 }
 
+//------------------------------------------------------- update -----------------------------------------------------------------------------------
 void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
@@ -1042,9 +1025,6 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
     uint64_t nbmask, nbmaskr;
     uint64_t newgene, ancestor, livegenes[3];
     uint64_t s2or3, birth, statflag, nextgolstate;
-#ifdef HASH
-    genedata gdata;
-#endif
 
     totsteps++;
     if(!(totsteps%10)) fprintf(stderr,"iteration step %d\r",totsteps);
@@ -1186,24 +1166,12 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 ancestor = newgene;
                 newgene = newgene ^ (r2<<nmut);                             // introduce single mutation with probability pmut = probmut
                 // if(newgene^ancestor) fprintf(stderr,"newgene %llu written at step %d with ancestor %llu\n",newgene, totsteps,ancestor);     // DEBUG
-#ifdef HASH
-                if(gol[ij]) {                                               // central old gene present: overwritten
-                    if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
-                        genedataptr->popcount--;  // if 0 lastextinctionframe updated after whole frame calculated
-                    }
-                    else fprintf(stderr,"hash storage error 1, gene %llx not stored\n",golg[ij]);
-                }
 
-                if((genedataptr = (genedata *) hashtable_find(&genetable, newgene)) != NULL) {
-                    genedataptr->popcount++;
+                if(gol[ij]) {                                               // central old gene present: overwritten
+                    hashdeletegene(golg[ij],"step %d hash delete error 1 in update, gene %llx not stored\n");
                 }
-                else {
-                    gdata=ginitdata;
-                    gdata.firstbirthframe = totsteps;
-                    gdata.firstancestor = ancestor;
-                    hashtable_insert(&genetable, newgene,(genedata *) &gdata);
-                }
-#endif
+                hashaddgene(newgene,ancestor);
+
                 newgol[ij]  =  1ull;                                        // new game of life cell value: alive
                 newgolg[ij] =  newgene;                                     // if birth then newgene
                 statflag = statflag | F_birth;
@@ -1218,14 +1186,9 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                     if(gol[ij]) statflag |= F_survival;
                 }
                 else {
-#ifdef HASH
                     if(gol[ij]) {                                           // death : need to update hash table
-                        if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
-                            genedataptr->popcount--;
-                        }
-                        else fprintf(stderr,"hash storage error 2, gene %llx not stored\n",golg[ij]);
+                        hashdeletegene(golg[ij],"step %d hash delete error 2 in update, gene %llx not stored\n");
                     }
-#endif
                     newgol[ij]  = 0ull;                                     // new game of life cell value dead
                     newgolg[ij] = 0ull;                                     // gene dies or stays dead
                     if(gol[ij]) statflag |= F_death;
@@ -1233,14 +1196,9 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
             } // end no birth
         }  // end if s2or3
         else {                                                              // else not birth or survival, 0 values for gol and gene
-#ifdef HASH
             if(gol[ij]) {                                                   // death : need to update hash table
-                if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
-                    genedataptr->popcount--;
-                }
-                else fprintf(stderr,"hash storage error 3, gene %llx not stored\n",golg[ij]);
+                hashdeletegene(golg[ij],"step %d hash delete error 3 in update, gene %llx not stored\n");
             }
-#endif
 	        newgol[ij]  = 0ull;                                             // new game of life cell value
 	        newgolg[ij] = 0ull;                                             // gene dies
             if(gol[ij]) statflag |= F_death;
@@ -1256,24 +1214,10 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
         newgolgstats[ij] = statflag;
     }  // end for ij
 
-#ifdef HASH
-    for (ij=0; ij<N2; ij++) {       // complete missing hash table records including activities
-        if(gol[ij]) {
-            if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
-                if(genedataptr->popcount == 0) {
-                    genedataptr->lastextinctionframe = totsteps;
-                    genedataptr->nextinctions++;
-                }
-            }
-            else fprintf(stderr,"hash storage error 4, gene %llx not stored\n",golg[ij]);
-        }
-        if(newgol[ij]) {
-            if((genedataptr = (genedata *) hashtable_find(&genetable, newgolg[ij])) != NULL)
-                genedataptr->activity ++;
-            else fprintf(stderr,"hash storage error 5, gene %llx not stored\n",newgolg[ij]);
-        }
+    for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
+        if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
+        if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-#endif
 
     for (ij=0; ij<N2; ij++) {        // update lattices
 	    gol[ij] = newgol[ij];        // copy new gol config to old one
@@ -1283,6 +1227,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
 
 }
 
+//------------------------------------------------------- stats routines -----------------------------------------------------------------------------------
 void tracestats(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int NN2) { // trace various stats over time of the simulation
     int ij,cnt,k,d,dc,gt[4],st[10];
     uint64_t gene,statflag;
@@ -1335,6 +1280,7 @@ void get_stats(int outstats[], int outgtypes[], int outstepstats[], int outconfi
     if (nhistG==nstatG) for(i=0; i<Noff*numStats; i++) outconfigstats[i] = configstats[i];
 }
 
+//------------------------------------------------------- countconfigs -----------------------------------------------------------------------------------
 void countconfigs(){        // count translated configs specified by offset array
     // for non zero nb patterns we count if the same pattern occurs at the central site and its offset address in space time
     int ij,i,j,k,t,ip1,im1,jp1,jm1,o,ij1,i1,j1;
@@ -1372,6 +1318,7 @@ void countconfigs(){        // count translated configs specified by offset arra
     }
 }
 
+//------------------------------------------------------- get_ ... -----------------------------------------------------------------------------------
 void get_histo(int outhisto[],int numHistoC){
     int i;
     if(numHistoC != numHisto){
@@ -1405,6 +1352,7 @@ void get_activities(uint64_t actgenes[],int activities[],int ngenesp[]) {
 void get_activities(uint64_t actgenes[],int activities[],int ngenesp[]) {}
 #endif
 
+//------------------------------------------------------- genelife_update -----------------------------------------------------------------------------------
 void genelife_update (int nsteps, int nhist, int nstat) {
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
@@ -1448,6 +1396,7 @@ void genelife_update (int nsteps, int nhist, int nstat) {
     }
 }
 
+//------------------------------------------------------- initialize_planes ---------------------------------------------------------------------------
 void initialize_planes(int offs[],  int No) {
     int i,j,idx;
     static int notfirst = 0;
@@ -1510,6 +1459,7 @@ void initialize_planes(int offs[],  int No) {
 #endif
 }
 
+//------------------------------------------------------- readFile and writeFile ---------------------------------------------------------------
 int readFile(char * code, char *fileName)
 {
   FILE *file;
@@ -1540,6 +1490,7 @@ int writeFile(char *fileName)     // initialize 32x32 genepat file with all empt
     return error;
 }
 
+//------------------------------------------------------- initialize ---------------------------------------------------------------------------
 void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams) {
 #ifdef HASH
     int hcnt;
@@ -1587,13 +1538,13 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     fprintf(stderr,"pmutmask %llx (NB 0 means no mutation)\n",pmutmask);
                                                                               // not yet useable with selection==12
     np = (repscheme && repscheme<=16) ? repscheme : 16;                       // number of planes used, 16 if 0
-    pmask = (np==16) ? 0xffffffffffffffff : (1ull<<(np<<2))-1;                // mask for bits included in np planes
-    if(selection<10) np = 64;
-    if (selection == 10) gene0=0xfedcba9876543210&pmask;
-    else gene0=0x0ull;
+    pmask = (np==16) ? 0xffffffffffffffffull : (1ull<<(np<<2))-1;                // mask for bits included in np planes
+    if(selection<10 || selection > 11) np = 64;
+    if (selection == 10) gene0=0xfedcba9876543210ull&pmask;
+    else                 gene0=0ull;
 
     nstartgenes = 8;
-    if (selection >= 10) nstartgenes = 16;
+    if (selection >= 10 && selection <=12) nstartgenes = 16;
     switch (selection) {
         case 0: for (k=0;k<4;k++) {startgenes[k]=0xf0f0f0f0f0f0f0f0;startgenes[k+4]=0x0f0f0f0f0f0f0f0f;} break;
         case 1: for (k=0;k<8;k++) startgenes[k]=((0x1ull<<k*3)-1ull)<<20;break;
@@ -1606,7 +1557,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         case 11:for (k=0;k<16;k++) startgenes[k] = gene0;                     // first set all startgenes as uncoupled
                 for (k=0;k<np;k++) startgenes[k] = 6<<(k<<2); break;          // coupled to neighbour plane before and after
         case 12:for (k=0;k<16;k++) startgenes[k] = 0x3ull<<(k<<2);break;
-        case 13:for (k=0;k<4;k++) {startgenes[k]=0xf0f0f0f0f0f0f0f0;startgenes[k+4]=0x0f0f0f0f0f0f0f0f;} break;
+        case 13:for (k=0;k<8;k++) startgenes[k]=((0x1ull<<k*3)-1ull)<<20;break;
         case 6:
         case 7:
         default: for (k=0;k<8;k++) startgenes[k]=(0x1ull<<(4+k*8))-1ull;
@@ -1648,8 +1599,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         }
         for (ij=0; ij<N2; ij++) {
             gol[ij] = 0;
-            golg[ij] = 0;
-            if (selection == 10) golg[ij]=0xfedcba9876543210;
+            golg[ij] = gene0;
         }
         for (ij1=0; ij1<32*32; ij1++) {
             if(N<32) {fprintf(stderr,"Error, array dim %d too small for file array dim %d\n",N,32);break;}
@@ -1663,9 +1613,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
                 golgstats[ij] = 0;
             }
             else {
-                gol[ij] = 0;
-                golg[ij] = 0;
-                if (selection == 10) golg[ij]=gene0;
+                gol[ij] = gene0;
                 golgstats[ij] = 0;
             }
             // if (golg[ij] == 0 && gol[ij] != 0) fprintf(stderr,"zero gene at %d\n",ij);
@@ -1677,8 +1625,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         if (Nf==0 || Nf>N) Nf=N;
         for (ij=0; ij<N2; ij++) {
             gol[ij] = 0ull;
-            golg[ij] = 0ull;
-            if (selection == 10) golg[ij]=gene0;
+            golg[ij] = gene0;
             golgstats[ij] = 0;
         }
         i0 = j0 = (N>>1)-(Nf>>1);
@@ -1686,52 +1633,46 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
             for (j=0; j<Nf; j++) {
                 ij=i0+i+N*(j0+j);
                 if(selection<10) gol[ij] = ((rand() & rmask) < initial1density)?1ull:0ull;
-                else for (k=0;k<np;k++) gol[ij] |= ((rand() & rmask) < initial1density)?(1ull<<(k<<2)):0ull;
+                else if(selection<13) for (k=0;k<np;k++) gol[ij] |= ((rand() & rmask) < initial1density)?(1ull<<(k<<2)):0ull;
+                else for (k=0;k<2;k++) gol[ij] |= ((rand() & rmask) < initial1density)?(1ull<<k):0ull;
             }
         }
         for (ij=0; ij<N2; ij++) {
             g = 0ull;
             if (gol[ij]||(selection>=10)) { // if live cell or multiplane, fill with random genome g or randomly chosen startgene depending on initialrdensity
-                if (((unsigned) rand() & rmask) < initialrdensity) {for (k=0; k<((np>16)?np:(np<<2)); k++) g = (g << 1) | (rand() & 0x1);g=gene0^g;}  // all 64 for selection<10 or np=16
+                if (((unsigned) rand() & rmask) < initialrdensity) {for (k=0; k<((np>16)?np:(np<<2)); k++) g = (g << 1) | (rand() & 0x1);g=gene0^g;}  // all 64 for 1selection<10 or selection>11 or np=16
                 else if (startgenechoice == nstartgenes) g = startgenes[0xf & rand() & (nstartgenes-1)];
                 else if (startgenechoice > nstartgenes) fprintf(stderr,"startgenechoice %d out of range\n",startgenechoice);
                 else g = startgenes[0xf & startgenechoice & (nstartgenes-1)];
                 cnt++;
             }
             golg[ij] = g;
-            // if (golg[ij] == 0ull && gol[ij] != 0ull) fprintf(stderr,"zero gene at %d\n",ij);
         }
-        // for (ij=0; ij<40; ij++) fprintf(stderr,"gene at %d %llx\n",ij,golg[ij]);   // test first 40
     }
     for (ij=0; ij<N2; ij++) {
         acttrace[ij]=rootgene;                 // initialize activity traces to root gene
-        genealogytrace[ij] = 0x3f3f3fff;
+        genealogytrace[ij] = rootgene;
     }
-#ifdef HASH
+
     for (ij=0; ij<N2; ij++) {
-        if(gol[ij]||(selection>=10)) {
-            if((genedataptr = (genedata *) hashtable_find(&genetable, golg[ij])) != NULL) {
-                genedataptr->popcount++;
-            }
-            else {
-                hashtable_insert(&genetable, golg[ij], (genedata *) &ginitdata);
-            }
+        if(gol[ij]||(selection==10)||(selection==11)||((gol[ij]>>1)&&(selection==13))) {
+            hashaddgene(golg[ij],rootgene);
         }
     }
+
+#ifdef HASH
     // it is possible to enumerate keys and values
     hcnt=hashtable_count(&genetable);
     genotypes = hashtable_keys( &genetable );
-
     fprintf(stderr,"population size %d with %d different genes\n",cnt,hcnt);
 #endif
 }
 
+//------------------------------------------------------- set ...---------------------------------------------------------------------------
 void set_colorfunction(int colorfunctionval) {
     if(colorfunction>7) fprintf(stderr,"error colorfunction value passed %d too large\n",colorfunctionval);
     else     colorfunction = colorfunctionval;
 }
-
-
 
 int setget_act_ymax(int actymax) {                  // sets ymax for activities only if argument nonzero, reads old value
     int ymaxold;
@@ -1740,6 +1681,7 @@ int setget_act_ymax(int actymax) {                  // sets ymax for activities 
     return(ymaxold);
 }
 
+//------------------------------------------------------- get ... ---------------------------------------------------------------------------
 void get_curgol(uint64_t outgol[], int NN){
     int ij;
     for (ij=0; ij<NN; ij++) {
@@ -1786,6 +1728,7 @@ void get_curgolgstats(uint64_t outgolgstats[], int NN){
     }
 }
 
+//------------------------------------------------------- countspecies ---------------------------------------------------------------------------
 int cmpfunc (const void * pa, const void * pb)
 {
    // return ( *(int*)pa - *(int*)pb );
@@ -1934,6 +1877,7 @@ void countspecieshash() {  /* counts numbers of all different species using qsor
 void countspecieshash() {}  /* dummy routine, no effect */
 #endif
 
+//------------------------------------------------------- activitieshash ---------------------------------------------------------------------------
 #ifdef HASH
 int activitieshash(int gindices[], uint64_t genes[], int popln[], int activities[], int col) {  /* count activities of all currently active species */
     int i, j, ij, ij1, x, nspecies, nspeciesnow;
@@ -2011,6 +1955,7 @@ int get_sorted_popln_act( int gindices[], uint64_t genes[], int popln[], int act
     return(nspecies);
 }
 
+//------------------------------------------------------- genealogies ---------------------------------------------------------------------------
 #ifdef HASH
 int cmpfunc4 (const void * pa, const void * pb)
 {
@@ -2140,7 +2085,7 @@ int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[],
                 if(nextgene==rootgene) birthstep=totsteps;
                 else {
                     if((genedataptr = (genedata *) hashtable_find(&genetable, nextgene)) != NULL) birthstep = genedataptr->firstbirthframe;
-                    else fprintf(stderr,"ancestor not found in genealogies during birthstep extraction\n");
+                    else fprintf(stderr,"ancestor %llx not found at (%d,%d) in genealogies during birthstep extraction\n",nextgene,ij&Nmask,ij>>log2N);
                 }
             }
             else birthstep=totsteps;
@@ -2170,6 +2115,7 @@ int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[],
 int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[], int birthsteps[]) {return(0)}  /* dummy routine, no effect */
 #endif
 
+//------------------------------------------------------- misc ---------------------------------------------------------------------------
 void delay(int milliseconds)
 {
     long pause;
