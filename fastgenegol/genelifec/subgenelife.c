@@ -98,7 +98,6 @@ int totsteps=0;                     // total number of simulation steps
 int totdisp=0;                      // total number of displayed steps
 int statcnts=0;                     // total number of statistic timepts counted
 uint64_t codingmask;                // ncoding derived mask for ncoding bits
-uint64_t  emptysites = 0;           // cumulative number of empty sites during simulation updates
 int nhistG = 0;                     // interval for collecting config histogram data : 0 no collection, nstatG collection with time
 int nstatG = 0;                     // interval for collecting other statistical trace data : 0 no collection
 int genealogydepth = 0;             // depth of genealogies in current population
@@ -264,6 +263,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                                 mask = gene * 11400714819323198549ul;mask = mask >> (64 - 16);
                                 mask = ((d2+62)<<8)+(mask<<16)+0xff;break;
                         case 13: mask = ((gene>>40)<<8)+0xff; break;
+                        case 14: mask = (d<<20)+((gene&0xff)<<8)+0xff;
                         default  : mask = ((d+(d<<6)+(d<<12)+(d<<18))<<8) + 0xff;
                 }
                 if(colorfunction==2) {
@@ -956,7 +956,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                         // toroidal i+1, i-1
         nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1;           // new order of nbs
         nb[4]=jp1+ip1; nb[5]=jp1+i; nb[6]=jp1+im1; nb[7]=j*N+im1;
-        for (s=0L,k=0,nb1i=0;k<8;k++) {                                     // packs non-zero nb indices in first up to 8*4 bits
+        for (s=0,k=0,nb1i=0;k<8;k++) {                                     // packs non-zero nb indices in first up to 8*4 bits
             gols=gol[nb[k]];                                                // whether neighbor is alive
             s += gols;                                                      // s is number of live nbs
             nb1i = (nb1i << (gols<<2)) + (gols*k);                          // nb1i is packed list of live neighbour indices
@@ -964,7 +964,8 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         statflag = 0L;
 
         birth = 0;
-        if(gene>0) {                                                        // death/survival
+        if(gol[ij]) {                                                       // death/survival
+            if (!((survivemask>>s)&1ull)) fprintf(stderr,"survival mask restricts birth for s= %d\n",s);
             if((((gene>>(s<<(ncoding-1))) & ncodingmask)==ncodingmask) && ((survivemask>>s)&1ull)) {       // survive
                 statflag |= F_survival;
                 newgol[ij]  = gol[ij];                                      // new game of life cell value same as old
@@ -974,6 +975,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
                 statflag |= F_death;
                 newgol[ij]  = 0ull;                                         // new game of life cell value dead
                 newgolg[ij] = 0ull;                                         // gene dies
+                hashdeletegene(golg[ij],"step %d hash delete error 2 in update, gene %llx not stored\n");
             }
         }
         else{                                                               // birth/nobirth
@@ -991,7 +993,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
             newgene = livegenes[idx];
             // compute random events for single bit mutation, as well as mutation position nmut
             randnr2 = (randnr & pmutmask);                                  // extract bits from randnr for random trial for 0 on pmutmask
-            r2 = randnr2?0L:1L;                                             // 1 if lowest nlog2pmut bits of randnr are zero, else zero
+            r2 = randnr2?0ull:1ull;                                         // 1 if lowest nlog2pmut bits of randnr are zero, else zero
             nmut = (randnr >> 57) & 0x3f;                                   // choose mutation position for length 64 gene : from bits 57:62 of randnr
             // nmut = nmut & NGENE;          CHANGED
             // complete calculation of newgol and newgolg, including mutation
@@ -1001,15 +1003,22 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
             newgolg[ij] =  newgene;                                         // if birth then newgene
             statflag = statflag | F_birth;
             if (r2) statflag = statflag | F_mutation;
+            if(gol[ij]) hashdeletegene(golg[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n");
+            hashaddgene(newgene,ancestor);
         }
         if(gol[ij]) statflag |= F_golstate;
-        emptysites = emptysites + newgol[ij];                               // keep track of empty sites, same information as total activity of occupied sites
         golgstats[ij] = statflag;
     }  // end for ij
+
+    for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
+        if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
+        if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
+    }
 
     for (ij=0; ij<N2; ij++) {        // update lattices
         gol[ij] = newgol[ij];        // copy new gol config to old one
         golg[ij] = newgolg[ij];      // copy new genes to old genes
+        golgstats[ij] = newgolgstats[ij]; // copy new golg stat flags to old genes
     }
 }
 
@@ -1210,7 +1219,6 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
             if(statflag&F_notgolrul) statflag |= F_nongolchg;
         }
         else if (golgstats[ij]&F_nongolchg) statflag |= F_nongolchg;        // maintain non-GoL chg status until state changed by GoL rule
-        emptysites = emptysites + newgol[ij];                               // keep track of empty sites, same information as total activity of occupied sites
         newgolgstats[ij] = statflag;
     }  // end for ij
 
@@ -1371,8 +1379,9 @@ void genelife_update (int nsteps, int nhist, int nstat) {
 
         if (selection<10)       update(gol,golg,newgol,newgolg);              // calculate next iteration with selection
         else if (selection <12) update_gol16(gol,golg,newgol,newgolg);        // calculate next iteration for 2-16x multiplane version
-        else if (selection <13) update_gol64(gol,golg,newgol,newgolg);        // calculate next iteration for 64x multiplane version
-        else                    update_gol2(gol,golg,newgol,newgolg);         // calculate next iteration for 2xgol multiplane version
+        else if (selection==12) update_gol64(gol,golg,newgol,newgolg);        // calculate next iteration for 64x multiplane version
+        else if (selection==13) update_gol2(gol,golg,newgol,newgolg);         // calculate next iteration for 2xgol multiplane version
+        else if (selection==14) update_lut_sum(gol,golg,newgol,newgolg);      // calculate next iteration for lut sum version
         if(nhist && (totsteps%nhist == 0)) countconfigs();                    // count configurations
         if(nstat && (totsteps%nstat == 0)) tracestats(gol,golg,golgstats,N2); // time trace point
 
@@ -1558,6 +1567,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
                 for (k=0;k<np;k++) startgenes[k] = 6<<(k<<2); break;          // coupled to neighbour plane before and after
         case 12:for (k=0;k<16;k++) startgenes[k] = 0x3ull<<(k<<2);break;
         case 13:for (k=0;k<8;k++) startgenes[k]=((0x1ull<<k*3)-1ull)<<20;break;
+        case 14:for (k=0;k<8;k++) startgenes[k]=0xff000000+0x0c;
         case 6:
         case 7:
         default: for (k=0;k<8;k++) startgenes[k]=(0x1ull<<(4+k*8))-1ull;
@@ -1632,9 +1642,9 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         for (i=0; i<Nf; i++) {
             for (j=0; j<Nf; j++) {
                 ij=i0+i+N*(j0+j);
-                if(selection<10) gol[ij] = ((rand() & rmask) < initial1density)?1ull:0ull;
+                if((selection<10)||(selection==14)) gol[ij] = ((rand() & rmask) < initial1density)?1ull:0ull;
                 else if(selection<13) for (k=0;k<np;k++) gol[ij] |= ((rand() & rmask) < initial1density)?(1ull<<(k<<2)):0ull;
-                else for (k=0;k<2;k++) gol[ij] |= ((rand() & rmask) < initial1density)?(1ull<<k):0ull;
+                else if (selection==13) for (k=0;k<2;k++) gol[ij] |= ((rand() & rmask) < initial1density)?(1ull<<k):0ull;
             }
         }
         for (ij=0; ij<N2; ij++) {
@@ -1801,7 +1811,6 @@ void countspecies1(uint64_t gol[], uint64_t golg[], int N2) {     /* counts numb
 
         fprintf(stderr,"count species %d with gene %llx has counts %llu and %d ones, fitness %llu\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
     }
-    fprintf(stderr,"at step %d cumulative activity = %llu\n",totsteps,(N2 * (uint64_t) totsteps) - emptysites);
     fprintf(stderr,"rulemod\trepscheme\tselection\toverwritemask\tsurvival\n");
     fprintf(stderr,"%d\t%d\t\t%d\t\t%d\t\t%d\n",rulemod,repscheme,selection,overwritemask,survival);
     fprintf(stderr,"nlog2pmut\tinit1\tinitr\tncoding\tstartchoice\n");
@@ -1871,7 +1880,6 @@ void countspecieshash() {  /* counts numbers of all different species using qsor
     fprintf(stderr,"_________________________________________________________________\n");
     free(golgs);
     golgs = NULL;
-    // fprintf(stderr,"cumulative activity = %llu\n",(N2 * (uint64_t) totsteps) - emptysites);
 }
 #else
 void countspecieshash() {}  /* dummy routine, no effect */
