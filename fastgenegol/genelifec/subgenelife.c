@@ -107,6 +107,7 @@ uint64_t golgstats[N2];             // 64 bit masks for different events during 
 uint64_t newgolgstats[N2];          // 64 bit masks for different events during processing
 uint64_t golmix[N2];                // array for calculating coupling of genes between planes for multiplane genelife
 uint64_t gene0;                     // uncoupled planes background gene, non zero for selection==10
+uint64_t selectedgene;              // gene currently selected interactively in graphics window
 //------------------------------------------------ arrays for time tracing -----------------------------------------------------------------------------
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
@@ -192,6 +193,9 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
 // readFile             read file of gol/golg array (32x32) data
 // writeFile            write file of gol/golg array (32x32) data
 // initialize           initialize simulation parameters and arrays
+// set_colorfunction    set color function integer from GUI for use in patterning and coloring display
+// setget_act_ymax      set activity ymax for scaling of activity plot
+// set_selectedgene     set selected gene for highlighting from current mouse selection in graphics window
 // get_curgol           get current gol array from python
 // get_curgolg          get current golg array from python
 // get_acttrace         get current acttrace array from python
@@ -215,6 +219,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
     uint64_t gene, gdiff, g2c, mask;
     int ij,d,d2,activity;
     unsigned int color[3],colormax;
+    double rescalecolor;
     static int numones[16]={0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4};
 
     if(colorfunction==0) { // colorfunction based on multiplicative hash
@@ -324,6 +329,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
         for (ij=0; ij<NN2; ij++) {
             gene=genealogytrace[ij];
             activity = 0;
+            if (gene == selectedgene) mask = 0xffffffff; else
             if (gene == rootgene) mask = 0x000000ff;                // black color for root
             else {
                 if(colorfunction==7) {
@@ -338,10 +344,12 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 if (gene == 0ull) gene = 11778L;                    // random color for gene==0
                 mask = gene * 11400714819323198549ul;
                 mask = mask >> (64 - 32);                           // hash with optimal prime multiplicator down to 32 bits
-                if(colorfunction==7) {
+                if(colorfunction==7) {                              // rescale color brightness by activity/activitymax
+                    mask |= 0x808080ff;                             // to get same starting color as in non rescaled case
                     colormax=0;
                     for(d=0;d<3;d++) if((color[d]=( (mask>>(8+(d<<3))) & 0xff))>colormax) colormax=color[d];
-                    for(d=0;d<3;d++) color[d]=color[d]*activity*0xff/(activitymax*colormax);     // rescale colors by activity
+                    rescalecolor=((double)(activity*0xff))/((double)(activitymax*colormax));         // integer version doesn't work
+                    for(d=0;d<3;d++) color[d]=(unsigned int) (((double) color[d])*rescalecolor);     // rescale colors by activity/activitymax
                     for(d=0,mask=0xff;d<3;d++) mask |= color[d]<<((d<<3)+8);
                 }
                 else mask |= 0x808080ff;                                 // ensure brighter color at risk of improbable redundancy, make alpha opaque
@@ -1366,8 +1374,9 @@ void genelife_update (int nsteps, int nhist, int nstat) {
     /* encode without if structures for optimal vector treatment */
     int t;
     uint64_t *newgol, *newgolg;
-    int *activities,*gindices,*popln,*birthsteps,nspecies,ngenealogydeep;
+    int *gindices,*activities,*popln,*birthsteps;
     uint64_t *genes;
+    int nspecies,ngenealogydeep;
     int activitieshash(int gindices[], uint64_t genes[], int popln[], int activities[],int col);   /* count activities of all currently active species */
     int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[], int birthsteps[]);   /* genealogies of all currently active species */
     
@@ -1691,6 +1700,10 @@ int setget_act_ymax(int actymax) {                  // sets ymax for activities 
     return(ymaxold);
 }
 
+void set_selectedgene(uint64_t gene) {
+    selectedgene=gene;
+    fprintf(stderr,"selected gene set to %llx\n",selectedgene);
+}
 //------------------------------------------------------- get ... ---------------------------------------------------------------------------
 void get_curgol(uint64_t outgol[], int NN){
     int ij;
@@ -2013,19 +2026,19 @@ int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[],
     genes = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
     popln = (int *) malloc(nspeciesnow*sizeof(int));
     activities = (int *) malloc(nspeciesnow*sizeof(int));
-    activitymax=0;
     birthsteps = (int *) malloc(nspeciesnow*sizeof(int));
 
     for (i=0; i<nspeciesnow; i++) {
         genes[i]=genotypes[gindices[i]];
         popln[i]=geneitems[gindices[i]].popcount;
-        activities[i]=activity=geneitems[gindices[i]].activity;
+        activities[i]=geneitems[gindices[i]].activity;
         birthsteps[i]=geneitems[gindices[i]].firstbirthframe;
     }
     
     for(ij=0;ij<N2;ij++) genealogytrace[ij]=rootgene;             // set field to rootgene black
     ancgene=rootgene;                                             // never really used, but included to avoid unitialized warning
     birthstep=0;
+    activitymax=0;
     for (i=jmax=0; i<nspeciesnow; i++) {
         //j1=0;
         for (j=0;j<N;j++) {  // go back at most N links in genealogy

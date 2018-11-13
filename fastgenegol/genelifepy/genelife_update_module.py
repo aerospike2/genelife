@@ -8,8 +8,9 @@ Wrapping a C library function that does update of long unsigned int arrays gol, 
 import numpy as np
 import numpy.ctypeslib as npct
 from ctypes import c_int
+from ctypes import c_uint64
 
-# input type for the genelife_update function
+# input type for genelife c to python array functions
 # must be a long unsigned int array, with single dimension that is contiguous
 uint64_array = npct.ndpointer(dtype=np.uint64, ndim=1, flags='CONTIGUOUS')
 int_array = npct.ndpointer(dtype=np.int32, ndim=1, flags='CONTIGUOUS')
@@ -62,7 +63,8 @@ libcd.set_colorfunction.restype = None
 libcd.set_colorfunction.argtypes = [c_int]
 libcd.setget_act_ymax.restype = c_int
 libcd.setget_act_ymax.argtypes = [c_int]
-
+libcd.set_selectedgene.restype = None
+libcd.set_selectedgene.argtypes = [c_uint64]
 
 def genelife_update(nsteps, nhist, nstat):
     return libcd.genelife_update(nsteps, nhist, nstat)
@@ -129,3 +131,6 @@ def set_colorfunction(colorfunctionval):
 
 def setget_act_ymax(ymax):
     return libcd.setget_act_ymax(ymax)
+    
+def set_selectedgene(gene):
+    return libcd.set_selectedgene(gene)
