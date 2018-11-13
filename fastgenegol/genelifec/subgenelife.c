@@ -960,13 +960,13 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
     int nb[8],  ij, i, j, jp1, jm1, ip1, im1;
     uint64_t gene, genecode, gols, nb1i, randnr, randnr2, r2;
     uint64_t newgene, ancestor, livegenes[8];
-    uint64_t  birth, statflag, ncodingmask;
+    uint64_t  birth, statflag, ncodingmask, allcoding;
     
     totsteps++;
     survivemask=repscheme&0x1ff;                                            // 9 bits of repscheme 0-8 used to limit space of rules for survival
     birthmask=(repscheme>>9)&0x1ff;                                         // 9 bits of repscheme 9-17 used to limit space of rules for birth
     ncodingmask = (1ull<<ncoding)-1ull;                                     // mask for number of bits coding for each lut rule: <=7 for survival, <=3 for b and s
-
+    allcoding = (1ull<<(ncoding*9*2))-1ull;                                 // mask for total gene coding region
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
         gene = golg[ij];
         i = ij & Nmask;  j = ij >> log2N;                                   // row & column
@@ -974,11 +974,11 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                         // toroidal i+1, i-1
         nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1;           // new order of nbs
         nb[4]=jp1+ip1; nb[5]=jp1+i; nb[6]=jp1+im1; nb[7]=j*N+im1;
-        for (s=0,k=0,nb1i=0,genecode=0x3ffff;k<8;k++) {                      // packs non-zero nb indices in first up to 8*4 bits
+        for (s=0,k=0,nb1i=0,genecode=allcoding;k<8;k++) {                      // packs non-zero nb indices in first up to 8*4 bits
             gols=gol[nb[k]];                                                // whether neighbor is alive
             s += gols;                                                      // s is number of live nbs
             nb1i = (nb1i << (gols<<2)) + (gols*k);                          // nb1i is packed list of live neighbour indices
-            genecode &= gols?golg[nb[k]]:0x3ffff;                           // and of live neighbours encodes birth rule & possibly survival rule
+            genecode &= gols?golg[nb[k]]:allcoding;                           // and of live neighbours encodes birth rule & possibly survival rule
         }
         statflag = 0ull;
         s2or3 = (s>>2) ? 0ull : (s>>1);                                     // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
@@ -987,7 +987,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         birth = 0;
         if(gol[ij]) {                                                       // death/survival
             if((((genecode>>(s<<(ncoding-1))) & ncodingmask) == ncodingmask) && ((survivemask>>s)&1ull)) {       // survival coded by and of neighbour genes
-            // if((((gene>>(s<<(ncoding-1))) & ncodingmask) == ncodingmask) && ((survivemask>>s)&1ull)) {        // survival coded by central gene
+            // if((((gene>>(s<<(ncoding-1))) & ncodingmask) == ncodingmask) && ((survivemask>>s)&1ull)) {        // alternative survival coded by central gene
                 statflag |= F_survival;
                 newgol[ij]  = gol[ij];                                      // new game of life cell value same as old
                 newgolg[ij] = golg[ij];                                     // gene stays same
@@ -999,16 +999,15 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
                 hashdeletegene(golg[ij],"step %d hash delete error 2 in update, gene %llx not stored\n");
             }
         }
-        else{
-                                                                        // birth/nobirth
-            genecode=genecode >> (9<<(ncoding-1));
+        else{                                                               // birth/nobirth
+            genecode = genecode >> (9<<(ncoding-1));
             if((((genecode>>(s<<(ncoding-1))) & ncodingmask) == ncodingmask) && ((birthmask>>s)&1ull)) {       // birth
             // if(s==3)  {                                                     // birth
                 birth = 1;                                                  // NB gene birth is coupled to gol state birth
                 newgol[ij]  = 1ull;
                 statflag |= F_birth;
             }
-            else {
+            else {                                                          // no birth
                 newgol[ij] = gol[ij];
                 newgolg[ij] = golg[ij];
             }
@@ -1032,12 +1031,11 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
             newgene = newgene ^ (r2<<nmut);                                 // introduce single mutation with probability pmut = probmut
             newgol[ij]  =  1L;                                              // new game of life cell value: alive
             newgolg[ij] =  newgene;                                         // if birth then newgene
-            statflag = statflag | F_birth;
             if (r2) statflag = statflag | F_mutation;
             if(gol[ij]) hashdeletegene(golg[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n");
             hashaddgene(newgene,ancestor);
         }
-        if(gol[ij]) statflag |= F_golstate;
+        if(gol[ij]) statflag |= F_golstate;                                 // this is the last gol state, not the new state
         golgstats[ij] = statflag;
     }  // end for ij
 
@@ -1578,7 +1576,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     initial1density = simparams[1];
     initialrdensity = simparams[2];
     ncoding = simparams[3];
-    if (selection==8) if (ncoding<1 || ncoding>7) ncoding = 7;              // ncoding range restriction for selection = 8
+    if (selection==8) if (ncoding<1 || ncoding>3) ncoding = 3;              // ncoding range restriction for selection = 8 ie 18*ncoding bits of gene used
     codingmask = (1ull<<ncoding)-1ull;                                      // bit mask corresponding to ncoding bits
     startgenechoice = simparams[4];
     
@@ -1603,7 +1601,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         case 4: for (k=0;k<8;k++) {g = 0xfffff0ull + k; startgenes[k] = k<4 ? g : ~g;} break;
         case 5: for (k=0;k<8;k++) {g = 0xf0ull + k; startgenes[k]= k<4 ? g : (~g)|(0xfull<<16);} break;
         // case 8: for (k=0;k<8;k++) startgenes[k]=0xff000000|0x100c; // for ncoding = 1 gol rule
-        case 8: for (k=0;k<8;k++) startgenes[k]=0xff000000|(codingmask<<((9+3)<<(ncoding-1)))|(codingmask<<((2)<<(ncoding-1)))|(codingmask<<((3)<<(ncoding-1)));break;
+        case 8: for (k=0;k<8;k++) startgenes[k]=(codingmask<<((9+3)<<(ncoding-1)))|(codingmask<<((2)<<(ncoding-1)))|(codingmask<<((3)<<(ncoding-1)));break;
         case 10:for (k=0;k<16;k++) startgenes[k] = gene0;                     // first set all startgenes as uncoupled
                 for (k=0;k<np;k++) startgenes[k] = (startgenes[k] & (~(0xfull<<(k<<2)))) | ((k+1)%np)<<(k<<2);break; // couple plane k+1 to k in startgene k
         case 11:for (k=0;k<16;k++) startgenes[k] = gene0;                     // first set all startgenes as uncoupled
