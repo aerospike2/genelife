@@ -1594,11 +1594,9 @@ void genelife_update (int nsteps, int nhist, int nstat) {
     /* encode without if structures for optimal vector treatment */
     int t;
     uint64_t *newgol, *newgolg;
-    int *gindices,*activities,*popln,*birthsteps;
-    uint64_t *genes;
     int nspecies,ngenealogydeep;
-    int activitieshash(int gindices[], uint64_t genes[], int popln[], int activities[],int col);   /* count activities of all currently active species */
-    int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[], int birthsteps[]);   /* genealogies of all currently active species */
+    int activitieshash(int col);                                              // count activities of all currently active species
+    int genealogies(void);                                                    // genealogies of all currently active species
     
     nhistG = nhist;
     nstatG = nstat;
@@ -1618,24 +1616,18 @@ void genelife_update (int nsteps, int nhist, int nstat) {
         if(nhist && (totsteps%nhist == 0)) countconfigs();                    // count configurations
         if(nstat && (totsteps%nstat == 0)) tracestats(gol,golg,golgstats,N2); // time trace point
 
-        gindices=NULL;activities=NULL;genes=NULL;popln=NULL;birthsteps=NULL;  // these arrays are mallocated in activitieshash or genealogies
-        nspecies=activitieshash(gindices, genes, popln, activities,1);        // colors acttrace and returns current population arrays
-        // possible further use of returned current gene population data here
+        nspecies=activitieshash(1);                                           // colors acttrace and returns current population arrays
         if(nspecies<0) fprintf(stderr,"error returned from activitieshash\n");
-        free(gindices);free(activities);free(genes);free(popln);free(birthsteps);// free arrays after use
 
-        gindices=NULL;activities=NULL;genes=NULL;popln=NULL;birthsteps=NULL;  // these arrays are mallocated in activitieshash or genealogies
-        ngenealogydeep=genealogies(gindices, genes, popln, activities,birthsteps); // colors genealogytrace
-        // possible further use of returned current gene population data here
+        ngenealogydeep=genealogies();                                         // colors genealogytrace
         if(ngenealogydeep<0) fprintf(stderr,"error returned from genealogies\n");
-        free(gindices);free(activities);free(genes);free(popln);free(birthsteps);// free arrays after use
 
-        curPlane = (curPlane +1) % numPlane;            // update plane pointers to next cyclic position
+        curPlane = (curPlane +1) % numPlane;                                  // update plane pointers to next cyclic position
         newPlane = (newPlane +1) % numPlane;
-        gol = planes[curPlane];                         // get planes of gol,golg data
+        gol = planes[curPlane];                                               // get planes of gol,golg data
         golg = planesg[curPlane];
         golgstats = planesgs[curPlane];
-        totdisp++;                                      // currently every step is counted for display in activities
+        totdisp++;                                                            // currently every step is counted for display in activities
     }
 }
 
@@ -2133,8 +2125,10 @@ void countspecieshash() {}  /* dummy routine, no effect */
 
 //------------------------------------------------------- activitieshash ---------------------------------------------------------------------------
 #ifdef HASH
-int activitieshash(int gindices[], uint64_t genes[], int popln[], int activities[], int col) {  /* count activities of all currently active species */
+int activitieshash() {  /* count activities of all currently active species */
     int i, j, ij, ij1, x, nspecies, nspeciesnow;
+    int *gindices,*popln,*activities;
+    uint64_t *genes;
     const int maxact = 10000;
     // int ymax1;
     uint64_t gene;
@@ -2143,35 +2137,31 @@ int activitieshash(int gindices[], uint64_t genes[], int popln[], int activities
     genotypes = hashtable_keys(&genetable);
     geneitems = (genedata*) hashtable_items( &genetable );
 
-    if(gindices != NULL && col) free(gindices);
+    // if(gindices != NULL && col) free(gindices);
     for (i=0,nspeciesnow=0; i<nspecies; i++)
         if(geneitems[i].popcount) nspeciesnow++;
-    if (col) gindices = (int *) malloc(nspeciesnow*sizeof(int));
-    else if (nspeciesnow>10000) return(-1);                        // exit with error need to allocate more space in python
+    gindices = (int *) malloc(nspeciesnow*sizeof(int));
+
     for (i=j=0; i<nspecies; i++) {
         if(geneitems[i].popcount) {
             gindices[j]=i;                                         // if col is 0 then the array gindices must be passed with sufficient length
             j++;
         }
     }
-    if (nspeciesnow > maxact || !col) {                             //sort with in order of decreasing population
+    if (nspeciesnow > maxact) {                             //sort with in order of decreasing population
         qsort(gindices, nspeciesnow, sizeof(int), cmpfunc3);        // sort in decreasing count order
     }
     if (nspeciesnow > maxact) nspeciesnow = maxact;
 
-    if (col) {
-        genes = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
-        popln = (int *) malloc(nspeciesnow*sizeof(int));
-        activities = (int *) malloc(nspeciesnow*sizeof(int));
-    }
+    genes = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
+    popln = (int *) malloc(nspeciesnow*sizeof(int));
+    activities = (int *) malloc(nspeciesnow*sizeof(int));
 
     for (i=0; i<nspeciesnow; i++) {
         genes[i]=genotypes[gindices[i]];
         popln[i]=geneitems[gindices[i]].popcount;
         activities[i]=geneitems[gindices[i]].activity;
     }
-    
-    if(!col) return(nspeciesnow);                                   // exit here unless doing display
     
     if (totdisp>=N) {                                               // 1 pixel to left scroll when full
         for(ij=0;ij<N2;ij++) {
@@ -2197,15 +2187,54 @@ int activitieshash(int gindices[], uint64_t genes[], int popln[], int activities
         //else
         //     fprintf(stderr,"activity out of range\n");
     }
+
+    free(gindices);free(activities);free(genes);free(popln);
     return(nspeciesnow);
 }
 #else
-int activitieshash(int gindices[], uint64_t genes[], int popln[], int activities[]) {return(0)}  /* dummy routine, no effect */
+int activitieshash() {return(0)}  /* dummy routine, no effect */
+#endif
+
+#ifdef HASH
+int activitieshashx(int gindices[], uint64_t genes[], int popln[], int activities[]) {  /* count activities of all currently active species */
+    int i, j, nspecies, nspeciesnow;
+    const int maxact = 10000;
+    
+    nspecies = hashtable_count(&genetable);
+    genotypes = hashtable_keys(&genetable);
+    geneitems = (genedata*) hashtable_items( &genetable );
+
+    // if(gindices != NULL && col) free(gindices);
+    for (i=0,nspeciesnow=0; i<nspecies; i++)
+        if(geneitems[i].popcount) nspeciesnow++;
+
+    if (nspeciesnow>10000) return(-1);                             // exit with error need to allocate more space in python
+    for (i=j=0; i<nspecies; i++) {
+        if(geneitems[i].popcount) {
+            gindices[j]=i;                                         // if col is 0 then the array gindices must be passed with sufficient length
+            j++;
+        }
+    }
+    qsort(gindices, nspeciesnow, sizeof(int), cmpfunc3);        // sort in decreasing count order
+
+    if (nspeciesnow > maxact) nspeciesnow = maxact;
+
+    for (i=0; i<nspeciesnow; i++) {
+        genes[i]=genotypes[gindices[i]];
+        popln[i]=geneitems[gindices[i]].popcount;
+        activities[i]=geneitems[gindices[i]].activity;
+    }
+    
+    return(nspeciesnow);                                   // exit here unless doing display
+
+}
+#else
+int activitieshashx(int gindices[], uint64_t genes[], int popln[], int activities[]) {return(-1)}  /* dummy routine, no effect */
 #endif
 
 int get_sorted_popln_act( int gindices[], uint64_t genes[], int popln[], int activities[]) {
     int nspecies;
-    nspecies=activitieshash(gindices, genes, popln, activities, 0);        // sets acttrace and returns current population arrays
+    nspecies=activitieshashx(gindices, genes, popln, activities);        // sets acttrace and returns current population arrays
     return(nspecies);
 }
 
@@ -2230,16 +2259,18 @@ int cmpfunc5 (const void * pa, const void * pb)                 // sort accordin
 }
 
 
-int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[], int birthsteps[]) {  /* genealogies of all currently active species */
+int genealogies() {  /* genealogies of all currently active species */
     int j, jmax, i, ij, nspecies, nspeciesnow, birthstep, *gorder;
     int j1, j2, j3, activity;
     uint64_t gene, ancgene, nextgene, *genealogytrace1;
+    int *gindices,*popln,*activities,*birthsteps;
+    uint64_t *genes;
+
     
     nspecies = hashtable_count(&genetable);
     genotypes = hashtable_keys(&genetable);
     geneitems = (genedata*) hashtable_items( &genetable );
 
-    if(gindices != NULL) free(gindices);
     gindices = (int *) malloc(nspecies*sizeof(int));
     for (i=nspeciesnow=0; i<nspecies; i++)
         if(geneitems[i].popcount) nspeciesnow++;
@@ -2362,6 +2393,7 @@ int genealogies(int gindices[], uint64_t genes[], int popln[], int activities[],
       }
     }
     free(gorder);free(genealogytrace1);
+    free(gindices);free(activities);free(genes);free(popln);free(birthsteps);
 
     return(jmax);
 }
