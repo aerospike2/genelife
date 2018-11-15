@@ -45,6 +45,7 @@ int inittype = 0;                   // 0 input from random field of random or st
                                     // value i>1: initialized to random field on central ixi block only, outside this zero.
 int colorfunction = 0;              // color function choice of 0: hash or 1: functional (color classes depends on selection parameter)
                                     // 2: as in 1 but color sites where last step was non GoL rule yellow, 3: as in 2 but yellow if state produced by non GoL
+                                    // 4: activities 5: genealogies without time 6: genealogies with time 7: genealogies with time and activity 8: gliders
 #define ASCII_ESC 27                /* escape for printing terminal commands, such as cursor repositioning : only used in non-graphic version */
 //-----------------------------------------masks for named repscheme bits--------------------------------------------------------------------------------
 #define R_0_2sel_3live    0x1       /* 1: employ selection on two least different live neighbours for ancestor with 3 live neighbours */
@@ -123,7 +124,7 @@ int ymax = 1000;                    // activity scale max for plotting : will be
 double log2ymax = 25.0;             // activity scale max 2^25 = 33.5 * 10^6
 int activitymax;                    // max of activity in genealogical record of current population
 uint64_t genealogytrace[N2];        // image trace of genealogies for N most frequently populated genes
-uint64_t genealogywork[N2];         // working space array for calculating genealogies
+uint64_t working[N2];               // working space array for calculating genealogies and doing neighbour bit packing
 //------------------------------------------------ planes and configuration offsets----------------------------------------------------------------------
 int Noff = 9;                       // number of offsets
 int **offsets;                      // array of offsets (2D + time) for planes
@@ -234,7 +235,8 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
 //------------------------------------------------------- colorgenes -------------------------------------------------------------------------------------
 void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2) {
     uint64_t gene, gdiff, g2c, mask;
-    int ij,d,d2,activity,popcount;
+    int ij,d,d2,k,activity,popcount;
+    unsigned int d1;
     unsigned int color[3],colormax;
     double rescalecolor;
     static int numones[16]={0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4};
@@ -380,6 +382,26 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 }
             }
             cgolg[ij]=(int) mask;
+        }
+    }
+    else if(colorfunction==8) {         // colorfunction based on packed bit pattern with multiplicative hash, compare with offset
+        for (ij=0; ij<NN2; ij++) {
+                gene = golmix[ij];
+                // POPCOUNT64C(gene,d);                    // assigns number of ones in gene to d. These 3 lines version for one offset comparison
+                // d=(d==64)?0:63-d;
+                // mask = (d==63) ? 0xffffffff : ((((d&3)<<22)+(((d>>2)&3)<<14)+(((d>>4)&3)<<6))<<8) + 0xff;
+                for (mask=0,k=0;k<8;k++) {
+                   d1 = (gene>>(k<<3))&0xff;
+                   d1 = (d1 > 63) ? 0 : (63-d1);
+                   d1 = (d1 < 48) ? 0 : d1-48;                 // 0 to 15 : perfect match is 15  (4 bits)
+                   d1 = (d1==0xf) ? 0x1f : d1;                 // perfect match separated to value 31 (5 bits) for better contrast
+                   if(k<3) mask+=d1<<(3+(k<<3));                // perfect match has full intensity colour
+                   else if (k==3 && d1==0x1f) mask = (d1<<3)+(d1<<11)+(d1<<19); // the fourth channel has white colour : no others shown
+                   else if (k<7 && d1==0x1f) mask+= (d1<<(3+((k-4)<<3)))+(d1<<(3+((k<6?k-3:0)<<3))); // mixed colours for NE SE SW
+                   else if(d1==0x1f) mask+= (d1<<3)+(d1<<10)+(d1<<18); // mixed colour for NW
+                }
+                mask = (mask<<8)+0xff;
+                cgolg[ij] = (int) mask;
         }
     }
 }
@@ -733,8 +755,9 @@ extern inline void hashgeneactivity(uint64_t gene,char errorformat[]) {
 }
 
 //------------------------------------------------------- pack012,3neighbors -------------------------------------------------------------------------------
-extern inline void pack012neighbors(uint64_t gol[],uint64_t golp[]) {              // routine to pack all up to 2nd neighbours in single word
 #define deltaxy(ij,x,y)  (ij - (ij&Nmask) + ((ij+(x)&Nmask) + (y)*N)) & N2mask
+
+extern inline void pack012neighbors(uint64_t gol[],uint64_t golp[]) {              // routine to pack all up to 2nd neighbours in single word
     unsigned int ij,k;
     uint64_t gs;
     int nbx[24] = {-1,0,1,1,1,0,-1,-1,-2,-1,0,1,2,2,2,2,2,1,0,-1,-2,-2,-2,-2};
@@ -751,7 +774,6 @@ extern inline void pack012neighbors(uint64_t gol[],uint64_t golp[]) {           
 }
 
 extern inline void pack0123neighbors(uint64_t gol[],uint64_t golp[]) {              // routine to pack all up to 3rd neighbours in single word
-#define deltaxy(ij,x,y)  (ij - (ij&Nmask) + ((ij+(x)&Nmask) + (y)*N)) & N2mask
     unsigned int ij,k;
     uint64_t gs;
     int nbx[48] = {-1,0,1,1,1,0,-1,-1,-2,-1,0,1,2,2,2,2,2,1,0,-1,-2,-2,-2,-2,-3,-2,-1,0,1,2,3,3,3,3,3,3,3,2,1,0,-1,-2,-3,-3,-3,-3,-3,-3};
@@ -767,9 +789,50 @@ extern inline void pack0123neighbors(uint64_t gol[],uint64_t golp[]) {          
     }
 }
 
+extern inline void pack49neighbors(uint64_t gol[],uint64_t golp[]) {              // routine to pack all up to 3rd neighbours in single word
+    unsigned int ij,k;
+    int nbx[6] = {1,0,2,0,-4,-4};
+    int nby[6] = {0,1,0,2,0,-4};
+
+    for (ij=0;ij<N2;ij++) golp[ij] = gol[ij];                                     // copy 1 bit gol to golp
+    for(k=0;k<6;k++)                                                              // hierarchical bit copy and swap
+        for (ij=0;ij<N2;ij++)
+             golp[ij] |= gol[deltaxy(ij,nbx[k],nby[k])]<<(1<<k);                  // 8x8 packed arrays
+    for (ij=0;ij<N2;ij++) golp[ij] = golp[ij]&0xfac8ffccfafaffffull;              // masks out 15 values in top row and left column to give 7x7 neighbourhoods
+                                                                                  // mask removes bit numbers 16,18,24,26,32,33,36,37,48,49,50,52,53,56,58
+}
+
+extern inline void compare_neighbors(uint64_t a[],uint64_t b[], int dx, int dy) {  // routine to compare packed pack neighbours with shift, result in a
+   unsigned int ij;
+    uint64_t bij;
+    
+    for (ij=0;ij<N2;ij++) {
+        bij=b[deltaxy(ij,dx,dy)];
+        a[ij] = (a[ij]|bij) ? a[ij]^bij : rootgene;
+    }
+}
+
+extern inline void compare_all_neighbors(uint64_t a[],uint64_t b[]) {  // routine to compare packed pack neighbours with shift, result in a
+    unsigned int ij;
+    unsigned int d;
+    int k;
+    uint64_t aij,bijk;
+    int nbx[8] = {0,1,0,-1,1,1,-1,-1};   // N E S W NE SE SW NW
+    int nby[8] = {-1,0,1,0,-1,1,1,-1};
+    
+    for (ij=0;ij<N2;ij++) {
+        aij = a[ij];
+        for (a[ij]=0ull,k=0;k<8;k++) {
+            bijk=b[deltaxy(ij,nbx[k],nby[k])];
+            POPCOUNT64C((aij^bijk),d);
+            d = (aij&&bijk) ? d : 0xff;
+            a[ij]|=((uint64_t) d)<<(k<<3);
+        }
+    }
+}
+
 //------------------------------------------------------- update_gol64 -----------------------------------------------------------------------------------
 void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]) {  // routine for 64x-gol packed update, no plane coupling
-#define deltaxy(ij,x,y)  (ij - (ij&Nmask) + ((ij+(x)&Nmask) + (y)*N)) & N2mask
     unsigned int ij,k;
     uint64_t gs,newgs,sums00,sums10,sums01,sums11,sums02,sums12,sums16[4];
     uint64_t s,su,sg3,s3,s2or3,sgol;
@@ -829,7 +892,6 @@ void update_gol2(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t new
 // both gol planes are coded as two bottom bits in the gol[i,j] array
 // coupling between the two planes occurs through complementary (1<->0) exact matching of the local Moore neighborhoods (8-sites)
 // survival and/or birth rules are negated (opposite outcome) when coupling is established
-#define deltaxy(ij,x,y)  (ij - (ij&Nmask) + ((ij+(x)&Nmask) + (y)*N)) & N2mask
     unsigned int ij,ij1,k,kch,nmut;
     uint64_t s0,s1,s0_2or3,s1_2or3,nbmask0,nbmask1,ancestor,newgene;
     uint64_t golmix,gol0,gol1,newgol1;
@@ -904,7 +966,6 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
 // gol states looked up for neighbors are the OR of the current plane gol value with gol values on planes specified by the gene
 // optionally genes also specify a unique copy plane for a gene: it can only be copied by a rule active on this plane
 // in this optional case, copy plane could be lowest non zero bit in gene at pos m for which m%4 == 1 (if none then gene is not copied)
-#define deltaxy(ij,x,y)  (ij - (ij&Nmask) + ((ij+(x)&Nmask) + (y)*N)) & N2mask
     unsigned int ij,ij1,k,kmin,p,p1,nmut,debcnt,mask,np,npmask;
     uint64_t s,sm,sm3,s3sm3,su,s3,sg3,s2or3,nbmask,nbmaskr,nbmaskrm,ancestor,newgene,golsh,pmask;
     uint64_t *golm;
@@ -1478,6 +1539,11 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
+    
+    pack49neighbors(gol,golmix);
+    pack49neighbors(newgol,working);
+    // compare_neighbors(golmix,working,0,-1);                              // compare with a single direction (north) for gliders
+    compare_all_neighbors(golmix,working);                                  // compare all 8 directions N E S W NE SE SW NW
 }
 
 //------------------------------------------------------- stats routines -----------------------------------------------------------------------------------
@@ -1934,7 +2000,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
 
 //------------------------------------------------------- set ...---------------------------------------------------------------------------
 void set_colorfunction(int colorfunctionval) {
-    if(colorfunction>7) fprintf(stderr,"error colorfunction value passed %d too large\n",colorfunctionval);
+    if(colorfunction>8) fprintf(stderr,"error colorfunction value passed %d too large\n",colorfunctionval);
     else     colorfunction = colorfunctionval;
 }
 
@@ -2276,7 +2342,7 @@ int cmpfunc5 (const void * pa, const void * pb)                 // sort accordin
    i1=*(int*)pa; i2=*(int*)pb;
    for (j=0;j<genealogydepth;j++) {
         ij1 = i1+j*N; ij2 = i2+j*N;
-        gene1=genealogywork[ij1]; gene2=genealogywork[ij2];
+        gene1=working[ij1]; gene2=working[ij2];
         if(gene1!=gene2) return((((gene1 > gene2) && (gene1!=rootgene)) || (gene2==rootgene)) ? 1 : -1);
     }
     return(0);
@@ -2323,7 +2389,7 @@ int genealogies() {  /* genealogies of all currently active species */
         birthsteps[i]=geneitems[gindices[i]].firstbirthframe;
     }
     
-    for(ij=0;ij<N2;ij++) genealogywork[ij]=rootgene;              // set field to rootgene black
+    for(ij=0;ij<N2;ij++) working[ij]=rootgene;              // set field to rootgene black
     ancgene=rootgene;                                             // never really used, but included to avoid unitialized warning
     birthstep=0;
     activitymax=0;
@@ -2356,7 +2422,7 @@ int genealogies() {  /* genealogies of all currently active species */
             }
             if (gene == rootgene) break;                            // reached root, exit j loop
             ij = i+j*N;
-            genealogywork[ij]=gene;
+            working[ij]=gene;
         }
         if (j>jmax) jmax=j;
     }
@@ -2365,12 +2431,12 @@ int genealogies() {  /* genealogies of all currently active species */
                                                                     //reverse ancestries to allow comparison at same number of speciations
     for (i=0; i<nspeciesnow; i++) {
         for(j=0;j<N;j++) {
-            if (genealogywork[i+j*N]==rootgene) break;
+            if (working[i+j*N]==rootgene) break;
         }
         for(j1=0;j1<(j>>1);j1++) {
-            gene=genealogywork[i+(j-j1-1)*N];
-            genealogywork[i+(j-j1-1)*N]=genealogywork[i+j1*N];
-            genealogywork[i+j1*N]=gene;
+            gene=working[i+(j-j1-1)*N];
+            working[i+(j-j1-1)*N]=working[i+j1*N];
+            working[i+j1*N]=gene;
         }
     }
     for (i=0; i<N; i++) gorder[i]=i;
@@ -2381,15 +2447,15 @@ int genealogies() {  /* genealogies of all currently active species */
     //for(ij=0;ij<N*jmax;ij++) genealogytrace1[ij]=genealogytrace[ij];// copy active portion of genealogytrace to new array genealogytrace1
     for(ij=0;ij<N2;ij++) genealogytrace[ij]=rootgene;               // initialize genealogytrace to root gene before drawing part of it
 
-    if(colorfunction>=6) {                                          // time trace of genealogies
+    if((colorfunction==6)||(colorfunction==7)) {                                          // time trace of genealogies
       for(i=0;i<nspeciesnow;i++) {
         for(j=0,j1=0;j<jmax;j++) {
             if(gorder[i]>=nspeciesnow) fprintf(stderr,"error in genealogies gorder at i=%d, order value %d out of range\n",i,gorder[i]);
             ij = gorder[i]+j*N;
-            gene = genealogywork[ij];
+            gene = working[ij];
             ij+=N;
             if(ij<N2) {
-                nextgene = genealogywork[ij];
+                nextgene = working[ij];
                 if(nextgene==rootgene) birthstep=totsteps;
                 else {
                     if((genedataptr = (genedata *) hashtable_find(&genetable, nextgene)) != NULL) birthstep = genedataptr->firstbirthframe;
@@ -2411,7 +2477,7 @@ int genealogies() {  /* genealogies of all currently active species */
       for(i=0;i<nspeciesnow;i++) {
         for(j=0;j<jmax;j++) {
             ij=i+j*N;
-            genealogytrace[ij]=genealogywork[gorder[i]+j*N];
+            genealogytrace[ij]=working[gorder[i]+j*N];
         }
       }
     }
