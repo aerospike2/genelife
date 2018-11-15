@@ -65,6 +65,8 @@ libcd.setget_act_ymax.restype = c_int
 libcd.setget_act_ymax.argtypes = [c_int]
 libcd.set_selectedgene.restype = None
 libcd.set_selectedgene.argtypes = [c_uint64]
+libcd.set_offsets.restype = None
+libcd.set_offsets.argtypes = [c_int,c_int,c_int]
 
 def genelife_update(nsteps, nhist, nstat):
     return libcd.genelife_update(nsteps, nhist, nstat)
@@ -134,3 +136,6 @@ def setget_act_ymax(ymax):
     
 def set_selectedgene(gene):
     return libcd.set_selectedgene(gene)
+
+def set_offsets(dx,dy,dt):
+    return libcd.set_offsets(dx,dy,dt);

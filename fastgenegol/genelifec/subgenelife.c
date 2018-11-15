@@ -126,6 +126,7 @@ int activitymax;                    // max of activity in genealogical record of
 uint64_t genealogytrace[N2];        // image trace of genealogies for N most frequently populated genes
 uint64_t working[N2];               // working space array for calculating genealogies and doing neighbour bit packing
 //------------------------------------------------ planes and configuration offsets----------------------------------------------------------------------
+int offdx=0,offdy=0,offdt=0;        // display chosen offsets for glider analysis with colorfunction 8
 int Noff = 9;                       // number of offsets
 int **offsets;                      // array of offsets (2D + time) for planes
 int *histo;
@@ -214,6 +215,7 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
 // set_colorfunction    set color function integer from GUI for use in patterning and coloring display
 // setget_act_ymax      set activity ymax for scaling of activity plot
 // set_selectedgene     set selected gene for highlighting from current mouse selection in graphics window
+// set_offsets          set offsets for detection of glider structures in display for color function 8
 // get_curgol           get current gol array from python
 // get_curgolg          get current golg array from python
 // get_acttrace         get current acttrace array from python
@@ -387,20 +389,25 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
     else if(colorfunction==8) {         // colorfunction based on packed bit pattern with multiplicative hash, compare with offset
         for (ij=0; ij<NN2; ij++) {
                 gene = golmix[ij];
-                // POPCOUNT64C(gene,d);                    // assigns number of ones in gene to d. These 3 lines version for one offset comparison
-                // d=(d==64)?0:63-d;
-                // mask = (d==63) ? 0xffffffff : ((((d&3)<<22)+(((d>>2)&3)<<14)+(((d>>4)&3)<<6))<<8) + 0xff;
-                for (mask=0,k=0;k<8;k++) {
-                   d1 = (gene>>(k<<3))&0xff;
-                   d1 = (d1 > 63) ? 0 : (63-d1);
-                   d1 = (d1 < 48) ? 0 : d1-48;                 // 0 to 15 : perfect match is 15  (4 bits)
-                   d1 = (d1==0xf) ? 0x1f : d1;                 // perfect match separated to value 31 (5 bits) for better contrast
-                   if(k<3) mask+=d1<<(3+(k<<3));                // perfect match has full intensity colour
-                   else if (k==3 && d1==0x1f) mask = (d1<<3)+(d1<<11)+(d1<<19); // the fourth channel has white colour : no others shown
-                   else if (k<7 && d1==0x1f) mask+= (d1<<(3+((k-4)<<3)))+(d1<<(3+((k<6?k-3:0)<<3))); // mixed colours for NE SE SW
-                   else if(d1==0x1f) mask+= (d1<<3)+(d1<<10)+(d1<<18); // mixed colour for NW
+                if(offdx==0 && offdy==0 && offdt==0) {
+                    for (mask=0,k=0;k<8;k++) {
+                        d1 = (gene>>(k<<3))&0xff;
+                        d1 = (d1 > 63) ? 0 : (63-d1);
+                        d1 = (d1 < 48) ? 0 : d1-48;                 // 0 to 15 : perfect match is 15  (4 bits)
+                        d1 = (d1==0xf) ? 0x1f : d1;                 // perfect match separated to value 31 (5 bits) for better contrast
+                        if(k<3) mask+=d1<<(3+(k<<3));                // perfect match has full intensity colour
+                        else if (k==3 && d1==0x1f) mask = (d1<<3)+(d1<<11)+(d1<<19); // the fourth channel has white colour : no others shown
+                        else if (k<7 && d1==0x1f) mask+= (d1<<(3+((k-4)<<3)))+(d1<<(3+((k<6?k-3:0)<<3))); // mixed colours for NE SE SW
+                        else if(d1==0x1f) mask+= (d1<<3)+(d1<<10)+(d1<<18); // mixed colour for NW
+                    }
+                    mask = (mask<<8)+0xff;
                 }
-                mask = (mask<<8)+0xff;
+                else {
+                   POPCOUNT64C(gene,d);                    // assigns number of ones in gene to d. These 3 lines version for one offset comparison
+                    d=(d==64)?0:63-d;
+                    mask = (d==63) ? 0xffffffff : ((((d&3)<<22)+(((d>>2)&3)<<14)+(((d>>4)&3)<<6))<<8) + 0xff;
+                }
+
                 cgolg[ij] = (int) mask;
         }
     }
@@ -1539,11 +1546,12 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    
-    pack49neighbors(gol,golmix);
-    pack49neighbors(newgol,working);
-    // compare_neighbors(golmix,working,0,-1);                              // compare with a single direction (north) for gliders
-    compare_all_neighbors(golmix,working);                                  // compare all 8 directions N E S W NE SE SW NW
+    if (colorfunction==8) {
+        pack49neighbors(gol,golmix);
+        pack49neighbors(newgol,working);
+        if(offdx==0 && offdy==0 && offdt==0) compare_all_neighbors(golmix,working);  // compare all 8 directions N E S W NE SE SW NW
+        else compare_neighbors(golmix,working,offdx,offdy);                 // compare with a single direction (north) for gliders
+    }
 }
 
 //------------------------------------------------------- stats routines -----------------------------------------------------------------------------------
@@ -2014,6 +2022,12 @@ int setget_act_ymax(int actymax) {                  // sets ymax for activities 
 void set_selectedgene(uint64_t gene) {
     selectedgene=gene;
     fprintf(stderr,"selected gene set to %llx\n",selectedgene);
+}
+
+void set_offsets(int dx,int dy,int dt) {
+    offdx =dx;
+    offdy = dy;
+    offdt = dt;
 }
 //------------------------------------------------------- get ... ---------------------------------------------------------------------------
 void get_curgol(uint64_t outgol[], int NN){
