@@ -108,7 +108,7 @@ int genealogydepth = 0;             // depth of genealogies in current populatio
 //---------------------------------------------------------main arrays in simulation---------------------------------------------------------------------
 uint64_t *gol, *golg;               // pointers to gol and golg arrays at one of the plane cycle locations
 uint64_t *golgstats, *newgolgstats; // pointers to 64 bit masks for different events during processing at one of the plane cycle locations
-uint64_t golmix[N2];                // array for calculating coupling of genes between planes for multiplane genelife
+uint64_t golmix[N2];                // array for calculating coupling of genes between planes for multiplane genelife, or for packing configs
 uint64_t gene0;                     // uncoupled planes background gene, non zero for selection==10
 uint64_t selectedgene;              // gene currently selected interactively in graphics window
 //------------------------------------------------ arrays for time tracing -----------------------------------------------------------------------------
@@ -121,7 +121,8 @@ int *configstats = NULL;            // dynamic array pointer for statistics of g
 uint64_t acttrace[N2];              // scrolled trace of last N time points of activity gene trace
 int ymax = 1000;                    // activity scale max for plotting : will be adjusted dynamically or by keys
 int activitymax;                    // max of activity in genealogical record of current population
-uint64_t genealogytrace[N2];        // scrolled trace of genealogies
+uint64_t genealogytrace[N2];        // image trace of genealogies for N most frequently populated genes
+uint64_t genealogywork[N2];         // working space array for calculating genealogies
 //------------------------------------------------ planes and configuration offsets----------------------------------------------------------------------
 int Noff = 9;                       // number of offsets
 int **offsets;                      // array of offsets (2D + time) for planes
@@ -673,6 +674,9 @@ extern inline void hashaddgene(uint64_t gene,uint64_t ancestor) {
             gdata.firstancestor = ancestor;
             hashtable_insert(&genetable, gene,(genedata *) &gdata);
         }
+        if(ancestor != rootgene)
+            if((genedataptr = (genedata *) hashtable_find(&genetable, ancestor)) == NULL)
+                fprintf(stderr,"error in hashaddgene, the ancestor %llx of gene %llx to be stored is not stored\n",ancestor,gene);
 #endif
 }
 
@@ -695,6 +699,9 @@ extern inline void hashreplacegene(uint64_t gene1,uint64_t gene2,uint64_t ancest
             gdata.firstancestor = ancestor;
             hashtable_insert(&genetable, gene2,(genedata *) &gdata);
         }
+        if(ancestor != rootgene)
+            if((genedataptr = (genedata *) hashtable_find(&genetable, ancestor)) == NULL)
+                fprintf(stderr,"error in hashreplacegene, the ancestor %llx of gene %llx to be stored is not stored\n",ancestor,gene2);
 #endif
 }
 
@@ -717,23 +724,37 @@ extern inline void hashgeneactivity(uint64_t gene,char errorformat[]) {
 #endif
 }
 
-//------------------------------------------------------- pack2neighbors ----------------------------------------------------------------------------------
-void pack2neighbors(uint64_t gol[], uint64_t golp[]) {              // routine for future use of all 2nd neighbours
+//------------------------------------------------------- pack012,3neighbors -------------------------------------------------------------------------------
+extern inline void pack012neighbors(uint64_t gol[],uint64_t golp[]) {              // routine to pack all up to 2nd neighbours in single word
 #define deltaxy(ij,x,y)  (ij - (ij&Nmask) + ((ij+(x)&Nmask) + (y)*N)) & N2mask
-    unsigned int ij,k,s;
+    unsigned int ij,k;
     uint64_t gs;
-    //int nb1x[8] = {-1,0,1,1,1,0,-1,-1};
-    //int nb1y[8] = {-1,-1,-1,0,1,1,1,0};
-    int nb2x[16] = {-2,-1,0,1,2,2,2,2,2,1,0,-1,-2,-2,-2,-2};
-    int nb2y[16] = {-2,-2,-2,-2,-2,-1,0,1,2,2,2,2,2,1,0,-1};
+    int nbx[24] = {-1,0,1,1,1,0,-1,-1,-2,-1,0,1,2,2,2,2,2,1,0,-1,-2,-2,-2,-2};
+    int nby[24] = {-1,-1,-1,0,1,1,1,0,-2,-2,-2,-2,-2,-1,0,1,2,2,2,2,2,1,0,-1};
 
-    for (ij=0;ij<N2;ij++) golp[ij] = 0ull;
+    for (ij=0;ij<N2;ij++)  golp[ij] = gol[ij];       // copy 1 bit gol to golp
+    
+    for (ij=0;ij<N2;ij++) {                          // copy up to 2nd neighbours to golp in upper 32-bit word
+        for(k=0,gs=0ull;k<24;k++) {
+            gs=gol[deltaxy(ij,nbx[k],nby[k])];
+            golp[ij] |= gs<<(k+32);
+        }
+    }
+}
+
+extern inline void pack0123neighbors(uint64_t gol[],uint64_t golp[]) {              // routine to pack all up to 3rd neighbours in single word
+#define deltaxy(ij,x,y)  (ij - (ij&Nmask) + ((ij+(x)&Nmask) + (y)*N)) & N2mask
+    unsigned int ij,k;
+    uint64_t gs;
+    int nbx[48] = {-1,0,1,1,1,0,-1,-1,-2,-1,0,1,2,2,2,2,2,1,0,-1,-2,-2,-2,-2,-3,-2,-1,0,1,2,3,3,3,3,3,3,3,2,1,0,-1,-2,-3,-3,-3,-3,-3,-3};
+    int nby[48] = {-1,-1,-1,0,1,1,1,0,-2,-2,-2,-2,-2,-1,0,1,2,2,2,2,2,1,0,-1,-3,-3,-3,-3,-3,-3,-3,-2,-1,0,1,2,3,3,3,3,3,3,3,2,1,0,-1,-2};
+
+    for (ij=0;ij<N2;ij++) golp[ij] = gol[ij];       // copy 1 bit gol to golp
+    
     for (ij=0;ij<N2;ij++) {
-        for(k=s=0;k<16;k++) {
-            gs=gol[deltaxy(ij,nb2x[k],nb2y[k])];
-            // golp[ij] |= gs<<(k+1);
-            golmix[ij] |= (k*gs) << (s<<2);
-            s+=gs;
+        for(k=0,gs=0ull;k<48;k++) {
+            gs=gol[deltaxy(ij,nbx[k],nby[k])];
+            golp[ij] |= gs<<(k+8);                  // copy up to 2nd neighbours to golp in upper 7 bytes of word
         }
     }
 }
@@ -752,7 +773,6 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
     const uint64_t ra= 0xaaaaaaaaaaaaaaaa;
     const uint64_t rc= 0xcccccccccccccccc;
     
-    totsteps++;
     if(!(totsteps%10)) fprintf(stderr,"iteration step %d\r",totsteps);
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
         sums00 = sums10 = sums01 = sums11 = sums02 = sums12 = 0ull;
@@ -809,10 +829,6 @@ void update_gol2(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t new
     int nb[8],crot;
     int nb1x[8] = {-1,0,1,1,1,0,-1,-1};
     int nb1y[8] = {-1,-1,-1,0,1,1,1,0};
-
-
-    totsteps++;
-    if(!(totsteps%10)) fprintf(stderr,"iteration step %d\r",totsteps);
     
     for (ij=0; ij<N2; ij++) {                                                   // loop over all sites of 2D torus with side length N
         for(k=0,s0=s1=nbmask0=nbmask1=0ull;k<8;k++) {                           // compute no of live neighbours using golmix (coupled plane neighbours)
@@ -891,8 +907,6 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
     int npmasks[17] = {1,1,3,3,7,7,7,7,0xf,0xf,0xf,0xf,0xf,0xf,0xf,0xf,0xf};
     const uint64_t r1= 0x1111111111111111;
     const uint64_t rc= 0xcccccccccccccccc;
-
-    totsteps++;
     
     np = (repscheme && repscheme<=16) ? repscheme : 16;                      // number of planes used, 16 if 0
     npmask = npmasks[np-1];                                                 // mask for other plane index
@@ -1038,7 +1052,6 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
     uint64_t newgene, ancestor, livegenes[8];
     uint64_t  birth, statflag, ncodingmask, allcoding;
     
-    totsteps++;
     survivemask=survivalmask&0xff;                                          // 8 bits of repscheme 0-7 used to limit space of rules for survival
     birthmask=(survivalmask>>8)&0xff;                                       // 8 bits of repscheme 8-15 used to limit space of rules for birth
     ncodingmask = (1ull<<ncoding)-1ull;                                     // mask for number of bits coding for each lut rule: <=4 for birth and survival case
@@ -1112,7 +1125,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
             hashaddgene(newgene,ancestor);
         }
         if(gol[ij]) statflag |= F_golstate;                                 // this is the last gol state, not the new state
-        golgstats[ij] = statflag;
+        newgolgstats[ij] = statflag;
     }  // end for ij
 
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
@@ -1142,10 +1155,8 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
     uint64_t newgene, ancestor;
     uint64_t statflag;
     
-    totsteps++;
     birthsurvivemask=(((uint64_t) overwritemask)<<32);                      // 32 bits of overwritemask used to limit space of rules for birth
     birthsurvivemask|=(uint64_t) survivalmask;                              // 32 bits of survival used to limit space of rules for survival
-    if(birthsurvivemask!=~0ull) fprintf(stderr,"error in birthsurvivemask not all on %llx\n",birthsurvivemask);
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
         gene = golg[ij];
         i = ij & Nmask;  j = ij >> log2N;                                   // row & column
@@ -1248,7 +1259,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
             hashaddgene(newgene,ancestor);
         }
         if(gol[ij]) statflag |= F_golstate;                                 // this is the last gol state, not the new state
-        golgstats[ij] = statflag;
+        newgolgstats[ij] = statflag;
     }  // end for ij
 
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
@@ -1270,8 +1281,6 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
     uint64_t newgene, ancestor, livegenes[3];
     uint64_t s2or3, birth, statflag, nextgolstate;
 
-    totsteps++;
-    if(!(totsteps%10)) fprintf(stderr,"iteration step %d\r",totsteps);
     rulemod1= rulemod & 0x1ull;                                             // allow GoL rule modification
     rulemod2= (rulemod & 0x2)>>1;                                           // allow GoL rule modification masking
     checkmasks = rulemod2 && (repscheme & R_6_checkmasks);                  // enable genetic masking of neighbours
@@ -1595,7 +1604,7 @@ void genelife_update (int nsteps, int nhist, int nstat) {
     int t;
     uint64_t *newgol, *newgolg;
     int nspecies,ngenealogydeep;
-    int activitieshash(int col);                                              // count activities of all currently active species
+    int activitieshash(void);                                              // count activities of all currently active species
     int genealogies(void);                                                    // genealogies of all currently active species
     
     nhistG = nhist;
@@ -1605,6 +1614,9 @@ void genelife_update (int nsteps, int nhist, int nstat) {
         newgolg = planesg[newPlane];
         newgolgstats = planesgs[newPlane];
 
+        totsteps++;
+        if(!(totsteps%10)) fprintf(stderr,"iteration step %d\r",totsteps);
+        
         if (selection<8)        update(gol,golg,newgol,newgolg);              // calculate next iteration with selection
         else if (selection==8)  update_lut_sum(gol,golg,newgol,newgolg);      // calculate next iteration for lut sum version
         else if (selection==9)  update_lut_canon_rot(gol,golg,newgol,newgolg);// calculate next iteration for lut canonical rotation version
@@ -1616,17 +1628,17 @@ void genelife_update (int nsteps, int nhist, int nstat) {
         if(nhist && (totsteps%nhist == 0)) countconfigs();                    // count configurations
         if(nstat && (totsteps%nstat == 0)) tracestats(gol,golg,golgstats,N2); // time trace point
 
-        nspecies=activitieshash(1);                                           // colors acttrace and returns current population arrays
-        if(nspecies<0) fprintf(stderr,"error returned from activitieshash\n");
-
-        ngenealogydeep=genealogies();                                         // colors genealogytrace
-        if(ngenealogydeep<0) fprintf(stderr,"error returned from genealogies\n");
-
         curPlane = (curPlane +1) % numPlane;                                  // update plane pointers to next cyclic position
         newPlane = (newPlane +1) % numPlane;
         gol = planes[curPlane];                                               // get planes of gol,golg data
         golg = planesg[curPlane];
         golgstats = planesgs[curPlane];
+
+        nspecies=activitieshash();                                           // colors acttrace and returns current population arrays
+        if(nspecies<0) fprintf(stderr,"error returned from activitieshash\n");
+        ngenealogydeep=genealogies();                                         // colors genealogytrace
+        if(ngenealogydeep<0) fprintf(stderr,"error returned from genealogies\n");
+        
         totdisp++;                                                            // currently every step is counted for display in activities
     }
 }
@@ -1638,7 +1650,7 @@ void initialize_planes(int offs[],  int No) {
 
     curPlane = 0;
     newPlane = 1;
-    if (notfirst)   return;     // need to fix memory free at two levels unless this fix
+    if (notfirst)   return;     // need to fix memory free at two levels unless this fix: no changes in planes structure during run allowed
     notfirst = 1;
     
     if(No%3 !=0) fprintf(stderr,"Ouch!  Size of offsets array not a multiple of 3 as expected.");
@@ -1899,7 +1911,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     }
 
     for (ij=0; ij<N2; ij++) {
-        if(gol[ij]||(selection==10)||(selection==11)||((gol[ij]>>1)&&(selection==13))) {
+        if((gol[ij] && (selection<10))||(selection==10)||(selection==11)||((gol[ij]>>1)&&(selection==13))) {
             hashaddgene(golg[ij],rootgene);
         }
     }
@@ -2252,7 +2264,7 @@ int cmpfunc5 (const void * pa, const void * pb)                 // sort accordin
    i1=*(int*)pa; i2=*(int*)pb;
    for (j=0;j<genealogydepth;j++) {
         ij1 = i1+j*N; ij2 = i2+j*N;
-        gene1=genealogytrace[ij1]; gene2=genealogytrace[ij2];
+        gene1=genealogywork[ij1]; gene2=genealogywork[ij2];
         if(gene1!=gene2) return((((gene1 > gene2) && (gene1!=rootgene)) || (gene2==rootgene)) ? 1 : -1);
     }
     return(0);
@@ -2260,9 +2272,9 @@ int cmpfunc5 (const void * pa, const void * pb)                 // sort accordin
 
 
 int genealogies() {  /* genealogies of all currently active species */
-    int j, jmax, i, ij, nspecies, nspeciesnow, birthstep, *gorder;
-    int j1, j2, j3, activity;
-    uint64_t gene, ancgene, nextgene, *genealogytrace1;
+    int j, jmax, i, ij, nspecies, nspeciesnow, birthstep;
+    int j1, j2, j3, activity, gorder[N];
+    uint64_t gene, ancgene, nextgene;
     int *gindices,*popln,*activities,*birthsteps;
     uint64_t *genes;
 
@@ -2299,7 +2311,7 @@ int genealogies() {  /* genealogies of all currently active species */
         birthsteps[i]=geneitems[gindices[i]].firstbirthframe;
     }
     
-    for(ij=0;ij<N2;ij++) genealogytrace[ij]=rootgene;             // set field to rootgene black
+    for(ij=0;ij<N2;ij++) genealogywork[ij]=rootgene;              // set field to rootgene black
     ancgene=rootgene;                                             // never really used, but included to avoid unitialized warning
     birthstep=0;
     activitymax=0;
@@ -2332,7 +2344,7 @@ int genealogies() {  /* genealogies of all currently active species */
             }
             if (gene == rootgene) break;                            // reached root, exit j loop
             ij = i+j*N;
-            genealogytrace[ij]=gene;
+            genealogywork[ij]=gene;
         }
         if (j>jmax) jmax=j;
     }
@@ -2341,32 +2353,31 @@ int genealogies() {  /* genealogies of all currently active species */
                                                                     //reverse ancestries to allow comparison at same number of speciations
     for (i=0; i<nspeciesnow; i++) {
         for(j=0;j<N;j++) {
-            if (genealogytrace[i+j*N]==rootgene) break;
+            if (genealogywork[i+j*N]==rootgene) break;
         }
         for(j1=0;j1<(j>>1);j1++) {
-            gene=genealogytrace[i+(j-j1-1)*N];
-            genealogytrace[i+(j-j1-1)*N]=genealogytrace[i+j1*N];
-            genealogytrace[i+j1*N]=gene;
+            gene=genealogywork[i+(j-j1-1)*N];
+            genealogywork[i+(j-j1-1)*N]=genealogywork[i+j1*N];
+            genealogywork[i+j1*N]=gene;
         }
     }
-    gorder = (int *) malloc(N*sizeof(int));
     for (i=0; i<N; i++) gorder[i]=i;
     qsort(gorder, nspeciesnow, sizeof(int), cmpfunc5);              // sort according to ancestral lines
     for (i=0;i<N;i++) if((gorder[i]<0)||(gorder[i]>=N)) fprintf(stderr,"step %d error in gorder out of bounds at i = %d with value %d\n",totsteps,i,gorder[i]);
 
-    genealogytrace1 = (uint64_t *) malloc(N*jmax*sizeof(uint64_t)); // allocate copy array of genetrace to allow sorting and modifications
-    for(ij=0;ij<N*jmax;ij++) genealogytrace1[ij]=genealogytrace[ij];// copy active portion of genealogytrace to new array genealogytrace1
-    for(ij=0;ij<N2;ij++) genealogytrace[ij]=rootgene;               // reinitialize genealogytrace to root gene before redrawing part of it
+    //genealogytrace1 = (uint64_t *) malloc(N*jmax*sizeof(uint64_t)); // allocate copy array of genetrace to allow sorting and modifications
+    //for(ij=0;ij<N*jmax;ij++) genealogytrace1[ij]=genealogytrace[ij];// copy active portion of genealogytrace to new array genealogytrace1
+    for(ij=0;ij<N2;ij++) genealogytrace[ij]=rootgene;               // initialize genealogytrace to root gene before drawing part of it
 
     if(colorfunction>=6) {                                          // time trace of genealogies
       for(i=0;i<nspeciesnow;i++) {
         for(j=0,j1=0;j<jmax;j++) {
             if(gorder[i]>=nspeciesnow) fprintf(stderr,"error in genealogies gorder at i=%d, order value %d out of range\n",i,gorder[i]);
             ij = gorder[i]+j*N;
-            gene = genealogytrace1[ij];
+            gene = genealogywork[ij];
             ij+=N;
             if(ij<N2) {
-                nextgene = genealogytrace1[ij];
+                nextgene = genealogywork[ij];
                 if(nextgene==rootgene) birthstep=totsteps;
                 else {
                     if((genedataptr = (genedata *) hashtable_find(&genetable, nextgene)) != NULL) birthstep = genedataptr->firstbirthframe;
@@ -2382,17 +2393,16 @@ int genealogies() {  /* genealogies of all currently active species */
             j1 = j2;
         }
       }
-      for(i=nspeciesnow;i<N;i++) for(j=0;j<N;j++) genealogytrace[gorder[i]+j*N]=rootgene;
+      // for(i=nspeciesnow;i<N;i++) for(j=0;j<N;j++) genealogytrace[gorder[i]+j*N]=rootgene;
     }
     else {                                                          // species changes only trace (colorfunction == 5)
       for(i=0;i<nspeciesnow;i++) {
         for(j=0;j<jmax;j++) {
             ij=i+j*N;
-            genealogytrace[ij]=genealogytrace1[gorder[i]+j*N];
+            genealogytrace[ij]=genealogywork[gorder[i]+j*N];
         }
       }
     }
-    free(gorder);free(genealogytrace1);
     free(gindices);free(activities);free(genes);free(popln);free(birthsteps);
 
     return(jmax);
