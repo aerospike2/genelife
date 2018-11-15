@@ -120,6 +120,7 @@ int *stepstats = NULL;              // dynamic array pointer for statistics of s
 int *configstats = NULL;            // dynamic array pointer for statistics of gol site configurations (x,y,t) offsets
 uint64_t acttrace[N2];              // scrolled trace of last N time points of activity gene trace
 int ymax = 1000;                    // activity scale max for plotting : will be adjusted dynamically or by keys
+double log2ymax = 25.0;             // activity scale max 2^25 = 33.5 * 10^6
 int activitymax;                    // max of activity in genealogical record of current population
 uint64_t genealogytrace[N2];        // image trace of genealogies for N most frequently populated genes
 uint64_t genealogywork[N2];         // working space array for calculating genealogies
@@ -233,7 +234,7 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
 //------------------------------------------------------- colorgenes -------------------------------------------------------------------------------------
 void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2) {
     uint64_t gene, gdiff, g2c, mask;
-    int ij,d,d2,activity;
+    int ij,d,d2,activity,popcount;
     unsigned int color[3],colormax;
     double rescalecolor;
     static int numones[16]={0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4};
@@ -329,20 +330,32 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
             else cgolg[ij] = 0;
         }
     }
-    else if(colorfunction==4){                    //activities
+    else if(colorfunction==4){                                  //activities
+        int popmax = 1000;                                      // need to bring this parameter up to python
         for (ij=0; ij<NN2; ij++) {
             gene=acttrace[ij];
-            if (gene == rootgene) mask = 0x3f3f3fff;          // grey color for background, all root genes
+            if (gene == rootgene) mask = 0x3f3f3fff;            // grey color for background, all root genes
             else {
-                if (gene == 0ull) gene = 11778L; // random color for gene==0
+                if (gene == 0ull) gene = 11778L;                // random color for gene==0
                 mask = gene * 11400714819323198549ul;
-                mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
+                mask = mask >> (64 - 32);                       // hash with optimal prime multiplicator down to 32 bits
                 mask |= 0x808080ff; // ensure brighter color at risk of improbable redundancy, make alpha opaque
+                if(popmax) {
+                    popcount=0;
+                    if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) popcount = genedataptr->popcount;
+                    else fprintf(stderr,"gene not found in colorfunction for activities\n");
+                    if(popcount>popmax) popcount=popmax;
+                    colormax=0;
+                    for(d=0;d<3;d++) if((color[d]=( (mask>>(8+(d<<3))) & 0xff))>colormax) colormax=color[d];
+                    rescalecolor=(log((double)popcount)/log((double)popmax))*((double)0xff/(double)colormax);
+                    for(d=0;d<3;d++) color[d]=(unsigned int) (((double) color[d])*rescalecolor);
+                    for(d=0,mask=0xff;d<3;d++) mask |= color[d]<<((d<<3)+8);
+                }
             }
             cgolg[ij]= (int) mask;
         }
     }
-    else if(colorfunction<8){                    //genealogies
+    else if(colorfunction<8){                                       //genealogies
         for (ij=0; ij<NN2; ij++) {
             gene=genealogytrace[ij];
             activity = 0;
@@ -350,26 +363,21 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
             if (gene == rootgene) mask = 0x000000ff;                // black color for root
             else {
                 if(colorfunction==7) {
-                    if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
-                        activity = genedataptr->activity;
-                    }
-                    else {
-                        fprintf(stderr,"gene not found in colorfunction for genealogy\n");
-                        activity = 0;
-                    }
+                    activity = 0;
+                    if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) activity = genedataptr->activity;
+                    else fprintf(stderr,"gene not found in colorfunction for genealogy\n");
                 }
                 if (gene == 0ull) gene = 11778L;                    // random color for gene==0
                 mask = gene * 11400714819323198549ul;
                 mask = mask >> (64 - 32);                           // hash with optimal prime multiplicator down to 32 bits
+                mask |= 0x808080ff;                                 // ensure brighter color at risk of improbable redundancy, make alpha opaque
                 if(colorfunction==7) {                              // rescale color brightness by activity/activitymax
-                    mask |= 0x808080ff;                             // to get same starting color as in non rescaled case
                     colormax=0;
                     for(d=0;d<3;d++) if((color[d]=( (mask>>(8+(d<<3))) & 0xff))>colormax) colormax=color[d];
                     rescalecolor=((double)(activity*0xff))/((double)(activitymax*colormax));         // integer version doesn't work
                     for(d=0;d<3;d++) color[d]=(unsigned int) (((double) color[d])*rescalecolor);     // rescale colors by activity/activitymax
                     for(d=0,mask=0xff;d<3;d++) mask |= color[d]<<((d<<3)+8);
                 }
-                else mask |= 0x808080ff;                                 // ensure brighter color at risk of improbable redundancy, make alpha opaque
             }
             cgolg[ij]=(int) mask;
         }
@@ -2140,6 +2148,7 @@ void countspecieshash() {}  /* dummy routine, no effect */
 int activitieshash() {  /* count activities of all currently active species */
     int i, j, ij, ij1, x, nspecies, nspeciesnow;
     int *gindices,*popln,*activities;
+    double act;
     uint64_t *genes;
     const int maxact = 10000;
     // int ymax1;
@@ -2190,10 +2199,13 @@ int activitieshash() {  /* count activities of all currently active species */
     //    ymax1 = activities[i]>ymax1 ? activities[i] : ymax1;
     // if (ymax1>ymax) ymax = ymax*2;     // autoscale of activities
     // if (ymax1<ymax/2) ymax = ymax/2;   // autoscale of activities
-    for(i=0;i<nspeciesnow;i++) {
-        activities[i] = N - (activities[i] * N) / ymax;
-        gene = genes[i];
-        ij = (x&Nmask)+activities[i]*N;
+    for(j=0;j<nspeciesnow;j++) {
+        // activities[j] = N - (activities[j] * N) / ymax;
+        act = (double) activities[j];
+        // activities[j] = N - (int) (N*log2(act)/log2ymax);      // logarithmic scale, suffers from discrete steps at bottom
+        activities[j] = N - (int) (N*act/(act+(double)ymax));
+        gene = genes[j];
+        ij = (x&Nmask)+activities[j]*N;
         if(ij > 0 && ij<N2)
             acttrace[ij] = gene;
         //else
