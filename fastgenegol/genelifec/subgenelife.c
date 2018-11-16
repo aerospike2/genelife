@@ -132,7 +132,7 @@ int **offsets;                      // array of offsets (2D + time) for planes
 int *histo;
 int numHisto;
 // initialize planes:
-#define maxPlane 2                  /* maximum number of planes allowed : values 2,4,8 allowed */
+#define maxPlane 4                  /* maximum number of planes allowed : values 2,4,8 allowed */
 int curPlane = 0;                   // current plane index
 int newPlane = 1;                   // new plane index
 int numPlane = maxPlane;            // number of planes must be power of 2 to allow efficient modulo plane
@@ -1547,10 +1547,17 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
     if (colorfunction==8) {
-        pack49neighbors(gol,golmix);
         pack49neighbors(newgol,working);
-        if(offdx==0 && offdy==0 && offdt==0) compare_all_neighbors(golmix,working);  // compare all 8 directions N E S W NE SE SW NW
-        else compare_neighbors(golmix,working,offdx,offdy);                 // compare with a single direction (north) for gliders
+        if(offdx==0 && offdy==0 && offdt==0) {
+            pack49neighbors(gol,golmix);
+            compare_all_neighbors(golmix,working);  // compare all 8 directions N E S W NE SE SW NW
+        }
+        else {
+            if (offdt<=-maxPlane) offdt=-maxPlane;
+            if(offdt>0) offdt = 0;
+            pack49neighbors(planesg[(newPlane-offdt)%maxPlane],golmix);
+            compare_neighbors(golmix,working,offdx,offdy);                 // compare with a single direction (north) for gliders
+        }
     }
 }
 
@@ -2027,8 +2034,17 @@ void set_selectedgene(uint64_t gene) {
 void set_offsets(int dx,int dy,int dt) {
     offdx =dx;
     offdy = dy;
+    if(dt>0) {
+        dt=0;
+        fprintf(stderr,"positive time offsets not allowed, looking into the future not possible\n");
+    }
+    if(dt<=-maxPlane) {
+        dt=-maxPlane+1;
+        fprintf(stderr,"not enough planes set for this time offset, recompile software with larger maxPlane value\n");
+    }
     offdt = dt;
 }
+
 //------------------------------------------------------- get ... ---------------------------------------------------------------------------
 void get_curgol(uint64_t outgol[], int NN){
     int ij;
