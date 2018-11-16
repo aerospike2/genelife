@@ -1486,6 +1486,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
             if(birth){
                 // compute random events for multiple single bit mutations, as well as mutation position nmut
                 r2=1ull;
+                ancestor = newgene;
                 while (r2 && pmutmask) {
                     RAND128P(randnr);                                           // inline exp so compiler recognizes auto-vec,
                     randnr2 = (randnr & pmutmask);                              // extract bits from randnr for random trial for 0 on pmutmask
@@ -1493,9 +1494,6 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                     nmut = (randnr >> 56) & 0x3f;                               // choose mutation position for length 64 gene : from bits 56:61 of randnr
                     newgene = newgene ^ (r2<<nmut);                             // introduce single mutation with probability pmut = probmut
                 }
-                    
-                ancestor = newgene;
-
 
                 if(gol[ij]) {                                               // central old gene present: overwritten
                     hashdeletegene(golg[ij],"step %d hash delete error 1 in update, gene %llx not stored\n");
