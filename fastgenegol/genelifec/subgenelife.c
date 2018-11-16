@@ -2368,6 +2368,7 @@ int cmpfunc5 (const void * pa, const void * pb)                 // sort accordin
    int i1,i2,ij1,ij2,j;
    uint64_t gene1,gene2;
    i1=*(int*)pa; i2=*(int*)pb;
+   
    for (j=0;j<genealogydepth;j++) {
         ij1 = i1+j*N; ij2 = i2+j*N;
         gene1=working[ij1]; gene2=working[ij2];
@@ -2376,6 +2377,49 @@ int cmpfunc5 (const void * pa, const void * pb)                 // sort accordin
     return(0);
 }
 
+int cmpfunc6 (const void * pa, const void * pb)                 // sort according to ancestry in genealogytrace using activity ordering
+{
+   int i1,i2,ij1,ij2,j;
+   uint64_t gene1,gene2;
+   i1=*(int*)pa; i2=*(int*)pb;
+   int act1,act2;
+   
+   for (j=0;j<genealogydepth;j++) {
+        ij1 = i1+j*N; ij2 = i2+j*N;
+        gene1=working[ij1]; gene2=working[ij2];
+        if(gene1!=gene2)  {
+            if((gene1!=rootgene) && (gene2 != rootgene)) {
+                if((genedataptr = (genedata *) hashtable_find(&genetable, gene1)) != NULL) act1 = genedataptr->activity; else act1 = 0;
+                if((genedataptr = (genedata *) hashtable_find(&genetable, gene2)) != NULL) act2 = genedataptr->activity; else act2 = 0;
+                return(act1 > act2 ? 1 : (act1==act2 ? (gene1 > gene2 ? 1 : -1) : -1));
+            }
+            else return((gene2==rootgene) ? 1 : -1);
+        }
+    }
+    return(0);
+}
+
+int cmpfunc7 (const void * pa, const void * pb)                 // sort according to ancestry in genealogytrace using activity ordering
+{
+   int i1,i2,ij1,ij2,j;
+   uint64_t gene1,gene2;
+   i1=*(int*)pa; i2=*(int*)pb;
+   int pop1,pop2;
+   
+   for (j=0;j<genealogydepth;j++) {
+        ij1 = i1+j*N; ij2 = i2+j*N;
+        gene1=working[ij1]; gene2=working[ij2];
+        if(gene1!=gene2)  {
+            if((gene1!=rootgene) && (gene2 != rootgene)) {
+                if((genedataptr = (genedata *) hashtable_find(&genetable, gene1)) != NULL) pop1 = genedataptr->popcount; else pop1 = 0;
+                if((genedataptr = (genedata *) hashtable_find(&genetable, gene2)) != NULL) pop2 = genedataptr->popcount; else pop2 = 0;
+                return(pop1 > pop2 ? 1 : (pop1==pop2 ? (gene1 > gene2 ? 1 : -1) : -1));
+            }
+            else return((gene2==rootgene) ? 1 : -1);
+        }
+    }
+    return(0);
+}
 
 int genealogies() {  /* genealogies of all currently active species */
     int j, jmax, i, ij, nspecies, nspeciesnow, birthstep;
@@ -2468,7 +2512,10 @@ int genealogies() {  /* genealogies of all currently active species */
         }
     }
     for (i=0; i<N; i++) gorder[i]=i;
-    qsort(gorder, nspeciesnow, sizeof(int), cmpfunc5);              // sort according to ancestral lines
+    qsort(gorder, nspeciesnow, sizeof(int), cmpfunc5);              // sort according to ancestral lines - use cmpfunc5 to sorting genes laterally via gene value
+    //qsort(gorder, nspeciesnow, sizeof(int), cmpfunc6);            // sort according to ancestral lines - use cmpfunc6 to sorting genes laterally via activity
+    //qsort(gorder, nspeciesnow, sizeof(int), cmpfunc7);            // sort according to ancestral lines - use cmpfunc7 to sort genes laterally via population size
+    
     for (i=0;i<N;i++) if((gorder[i]<0)||(gorder[i]>=N)) fprintf(stderr,"step %d error in gorder out of bounds at i = %d with value %d\n",totsteps,i,gorder[i]);
 
     //genealogytrace1 = (uint64_t *) malloc(N*jmax*sizeof(uint64_t)); // allocate copy array of genetrace to allow sorting and modifications
