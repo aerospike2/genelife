@@ -1404,7 +1404,6 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 }
                 nbmaskr = ((nbmaskr & 0x1ull)<<7) | (nbmaskr>>1);           // 8 bit rotate right
             }
-            //nbmaskr = 0ull;       // DEBUG check that default behaviour if genes no influence : PASSED
             for (k=0,s=0,nb1i=0ull;k<8;k++) {                               // recalculate sum and nb1i using combined mask
                 gs =gol[nb[k]] & (((~nbmaskr)>>k)&0x1ull);                  // if mask bit set, count as if dead
                 nbmask |= gs<<k;                                            // also calculate nbmask for use below
@@ -1445,7 +1444,6 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                   else {
                       newgene = golg[nbch];
                   }
-                  // if (newgene == 0ull) fprintf(stderr,"step %d Warning, new gene zero: nbmask %llx nbmaskrm %llx kmin %d gol %llx golg %llx newgene %llx ij %d\n",totsteps,nbmask,nbmaskrm,kmin,gol[nb[kmin]],golg[nb[kmin]],newgene,ij);
                 } // end if not all live neighbors the same
                 else {
                     statflag |= F_3g_same;
@@ -1458,7 +1456,6 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 statflag |= F_2_live;
                 if (rulemod1ij||gol[ij]) {                                  // rule departure from GOL allowed or possible overwrite
                     if ((0x1ull&(overwritemask>>1))||!gol[ij]) {            // either overwrite on for s==2 or central site is empty
-                        //for (k=0;k<s;k++) livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]]; // live gene at neighbour site
                         if (repscheme & R_2_2ndnbs) selectone_nbs(s,nb1i,nb,gol,golg,&birth,&newgene);
                         else if (repscheme & R_5_2uniquepos) {
                             nbmask = (0x1ull<<(nb1i&0x7)) + (0x1ull<<((nb1i>>4)&0x7));
@@ -1487,16 +1484,18 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
             }
 
             if(birth){
-                // if (gol[ij]) fprintf(stderr,"birth overwrite event ij %d newgene %llu s %llu\n",ij,newgene,s);
-                RAND128P(randnr);                                           // inline exp so compiler recognizes auto-vec,
-                // compute random events for single bit mutation, as well as mutation position nmut
-                randnr2 = (randnr & pmutmask);                // extract bits from randnr for random trial for 0 on pmutmask
-                r2 = (!pmutmask||randnr2)?0ull:1ull;                        // 1 if lowest nlog2pmut bits of randnr are zero, else zero
-                nmut = (randnr >> 56) & 0x3f;                               // choose mutation position for length 64 gene : from bits 56:61 of randnr
-                // complete calculation of newgol and newgolg, including mutation
+                // compute random events for multiple single bit mutations, as well as mutation position nmut
+                r2=1ull;
+                while (r2 && pmutmask) {
+                    RAND128P(randnr);                                           // inline exp so compiler recognizes auto-vec,
+                    randnr2 = (randnr & pmutmask);                              // extract bits from randnr for random trial for 0 on pmutmask
+                    r2 = (randnr2)?0ull:1ull;                                   // 1 only if lowest nlog2pmut bits of randnr are zero
+                    nmut = (randnr >> 56) & 0x3f;                               // choose mutation position for length 64 gene : from bits 56:61 of randnr
+                    newgene = newgene ^ (r2<<nmut);                             // introduce single mutation with probability pmut = probmut
+                }
+                    
                 ancestor = newgene;
-                newgene = newgene ^ (r2<<nmut);                             // introduce single mutation with probability pmut = probmut
-                // if(newgene^ancestor) fprintf(stderr,"newgene %llu written at step %d with ancestor %llu\n",newgene, totsteps,ancestor);     // DEBUG
+
 
                 if(gol[ij]) {                                               // central old gene present: overwritten
                     hashdeletegene(golg[ij],"step %d hash delete error 1 in update, gene %llx not stored\n");
@@ -1507,7 +1506,6 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 newgolg[ij] =  newgene;                                     // if birth then newgene
                 statflag = statflag | F_birth;
                 if (r2) statflag = statflag | F_mutation;
-                // if(newgene==0ull) fprintf(stderr,"error in writing newgene, previous = %llx, statflag = %llx\n",golg[ij],statflag);
             } // end birth
             else {
                 if ((survivalmask&s&0x1ull)|((survivalmask>>1)&(~s)&0x1ull)|((~rulemod1ij)&0x1ull)) {// (surv bit 0 and s==3) or (surv bit 1 and s==2) or not rulemod1ij
