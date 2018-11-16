@@ -420,7 +420,7 @@ void colorgenes(int cgolg[], int NN2) {
 extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene) {
 // birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene.
     unsigned int k,d0,d1,d2,d3,dd,swap;                  // number of ones in various gene combinations
-    uint64_t livegenes[2],gdiff,gdiff0,gdiff1;           // various gene combinations
+    uint64_t livegenes[2],gdiff,gdiff0,gdiff1; // various gene combinations
     uint64_t gene2centre;                                // gene function centres in sequence space
     int g0011,g0110,prey,prey2;
 
@@ -489,25 +489,27 @@ extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], ui
             *newgene= (prey2 ? ((d0<d1) ? livegenes[0] : livegenes[1]) : ((d0<32) ? livegenes[1] : livegenes[0]));
             break;
         case 6:                                         // birth if 2 genes differently functional (Not Yet Working)
-            gene2centre = (1ull<<ncoding)-1ull;              // first ncoding 1s in this sequence
-            gdiff  = livegenes[0]^livegenes[1];
-            gdiff0 = livegenes[0]^gene2centre;
-            gdiff1 = livegenes[1]^gene2centre;
-            POPCOUNT64C(gdiff,dd);
-            POPCOUNT64C(gdiff0,d2);
-            POPCOUNT64C(gdiff1,d3);
-            g0011 = d0<dd && d3<dd;
-            g0110 = d2<dd && d1<dd;
-            *birth = (g0011 != g0110)  ? 1ull: 0ull;         // birth if 2 genes closer to two different targets than each other
-            *newgene= g0011 ? ((d0<d3) ? livegenes[0] : livegenes[1]) : ((d2<d1) ? livegenes[0] : livegenes[1]);
+                                                                            // 1st target is WLOG the all 0 sequence, d0 and d1 gives distances of two genes
+            if(ncoding<64) gene2centre = (1ull<<ncoding)-1ull;              // first ncoding 1s in this sequence
+            else gene2centre = ~0ull;                                       // otherwise 2nd target is all 64 ones
+            gdiff  = livegenes[0]^livegenes[1];                             // difference between two genes
+            gdiff0 = livegenes[0]^gene2centre;                              // difference of gene 0 to 2nd target
+            gdiff1 = livegenes[1]^gene2centre;                              // difference of gene 1 to 2nd target
+            POPCOUNT64C(gdiff,dd);                                          // dd is distance between genes
+            POPCOUNT64C(gdiff0,d2);                                         // d2 is distance of gene 0 from 2nd target
+            POPCOUNT64C(gdiff1,d3);                                         // d3 is distance of gene 1 from 2nd target
+            g0011 = d0<dd && d3<dd;                      // gene 0 closer to 1st target and gene 1 closer to 2nd target than they are from each other
+            g0110 = d2<dd && d1<dd;                      // gene 0 closer to 2nd target and gene 1 closer to 1st target than they are from each other
+            *birth = (g0011 && (d0!=d3)) != (g0110 && (d2!=d1))  ? 1ull: 0ull; // birth if 2 genes closer to two different targets than to each other
+            *newgene= (g0011 && (d0!=d3)) ? ((d0<d3) ? livegenes[0] : livegenes[1]) : ((d2<d1) ? livegenes[0] : livegenes[1]);
             break;
         case 7:                                          // no special birth via selection allowed
             *birth = 0ull;
             *newgene = livegenes[0];                     // dummy choice not used
             break;
-        // case 8,9: this subroutine not used
+        // cases 8+: this subroutine is not used
         default:
-            fprintf(stderr,"Error: two live gene fitness value %d is not yet implemented\n",selection);
+            fprintf(stderr,"Error: two live gene fitness value %d is not implemented\n",selection);
             exit(1);
     }
 }
