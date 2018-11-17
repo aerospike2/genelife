@@ -49,19 +49,25 @@ int colorfunction = 0;              // color function choice of 0: hash or 1: fu
 #define ASCII_ESC 27                /* escape for printing terminal commands, such as cursor repositioning : only used in non-graphic version */
 //-----------------------------------------masks for named repscheme bits--------------------------------------------------------------------------------
 #define R_0_2sel_3live    0x1       /* 1: for 3-live-n birth, employ selection on two least different live neighbours for ancestor */
-#define R_1_canon_nb      0x2       /* 1: choose live neighbour at zero bit in canonical rotation 0: choose most difft position */
-#define R_2_neutral_pos   0x4       /* 1: for 2-live-nb birth, choose canonical position as specified by R_1_canon_nb rather than doing selection */
-#define R_3_enforce3birth 0x8       /* 1: enforce birth for 3 live nbs (with ancestor most difft) in case 2-select fails (req. R_0_2sel_3live==1 for effect) */
-#define R_4_enforce2birth 0x10      /* 1: enforce birth for 2 live nbs : choose 1st live nb from top left of canonical config as ancestor (asym!) */
-#define R_5_2ndnbs        0x20      /* 1: execute genetically encoded 2nd neighbours of live neighbours to determine birth & ancestor */
-#define R_6_checkmasks    0x40      /* 1: check genetically encoded masks to mask out certain live nb pos's: rule as if these not there */
-#define R_7_nongolstat    0x80      /* 1: enforce GoL rule if state of central cell was last changed by a non GoL rule */
-#define R_8_nongolstatnbs 0x100     /* 1: enforce GoL rule if state of any cell in nbs was last changed by a non GoL rule */
-#define R_9_2birth_k0     0x200     /* 1: bit position at start of k1-4 mask for selective subset of 2-births */
-#define R_9_12_2birth_k1_4 0x1e00   /* 1: enforce birth for 2 live nbs canonical config for one of k= 1,2,3,4, next 4 bits: choose 1st live nb from TL (asym!) */
-#define R_13_quarter_surv 0x2000    /* 1: quarter the spatial domain with survival values : only in update ie for selection<8 */
-#define R_14_quarter_over 0x4000    /* 1: quarter the spatial domain with overwrite values : only in update ie for selection<8 */
-#define R_15_quarter_enfb 0x8000    /* 1: quarter the spatial domain with enforce birth values : only in update ie for selection<8 */
+#define R_1_2sel_2live    0x2       /* 1: allow 2-live-n birth, employ selection on 2 live neighbours for ancestor */
+#define R_2_canonical_nb  0x4       /* 1: choose live neighbour at zero bit in canonical rotation 0: choose most difft position */
+#define R_3_neutral_pos   0x8       /* 1: for 2-live-nb birth, choose canonical position as specified by R_2_canonical_nb rather than doing selection */
+#define R_4_enforce3birth 0x10      /* 1: enforce birth for 3 live nbs (with ancestor most difft) in case 2-select fails (req. R_0_2sel_3live==1 for effect) */
+#define R_5_enforce2birth 0x20      /* 1: enforce birth for 2 live nbs : choose 1st live nb from top left of canonical config as ancestor (asym!) */
+#define R_6_2ndnb_genes   0x40      /* 1: execute genetically encoded 2nd neighbours of live neighbours to determine birth & 1st nb ancestor */
+#define R_7_1stnb_masks   0x80      /* 1: check genetically encoded masks to mask out certain live nb pos's: rule as if these not there */
+#define R_8_nongolstat    0x100     /* 1: enforce GoL rule if state of central cell was last changed by a non GoL rule */
+#define R_9_nongolstatnbs 0x200     /* 1: enforce GoL rule if state of any cell in nbs was last changed by a non GoL rule */
+#define R_10_2birth_k0    0x400     /* 1: bit position at start of k1-4 mask for selective subset of 2-births */
+#define R_10_13_2birth_k4 0x3c00    /* 1: enforce birth for 2 live nbs canonical config for one of k= 1,2,3,4, next 4 bits: choose 1st live nb from TL (asym!) */
+#define R_quarter         0x1fc000  /* 1: quarter the spatial domain with one or more of 7 pairs of repscheme bits ie 4 different values */
+#define R_14_quarter_sele 0x4000    /* 1: quarter the spatial domain with selection enable values for 2,3 live nbs: only in update ie for selection<8 */
+#define R_15_quarter_posn 0x8000    /* 1: quarter the spatial domain with selection enable values for 2,3 live nbs: only in update ie for selection<8 */
+#define R_16_quarter_enfb 0x10000   /* 1: quarter the spatial domain with enforce birth values for 2,3 live nbs: only in update ie for selection<8 */
+#define R_17_quarter_2nb1 0x20000   /* 1: quarter the spatial domain with 1st nb masks and/or 2nd nb addition: only in update ie for selection<8 */
+#define R_18_quarter_ngol 0x40000   /* 1: quarter the spatial domain with last non gol rule and/or non gol created state: only in update ie for selection<8 */
+#define R_19_quarter_surv 0x80000   /* 1: quarter the spatial domain with survival values for 2,3 live nbs: only in update ie for selection<8 */
+#define R_20_quarter_over 0x100000  /* 1: quarter the spatial domain with overwrite values for 2,3 live nbs: only in update ie for selection<8 */
 //----------------------------------------status flag bits for recording site status in golgstats array---------------------------------------------------
 #define F_notgolrul 0x1             /* bit is 1 if last step not a GoL rule*/
 #define F_2_live    0x2             /* bit is 1 if exactly 2 live neighbours */
@@ -115,6 +121,7 @@ uint64_t *golgstats, *newgolgstats; // pointers to 64 bit masks for different ev
 uint64_t golmix[N2];                // array for calculating coupling of genes between planes for multiplane genelife, or for packing configs
 uint64_t gene0;                     // uncoupled planes background gene, non zero for selection==10
 uint64_t selectedgene;              // gene currently selected interactively in graphics window
+unsigned int canonical;             // current value of choice of canonical position repscheme bit 2 : needed globally in ...difft2-6 routines
 //------------------------------------------------ arrays for time tracing -----------------------------------------------------------------------------
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
@@ -558,7 +565,7 @@ extern inline void selectone_nbs(int s, uint64_t nb2i, int nb[], uint64_t gol[],
 
 //------------------------------------------------------- selectdifft2 -------------------------------------------------------------------------------------
 extern inline unsigned int selectdifft2(uint64_t nbmask, int nb[], int *crot) {
-// selection based on canonical rotation to bunched pair, choose clockwise or anti-clockwise one (for R_1_canon_nb)
+// selection based on canonical rotation to bunched pair, choose clockwise or anti-clockwise one (for R_2_canonical_nb)
     int k,kmin;
     uint64_t nbmaskr, nbmaskrm;
 
@@ -579,7 +586,7 @@ extern inline unsigned int selectdifft2(uint64_t nbmask, int nb[], int *crot) {
             fprintf(stderr,"Error in canonical rotation for two live neighbours nbmaskrm = %llx for mask %llx\n",nbmaskrm,nbmask); k = 0;
         } //default case
     } //switch
-    if (repscheme & R_1_canon_nb) return(kmin);           // replication of live nb in bit 0 of canonical rotation
+    if (canonical) return(kmin);                           // replication of live nb in bit 0 of canonical rotation
     else  return((kmin+k)&0x7);                            // replication of live nb in other bit of canonical rotation
 }
 
@@ -589,13 +596,13 @@ extern inline unsigned int selectdifft3(uint64_t nbmask, int nb[], int *crot) {
     uint64_t nbmaskr,nbmaskrm;
     
     for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {                // compute canonical rotation (minimum) of this mask
-        nbmaskr = ((nbmaskr & 1ull)<<7) | (nbmaskr>>1);             // 8 bit rotate right
+        nbmaskr = ((nbmaskr & 1ull)<<7) | (nbmaskr>>1);               // 8 bit rotate right
         if (nbmaskr < nbmaskrm) {                                     // choose minimal value of mask rotation
             nbmaskrm = nbmaskr;                                       // neighbor mask rotate min is current rotation
             kmin = k;                                                 // no of times rotated to right
         }
     }
-    if (repscheme & R_1_canon_nb) return(kmin);                      // replication of live neigbour in bit 0 of canonical rotation
+    if (canonical) return(kmin);                                      // replication of live neigbour in bit 0 of canonical rotation
     else {                                                            // replication of live neighbour in most different position
         switch (nbmaskrm) {                              //              x07    x0b    x0d    x13    x15    x19    x25
             case 0x07ull : k = 1; *crot = 0; break;      // 00000111    |012|  <-
@@ -626,7 +633,7 @@ extern inline unsigned int selectdifft4(uint64_t nbmask, int nb[], int *crot) {
             kmin = k;                                                 // no of times rotated to right
         }
     }
-    if (repscheme & R_1_canon_nb) return(kmin);                      // replication of live neigbour in bit 0 of canonical rotation
+    if (canonical) return(kmin);                                      // replication of live neigbour in bit 0 of canonical rotation
     else {                                                            // replication of live neighbour in most central position (left disambiguation)
         switch (nbmaskrm) {                             //              x07    x0b    x0d    x13    x15    x19    x25
             case 0x0full : k = 1; *crot = 0; break;     // 00001111    |012|  <-
@@ -660,7 +667,7 @@ extern inline unsigned int selectdifft5(uint64_t nbmask, int nb[], int *crot) {
             kmin = k;                                                 // no of times rotated to right
         }
     }
-    if (repscheme & R_1_canon_nb) return((kmin+7)&0x7);              // replication of live neigbour in bit 0 of canonical rotation
+    if (canonical) return((kmin+7)&0x7);                              // replication of live neigbour in bit 0 of canonical rotation
     else {                                                            // replication of live neighbour in most different position
         switch (nbmaskrm) {                              //              x07    x0b    x0d    x13    x15    x19    x25
             case 0x07ull : k = 5; *crot = 0; break;      // 00000111    |012|  <-
@@ -681,7 +688,7 @@ extern inline unsigned int selectdifft5(uint64_t nbmask, int nb[], int *crot) {
 
 //------------------------------------------------------- selectdifft6 -------------------------------------------------------------------------------------
 extern inline unsigned int selectdifft6(uint64_t nbmask, int nb[], int *crot) {
-// selection based on canonical rotation to bunched pair, choose clockwise or anti-clockwise one (for R_1_canon_nb)
+// selection based on canonical rotation to bunched pair, choose clockwise or anti-clockwise one (for R_2_canonical_nb)
     int k,kmin;
     uint64_t nbmaskr, nbmaskrm;
 
@@ -702,8 +709,8 @@ extern inline unsigned int selectdifft6(uint64_t nbmask, int nb[], int *crot) {
             fprintf(stderr,"Error in canonical rotation for two live neighbours nbmaskrm = %llx for mask %llx\n",nbmaskrm,nbmask); k = 0;
         } //default case
     } //switch
-    if (repscheme & R_1_canon_nb) return((kmin+7)&0x7);           // replication of live nb in bit 0 of canonical rotation
-    else  return((kmin+k)&0x7);                            // replication of live nb in other bit of canonical rotation
+    if (canonical) return((kmin+7)&0x7);                    // replication of live nb in bit 0 of canonical rotation
+    else  return((kmin+k)&0x7);                             // replication of live nb in other bit of canonical rotation
 }
 //------------------------------------------------------- hash gene inline fns ----------------------------------------------------------------------
 extern inline void hashaddgene(uint64_t gene,uint64_t ancestor) {
@@ -911,6 +918,8 @@ void update_gol2(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t new
     int nb[8],crot;
     int nb1x[8] = {-1,0,1,1,1,0,-1,-1};
     int nb1y[8] = {-1,-1,-1,0,1,1,1,0};
+    
+    canonical = repscheme & R_2_canonical_nb;
     
     for (ij=0; ij<N2; ij++) {                                                   // loop over all sites of 2D torus with side length N
         for(k=0,s0=s1=nbmask0=nbmask1=0ull;k<8;k++) {                           // compute no of live neighbours using golmix (coupled plane neighbours)
@@ -1236,6 +1245,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
     uint64_t newgene, ancestor;
     uint64_t statflag;
     
+    canonical = repscheme & R_2_canonical_nb;
     birthsurvivemask=(((uint64_t) overwritemask)<<32);                      // 32 bits of overwritemask used to limit space of rules for birth
     birthsurvivemask|=(uint64_t) survivalmask;                              // 32 bits of survival used to limit space of rules for survival
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
@@ -1355,7 +1365,8 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
     /* encode without if structures for optimal vector treatment */
 
     int s, s0, k, k1, nmut, crot;
-    unsigned int kch,checkmasks,checknongol,rulemod1,rulemod2,rulemod1ij,rulemod2ij,survival,overwrite,enforcebirth;
+    unsigned int kch,checkmasks,rulemod1,rulemod2,rulemod1ij,rulemod2ij;
+    unsigned int select23live,pos_canon_neutral,survival,overwrite,enforcebirth,add2ndmask1st,nongolnottwice;
     int nb[8], nbc, nbch, ij, i, j, jp1, jm1, ip1, im1;
     uint64_t g, gs, nb1i, nb2i, randnr, randnr2, r2;
     uint64_t nbmask, nbmaskr;
@@ -1364,8 +1375,15 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
 
     rulemod1= rulemod & 0x1ull;                                             // allow GoL rule modification
     rulemod2= (rulemod & 0x2)>>1;                                           // allow GoL rule modification masking
-    checkmasks = rulemod2 && (repscheme & R_6_checkmasks);                  // enable genetic masking of neighbours
-    checknongol = repscheme & R_7_nongolstat;                               // enable control of successive rule departures
+    checkmasks = rulemod2 && (repscheme & R_7_1stnb_masks);                  // enable genetic masking of neighbours
+    
+    survival = survivalmask;
+    overwrite = overwritemask;
+    select23live = ((repscheme & R_0_2sel_3live)?1:0)+((repscheme & R_1_2sel_2live)?2:0);
+    pos_canon_neutral = ((repscheme & R_2_canonical_nb)?1:0)+((repscheme & R_3_neutral_pos)?2:0);
+    enforcebirth =((repscheme & R_4_enforce3birth)?1:0)+((repscheme & R_5_enforce2birth)?2:0);
+    add2ndmask1st = ((repscheme & R_6_2ndnb_genes)?1:0)+((repscheme & R_7_1stnb_masks)?2:0);
+    nongolnottwice = ((repscheme & R_8_nongolstat)?1:0)+((repscheme & R_9_nongolstatnbs)?2:0);
 
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
 	    i = ij & Nmask;  j = ij >> log2N;                                   // row & column
@@ -1387,8 +1405,8 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
         rulemod1ij = rulemod1;
         nbmask = 0;
         if(s>1) {
-          if(checknongol) {                                                 // check for non GoL changed states
-            if(repscheme & R_8_nongolstatnbs) {                             // check in neighborhood
+          if(nongolnottwice&0x1) {                                          // check for non GoL changed states
+            if((nongolnottwice>>1)&0x1) {                                   // check in neighborhood
                 int sng;                                                    // sum of nbs with non GoL rule change bit set
                 for (k=0,sng=0;k<8;k++) {                                   // calc number of neighbours resulting from nongol rule change
                     sng += (golgstats[nb[k]]&F_nongolchg)?1:0;              // neighbors with state set by a non GoL change
@@ -1397,7 +1415,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
             }
             if(golgstats[ij]&F_nongolchg) rulemod2ij = rulemod1ij = 0ull;   // if central state the result of a non GoL rule change
           }
-          if(checkmasks&&rulemod2ij) {                                      // recalculate effective new s as less than original sum sm
+          if(((add2ndmask1st>>1)&0x1)&&rulemod2ij) {                        // recalculate effective new s as less than original sum sm
             for (k=0,nbmaskr=0;k<8;k++) {                                   // depending on rotated overlay of masks in live neighbour genes
                 if(gol[nb[k]]) {
                     g= golg[nb[k]];                                         // fnal gene has ncoding 0s then 8 bit mask
@@ -1417,13 +1435,16 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
           }
         }
         if (s2or3) {                                                        // if 2 or 3 neighbours alive
-            if (repscheme & R_14_quarter_over)  overwrite =  (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
-            else overwrite = overwritemask;
-            if (repscheme & R_15_quarter_enfb)  enforcebirth =  (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
-            else enforcebirth =((repscheme & R_3_enforce3birth)?1:0)+((repscheme & R_4_enforce2birth)?2:0);
-            if (repscheme & R_13_quarter_surv)  survival =  (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
-            else survival = survivalmask;
-            
+            if (repscheme & R_quarter) {                                    // quarter the plane with 4 different parameter values
+                if (repscheme & R_14_quarter_sele)  select23live =      (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
+                if (repscheme & R_15_quarter_posn)  pos_canon_neutral = (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
+                if (repscheme & R_16_quarter_enfb)  enforcebirth =      (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
+                if (repscheme & R_17_quarter_2nb1)  add2ndmask1st =     (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
+                if (repscheme & R_18_quarter_ngol)  nongolnottwice =    (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
+                if (repscheme & R_19_quarter_surv)  survival =          (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
+                if (repscheme & R_20_quarter_over)  overwrite =         (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
+                canonical = pos_canon_neutral&0x1;       // global value since needed in ...difft2-6 subroutines
+            }
             birth = 0ull;
             newgene = 0ull;
             if (s&0x1ull) {  // s==3                                        // allow birth (with possible overwrite)
@@ -1431,17 +1452,17 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
               if ((0x1ull&overwrite)|(0x1ull&~gol[ij]) ) {                  // central site empty or overwrite mode
                 birth = 1ull;                                               // birth flag
                 for(k=0;k<s;k++) livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]]; // live neighbour genes
-                if (!(checkmasks&&rulemod2ij)) for (k=0,nbmask=0;k<8;k++) nbmask |= (gol[nb[k]]<<k);  // 8-bit mask of GoL states of 8 nbs, clockwise from top left
+                if (!(((add2ndmask1st>>1)&0x1)&&rulemod2ij)) for (k=0,nbmask=0;k<8;k++) nbmask |= (gol[nb[k]]<<k);  // 8-bit mask of GoL states of 8 nbs, clockwise from top left
                 statflag |= F_3_livenbs & (nbmask<<16);                     // record live neighbour pattern
                 if((livegenes[0]^livegenes[1])|(livegenes[0]^livegenes[2])) { // genes not all same, need ancestor calculation
                   kch=selectdifft3(nbmask, nb, &crot);nbch=nb[kch&0x7];
-                  if (repscheme & R_0_2sel_3live) {                         // execute selective replication of one of two otherwise unchosen live genes
+                  if (select23live&0x1) {                                   // execute selective replication of one of two otherwise unchosen live genes
                       nb2i = 0ull;
                       for(k1=k=0;k<3;k++) {                                 // choice of two other live genes for possible ancestor
                           nbc=(nb1i>>(k<<2))&0x7;
                           if(nb[nbc]!=nbch) nb2i = (nbc<<(k1++<<2))+nb2i;
                       }
-                      if (repscheme & R_5_2ndnbs) selectone_nbs(s,nb2i,nb,gol,golg,&birth,&newgene);
+                      if (add2ndmask1st&0x1) selectone_nbs(s,nb2i,nb,gol,golg,&birth,&newgene);  //2nd nb modulation
                       else selectone(s,nb2i,nb,golg,&birth,&newgene);
                       if (birth==0ull) {                                    // optional reset of ancestor & birth if no ancestors chosen in selectone
                         if((enforcebirth&0x1)||rulemod1ij)  {               // birth cannot fail or genes don't matter or no modification to gol rules
@@ -1458,21 +1479,21 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 else {
                     statflag |= F_3g_same;
                     newgene = livegenes[0];                                 // genes all the same : copy first one
-                    if((~enforcebirth&0x1) && rulemod1ij) birth = 0ull;   // no birth for 3 identical genes
+                    if((~enforcebirth&0x1) && rulemod1ij) birth = 0ull;     // no birth for 3 identical genes
                 }
               } // end central site empty or overwrite mode
             }  // end if s==3
             else {  // s==2                                                 // possible birth as exception to GoL rule
                 statflag |= F_2_live;
-                if (rulemod1ij||gol[ij]) {                                  // rule departure from GOL allowed or possible overwrite
-                    if ((0x1ull&(overwrite>>1))||!gol[ij]) {            // either overwrite on for s==2 or central site is empty
-                        if (repscheme & R_5_2ndnbs) selectone_nbs(s,nb1i,nb,gol,golg,&birth,&newgene);
-                        else if (repscheme & R_2_neutral_pos) {
+                if (((select23live>>1)&0x1)&&(rulemod1ij||gol[ij])) {       // rule departure from GOL allowed or possible overwrite
+                    if ((0x1ull&(overwrite>>1))||!gol[ij]) {                // either overwrite on for s==2 or central site is empty
+                        if (add2ndmask1st&0x1) selectone_nbs(s,nb1i,nb,gol,golg,&birth,&newgene); //2nd nb modulation
+                        else if (repscheme & ((pos_canon_neutral>>1)&0x1)) {
                             nbmask = (0x1ull<<(nb1i&0x7)) + (0x1ull<<((nb1i>>4)&0x7));
                             kch=selectdifft2(nbmask, nb, &crot);
                             newgene = golg[nb[kch]];
-                            if(repscheme & R_9_12_2birth_k1_4) {
-                                if(repscheme & (R_9_2birth_k0<<(kch-1))) birth = 1ull;
+                            if(repscheme & R_10_13_2birth_k4) {
+                                if(repscheme & (R_10_2birth_k0<<(kch-1))) birth = 1ull;
                                 else birth = 0ull;
                             }
                             else birth = 1ull;
@@ -1482,8 +1503,8 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                             nbmask = (0x1ull<<(nb1i&0x7)) + (0x1ull<<((nb1i>>4)&0x7));
                             kch=selectdifft2(nbmask, nb, &crot);
                             newgene = golg[nb[kch]];
-                            if(repscheme & R_9_12_2birth_k1_4) {
-                                if(repscheme & (R_9_2birth_k0<<(kch-1))) birth = 1ull;
+                            if(repscheme & R_10_13_2birth_k4) {
+                                if(repscheme & (R_10_2birth_k0<<(kch-1))) birth = 1ull;
                                 else birth = 0ull;
                             }
                             else birth = 1ull;
