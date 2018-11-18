@@ -2086,7 +2086,7 @@ void set_quadrant(int quadrant) {
     }
 }
 
-void set_repscheme_bits(int quadrant, int x, int y) {
+unsigned int set_repscheme_bits(int quadrant, int x, int y, int surviveover[]) {
     unsigned int quadrantval;
     
     quadrantval=(x<(Nmask>>1)? 0 : 1) + (y<(Nmask>>1)? 0 : 2);              // determine selected quadrant
@@ -2104,6 +2104,9 @@ void set_repscheme_bits(int quadrant, int x, int y) {
     }
     repscheme &= ~R_quadrant;                                                // remove all quadrant bits : only one set at a time in interactive version
     quadrants = -1;                                                          // reset internal quadrants choice so that full display is shown
+    surviveover[0]=survivalmask;
+    surviveover[1]=overwritemask;
+    return(repscheme);
 }
 //------------------------------------------------------- get ... ---------------------------------------------------------------------------
 void get_curgol(uint64_t outgol[], int NN){

@@ -9,11 +9,13 @@ import numpy as np
 import numpy.ctypeslib as npct
 from ctypes import c_int
 from ctypes import c_uint64
+from ctypes import c_uint32
 
 # input type for genelife c to python array functions
 # must be a long unsigned int array, with single dimension that is contiguous
 uint64_array = npct.ndpointer(dtype=np.uint64, ndim=1, flags='CONTIGUOUS')
 int_array = npct.ndpointer(dtype=np.int32, ndim=1, flags='CONTIGUOUS')
+uint_array = npct.ndpointer(dtype=np.uint32, ndim=1, flags='CONTIGUOUS')
 
 # load the library, using numpy mechanisms
 libcd = npct.load_library("libgenelife", ".")
@@ -69,8 +71,8 @@ libcd.set_offsets.restype = None
 libcd.set_offsets.argtypes = [c_int,c_int,c_int]
 libcd.set_quadrant.restype = None
 libcd.set_quadrant.argtypes = [c_int]
-libcd.set_repscheme_bits.restype = None
-libcd.set_repscheme_bits.argtypes = [c_int,c_int,c_int]
+libcd.set_repscheme_bits.restype = c_uint32
+libcd.set_repscheme_bits.argtypes = [c_int,c_int,c_int, uint_array]
 
 def genelife_update(nsteps, nhist, nstat):
     return libcd.genelife_update(nsteps, nhist, nstat)
@@ -147,6 +149,6 @@ def set_offsets(dx,dy,dt):
 def set_quadrant(quadrant):
     return libcd.set_quadrant(quadrant)
 
-def set_repscheme_bits(quadrant, x, y):
-    return libcd.set_repscheme_bits(quadrant, x, y)
+def set_repscheme_bits(quadrant, x, y, surviveover):
+    return libcd.set_repscheme_bits(quadrant, x, y, surviveover)
 
