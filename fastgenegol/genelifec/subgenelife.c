@@ -20,15 +20,16 @@ const int N2 = N*N;                 // number of sites in square-toroidal array
 const int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
 const int N2mask = N2 - 1;          // bit mask for array, used instead of modulo operation
 //--------------------------------------------------------- main parameters of model ----------------------------------------------------------------
-unsigned int rulemod = 1;           // det: whether to modify GoL rule for 2 and 3 live neighbours : opposite outcome with small probability p0
+unsigned int rulemod = 1;           // det: whether to modify GoL rules
 int selection = 1;                  // fitness of 2 live neighbours: 0. integer value   1. number of ones  2. scissors-stone-well-paper: wins over left 1-1-2-2
                                     // 3. scissors-stone-well-paper 1-1-1-1 4. 5. predator prey 6. two target coding 7. selection always fails (no result)
                                     // 8. genes encode lut based on sum 9. reserved for future use NYI error message produced
                                     // 10. 1-16 planes coupled to genes via plane index 11. 1-16 planes coupled to 2-4 nearest planes via gene masks
                                     // 12. 64 planes of GoL currently independent  13. two match-coupled planes : one with genes
-unsigned int repscheme = 1;         // replication scheme: lowest 3 bits used to define 8 states: bit2 2ndnbs, bit1 not most difft, bit0 2select on 3
-                                    //                     next 2 bits to allow birth failure: bit3 for 3-live-nb and bit4 for 2-live-nb configs
-                                    //                     next 2 bits to enable uniquepos case and masking of first neighbours respectively
+unsigned int repscheme = 1;         // replication scheme: lowest 10 bits define 5 pairs of bit options for:
+                                    // 0,1 select birth 2,3 neighbour choice 4,5 enforce birth 6,7 2nd,1st neighbour genes 8,9 no successive nonGoL
+                                    // bits 10-13 specify 4-bit mask for 2-live neighbour birth onl for those of the 4 canonical configurations set
+                                    // bits 14-20 activate quadrant exploration of specific subset of the first 5 pairs of repscheme and survival and overwrite masks
 unsigned int survivalmask = 0x2;    // survive mask for two (bit 1) and three (bit 0) live neighbours
                                     // for selection=8 this is 16-bit birthsurvivemask, for selection=9 it is 32-bit survivemask to restrict luts
 unsigned int overwritemask = 0x2;   // bit mask for 4 cases of overwrite: bit 0. s==3  bit 1. special birth s==2
@@ -60,14 +61,15 @@ int colorfunction = 0;              // color function choice of 0: hash or 1: fu
 #define R_9_nongolstatnbs 0x200     /* 1: enforce GoL rule if state of any cell in nbs was last changed by a non GoL rule */
 #define R_10_2birth_k0    0x400     /* 1: bit position at start of k1-4 mask for selective subset of 2-births */
 #define R_10_13_2birth_k4 0x3c00    /* 1: enforce birth for 2 live nbs canonical config for one of k= 1,2,3,4, next 4 bits: choose 1st live nb from TL (asym!) */
-#define R_quarter         0x1fc000  /* 1: quarter the spatial domain with one or more of 7 pairs of repscheme bits ie 4 different values */
-#define R_14_quarter_sele 0x4000    /* 1: quarter the spatial domain with selection enable values for 2,3 live nbs: only in update ie for selection<8 */
-#define R_15_quarter_posn 0x8000    /* 1: quarter the spatial domain with selection enable values for 2,3 live nbs: only in update ie for selection<8 */
-#define R_16_quarter_enfb 0x10000   /* 1: quarter the spatial domain with enforce birth values for 2,3 live nbs: only in update ie for selection<8 */
-#define R_17_quarter_2nb1 0x20000   /* 1: quarter the spatial domain with 1st nb masks and/or 2nd nb addition: only in update ie for selection<8 */
-#define R_18_quarter_ngol 0x40000   /* 1: quarter the spatial domain with last non gol rule and/or non gol created state: only in update ie for selection<8 */
-#define R_19_quarter_surv 0x80000   /* 1: quarter the spatial domain with survival values for 2,3 live nbs: only in update ie for selection<8 */
-#define R_20_quarter_over 0x100000  /* 1: quarter the spatial domain with overwrite values for 2,3 live nbs: only in update ie for selection<8 */
+#define R_quadrant        0x1fc000  /* 1: quarter the spatial domain with one or more of 7 pairs of repscheme bits ie 4 different values */
+#define R_14_quadrant_sele 0x4000    /* q0 1: quarter the spatial domain with selection enable values for 2,3 live nbs: only in update ie for selection<8 */
+#define R_15_quadrant_posn 0x8000    /* q1 1: quarter the spatial domain with selection enable values for 2,3 live nbs: only in update ie for selection<8 */
+#define R_16_quadrant_enfb 0x10000   /* q2 1: quarter the spatial domain with enforce birth values for 2,3 live nbs: only in update ie for selection<8 */
+#define R_17_quadrant_2nb1 0x20000   /* q3 1: quarter the spatial domain with 1st nb masks and/or 2nd nb addition: only in update ie for selection<8 */
+#define R_18_quadrant_ngol 0x40000   /* q4 1: quarter the spatial domain with last non gol rule and/or non gol created state: only in update ie for selection<8 */
+#define R_19_quadrant_surv 0x80000   /* q5 1: quarter the spatial domain with survival values for 2,3 live nbs: only in update ie for selection<8 */
+#define R_20_quadrant_over 0x100000  /* q6 1: quarter the spatial domain with overwrite values for 2,3 live nbs: only in update ie for selection<8 */
+
 //----------------------------------------status flag bits for recording site status in golgstats array---------------------------------------------------
 #define F_notgolrul 0x1             /* bit is 1 if last step not a GoL rule*/
 #define F_2_live    0x2             /* bit is 1 if exactly 2 live neighbours */
@@ -122,6 +124,7 @@ uint64_t golmix[N2];                // array for calculating coupling of genes b
 uint64_t gene0;                     // uncoupled planes background gene, non zero for selection==10
 uint64_t selectedgene;              // gene currently selected interactively in graphics window
 unsigned int canonical;             // current value of choice of canonical position repscheme bit 2 : needed globally in ...difft2-6 routines
+int quadrants=-1;                   // integer choice of bit pair from repscheme/survivalmask/overwritemask for quadrant division of array (-1 none)
 //------------------------------------------------ arrays for time tracing -----------------------------------------------------------------------------
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
@@ -1435,14 +1438,14 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
           }
         }
         if (s2or3) {                                                        // if 2 or 3 neighbours alive
-            if (repscheme & R_quarter) {                                    // quarter the plane with 4 different parameter values
-                if (repscheme & R_14_quarter_sele)  select23live =      (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
-                if (repscheme & R_15_quarter_posn)  pos_canon_neutral = (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
-                if (repscheme & R_16_quarter_enfb)  enforcebirth =      (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
-                if (repscheme & R_17_quarter_2nb1)  add2ndmask1st =     (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
-                if (repscheme & R_18_quarter_ngol)  nongolnottwice =    (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
-                if (repscheme & R_19_quarter_surv)  survival =          (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
-                if (repscheme & R_20_quarter_over)  overwrite =         (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
+            if (repscheme & R_quadrant) {                                    // quarter the plane with 4 different parameter values
+                if (repscheme & R_14_quadrant_sele)  select23live =      (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
+                if (repscheme & R_15_quadrant_posn)  pos_canon_neutral = (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
+                if (repscheme & R_16_quadrant_enfb)  enforcebirth =      (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
+                if (repscheme & R_17_quadrant_2nb1)  add2ndmask1st =     (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
+                if (repscheme & R_18_quadrant_ngol)  nongolnottwice =    (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
+                if (repscheme & R_19_quadrant_surv)  survival =          (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
+                if (repscheme & R_20_quadrant_over)  overwrite =         (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
                 canonical = pos_canon_neutral&0x1;       // global value since needed in ...difft2-6 subroutines
             }
             birth = 0ull;
@@ -1880,6 +1883,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     totsteps = 0;
     totdisp = 0;
     statcnts = 0;
+    quadrants = -1;
     
     // writeFile("genepat.dat");
 
@@ -2074,6 +2078,33 @@ void set_offsets(int dx,int dy,int dt) {
     offdt = dt;
 }
 
+void set_quadrant(int quadrant) {
+    if (quadrant >= -1 && quadrant < 7) quadrants = quadrant;
+    repscheme &= ~R_quadrant;                                           // remove all quadrant bits : only one set at a time in interactive version
+    if(quadrant >= 0 && quadrant < 7) {
+        repscheme |= R_14_quadrant_sele<<quadrant;                          // assumes quadrant selectors are 7 successive bits following R_14_...
+    }
+}
+
+void set_repscheme_bits(int quadrant, int x, int y) {
+    unsigned int quadrantval;
+    
+    quadrantval=(x<(Nmask>>1)? 0 : 1) + (y<(Nmask>>1)? 0 : 2);              // determine selected quadrant
+    if(quadrants >= 0 && quadrants < 5) {                                   // assumes repscheme bits in pairs starting from bit 0 matching quadrants
+        repscheme &=  ~(0x3llu<<(quadrants<<1));
+        repscheme |=  ((uint64_t) quadrantval)<<(quadrant<<1);
+    }
+    else if (quadrant < 6) {
+        survivalmask &= ~0x3u;
+        survivalmask|= quadrantval;
+    }
+    else if (quadrant<7) {
+        overwritemask &= ~0x3u;
+        overwritemask|= quadrantval;
+    }
+    repscheme &= ~R_quadrant;                                                // remove all quadrant bits : only one set at a time in interactive version
+    quadrants = -1;                                                          // reset internal quadrants choice so that full display is shown
+}
 //------------------------------------------------------- get ... ---------------------------------------------------------------------------
 void get_curgol(uint64_t outgol[], int NN){
     int ij;

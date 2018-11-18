@@ -67,6 +67,10 @@ libcd.set_selectedgene.restype = None
 libcd.set_selectedgene.argtypes = [c_uint64]
 libcd.set_offsets.restype = None
 libcd.set_offsets.argtypes = [c_int,c_int,c_int]
+libcd.set_quadrant.restype = None
+libcd.set_quadrant.argtypes = [c_int]
+libcd.set_repscheme_bits.restype = None
+libcd.set_repscheme_bits.argtypes = [c_int,c_int,c_int]
 
 def genelife_update(nsteps, nhist, nstat):
     return libcd.genelife_update(nsteps, nhist, nstat)
@@ -139,3 +143,10 @@ def set_selectedgene(gene):
 
 def set_offsets(dx,dy,dt):
     return libcd.set_offsets(dx,dy,dt);
+
+def set_quadrant(quadrant):
+    return libcd.set_quadrant(quadrant)
+
+def set_repscheme_bits(quadrant, x, y):
+    return libcd.set_repscheme_bits(quadrant, x, y)
+
