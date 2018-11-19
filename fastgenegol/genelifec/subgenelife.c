@@ -878,7 +878,8 @@ extern inline void compare_all_neighbors(uint64_t a[],uint64_t b[]) {  // routin
 void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]) {  // routine for 64x-gol packed update, no plane coupling
     unsigned int ij,k;
     uint64_t gs,newgs,sums00,sums10,sums01,sums11,sums02,sums12,sums16[4];
-    uint64_t s,su,sg3,s3,s2or3,sgol,plcodingmask;
+    uint64_t s,su,sg3,s3,s2or3,sgol,s2,plcodingmask,gene,gc1,gc2,shg1,shg2;
+    // uint64_t s2shR,s2shL,g;
     int nb1x[8] = {-1,0,1,1,1,0,-1,-1};
     int nb1y[8] = {-1,-1,-1,0,1,1,1,0};
     const uint64_t r1= 0x1111111111111111;
@@ -910,22 +911,30 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
         sums16[1] = (sums10&r3)+(sums11&r3)+(sums12&r3);
         sums16[2] = ((sums00&rc)>>2)+((sums01&rc)>>2)+((sums02&rc)>>2);
         sums16[3] = ((sums10&rc)>>2)+((sums11&rc)>>2)+((sums12&rc)>>2);
-        newgs=0;
+        newgs=0ull;s2=0ull;
         for (k=0;k<4;k++) {
             s = sums16[k];su = s&rc;
             sg3=(((su>>1)|su)>>2) & r1;
             s2or3 = (~sg3)&(s>>1)&r1;
             s3=s2or3&s&r1;
-            sgol=(s2or3&(gol[ij]|s3))&r1;
+            sgol=s2or3 & r1 & (rulemod ? (gol[ij]^~s3) : (gol[ij]|s3));
             newgs|=sgol<<k;
+            s2 |= (s2or3&(~s3)&r1)<<k;
         }
-        //for (k=0;k<64;k++) {                                                    // explicit loop over 64 bits
-        //    s = (sums16[k&0x3]>>(k>>2))&0xf;
-        //    s2or3 = (s>>2) ? 0ull : (s>>1);                                     // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
-        //    newgs |= (s2or3 & (gol[ij] |(s&0x1ull)))<<k;                        // GoL standard calculation next state
-        //}
+
+        if(rulemod) {
+            gene=golg[ij];
+            //s2shR = (s2>>1)|(s2<<63);                                         // genes determine whether planes are coupled to next or previous plane, coupling too strong
+            //s2shL = (s2<<1)|(s2>>63);
+            // newgs = newgs | (s2&s2shL&gene) | (s2&s2shR&~gene);
+            gc1 = (gene>>6)&0x3 ? 0ull : 1ull;                                  // lowest 8 bits must be in range 0-63 for gene function as plane 1
+            gc2 = (gene>>(8+6))&0x3 ? 0ull:1ull;                                // next lowest  8 bits must be in range 0-63 for gene function as plane 2
+            shg1 = s2&(gc1<<(gene&0x3f));                                       // whether 2-live nbs at plane1
+            shg2 = ((s2>>((gene>>8)&0x3f))&gc2)<<(gene&0x3f);                   // whether 2-live nbs at plane2
+            newgs = newgs | (shg1 & shg2);                                      // low 16 bits of genes determine which two planes are coupled
+        }
         newgol[ij]=newgs&plcodingmask;
-        newgolg[ij]=golg[ij];                                                     // currently no gene changes
+        newgolg[ij]=golg[ij];
     }
 }
 
