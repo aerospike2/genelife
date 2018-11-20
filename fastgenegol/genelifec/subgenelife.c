@@ -133,7 +133,7 @@ int *genestats = NULL;              // dynamic array pointer for statistics of n
 int *stepstats = NULL;              // dynamic array pointer for statistics of site update types over time
 int *configstats = NULL;            // dynamic array pointer for statistics of gol site configurations (x,y,t) offsets
 uint64_t acttrace[N2];              // scrolled trace of last N time points of activity gene trace
-int ymax = 1000;                    // activity scale max for plotting : will be adjusted dynamically or by keys
+int ymax = 2000;                    // activity scale max for plotting : will be adjusted dynamically or by keys
 double log2ymax = 25.0;             // activity scale max 2^25 = 33.5 * 10^6
 int activitymax;                    // max of activity in genealogical record of current population
 uint64_t genealogytrace[N2];        // image trace of genealogies for N most frequently populated genes
@@ -1985,7 +1985,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     inittype = runparams[6];
 
     pmutmask = (unsigned int) simparams[0];                                 // low values of pmutmask <32 are interpreted as -nlog2pmut
-    if(pmutmask<32) pmutmask = (0x1 << pmutmask) - 0x1ull;                  // NB if pmut==0, pmutmask==zero, no mutation.
+    if(pmutmask<32) pmutmask = (0x1 << (32-pmutmask)) - 0x1ull;                  // NB if pmut==0, pmutmask==zero, no mutation.
     initial1density = simparams[1];
     initialrdensity = simparams[2];
     ncodingin = simparams[3];                                               // used in selection  4,5,6,8,
@@ -2209,6 +2209,15 @@ unsigned int set_repscheme_bits(int quadrant, int x, int y, int surviveover[]) {
     surviveover[1]=overwritemask;
     return(repscheme);
 }
+
+void set_surviveover64(unsigned int surviveover[], int len ) {
+    if (len==2) {
+        survivalmask = surviveover[0];
+        overwritemask = surviveover[1];
+    }
+    else fprintf(stderr,"surviveover64 needs two parameters %d provided\n",len);
+}
+
 //------------------------------------------------------- get ... ---------------------------------------------------------------------------
 void get_curgol(uint64_t outgol[], int NN){
     int ij;

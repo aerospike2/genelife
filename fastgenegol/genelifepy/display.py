@@ -24,6 +24,8 @@ from os import system
 
 Width = 512
 Height = 512
+#Width = 1024
+#Height = 1024
 
 # set window position
 os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (20,20)

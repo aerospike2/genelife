@@ -73,6 +73,8 @@ libcd.set_quadrant.restype = None
 libcd.set_quadrant.argtypes = [c_int]
 libcd.set_repscheme_bits.restype = c_uint32
 libcd.set_repscheme_bits.argtypes = [c_int,c_int,c_int, uint_array]
+libcd.set_surviveover64.restype = None
+libcd.set_surviveover64.argtypes = [uint_array, c_int]
 
 def genelife_update(nsteps, nhist, nstat):
     return libcd.genelife_update(nsteps, nhist, nstat)
@@ -151,4 +153,7 @@ def set_quadrant(quadrant):
 
 def set_repscheme_bits(quadrant, x, y, surviveover):
     return libcd.set_repscheme_bits(quadrant, x, y, surviveover)
+
+def set_surviveover64(surviveover):
+    return libcd.set_surviveover64( surviveover, len(surviveover))
 
