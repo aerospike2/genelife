@@ -36,8 +36,8 @@ unsigned int overwritemask = 0x2;   // bit mask for 4 cases of overwrite: bit 0.
                                     // for selection=9 it is 32-bit birthmask to restrict luts
 int ncoding = 1;                    // number of coding bits per gene function
 int ncoding2 = 0;                   // number of coding bits per gene function for masks in connection with repscheme add2ndmask1st R_6,7
-int nlog2pmut = 5;                  // pmut (prob of mutation) = 2^(-nlog2pmut), minimum non-zero pmut = 2^-56. 0 means no mutation.
-uint64_t pmutmask;                  // binary mask so that prob of choosing zero is pmut, assigned
+// int nlog2pmut = 5;               // pmut (prob of mutation) = 2^(-nlog2pmut), minimum non-zero pmut = 2^-56. 0 means no mutation.
+unsigned int pmutmask;              // binary mask so that prob of choosing zero is pmut = pmutmask/2^32
 //-----------------------------------------------------------initialization and color parameters------------------------------------------------------
 int initial1density = (1<<15)>>1;   // initial density of ones in gol as integer value, divide by 2^15 for true density
 int initialrdensity = (1<<15)>>1;   // initial density of random genes in live sites, divide by 2^15 for true density
@@ -206,6 +206,7 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
 // colorgenes1          colour genes specified as input parameters
 // colorgenes           colour genes specified at current time point
 //.......................................................................................................................................................
+// randprob             random event with probability determined by a 32 bit unsigned integer iprob as iprob / 2^32 using RAND128
 // selectone            select one (or none) of two genes based on selection model parameter selection :  returns birth and newgene
 // selectone_nbs        select one of two genes based on pattern of their live 2nd shell neighbours and their genetic encoding
 // selectdifft2         select the right or left of two genes bunched with least number of empty genes between them
@@ -449,6 +450,10 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
 
 void colorgenes(int cgolg[], int NN2) {
     colorgenes1(gol, golg, golgstats, cgolg, NN2);
+}
+//-------------------------------------------------------- randprob ------------------------------------------------------------
+extern inline uint64_t randprob(unsigned int uprob, unsigned int randnr) {
+    return(randnr < uprob ? 1ull : 0ull);
 }
 //------------------------------------------------------- selectone ------------------------------------------------------------
 extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene) {
@@ -876,10 +881,12 @@ extern inline void compare_all_neighbors(uint64_t a[],uint64_t b[]) {  // routin
 
 //------------------------------------------------------- update_gol64 -----------------------------------------------------------------------------------
 void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]) {  // routine for 64x-gol packed update, no plane coupling
-    unsigned int ij,k;
+    unsigned int ij,ij1,j,k,kch,nmut,nbmask,birthplane;
     uint64_t gs,newgs,sums00,sums10,sums01,sums11,sums02,sums12,sums16[4];
-    uint64_t s,su,sg3,s3,s2or3,sgol,s2,plcodingmask,gene,gc1,gc2,shg1,shg2;
+    uint64_t s,su,sg3,s3,s2or3,sgol,s2,plcodingmask,gene,newgene,ancestor,gc1,gc2,shg1,shg2,b,b2;
     // uint64_t s2shR,s2shL,g;
+    uint64_t randnr, rand2, statflag;
+    int nb[8],crot;
     int nb1x[8] = {-1,0,1,1,1,0,-1,-1};
     int nb1y[8] = {-1,-1,-1,0,1,1,1,0};
     const uint64_t r1= 0x1111111111111111;
@@ -887,9 +894,13 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
     const uint64_t r5= 0x5555555555555555;
     const uint64_t ra= 0xaaaaaaaaaaaaaaaa;
     const uint64_t rc= 0xcccccccccccccccc;
+
     
+    canonical = repscheme & R_2_canonical_nb;
     plcodingmask= (NbP==64) ? ~0ull : (1ull<<NbP)-1;
     if(!(totsteps%10)) fprintf(stderr,"iteration step %d\r",totsteps);
+    fprintf(stderr,"in gol64 codingmask is %llx and number of planes is %d\n",codingmask,NbP);
+    
     for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
         sums00 = sums10 = sums01 = sums11 = sums02 = sums12 = 0ull;
         for(k=0;k<3;k++) {
@@ -911,15 +922,17 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
         sums16[1] = (sums10&r3)+(sums11&r3)+(sums12&r3);
         sums16[2] = ((sums00&rc)>>2)+((sums01&rc)>>2)+((sums02&rc)>>2);
         sums16[3] = ((sums10&rc)>>2)+((sums11&rc)>>2)+((sums12&rc)>>2);
-        newgs=0ull;s2=0ull;
+        newgs=0ull;s2=b=0ull;
         for (k=0;k<4;k++) {
             s = sums16[k];su = s&rc;
             sg3=(((su>>1)|su)>>2) & r1;
             s2or3 = (~sg3)&(s>>1)&r1;
             s3=s2or3&s&r1;
-            sgol=s2or3 & r1 & (rulemod ? (gol[ij]^~s3) : (gol[ij]|s3));
+            sgol=s2or3 & r1 & (gol[ij]|s3);
+            // sgol=s2or3 & r1 & (rulemod ? (gol[ij]^~s3) : (gol[ij]|s3));
             newgs|=sgol<<k;
-            s2 |= (s2or3&(~s3)&r1)<<k;
+            s2 |= (s2or3&~s3&r1)<<k;
+            b |= (s2or3&s3&r1)<<k;                                              // for game of life officially birth only if &~gol[ij] but survival replaced here by overwrite birth
         }
 
         if(rulemod) {
@@ -927,14 +940,71 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
             //s2shR = (s2>>1)|(s2<<63);                                         // genes determine whether planes are coupled to next or previous plane, coupling too strong
             //s2shL = (s2<<1)|(s2>>63);
             // newgs = newgs | (s2&s2shL&gene) | (s2&s2shR&~gene);
-            gc1 = (gene>>6)&0x3 ? 0ull : 1ull;                                  // lowest 8 bits must be in range 0-63 for gene function as plane 1
-            gc2 = (gene>>(8+6))&0x3 ? 0ull:1ull;                                // next lowest  8 bits must be in range 0-63 for gene function as plane 2
+            gc1 = ((gene>>6)&codingmask) ? 0ull : 1ull;                                  // lowest 8 bits must be in range 0-63 for gene function as plane 1
+            gc2 = ((gene>>(32+6))&codingmask) ? 0ull:1ull;                                // next lowest  8 bits must be in range 0-63 for gene function as plane 2
             shg1 = s2&(gc1<<(gene&0x3f));                                       // whether 2-live nbs at plane1
             shg2 = ((s2>>((gene>>8)&0x3f))&gc2)<<(gene&0x3f);                   // whether 2-live nbs at plane2
             newgs = newgs | (shg1 & shg2);                                      // low 16 bits of genes determine which two planes are coupled
+            b2 = shg1 & shg2 & ~gol[ij];
+            b |= ~b2;
+            if (shg1 & shg2) fprintf(stderr,"iter %d at ij %d modification is  %llx and %llx\n",totsteps,ij,shg1,shg2);
         }
+        else b2 = 0ull;
         newgol[ij]=newgs&plcodingmask;
-        newgolg[ij]=golg[ij];
+        // newgolg[ij]=golg[ij];
+        statflag = 0ull;
+        if(b) {
+            if(b2) { // 2-live-nb birth with gene copied from canonical choice from neighborhood in single plane with coupling position
+                statflag |= F_notgolrul;
+                birthplane=golg[ij]&0x3f;
+                for(k=0,nbmask=0ull;k<8;k++) {                           // compute no of live neighbours using birthplane (coupled plane neighbours)
+                    nbmask |= ((gol[deltaxy(ij,nb1x[k],nb1y[k])]>>birthplane)&1ull)<<k;
+                }
+                kch=selectdifft2(nbmask, nb, &crot);
+            }
+            else {  // 3-live-nb birth with gene copied from most difft member of neighbourhood of lowest plane with 3-live-nbs
+                for (j=32,k=0;j>0;j>>=1) {
+                    if(b&(((1ull<<j)-1)<<k)) k+=0;
+                    else k+=j;
+                }
+                birthplane=k;
+                for(k=0,nbmask=0ull;k<8;k++) {                           // compute no of live neighbours using birthplane (coupled plane neighbours)
+                    nbmask |= ((gol[deltaxy(ij,nb1x[k],nb1y[k])]>>birthplane)&1ull)<<k;
+                }
+                kch=selectdifft3(nbmask, nb, &crot);
+            }
+            ij1=deltaxy(ij,nb1x[kch],nb1y[kch]);
+            newgene = golg[ij1];
+            RAND128P(randnr);                                                   // inline exp so compiler recognizes auto-vec,
+            rand2 = randprob(pmutmask, (unsigned int) randnr);
+            nmut = (randnr >> 56) & 0x3f;                                       // choose mutation pos for length 64 gene : from bits 56:61 of randnr
+            ancestor = newgene;
+            newgene = newgene ^ (rand2<<nmut);                                  // introduce single mutation with probability pmut = probmut
+            newgolg[ij]=newgene;
+            statflag = statflag | F_birth;
+            if (rand2) statflag = statflag | F_mutation;
+            if(statflag&F_notgolrul) statflag |= F_nongolchg;
+            hashaddgene(newgene,ancestor);
+        } //end if birth
+        else if (newgol[ij]) {                                                     // gene persistence
+            newgolg[ij]=golg[ij];
+            statflag = statflag | F_survival;
+        }
+        else {                                                                  // gene death if alive
+            if(gol[ij]) {                                                          // site with gene
+                hashdeletegene(golg[ij],"step %d hash storage error 2 in update_gol2, gene %llx not stored\n");
+                newgolg[ij]=gene0;
+                statflag = statflag | F_death;
+            }
+            else newgolg[ij]=golg[ij];                                          // stays dead
+        } // end else
+        newgolgstats[ij] = statflag;
+
+    }
+    
+    for (ij=0; ij<N2; ij++) {       // complete missing hash table records including activities, NB all sites have genes in gol16 but don't record activity for zerogene
+        hashgeneextinction(golg[ij],"hash storage error 4 in update_gol64, gene %llx not stored\n");
+        if(newgolg[ij]!=gene0) hashgeneactivity(newgolg[ij],"hash storage error 5 in update_gol64, gene %llx not stored\n");
     }
 }
 
@@ -948,7 +1018,7 @@ void update_gol2(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t new
     unsigned int ij,ij1,k,kch,nmut;
     uint64_t s0,s1,s0_2or3,s1_2or3,nbmask0,nbmask1,ancestor,newgene;
     uint64_t golmix,gol0,gol1,newgol1;
-    uint64_t randnr, randnr2, rand2, statflag;
+    uint64_t randnr, rand2, statflag;
     int nb[8],crot;
     int nb1x[8] = {-1,0,1,1,1,0,-1,-1};
     int nb1y[8] = {-1,-1,-1,0,1,1,1,0};
@@ -982,8 +1052,7 @@ void update_gol2(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t new
             ij1=deltaxy(ij,nb1x[kch],nb1y[kch]);
             newgene = golg[ij1];
             RAND128P(randnr);                                                   // inline exp so compiler recognizes auto-vec,
-            randnr2 = (randnr & pmutmask);                                      // extract bits from randnr for random trial for 0 on pmutmask
-            rand2 = (!pmutmask||randnr2)?0ull:1ull;                             // 1 if lowest nlog2pmut bits of randnr are zero, else zero
+            rand2 = randprob(pmutmask, (unsigned int) randnr);
             nmut = (randnr >> 56) & 0x3f;                                       // choose mutation pos for length 64 gene : from bits 56:61 of randnr
             ancestor = newgene;
             newgene = newgene ^ (rand2<<nmut);                                  // introduce single mutation with probability pmut = probmut
@@ -1025,7 +1094,7 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
     uint64_t s,sm,sm3,s3sm3,su,s3,sg3,s2or3,nbmask,nbmaskr,nbmaskrm,ancestor,newgene,golsh,pmask;
     uint64_t *golm;
     //uint64_t s0,sm;
-    uint64_t randnr, randnr2, rand2, statflag;
+    uint64_t randnr, rand2, statflag;
     int nb1x[8] = {-1,0,1,1,1,0,-1,-1};
     int nb1y[8] = {-1,-1,-1,0,1,1,1,0};
     int npmasks[17] = {1,1,3,3,7,7,7,7,0xf,0xf,0xf,0xf,0xf,0xf,0xf,0xf,0xf};
@@ -1124,8 +1193,7 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
                 ij1=deltaxy(ij,nb1x[k],nb1y[k]);
                 newgene = golg[ij1];
                 RAND128P(randnr);                                                 // inline exp so compiler recognizes auto-vec,
-                randnr2 = (randnr & pmutmask);                                    // extract bits from randnr for random trial for 0 on pmutmask
-                rand2 = (!pmutmask||randnr2)?0ull:1ull;                           // 1 if lowest nlog2pmut bits of randnr are zero, else zero
+                rand2 = randprob(pmutmask, (unsigned int) randnr);
                 nmut = (randnr >> 56) & (0x3|(npmask<<2));                        // choose mutation pos for length np*4 gene : from bits 56:61 of randnr
                 ancestor = newgene;
                 newgene = newgene ^ (rand2<<nmut);                                // introduce single mutation with probability pmut = probmut
@@ -1172,7 +1240,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
     unsigned int survivemask;
     unsigned int birthmask;
     int nb[8],  ij, i, j, jp1, jm1, ip1, im1;
-    uint64_t genecode, gols, nb1i, randnr, randnr2, r2;
+    uint64_t genecode, gols, nb1i, randnr, r2;
     uint64_t newgene, ancestor, livegenes[8];
     uint64_t  birth, statflag, ncodingmask, allcoding;
     
@@ -1235,8 +1303,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
             idx = ((randnr>>52)&0xf) % s;                                   // choose random for now
             newgene = livegenes[idx];
             // compute random events for single bit mutation, as well as mutation position nmut
-            randnr2 = (randnr & pmutmask);                                  // extract bits from randnr for random trial for 0 on pmutmask
-            r2 = (!pmutmask||randnr2)?0ull:1ull;                            // 1 if lowest nlog2pmut bits of randnr are zero, else zero
+            r2 = randprob(pmutmask, (unsigned int) randnr);
             nmut = (randnr >> 57) & 0x3f;                                   // choose mutation position for length 64 gene : from bits 57+ of randnr
             // complete calculation of newgol and newgolg, including mutation
             ancestor = newgene;
@@ -1274,7 +1341,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
     static int sumoffs[5] = {0,4,11,21,28};
     int nb[8], ij, i, j, jp1, jm1, ip1, im1;
     unsigned int kch;
-    uint64_t genecode, gcode, gols, nb1i, nbmask, randnr, randnr2, r2;
+    uint64_t genecode, gcode, gols, nb1i, nbmask, randnr, r2;
     uint64_t newgene, ancestor;
     uint64_t statflag;
     
@@ -1369,8 +1436,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
             RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
             newgene = golg[nb[kch]];                                        // deterministic choice of gene via selectdifftn functions
             // compute random events for single bit mutation, as well as mutation position nmut
-            randnr2 = (randnr & pmutmask);                                  // extract bits from randnr for random trial for 0 on pmutmask
-            r2 = (!pmutmask||randnr2)?0ull:1ull;                            // 1 if lowest nlog2pmut bits of randnr are zero, else zero
+            r2 = randprob(pmutmask, (unsigned int) randnr);
             nmut = (randnr >> 57) & 0x3f;                                   // choose mutation position for length 64 gene : from bits 57+ of randnr
             // complete calculation of newgol and newgolg, including mutation
             ancestor = newgene;
@@ -1400,7 +1466,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
     unsigned int kch,rulemodij,add2nd,mask1st;
     unsigned int select23live,pos_canon_neutral,survival,overwrite,enforcebirth,add2ndmask1st,nongolnottwice;
     int nb[8], nbc, nbch, ij, i, j, jp1, jm1, ip1, im1;
-    uint64_t g, gs, nb1i, nb2i, randnr, randnr2, r2;
+    uint64_t g, gs, nb1i, nb2i, randnr, r2;
     uint64_t nbmask, nbmaskr;
     uint64_t newgene, ancestor, livegenes[3];
     uint64_t s2or3, birth, statflag, nextgolstate;
@@ -1548,10 +1614,9 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 // compute random events for multiple single bit mutations, as well as mutation position nmut
                 r2=1ull;
                 ancestor = newgene;
-                while (r2 && pmutmask) {
+                while (r2) {
                     RAND128P(randnr);                                           // inline exp so compiler recognizes auto-vec,
-                    randnr2 = (randnr & pmutmask);                              // extract bits from randnr for random trial for 0 on pmutmask
-                    r2 = (randnr2)?0ull:1ull;                                   // 1 only if lowest nlog2pmut bits of randnr are zero
+                    r2 = randprob(pmutmask,(unsigned int) randnr);
                     nmut = (randnr >> 56) & 0x3f;                               // choose mutation position for length 64 gene : from bits 56:61 of randnr
                     newgene = newgene ^ (r2<<nmut);                             // introduce single mutation with probability pmut = probmut
                 }
@@ -1919,12 +1984,11 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     colorfunction = runparams[5];
     inittype = runparams[6];
 
-    nlog2pmut = simparams[0];
-    if(nlog2pmut>56) nlog2pmut=0;                                           // need to use top 6-8 bits of 64 bit random nr for position
-    pmutmask = (0x1ull << nlog2pmut) - 0x1ull;                              // NB if nlogpmut==0, pmutmask==zero, no mutation.
+    pmutmask = (unsigned int) simparams[0];                                 // low values of pmutmask <32 are interpreted as -nlog2pmut
+    if(pmutmask<32) pmutmask = (0x1 << pmutmask) - 0x1ull;                  // NB if pmut==0, pmutmask==zero, no mutation.
     initial1density = simparams[1];
     initialrdensity = simparams[2];
-    ncodingin = simparams[3];                                                 // used in selection  4,5,6,8,
+    ncodingin = simparams[3];                                               // used in selection  4,5,6,8,
     ncoding = ncodingin & 0xff;
     ncoding2 = (ncodingin>>8) & 0xff;
     if (ncoding > 64) {
@@ -1947,7 +2011,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     fprintf(stderr,"runparams %d %d %d %d %d %d %d\n",runparams[0],runparams[1],runparams[2],
                                          runparams[3],runparams[4],runparams[5],runparams[6]);
     fprintf(stderr,"simparams %d %d %d %d %d\n",simparams[0],simparams[1],simparams[2],simparams[3],simparams[4]);
-    fprintf(stderr,"pmutmask %llx (NB 0 means no mutation)\n",pmutmask);
+    fprintf(stderr,"pmutmask %x (NB 0 means no mutation)\n",pmutmask);
 
     if (selection == 10) {                                                   // have to treat separately since bitplanes for gol only every 4th plane
         uint64_t pmask;
@@ -2267,8 +2331,8 @@ void countspecies1(uint64_t gol[], uint64_t golg[], int N2) {     /* counts numb
     }
     fprintf(stderr,"rulemod\trepscheme\tselection\toverwritemask\tsurvival\n");
     fprintf(stderr,"%d\t%d\t\t%d\t\t%d\t\t%d\n",rulemod,repscheme,selection,overwritemask,survivalmask);
-    fprintf(stderr,"nlog2pmut\tinit1\tinitr\tncoding\tstartchoice\n");
-    fprintf(stderr,"%d\t\t%d\t%d\t%d\t%d\n",nlog2pmut,initial1density,initialrdensity,ncoding,startgenechoice);
+    fprintf(stderr,"pmutmask\tinit1\tinitr\tncoding\tstartchoice\n");
+    fprintf(stderr,"%x\t\t%d\t%d\t%d\t%d\n",pmutmask,initial1density,initialrdensity,ncoding,startgenechoice);
 }
 
 void countspecies() {                                                       // counts current species without using hash tables
