@@ -2003,7 +2003,10 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         case 13: NbP=2; NbG=64;break;
         default: NbP=1; NbG=64;
     }
-    codingmask = (1ull<<ncoding2)-1ull;                                      // bit mask corresponding to ncoding2 bits, only used in connection with add2ndmask1st
+    if (selection<8)
+        codingmask = (1ull<<ncoding2)-1ull;                                      // bit mask corresponding to ncoding2 bits, only used in connection with add2ndmask1st
+    else if (selection==8)
+        codingmask = (1ull<<ncoding)-1ull;
     startgenechoice = simparams[4];
     
     fprintf(stderr,"___________________________________________________________________________________________\n");
@@ -2215,7 +2218,7 @@ void set_surviveover64(unsigned int surviveover[], int len ) {
         survivalmask = surviveover[0];
         overwritemask = surviveover[1];
     }
-    else fprintf(stderr,"surviveover64 needs two parameters %d provided\n",len);
+    else fprintf(stderr,"surviveover64 needs two parameters, %d provided\n",len);
 }
 
 //------------------------------------------------------- get ... ---------------------------------------------------------------------------
