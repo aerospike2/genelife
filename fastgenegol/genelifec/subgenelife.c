@@ -34,10 +34,11 @@ unsigned int survivalmask = 0x2;    // survive mask for two (bit 1) and three (b
                                     // for selection=8 this is 16-bit birthsurvivemask, for selection=9 it is 32-bit survivemask to restrict luts
 unsigned int overwritemask = 0x2;   // bit mask for 4 cases of overwrite: bit 0. s==3  bit 1. special birth s==2
                                     // for selection=9 it is 32-bit birthmask to restrict luts
-int ncoding = 1;                    // number of coding bits per gene function
-int ncoding2 = 0;                   // number of coding bits per gene function for masks in connection with repscheme add2ndmask1st R_6,7
-// int nlog2pmut = 5;               // pmut (prob of mutation) = 2^(-nlog2pmut), minimum non-zero pmut = 2^-56. 0 means no mutation.
-unsigned int pmutmask;              // binary mask so that prob of choosing zero is pmut = pmutmask/2^32
+int ncoding = 1;                    // byte 0 of python ncoding : number of coding bits per gene function
+int ncoding2 = 0;                   // byte 1 of python ncoding: number of coding bits per gene function for masks in connection with repscheme add2ndmask1st R_6,7
+int NbP;                            // byte 2 of python ncoding: number of bit planes used for parallel gol planes packed into gol long unsigned integer : used for selection = 10-13
+int NbG;                            // number of bits in gene used : fully determined by selection and NbP
+unsigned int pmutmask;              // binary mask so that prob of choosing zero is pmut = pmutmask/2^32. If value<32 interpret as integer -log2(prob).
 //-----------------------------------------------------------initialization and color parameters------------------------------------------------------
 int initial1density = (1<<15)>>1;   // initial density of ones in gol as integer value, divide by 2^15 for true density
 int initialrdensity = (1<<15)>>1;   // initial density of random genes in live sites, divide by 2^15 for true density
@@ -139,8 +140,6 @@ int activitymax;                    // max of activity in genealogical record of
 uint64_t genealogytrace[N2];        // image trace of genealogies for N most frequently populated genes
 uint64_t working[N2];               // working space array for calculating genealogies and doing neighbour bit packing
 //------------------------------------------------ planes and configuration offsets----------------------------------------------------------------------
-int NbP;                            // number of bit planes used for parallel gol planes packed into gol long unsigned integer : used for selection = 10-13
-int NbG;                            // number of bits in gene used : fully determined by selection and NbP;
 int offdx=0,offdy=0,offdt=0;        // display chosen offsets for glider analysis with colorfunction 8
 int Noff = 9;                       // number of offsets
 int **offsets;                      // array of offsets (2D + time) for planes
@@ -220,6 +219,7 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
 // pack49neighbors      fast routine to pack all up to 3rd neighbours in single word : oder of bits dictated by hiearchical assembly
 // compare_neighbors    compare packed pack neighbours with one given x,y shift of arbitrary size
 // compare_all_neighbors compare packed pack neighbours with all nearest neighbour x,y shifts
+// packandcompare       pack and compare either all 1-shifted 3-neighbourhoods with t=-1 or chosen (dx,dy,dt) 3-neighbourhoods
 //.......................................................................................................................................................
 // update_gol64         update version for 64 parallel gol planes, currently without genetic coupling (routine not yet used)
 // update_gol2          update version for 2 parallel gol planes, coupled by a gene on one plane
@@ -247,6 +247,8 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
 // set_offsets          set offsets for detection of glider structures in display for color function 8
 // set_quadrant         set the pair of bits in repscheme (or survivalmask or overwritemask) used for quadrant variation 0-6
 // set_repscheme_bits   set the two of the repscheme (or survivalmask or overwritemask) bits corresponding to the selected quadrant
+// set_repscheme        set repscheme from python
+// set_surviveover      set the two masks for survival and overwrite from python (survivalmask, overwritemask)
 //.......................................................................................................................................................
 // get_curgol           get current gol array from python
 // get_curgolg          get current golg array from python
@@ -456,8 +458,8 @@ extern inline uint64_t randprob(unsigned int uprob, unsigned int randnr) {
     return(randnr < uprob ? 1ull : 0ull);
 }
 //------------------------------------------------------- selectone ------------------------------------------------------------
-extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene) {
-// birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene.
+extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene, uint64_t randnr) {
+// birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene. Non-random result except for selection case 7.
     unsigned int k,d0,d1,d2,d3,dd,swap;                  // number of ones in various gene combinations
     uint64_t livegenes[2],gdiff,gdiff0,gdiff1; // various gene combinations
     uint64_t gene2centre;                                // gene function centres in sequence space
@@ -542,9 +544,9 @@ extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], ui
             *birth = (g0011 && (d0!=d3)) != (g0110 && (d2!=d1))  ? 1ull: 0ull; // birth if 2 genes closer to two different targets than to each other
             *newgene= (g0011 && (d0!=d3)) ? ((d0<d3) ? livegenes[0] : livegenes[1]) : ((d2<d1) ? livegenes[0] : livegenes[1]);
             break;
-        case 7:                                          // no special birth via selection allowed
-            *birth = 0ull;
-            *newgene = livegenes[0];                     // dummy choice not used
+        case 7:                                          // neutral selection but birth only occurs if two chosen sequences are different (NB uses RNG)
+            *birth = livegenes[0]^livegenes[1] ? 1ull: 0ull;
+            *newgene = livegenes[(randnr>>62)&1ull];     // could not find a deterministic way to do this. Uses unused bit of current random number.
             break;
         // cases 8+: this subroutine is not used
         default:
@@ -879,6 +881,21 @@ extern inline void compare_all_neighbors(uint64_t a[],uint64_t b[]) {  // routin
     }
 }
 
+extern inline void packandcompare(uint64_t newgol[],uint64_t working[],uint64_t golmix[]) {
+    if (colorfunction==8) {
+        pack49neighbors(newgol,working);
+        if(offdx==0 && offdy==0 && offdt==0) {
+            pack49neighbors(gol,golmix);
+            compare_all_neighbors(golmix,working);  // compare all 8 directions N E S W NE SE SW NW
+        }
+        else {
+            if (offdt<=-maxPlane) offdt=-maxPlane;
+            if(offdt>0) offdt = 0;
+            pack49neighbors(planesg[(newPlane-offdt)%maxPlane],golmix);
+            compare_neighbors(golmix,working,offdx,offdy);                 // compare with a single direction (north) for gliders
+        }
+    }
+}
 //------------------------------------------------------- update_gol64 -----------------------------------------------------------------------------------
 void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]) {  // routine for 64x-gol packed update, no plane coupling
     unsigned int ij,ij1,j,k,kch,nmut,nbmask,birthplane;
@@ -1318,6 +1335,8 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         newgolgstats[ij] = statflag;
     }  // end for ij
 
+    if (colorfunction==8) packandcompare(newgol,working,golmix);
+    
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
@@ -1451,12 +1470,13 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
         newgolgstats[ij] = statflag;
     }  // end for ij
 
+    if (colorfunction==8) packandcompare(newgol,working,golmix);
+    
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
 }
-
 //------------------------------------------------------- update -----------------------------------------------------------------------------------
 void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
@@ -1544,6 +1564,8 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
             }
             birth = 0ull;
             newgene = 0ull;
+            if(selection==7) {RAND128P(randnr)}                           // random number only used in selection for neutral selection case 7
+            else randnr=0;
             if (s&0x1ull) {  // s==3                                        // allow birth (with possible overwrite)
               statflag |= F_3_live;                                         // record instance of 3 live nbs
               if ((0x1ull&overwrite)|(0x1ull&~gol[ij]) ) {                  // central site empty or overwrite mode
@@ -1559,9 +1581,9 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                           if(nb[nbc]!=nbch) nb2i = (nbc<<(k1++<<2))+nb2i;
                       }
                       if (add2nd) selectone_nbs(s,nb2i,nb,gol,golg,&birth,&newgene);  //2nd nb modulation
-                      else selectone(s,nb2i,nb,golg,&birth,&newgene);
+                      else selectone(s,nb2i,nb,golg,&birth,&newgene,randnr);
                       if (birth==0ull) {                                    // optional reset of ancestor & birth if no ancestors chosen in selectone
-                        if((enforcebirth&0x1)||rulemodij)  {               // birth cannot fail or genes don't matter or no modification to gol rules
+                        if((enforcebirth&0x1)||rulemodij)  {                // birth cannot fail or genes don't matter or no modification to gol rules
                             newgene = golg[nbch];
                             birth = 1ull;
                         }
@@ -1594,7 +1616,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                             }
                             else birth = 1ull;
                         }
-                        else selectone(s,nb1i,nb,golg,&birth,&newgene);
+                        else selectone(s,nb1i,nb,golg,&birth,&newgene,randnr);
                         if(!birth && (enforcebirth&0x2)) {
                             nbmask = (0x1ull<<(nb1i&0x7)) + (0x1ull<<((nb1i>>4)&0x7));
                             kch=selectdifft2(nbmask, nb, &crot);
@@ -1666,23 +1688,13 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
         newgolgstats[ij] = statflag;
     }  // end for ij
 
+
+    if (colorfunction==8) packandcompare(newgol,working,golmix);
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    if (colorfunction==8) {
-        pack49neighbors(newgol,working);
-        if(offdx==0 && offdy==0 && offdt==0) {
-            pack49neighbors(gol,golmix);
-            compare_all_neighbors(golmix,working);  // compare all 8 directions N E S W NE SE SW NW
-        }
-        else {
-            if (offdt<=-maxPlane) offdt=-maxPlane;
-            if(offdt>0) offdt = 0;
-            pack49neighbors(planesg[(newPlane-offdt)%maxPlane],golmix);
-            compare_neighbors(golmix,working,offdx,offdy);                 // compare with a single direction (north) for gliders
-        }
-    }
+
 }
 
 //------------------------------------------------------- stats routines -----------------------------------------------------------------------------------
@@ -2211,6 +2223,10 @@ unsigned int set_repscheme_bits(int quadrant, int x, int y, int surviveover[]) {
     surviveover[0]=survivalmask;
     surviveover[1]=overwritemask;
     return(repscheme);
+}
+
+void set_repscheme(unsigned int repscheme_in) {
+    repscheme = repscheme_in;
 }
 
 void set_surviveover64(unsigned int surviveover[], int len ) {
