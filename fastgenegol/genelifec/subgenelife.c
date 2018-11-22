@@ -254,6 +254,7 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
 // set_quadrant         set the pair of bits in repscheme (or survivalmask or overwritemask) used for quadrant variation 0-6
 // set_repscheme_bits   set the two of the repscheme (or survivalmask or overwritemask) bits corresponding to the selected quadrant
 // set_repscheme        set repscheme from python
+// set_rulemod          set rulemod from python
 // set_surviveover      set the two masks for survival and overwrite from python (survivalmask, overwritemask)
 //.......................................................................................................................................................
 // get_curgol           get current gol array from python
@@ -941,7 +942,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
         nextgolstate = s2or3 ? (gol[ij] ? 1ull : (s&0x1ull ? 1ull : 0ull )) : 0ull;   // GoL standard calculation next state
 
         statflag = 0ull;
-        rulemodij = rulemod;
+        rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1);   // if rulemod bit 1 is on then split into half planes with/without mod
         nbmask = 0;
         if(s>1) {
           if (repscheme & R_17_quadrant_2nb1)  add2ndmask1st =     (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
@@ -2226,6 +2227,10 @@ unsigned int set_repscheme_bits(int quadrant, int x, int y, int surviveover[]) {
 
 void set_repscheme(unsigned int repscheme_in) {
     repscheme = repscheme_in;
+}
+
+void set_rulemod(unsigned int rulemod_in) {
+    rulemod = rulemod_in;
 }
 
 void set_displayplanes(unsigned int displayplanes_in) {
