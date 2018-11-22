@@ -1023,7 +1023,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 else {
                     statflag |= F_3g_same;
                     newgene = livegenes[0];                                 // genes all the same : copy first one
-                    if((~enforcebirth&0x1) && rulemodij) birth = 0ull;     // no birth for 3 identical genes
+                    if((~enforcebirth&0x1) && rulemodij) birth = 0ull;      // no birth for 3 identical genes if not enforcebirth3 and rulemod
                 }
               } // end central site empty or overwrite mode
             }  // end if s==3
