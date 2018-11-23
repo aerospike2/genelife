@@ -465,8 +465,8 @@ extern inline uint64_t randprob(unsigned int uprob, unsigned int randnr) {
     return(randnr < uprob ? 1ull : 0ull);
 }
 //------------------------------------------------------- selectone ------------------------------------------------------------
-extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene, uint64_t randnr) {
-// birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene. Non-random result except for selection case 7.
+extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene, unsigned int kch) {
+// birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene. Non-random result.
     unsigned int k,d0,d1,d2,d3,dd,swap;                  // number of ones in various gene combinations
     uint64_t livegenes[2],gdiff,gdiff0,gdiff1; // various gene combinations
     uint64_t gene2centre;                                // gene function centres in sequence space
@@ -552,8 +552,10 @@ extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], ui
             *newgene= (g0011 && (d0!=d3)) ? ((d0<d3) ? livegenes[0] : livegenes[1]) : ((d2<d1) ? livegenes[0] : livegenes[1]);
             break;
         case 7:                                          // neutral selection but selective birth only occurs if two chosen sequences are same (different) (NB uses RNG)
-            *birth = livegenes[0]^livegenes[1] ? 0ull: 1ull;
-            *newgene = livegenes[(randnr>>62)&1ull];     // could not find a deterministic way to do this. Uses unused bit of current random number.
+                                                         // note that birth is already suppressed for 3 identical live nbs unless enforcebirth-3 bit on
+                                                         // we want to use this routine only for two live nbs and only when genes not same
+            *birth = livegenes[0]^livegenes[1] ? 1ull: 0ull;
+            *newgene = golg[nb[kch]];
             break;
         // cases 8+: this subroutine is not used
         default:
@@ -990,8 +992,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
             }
             birth = 0ull;
             newgene = 0ull;
-            if(selection==7) {RAND128P(randnr)}                           // random number only used in selection for neutral selection case 7
-            else randnr=0;
+
             if (s&0x1ull) {  // s==3                                        // allow birth (with possible overwrite)
               statflag |= F_3_live;                                         // record instance of 3 live nbs
               if ((0x1ull&overwrite)|(0x1ull&~gol[ij]) ) {                  // central site empty or overwrite mode
@@ -1007,7 +1008,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                           if(nb[nbc]!=nbch) nb2i = (nbc<<(k1++<<2))+nb2i;
                       }
                       if (add2nd) selectone_nbs(s,nb2i,nb,gol,golg,&birth,&newgene);  //2nd nb modulation
-                      else selectone(s,nb2i,nb,golg,&birth,&newgene,randnr);
+                      else selectone(s,nb2i,nb,golg,&birth,&newgene,kch);
                       if (birth==0ull) {                                    // optional reset of ancestor & birth if no ancestors chosen in selectone
                         if((enforcebirth&0x1)||rulemodij)  {                // birth cannot fail or genes don't matter or no modification to gol rules
                             newgene = golg[nbch];
@@ -1032,17 +1033,19 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 if (((select23live>>1)&0x1)&&(rulemodij||gol[ij])) {       // rule departure from GOL allowed or possible overwrite
                     if ((0x1ull&(overwrite>>1))||!gol[ij]) {                // either overwrite on for s==2 or central site is empty
                         if (add2nd) selectone_nbs(s,nb1i,nb,gol,golg,&birth,&newgene); //2nd nb modulation
-                        else if (repscheme & ((pos_canon_neutral>>1)&0x1)) {
+                        else {
                             nbmask = (0x1ull<<(nb1i&0x7)) + (0x1ull<<((nb1i>>4)&0x7));
                             kch=selectdifft2(nbmask, &crot);
-                            newgene = golg[nb[kch]];
-                            if(repscheme & R_10_13_2birth_k4) {
-                                if(repscheme & (R_10_2birth_k0<<(kch-1))) birth = 1ull;
-                                else birth = 0ull;
+                            if (repscheme & ((pos_canon_neutral>>1)&0x1)) { // enforce gene independent birth
+                                newgene = golg[nb[kch]];
+                                birth = 1ull;
                             }
-                            else birth = 1ull;
+                            else selectone(s,nb1i,nb,golg,&birth,&newgene,kch);
+                            if(repscheme & R_10_13_2birth_k4) {             // birth only on the active subset of 4 canonical 2-live nb configs if any are active
+                                if(~repscheme & (R_10_2birth_k0<<(kch-1))) birth = 0ull;   // cancel birth if chosen configuration not active
+                            }
                         }
-                        else selectone(s,nb1i,nb,golg,&birth,&newgene,randnr);
+
                         if(!birth && (enforcebirth&0x2)) {
                             nbmask = (0x1ull<<(nb1i&0x7)) + (0x1ull<<((nb1i>>4)&0x7));
                             kch=selectdifft2(nbmask, &crot);
