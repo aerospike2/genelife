@@ -1546,9 +1546,8 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
     const uint64_t rc= 0xcccccccccccccccc;
     
     canonical = repscheme & R_2_canonical_nb;
-    plcodingmask= (NbP==64) ? ~0ull : (1ull<<NbP)-1;
+    plcodingmask= (NbP==64) ? ~0ull : (1ull<<NbP)-1;                            // note that for number of planes less than 64, the 3D calculation is not periodic closed. PROBLEM! *******
     if(!(totsteps%10)) fprintf(stderr,"iteration step %d\r",totsteps);
-    // fprintf(stderr,"in gol64 codingmask is %llx and number of planes is %d\n",codingmask,NbP);
     
     for (ij=0; ij<N2; ij++) {                                                   // loop over all sites of 2D torus with side length N
         golij = gol[ij];
@@ -1584,7 +1583,7 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
             b3 |= (s3&(~golij>>k)&r1)<<k;
         }
         b= newgs&~golij;
-        if (b!=b3) fprintf(stderr,"in update_gol64 something went wrong with 2D-GoL birth process b=%llx != b3=%llx\n",b,b3);
+        // if (b!=b3) fprintf(stderr,"in update_gol64 something went wrong with 2D-GoL birth process b=%llx != b3=%llx\n",b,b3);
         if (rulemod) {
             for (k=0;k<4;k++) {
                 sm = s = sums16[k]-((golij>>k)&r1);                             // the sum for each central plane should not include the central site
@@ -1602,7 +1601,7 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
                 sm += sh&r7;
                 sums3D[k] = sm|sge8|(sh&r8);                                    // sums3D are correct modulo 8 for 26 nbs and the 4th bit determines if sum is >=8.
             }
-            // determine if values are 567 for survival or 6 for birth (excluding central cell) Carter's 3D life rule 5766.
+            // determine if values are 567 for survival or 6 for birth (excluding central cell): Carter's 3D life rule 5766.
             for (s6=s567=0ull,k=0;k<4;k++) {
                 s  = sums3D[k];                                                 // sums in 3D calculated above
                 sm = (~s>>3)&(s>>2);                                            // partial calculation of common bits between s6 and s567
@@ -1611,14 +1610,28 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
                 s567 |= (sh|(sm&s&r1))<<k;                                      // assembled bits for all 64 planes of whether sum=5,6 or 7
             }
             b3d = s6 & ~golij;
-            newgs3d = s6|(s567&golij);                                         // new state is 3D GoL next state
+            newgs3d = s6|(s567&golij);                                          // new state is 3D GoL next state
         }
         else b3d=newgs3d=0ull;
-        newgol[ij]=(newgs|newgs3d)&plcodingmask;
+
         golgij=golg[ij];
-        genemask = 1ull<<(golgij&0x3full);
-        b3d=b3d&genemask;
-        b = b3|b3d;
+        if(rulemod) {
+            if(repscheme&0x1) {                                                 // turn coupling on: 2D plus 3D when gene specifies the plane
+                if(repscheme&0x2) {                                             // with this repscheme parameter, only use birth not survival from 2D GoL
+                    newgs = b3;
+                }
+                genemask = 1ull<<(golgij&0x3full);
+                b3d=b3d&genemask;
+                b = b3|b3d;
+                newgol[ij]=(newgs|newgs3d)&plcodingmask;
+            }
+            else {                                                              // genes have no effect on pure 3D GoL for repscheme = 0
+                b = b3d;
+                b3=0ull;
+                newgol[ij]=newgs3d&plcodingmask;
+            }
+        }
+        
         statflag = 0ull;
         if(b) {                                                                 // deterministic rule in first plane starting from gene-specified plane number
             statflag |= F_notgolrul;
@@ -1626,8 +1639,6 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
             if(birthinitplane) b = (b>>birthinitplane) | (b<<(64-birthinitplane));    // rotate b to start at genetic birthplane
             FIRST1INDEX(b, kb);
             kb = (kb+birthinitplane)&0x3f;
-            
-            // PROBLEM need to rotate back for code below
             if((b3>>kb)&1ull) {                                                 // gene copied preferentially according to 2D birth rule with ancestor coming from
                 for(k=0,nbmask=0ull;k<8;k++) {                                  // compute no of live neighbours using birthplane (coupled plane neighbours)
                     nbmask |= ((gol[deltaxy(ij,nb1x[k],nb1y[k])]>>kb)&1ull)<<k;
