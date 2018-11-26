@@ -376,8 +376,8 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                                                      : ((d>>2) ? 2*32 + (d-4)*8
                                                      : ((d>>1) ? 32 + (d-2)*16
                                                      : d*32))));
-                            mask = gol[ij] * 11400714819323198549ul;mask = mask >> (64 - 16);
-                            mask = ((d2+62)<<8)+(mask<<16)+0xff;
+                            mask = gol[ij] * 11400714819323198549ul;mask = mask >> (64 - 16); // 16 random bits based on gol state
+                            mask = ((d2+62)<<24)+(mask<<16)+0xff;
                         }
                         else mask = ((unsigned int)((gol[ij]>>displayoneplane)&1ull))*((displayoneplane<<26)+((63-displayoneplane)<<18)+0xff);
                     }
