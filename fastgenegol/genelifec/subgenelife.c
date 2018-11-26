@@ -1531,7 +1531,7 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
 void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]) {  // selection model 12, routine for 64x-gol packed update with 1 gene plane
     unsigned int ij,ij1,k,k1,kch,kb,sum,nmut,nbmask,birthinitplane,plane;
     uint64_t golij,gs,newgs,newgs3d,sums00,sums10,sums01,sums11,sums02,sums12,sums16[4],sums3D[4];
-    uint64_t s,s3,s4,s567,s6 = 0,sgol,sm,sh,sge8,plcodingmask,golgij,newgene,ancestor,b,b3,b3d,genemask;
+    uint64_t s,s3,s4,s5,s6,s7,s567,sgol,sm,sh,sge8,plcodingmask,golgij,newgene,ancestor,b,b3,b3d,genemask;
     // uint64_t s2shR,s2shL,g;
     uint64_t randnr, rand2, statflag;
     int crot;
@@ -1602,15 +1602,20 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
                 sums3D[k] = sm|sge8|(sh&r8);                                    // sums3D are correct modulo 8 for 26 nbs and the 4th bit determines if sum is >=8.
             }
             // determine if values are 567 for survival or 6 for birth (excluding central cell): Carter's 3D life rule 5766.
-            for (s6=s567=0ull,k=0;k<4;k++) {
+            for (s5=s6=s7=s567=0ull,k=0;k<4;k++) {
                 s  = sums3D[k];                                                 // sums in 3D calculated above
                 sm = (~s>>3)&(s>>2);                                            // partial calculation of common bits between s6 and s567
                 sh = sm&(s>>1)&~s&r1;                                           // contribution to s6 from k
                 s6 |= sh<<k;                                                    // assembled bits for all 64 planes of whether sum=6
                 s567 |= (sh|(sm&s&r1))<<k;                                      // assembled bits for all 64 planes of whether sum=5,6 or 7
+                s5 |= (sm&~(s>>1)&s&r1)<<k;                                     // needed for repscheme coupling variants not for standard 3D
+                s7 |= (sm&(s>>1)&s&r1)<<k;                                      // needed for repscheme coupling variants not for standard 3D
             }
             b3d = s6 & ~golij;
-            newgs3d = s6|(s567&golij);                                          // new state is 3D GoL next state
+            if      (repscheme&0x10) newgs3d = s6|(s5&golij);                   // new state is modified 3D GoL next state with survival only for 5 or 6 not 7
+            else if (repscheme&0x20) newgs3d = s6|(s7&golij);                   // new state is modified 3D GoL next state with survival only for 6 or 7 not 5
+            else if (repscheme&0x40) newgs3d = s6;                              // new state is modified 3D GoL next state with survival only for 6 not 7 not 5
+            else                     newgs3d = s6|(s567&golij);                 // new state is 3D GoL next state
         }
         else b3d=newgs3d=0ull;
 
