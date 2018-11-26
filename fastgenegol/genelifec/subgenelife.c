@@ -1601,7 +1601,7 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
                 sm += sh&r7;
                 sums3D[k] = sm|sge8|(sh&r8);                                    // sums3D are correct modulo 8 for 26 nbs and the 4th bit determines if sum is >=8.
             }
-            // determine if values are 567 for survival or 6 for birth (excluding central cell): Carter's 3D life rule 5766.
+            // determine if values are 567 for survival or 6 for birth (excluding central cell): Carter Bay's 3D life rule 5766.
             for (s5=s6=s7=s567=0ull,k=0;k<4;k++) {
                 s  = sums3D[k];                                                 // sums in 3D calculated above
                 sm = (~s>>3)&(s>>2);                                            // partial calculation of common bits between s6 and s567
