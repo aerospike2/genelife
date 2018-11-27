@@ -87,6 +87,8 @@ libcd.set_displayplanes.restype = None
 libcd.set_displayplanes.argtypes = [c_uint32]
 libcd.set_surviveover64.restype = None
 libcd.set_surviveover64.argtypes = [uint_array, c_int]
+libcd.set_vscrolling.restype = None
+libcd.set_vscrolling.argtypes = []
 
 def get_log2N():
     return libcd.get_log2N()
@@ -186,3 +188,6 @@ def set_displayplanes(displayplanes):
 
 def set_surviveover64(surviveover):
     return libcd.set_surviveover64( surviveover, len(surviveover))
+
+def set_vscrolling():
+    return libcd.set_vscrolling()

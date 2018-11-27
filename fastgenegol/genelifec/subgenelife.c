@@ -134,6 +134,7 @@ int quadrants=-1;                   // integer choice of bit pair from repscheme
 uint64_t displayplanes;             // mask for displaying planes in selection models 10,11,12
 uint64_t displayoneplane;           // display one plane only if <64, all planes if 64
 int randomsoup=0;                   // whether to continue random input of genes and gol states into the square central region defined by initfield
+int vscrolling=0;                   // whether to do vertical scrolling to track upwards growth (losing all states that fall off downward cliff)
 //------------------------------------------------ arrays for time tracing -----------------------------------------------------------------------------
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
@@ -272,10 +273,12 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
 // set_selectedgene     set selected gene for highlighting from current mouse selection in graphics window
 // set_offsets          set offsets for detection of glider structures in display for color function 8
 // set_quadrant         set the pair of bits in repscheme (or survivalmask or overwritemask) used for quadrant variation 0-6
+// set_randomsoup       toggle the randomsoup activation for continual updating of initialization field with random states and genes
 // set_repscheme_bits   set the two of the repscheme (or survivalmask or overwritemask) bits corresponding to the selected quadrant
 // set_repscheme        set repscheme from python
 // set_rulemod          set rulemod from python
 // set_surviveover      set the two masks for survival and overwrite from python (survivalmask, overwritemask)
+// set_vscrolling       set vertical scrolling to track fronts of growth in vertical upwards direction
 //.......................................................................................................................................................
 // get_log2N            get the current log2N value from C to python
 // get_curgol           get current gol array from C to python
@@ -488,8 +491,6 @@ void colorgenes(int cgolg[], int NN2) {
 extern inline uint64_t randprob(unsigned int uprob, unsigned int randnr) {
     return(randnr < uprob ? 1ull : 0ull);
 }
-//.......................................................................................................................................................
-extern inline void random_soup(uint64_t newgol[],uint64_t newgolg[]);
 //------------------------------------------------------- selectone ------------------------------------------------------------
 extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene, unsigned int kch) {
 // birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene. Non-random result.
@@ -850,7 +851,7 @@ extern inline void hashgeneactivity(uint64_t gene,char errorformat[]) {
 }
 //------------------------------------------------------- pack012,3neighbors -------------------------------------------------------------------------------
 #define deltaxy(ij,x,y)  (ij - (ij&Nmask) + (((ij+(x))&Nmask) + (y)*N)) & N2mask
-
+//.......................................................................................................................................................
 extern inline void pack012neighbors(uint64_t gol[],uint64_t golp[]) {              // routine to pack all up to 2nd neighbours in single word
     unsigned int ij,k;
     uint64_t gs;
@@ -866,7 +867,7 @@ extern inline void pack012neighbors(uint64_t gol[],uint64_t golp[]) {           
         }
     }
 }
-
+//.......................................................................................................................................................
 extern inline void pack0123neighbors(uint64_t gol[],uint64_t golp[]) {              // routine to pack all up to 3rd neighbours in single word
     unsigned int ij,k;
     uint64_t gs;
@@ -882,7 +883,7 @@ extern inline void pack0123neighbors(uint64_t gol[],uint64_t golp[]) {          
         }
     }
 }
-
+//.......................................................................................................................................................
 extern inline void pack49neighbors(uint64_t gol[],uint64_t golp[]) {              // routine to pack all up to 3rd neighbours in single word
     unsigned int ij,k;
     int nbx[6] = {1,0,2,0,-4,-4};
@@ -895,7 +896,7 @@ extern inline void pack49neighbors(uint64_t gol[],uint64_t golp[]) {            
     for (ij=0;ij<N2;ij++) golp[ij] = golp[ij]&0xfac8ffccfafaffffull;              // masks out 15 values in top row and left column to give 7x7 neighbourhoods
                                                                                   // mask removes bit numbers 16,18,24,26,32,33,36,37,48,49,50,52,53,56,58
 }
-
+//.......................................................................................................................................................
 extern inline void compare_neighbors(uint64_t a[],uint64_t b[], int dx, int dy) {  // routine to compare packed pack neighbours with shift, result in a
    unsigned int ij;
     uint64_t bij;
@@ -905,7 +906,7 @@ extern inline void compare_neighbors(uint64_t a[],uint64_t b[], int dx, int dy) 
         a[ij] = (a[ij]|bij) ? a[ij]^bij : rootgene;
     }
 }
-
+//.......................................................................................................................................................
 extern inline void compare_all_neighbors(uint64_t a[],uint64_t b[]) {  // routine to compare packed pack neighbours with shift, result in a
     unsigned int ij;
     unsigned int d;
@@ -924,7 +925,7 @@ extern inline void compare_all_neighbors(uint64_t a[],uint64_t b[]) {  // routin
         }
     }
 }
-
+//.......................................................................................................................................................
 extern inline void packandcompare(uint64_t newgol[],uint64_t working[],uint64_t golmix[]) {
     if (colorfunction==8) {
         pack49neighbors(newgol,working);
@@ -937,6 +938,72 @@ extern inline void packandcompare(uint64_t newgol[],uint64_t working[],uint64_t 
             if(offdt>0) offdt = 0;
             pack49neighbors(planesg[(newPlane-offdt)%maxPlane],golmix);
             compare_neighbors(golmix,working,offdx,offdy);                 // compare with a single direction (north) for gliders
+        }
+    }
+}
+//------------------------------------------------------- geography -----------------------------------------------------------------------------------
+extern inline void v_scroll(uint64_t newgol[],uint64_t newgolg[]) {
+    int ij,scroll_needed;
+
+    scroll_needed = 0;
+    for (ij=N2-N;ij<N2;ij++) {                              // clear top row
+        if(newgol[ij]) {
+            scroll_needed = 1;
+            break;
+        }
+    }
+  
+    for (ij=0;ij<N;ij++) {                                  // delete genes in bottom buffer row
+        if(newgol[ij]) {
+            newgol[ij]=0ull;
+            hashdeletegene(newgolg[ij],"error in v_scroll hashdeletegene call for step %d with gene %llx\n");
+            newgolg[ij]=gene0;
+        }
+    }
+    
+    if(!scroll_needed) return;
+    
+    for (ij=0;ij<N2-N;ij++) {                               // scroll rows down 1 leaving top row intact
+        newgol[ij]=newgol[ij+N];
+        newgolg[ij]=newgolg[ij+N];
+    }
+    for (ij=0;ij<N;ij++) {                                  // delete all states and genes in new bottom buffer row
+        if(newgol[ij]) {
+            newgol[ij]=0ull;
+            hashdeletegene(newgolg[ij],"error in v_scroll hashdeletegene call for step %d with gene %llx\n");
+            newgolg[ij]=gene0;
+        }
+    }
+    for (ij=N2-N;ij<N2;ij++) {                              // clear top row
+        if(newgol[ij]) {
+            newgol[ij]=0ull;
+            hashdeletegene(newgolg[ij],"error in v_scroll hashdeletegene call for step %d with gene %llx\n");
+            newgolg[ij]=gene0;
+        }
+    }
+}
+//.......................................................................................................................................................
+extern inline void random_soup(uint64_t newgol[],uint64_t newgolg[]) {
+    int Nf,i,j,ij,i0,j0,k;
+    uint64_t g;
+    static unsigned int rmask = (1 << 15) - 1;
+    
+    Nf = initfield;
+    if (Nf==0 || Nf>N) Nf=N;
+    i0 = j0 = (N>>1)-(Nf>>1);
+    for (i=0; i<Nf; i++) {
+        for (j=0; j<Nf; j++) {
+            ij=i0+i+N*(j0+j);
+            if(!newgol[ij]) {       // check whether this OK for selection 10,11 with genes everywhere and hashdelete
+                if (selection<10) newgol[ij] = ((rand() & rmask) < initial1density)?1ull:0ull;
+                else if(selection==10 || selection==11) for (k=0;k<NbP;k++) newgol[ij] |= ((rand() & rmask) < initial1density)?(1ull<<(k<<2)):0ull;
+                else for (k=0;k<NbP;k++) newgol[ij] |= ((rand() & rmask) < initial1density)?(1ull<<k):0ull;
+                if (newgol[ij]) {  // if live cell or multiplane, fill with random genome g
+                    for (g=0ull,k=0; k<NbG; k++) g = (g << 1) | (rand() & 0x1);g=gene0^g;   // replace with rand128 in parallel
+                    newgolg[ij] = g;
+                    hashaddgene(newgolg[ij],rootgene);
+                }
+            }
         }
     }
 }
@@ -1152,6 +1219,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
     }  // end for ij
 
     if(randomsoup) random_soup(newgol,newgolg);
+    if(vscrolling) v_scroll(newgol,newgolg);
 
     if (colorfunction==8) packandcompare(newgol,working,golmix);
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
@@ -2261,31 +2329,6 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     fprintf(stderr,"population size %d with %d different genes\n",cnt,hcnt);
 #endif
 }
-//.......................................................................................................................................................
-extern inline void random_soup(uint64_t newgol[],uint64_t newgolg[]) {
-    int Nf,i,j,ij,i0,j0,k;
-    uint64_t g;
-    static unsigned int rmask = (1 << 15) - 1;
-    
-    Nf = initfield;
-    if (Nf==0 || Nf>N) Nf=N;
-    i0 = j0 = (N>>1)-(Nf>>1);
-    for (i=0; i<Nf; i++) {
-        for (j=0; j<Nf; j++) {
-            ij=i0+i+N*(j0+j);
-            if(!newgol[ij]) {       // check whether this OK for selection 10,11 with genes everywhere and hashdelete
-                if (selection<10) newgol[ij] = ((rand() & rmask) < initial1density)?1ull:0ull;
-                else if(selection==10 || selection==11) for (k=0;k<NbP;k++) newgol[ij] |= ((rand() & rmask) < initial1density)?(1ull<<(k<<2)):0ull;
-                else for (k=0;k<NbP;k++) newgol[ij] |= ((rand() & rmask) < initial1density)?(1ull<<k):0ull;
-                if (newgol[ij]) {  // if live cell or multiplane, fill with random genome g
-                    for (g=0ull,k=0; k<NbG; k++) g = (g << 1) | (rand() & 0x1);g=gene0^g;   // replace with rand128 in parallel
-                    newgolg[ij] = g;
-                    hashaddgene(newgolg[ij],rootgene);
-                }
-            }
-        }
-    }
-}
 //------------------------------------------------------- set ...---------------------------------------------------------------------------
 void set_colorfunction(int colorfunctionval) {
     if(colorfunction>8) fprintf(stderr,"error colorfunction value passed %d too large\n",colorfunctionval);
@@ -2302,10 +2345,6 @@ int setget_act_ymax(int actymax) {                  // sets ymax for activities 
 void set_selectedgene(uint64_t gene) {
     selectedgene=gene;
     fprintf(stderr,"selected gene set to %llx\n",selectedgene);
-}
-//.......................................................................................................................................................
-void set_randomsoup() {
-    randomsoup=1-randomsoup;
 }
 //.......................................................................................................................................................
 void set_offsets(int dx,int dy,int dt) {
@@ -2328,6 +2367,10 @@ void set_quadrant(int quadrant) {
     if(quadrant >= 0 && quadrant < 7) {
         repscheme |= R_14_quadrant_sele<<quadrant;                          // assumes quadrant selectors are 7 successive bits following R_14_...
     }
+}
+//.......................................................................................................................................................
+void set_randomsoup() {
+    randomsoup=1-randomsoup;
 }
 //.......................................................................................................................................................
 unsigned int set_repscheme_bits(int quadrant, int x, int y, int surviveover[]) {
@@ -2378,6 +2421,10 @@ void set_surviveover64(unsigned int surviveover[], int len ) {
         overwritemask = surviveover[1];
     }
     else fprintf(stderr,"surviveover64 needs two parameters, %d provided\n",len);
+}
+//.......................................................................................................................................................
+void set_vscrolling() {
+    vscrolling=1-vscrolling;
 }
 //------------------------------------------------------- get ... ---------------------------------------------------------------------------
 //.......................................................................................................................................................
