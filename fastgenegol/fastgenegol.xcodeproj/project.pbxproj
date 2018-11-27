@@ -15,6 +15,7 @@
 		5275A1351F2930E90062765F /* cos_doubles.h in Headers */ = {isa = PBXBuildFile; fileRef = 5275A1311F2930E90062765F /* cos_doubles.h */; };
 		528F919D1F31E30E008DD596 /* probtestdispatch.c in Sources */ = {isa = PBXBuildFile; fileRef = 528F91941F2F9895008DD596 /* probtestdispatch.c */; };
 		52A14B3F2177387E000E2ED4 /* hashtable.h in Headers */ = {isa = PBXBuildFile; fileRef = 52A14B3E2177387E000E2ED4 /* hashtable.h */; };
+		52F19B3D21ADF41200D33844 /* lsb64.c in Sources */ = {isa = PBXBuildFile; fileRef = 52F19B3121ADF18500D33844 /* lsb64.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -80,6 +81,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 1;
 		};
+		52F19B3421ADF3C900D33844 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -113,6 +123,8 @@
 		52A14B3E2177387E000E2ED4 /* hashtable.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hashtable.h; sourceTree = "<group>"; };
 		52DB371F21507BCF0087F098 /* subgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = subgenelife.c; path = genelifec/subgenelife.c; sourceTree = SOURCE_ROOT; };
 		52F19B3021ABE7F900D33844 /* sumtest.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = sumtest.c; sourceTree = "<group>"; };
+		52F19B3121ADF18500D33844 /* lsb64.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = lsb64.c; sourceTree = "<group>"; };
+		52F19B3621ADF3C900D33844 /* lsb64 */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = lsb64; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -159,6 +171,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		528F918F1F2F9895008DD596 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		52F19B3321ADF3C900D33844 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -213,6 +232,7 @@
 				5206B8162150815C00394209 /* genelifepy */,
 				5206B8192150823000394209 /* cos */,
 				528F91931F2F9895008DD596 /* probtest */,
+				52F19B3721ADF3C900D33844 /* lsb64 */,
 				525EB7AA1F18DCE4004078F1 /* Products */,
 				528F919E1F33303D008DD596 /* Frameworks */,
 			);
@@ -228,6 +248,7 @@
 				528F91921F2F9895008DD596 /* probtest */,
 				521C1456214DDE9400E17A8F /* dispgenelife */,
 				521C1464214DDF0400E17A8F /* actgenelife */,
+				52F19B3621ADF3C900D33844 /* lsb64 */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -250,6 +271,14 @@
 				528F919F1F33303E008DD596 /* libdispatch.tbd */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		52F19B3721ADF3C900D33844 /* lsb64 */ = {
+			isa = PBXGroup;
+			children = (
+				52F19B3121ADF18500D33844 /* lsb64.c */,
+			);
+			path = lsb64;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -395,6 +424,23 @@
 			productReference = 528F91921F2F9895008DD596 /* probtest */;
 			productType = "com.apple.product-type.tool";
 		};
+		52F19B3521ADF3C900D33844 /* lsb64 */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 52F19B3A21ADF3C900D33844 /* Build configuration list for PBXNativeTarget "lsb64" */;
+			buildPhases = (
+				52F19B3221ADF3C900D33844 /* Sources */,
+				52F19B3321ADF3C900D33844 /* Frameworks */,
+				52F19B3421ADF3C900D33844 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = lsb64;
+			productName = lsb64;
+			productReference = 52F19B3621ADF3C900D33844 /* lsb64 */;
+			productType = "com.apple.product-type.tool";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -432,6 +478,10 @@
 						CreatedOnToolsVersion = 8.3.3;
 						ProvisioningStyle = Automatic;
 					};
+					52F19B3521ADF3C900D33844 = {
+						CreatedOnToolsVersion = 10.1;
+						ProvisioningStyle = Automatic;
+					};
 				};
 			};
 			buildConfigurationList = 525EB7A41F18DCE4004078F1 /* Build configuration list for PBXProject "fastgenegol" */;
@@ -453,6 +503,7 @@
 				528F91911F2F9895008DD596 /* probtest */,
 				521C1455214DDE9400E17A8F /* dispgenelife */,
 				521C1463214DDF0400E17A8F /* actgenelife */,
+				52F19B3521ADF3C900D33844 /* lsb64 */,
 			);
 		};
 /* End PBXProject section */
@@ -510,6 +561,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				528F919D1F31E30E008DD596 /* probtestdispatch.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		52F19B3221ADF3C900D33844 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				52F19B3D21ADF41200D33844 /* lsb64.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -823,6 +882,45 @@
 			};
 			name = Release;
 		};
+		52F19B3B21ADF3C900D33844 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_USE_OPTIMIZATION_PROFILE = NO;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_IDENTITY = "Mac Developer";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEVELOPMENT_TEAM = 6FG96XX388;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GENERATE_PROFILING_CODE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		52F19B3C21ADF3C900D33844 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_USE_OPTIMIZATION_PROFILE = NO;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_IDENTITY = "Mac Developer";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEVELOPMENT_TEAM = 6FG96XX388;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GENERATE_PROFILING_CODE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -894,6 +992,15 @@
 			buildConfigurations = (
 				528F91961F2F9895008DD596 /* Debug */,
 				528F91971F2F9895008DD596 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		52F19B3A21ADF3C900D33844 /* Build configuration list for PBXNativeTarget "lsb64" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				52F19B3B21ADF3C900D33844 /* Debug */,
+				52F19B3C21ADF3C900D33844 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
