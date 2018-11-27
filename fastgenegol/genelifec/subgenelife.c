@@ -1631,6 +1631,7 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
     
     for (ij=0; ij<N2; ij++) {                                                   // loop over all sites of 2D torus with side length N
         golij = gol[ij];
+        if(golij && golg[ij]==0ull) fprintf(stderr,"First step %d ij %d golij non zero %llx but golgij zero\n",totsteps,ij,golij);
         sums00 = sums10 = sums01 = sums11 = sums02 = sums12 = 0ull;             // assemble 4 bit sums of planar 9-neighborhoods
         for(k=0;k<3;k++) {
             gs=gol[deltaxy(ij,nb1x[k],nb1y[k])];
@@ -1705,8 +1706,10 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
                 if(repscheme&0x2) {                                             // with this repscheme parameter, only use birth not survival from 2D GoL
                     newgs = b3;
                 }
-                genemask = 1ull<<(golgij&0x3full);
-                b3d=b3d&genemask;
+                //genemask = 1ull<<(golgij&0x3full);                            // gene allows coupling in plane specified by last 6 bits of gene
+                genemask = golgij;                                              // gene allows coupling in planes where a 1 is in genome only
+                b3d&=genemask;
+                newgs3d&=genemask;
                 b = b3|b3d;
                 newgol[ij]=(newgs|newgs3d)&plcodingmask;
             }
@@ -1775,7 +1778,8 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
         }
         else {                                                                   // gene death if was alive and death on all planes
             if(golij) {                                                          // site was alive, so it must have had a gene
-                hashdeletegene(golg[ij],"step %d hash storage error 2 in update_gol64, gene %llx not stored\n");
+                if(golgij==0ull) fprintf(stderr,"step %d ij %d golij non zero %llx but golgij zero\n",totsteps,ij,golij);
+                hashdeletegene(golgij,"step %d hash storage error 2 in update_gol64, gene %llx not stored\n");
                 newgolg[ij]=gene0;
                 statflag = statflag | F_death;
             }
@@ -2678,16 +2682,16 @@ int activitieshash() {  /* count activities of all currently active species */
     // if (ymax1>ymax) ymax = ymax*2;     // autoscale of activities
     // if (ymax1<ymax/2) ymax = ymax/2;   // autoscale of activities
     for(j=0;j<nspeciesnow;j++) {
-        // activities[j] = N - (activities[j] * N) / ymax;        // linear scale, needs truncation if ymax superceded
+        // activities[j] = N-1 - (activities[j] * (N-1)) / ymax;        // linear scale, needs truncation if ymax superceded
         act = (double) activities[j];
-        // activities[j] = N - (int) (N*log2(act)/log2ymax);      // logarithmic scale, suffers from discrete steps at bottom
-        activities[j] = N - (int) (N*act/(act+(double)ymax));
+        // activities[j] = (N-1) - (int) ((N-1)*log2(act)/log2ymax);      // logarithmic scale, suffers from discrete steps at bottom
+        activities[j] = (N-1) - (int) ((N-1)*act/(act+(double)ymax));
         gene = genes[j];
         ij = (x&Nmask)+activities[j]*N;
-        //if(ij >= 0 && ij<N2)
+        // if(ij >= 0 && ij<N2)
         acttrace[ij] = gene;
         //else
-        //     fprintf(stderr,"activity out of range\n");
+        //    fprintf(stderr,"error activity ij out of range activities[j] %d\n",activities[j]);
     }
 
     free(gindices);free(activities);free(genes);free(popln);
@@ -2708,16 +2712,19 @@ int activitieshashx(int gindices[], uint64_t genes[], int popln[], int activitie
 
     // if(gindices != NULL && col) free(gindices);
     for (i=0,nspeciesnow=0; i<nspecies; i++)
-        if(geneitems[i].popcount) nspeciesnow++;
+        //if(geneitems[i].popcount) nspeciesnow++;                  // time critical loop, replace if by conditional
+        nspeciesnow+= geneitems[i].popcount ? 1 : 0;
 
-    if (nspeciesnow>10000) return(-1);                             // exit with error need to allocate more space in python
+    if (nspeciesnow>10000) return(-1);                              // exit with error need to allocate more space in python
     for (i=j=0; i<nspecies; i++) {
-        if(geneitems[i].popcount) {
-            gindices[j]=i;                                         // if col is 0 then the array gindices must be passed with sufficient length
-            j++;
-        }
+        //if(geneitems[i].popcount) {
+        //    gindices[j]=i;                                        // if col is 0 then the array gindices must be passed with sufficient length
+        //    j++;
+        //}
+        gindices[j]=geneitems[i].popcount ? i : gindices[j--];      // time critical loop, replace if by conditional
+        j++;
     }
-    qsort(gindices, nspeciesnow, sizeof(int), cmpfunc3);        // sort in decreasing count order
+    qsort(gindices, nspeciesnow, sizeof(int), cmpfunc3);            // sort in decreasing count order
 
     if (nspeciesnow > maxact) nspeciesnow = maxact;
 
@@ -2727,7 +2734,7 @@ int activitieshashx(int gindices[], uint64_t genes[], int popln[], int activitie
         activities[i]=geneitems[gindices[i]].activity;
     }
     
-    return(nspeciesnow);                                   // exit here unless doing display
+    return(nspeciesnow);                                            // exit here unless doing display
 
 }
 #else
