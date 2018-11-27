@@ -942,7 +942,7 @@ extern inline void packandcompare(uint64_t newgol[],uint64_t working[],uint64_t 
     }
 }
 //------------------------------------------------------- geography -----------------------------------------------------------------------------------
-extern inline void v_scroll(uint64_t newgol[],uint64_t newgolg[]) {
+void v_scroll(uint64_t newgol[],uint64_t newgolg[]) {
     int ij,scroll_needed;
 
     scroll_needed = 0;
@@ -983,14 +983,16 @@ extern inline void v_scroll(uint64_t newgol[],uint64_t newgolg[]) {
     }
 }
 //.......................................................................................................................................................
-extern inline void random_soup(uint64_t newgol[],uint64_t newgolg[]) {
+void random_soup(uint64_t newgol[],uint64_t newgolg[]) {
     int Nf,i,j,ij,i0,j0,k;
-    uint64_t g;
+    uint64_t randnr,mask;
     static unsigned int rmask = (1 << 15) - 1;
     
+    mask=(NbG==64 ? ~0 :(1ull<<NbG)-1ull);
     Nf = initfield;
     if (Nf==0 || Nf>N) Nf=N;
     i0 = j0 = (N>>1)-(Nf>>1);
+    
     for (i=0; i<Nf; i++) {
         for (j=0; j<Nf; j++) {
             ij=i0+i+N*(j0+j);
@@ -999,8 +1001,8 @@ extern inline void random_soup(uint64_t newgol[],uint64_t newgolg[]) {
                 else if(selection==10 || selection==11) for (k=0;k<NbP;k++) newgol[ij] |= ((rand() & rmask) < initial1density)?(1ull<<(k<<2)):0ull;
                 else for (k=0;k<NbP;k++) newgol[ij] |= ((rand() & rmask) < initial1density)?(1ull<<k):0ull;
                 if (newgol[ij]) {  // if live cell or multiplane, fill with random genome g
-                    for (g=0ull,k=0; k<NbG; k++) g = (g << 1) | (rand() & 0x1);g=gene0^g;   // replace with rand128 in parallel
-                    newgolg[ij] = g;
+                    RAND128P(randnr);
+                    newgolg[ij] = gene0^(randnr&mask);
                     hashaddgene(newgolg[ij],rootgene);
                 }
             }
@@ -1327,6 +1329,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
     }  // end for ij
 
     if(randomsoup) random_soup(newgol,newgolg);
+    if(vscrolling) v_scroll(newgol,newgolg);
     if (colorfunction==8) packandcompare(newgol,working,golmix);
     
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
@@ -1462,6 +1465,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
     }  // end for ij
 
     if(randomsoup) random_soup(newgol,newgolg);
+    if(vscrolling) v_scroll(newgol,newgolg);
     if (colorfunction==8) packandcompare(newgol,working,golmix);
     
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
@@ -1597,6 +1601,7 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
     } // for ij
     
     if(randomsoup) random_soup(newgol,newgolg);
+    if(vscrolling) v_scroll(newgol,newgolg);
     for (ij=0; ij<N2; ij++) {  // complete missing hash table records including activities, NB all sites have genes in gol16 but don't record activity for zerogene
         hashgeneextinction(golg[ij],"hash storage error 4 in update_gol16, gene %llx not stored\n");
         if(newgolg[ij]!=gene0) hashgeneactivity(newgolg[ij],"hash storage error 5 in update_gol16, gene %llx not stored\n");
@@ -1761,16 +1766,16 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
             statflag = statflag | F_birth;
             if (rand2) statflag = statflag | F_mutation;
             if(statflag&F_notgolrul) statflag |= F_nongolchg;
-            if (golij) hashdeletegene(golgij,"step %d hash storage error 1 in update_gol2, gene %llx not stored\n"); // gene may be present because of live state on different plane
+            if (golij) hashdeletegene(golgij,"step %d hash storage error 1 in update_gol64, gene %llx not stored\n"); // gene may be present because of live state on different plane
             hashaddgene(newgene,ancestor);
         } //end if birth
-        else if (newgol[ij]) {                                                   // gene persistence
+        else if (newgol[ij]) {                                                   // gene persistence if newgol non zero
             newgolg[ij]=golgij;
             statflag = statflag | F_survival;
         }
         else {                                                                   // gene death if was alive and death on all planes
-            if(golij) {                                                          // site with gene
-                hashdeletegene(golg[ij],"step %d hash storage error 2 in update_gol2, gene %llx not stored\n");
+            if(golij) {                                                          // site was alive, so it must have had a gene
+                hashdeletegene(golg[ij],"step %d hash storage error 2 in update_gol64, gene %llx not stored\n");
                 newgolg[ij]=gene0;
                 statflag = statflag | F_death;
             }
@@ -1781,6 +1786,7 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
     }
     
     if(randomsoup) random_soup(newgol,newgolg);
+    if(vscrolling) v_scroll(newgol,newgolg);
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records including activities, NB all sites have genes in gol16 but don't record activity for zerogene
         if(gol[ij]) hashgeneextinction(golg[ij],"hash storage error 4 in update_gol64, gene %llx not stored\n");
         if(newgolg[ij]!=gene0) hashgeneactivity(newgolg[ij],"hash storage error 5 in update_gol64, gene %llx not stored\n");
@@ -1858,6 +1864,7 @@ void update_gol2match(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_
     } // for ij
 
     if(randomsoup) random_soup(newgol,newgolg);
+    if(vscrolling) v_scroll(newgol,newgolg);
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records including activities
         if(gol[ij]>>1) hashgeneextinction(golg[ij],"hash storage error 3 in update_gol2, gene %llx not stored\n");
         if(newgol[ij]>>1) hashgeneactivity(newgolg[ij],"hash storage error 4 in update_gol2, gene %llx not stored\n");
@@ -2022,10 +2029,12 @@ void genelife_update (int nsteps, int nhist, int nstat) {
         golg = planesg[curPlane];
         golgstats = planesgs[curPlane];
 
-        nspecies=activitieshash();                                           // colors acttrace and returns current population arrays
+        nspecies=activitieshash();                                           // colors acttrace and returns current population arrays, need to run always for continuity
         if(nspecies<0) fprintf(stderr,"error returned from activitieshash\n");
-        ngenealogydeep=genealogies();                                         // colors genealogytrace
-        if(ngenealogydeep<0) fprintf(stderr,"error returned from genealogies\n");
+        if(colorfunction>4 && colorfunction<8) {
+            ngenealogydeep=genealogies();                                    // colors genealogytrace
+            if(ngenealogydeep<0) fprintf(stderr,"error returned from genealogies\n");
+        }
         
         totdisp++;                                                            // currently every step is counted for display in activities
     }
@@ -2626,7 +2635,8 @@ int activitieshash() {  /* count activities of all currently active species */
 
     // if(gindices != NULL && col) free(gindices);
     for (i=0,nspeciesnow=0; i<nspecies; i++)
-        if(geneitems[i].popcount) nspeciesnow++;
+        nspeciesnow+=geneitems[i].popcount ? 1 : 0;
+    
     gindices = (int *) malloc(nspeciesnow*sizeof(int));
 
     for (i=j=0; i<nspecies; i++) {
@@ -2634,6 +2644,8 @@ int activitieshash() {  /* count activities of all currently active species */
             gindices[j]=i;                                         // if col is 0 then the array gindices must be passed with sufficient length
             j++;
         }
+        //gindices[j]=(geneitems[i].popcount) ? i : gindices[j--];   // if col is 0 then the array gindices must be passed with sufficient length
+        //j++;
     }
     if (nspeciesnow > maxact) {                             //sort with in order of decreasing population
         qsort(gindices, nspeciesnow, sizeof(int), cmpfunc3);        // sort in decreasing count order
@@ -2653,7 +2665,7 @@ int activitieshash() {  /* count activities of all currently active species */
     if (totdisp>=N) {                                               // 1 pixel to left scroll when full
         for(ij=0;ij<N2;ij++) {
             ij1 = ((ij+1)&Nmask)+((ij>>log2N)<<log2N);              // (i+1)%N+j*N;
-            if(ij1>=N2) fprintf(stderr,"error in scroll of acttrace\n");
+            // if(ij1>=N2) fprintf(stderr,"error in scroll of acttrace\n");
             acttrace[ij]=acttrace[ij1];
         }
         x=N-1;
@@ -2666,14 +2678,14 @@ int activitieshash() {  /* count activities of all currently active species */
     // if (ymax1>ymax) ymax = ymax*2;     // autoscale of activities
     // if (ymax1<ymax/2) ymax = ymax/2;   // autoscale of activities
     for(j=0;j<nspeciesnow;j++) {
-        // activities[j] = N - (activities[j] * N) / ymax;
+        // activities[j] = N - (activities[j] * N) / ymax;        // linear scale, needs truncation if ymax superceded
         act = (double) activities[j];
         // activities[j] = N - (int) (N*log2(act)/log2ymax);      // logarithmic scale, suffers from discrete steps at bottom
         activities[j] = N - (int) (N*act/(act+(double)ymax));
         gene = genes[j];
         ij = (x&Nmask)+activities[j]*N;
-        if(ij > 0 && ij<N2)
-            acttrace[ij] = gene;
+        //if(ij >= 0 && ij<N2)
+        acttrace[ij] = gene;
         //else
         //     fprintf(stderr,"activity out of range\n");
     }
