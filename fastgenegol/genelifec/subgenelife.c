@@ -43,7 +43,7 @@ unsigned int pmutmask;              // binary mask so that prob of choosing zero
 int initial1density = (1<<15)>>1;   // initial density of ones in gol as integer value, divide by 2^15 for true density
 int initialrdensity = (1<<15)>>1;   // initial density of random genes in live sites, divide by 2^15 for true density
 int startgenechoice = 8;            // selection for defined starting genes 0-8 (8 is random 0-7) otherwise choose only particular startgene
-int inittype = 0;                   // 0 input from random field of random or start genes, 1 input from file genepat.dat of 32x32 indexes to start genes
+int initfield = 0;                   // 0 input from random field of random or start genes, 1 input from file genepat.dat of 32x32 indexes to start genes
                                     // value i>1: initialized to random field on central ixi block only, outside this zero.
 int colorfunction = 0;              // color function choice of 0: hash or 1: functional (color classes depends on selection parameter)
                                     // 2: as in 1 but color sites where last step was non GoL rule yellow, 3: as in 2 but yellow if state produced by non GoL
@@ -133,6 +133,7 @@ unsigned int canonical;             // current value of choice of canonical posi
 int quadrants=-1;                   // integer choice of bit pair from repscheme/survivalmask/overwritemask for quadrant division of array (-1 none)
 uint64_t displayplanes;             // mask for displaying planes in selection models 10,11,12
 uint64_t displayoneplane;           // display one plane only if <64, all planes if 64
+int randomsoup=0;                   // whether to continue random input of genes and gol states into the square central region defined by initfield
 //------------------------------------------------ arrays for time tracing -----------------------------------------------------------------------------
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
@@ -487,6 +488,8 @@ void colorgenes(int cgolg[], int NN2) {
 extern inline uint64_t randprob(unsigned int uprob, unsigned int randnr) {
     return(randnr < uprob ? 1ull : 0ull);
 }
+//.......................................................................................................................................................
+extern inline void random_soup(uint64_t newgol[],uint64_t newgolg[]);
 //------------------------------------------------------- selectone ------------------------------------------------------------
 extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene, unsigned int kch) {
 // birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene. Non-random result.
@@ -805,7 +808,7 @@ extern inline void hashaddgene(uint64_t gene,uint64_t ancestor) {
 extern inline void hashdeletegene(uint64_t gene,char errorformat[]) {
 #ifdef HASH
         if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) genedataptr->popcount--;
-        else fprintf(stderr,errorformat,totsteps,gene);
+        else fprintf(stderr,errorformat,totsteps,gene);     // errorformat must contain %d and %llx format codes in this order
 #endif
 }
 //.......................................................................................................................................................
@@ -941,7 +944,6 @@ extern inline void packandcompare(uint64_t newgol[],uint64_t working[],uint64_t 
 void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){
     /* update GoL for toroidal field which has side length which is a binary power of 2 */
     /* encode without if structures for optimal vector treatment */
-
     int s, s0, k, k1, nmut, crot;
     unsigned int kch,rulemodij,add2nd,mask1st;
     unsigned int select23live,pos_canon_neutral,survival,overwrite,enforcebirth,add2ndmask1st,nongolnottwice;
@@ -1149,6 +1151,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
         newgolgstats[ij] = statflag;
     }  // end for ij
 
+    if(randomsoup) random_soup(newgol,newgolg);
 
     if (colorfunction==8) packandcompare(newgol,working,golmix);
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
@@ -1255,6 +1258,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         newgolgstats[ij] = statflag;
     }  // end for ij
 
+    if(randomsoup) random_soup(newgol,newgolg);
     if (colorfunction==8) packandcompare(newgol,working,golmix);
     
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
@@ -1389,6 +1393,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
         newgolgstats[ij] = statflag;
     }  // end for ij
 
+    if(randomsoup) random_soup(newgol,newgolg);
     if (colorfunction==8) packandcompare(newgol,working,golmix);
     
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
@@ -1523,6 +1528,7 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
       } // end else (s3)
     } // for ij
     
+    if(randomsoup) random_soup(newgol,newgolg);
     for (ij=0; ij<N2; ij++) {  // complete missing hash table records including activities, NB all sites have genes in gol16 but don't record activity for zerogene
         hashgeneextinction(golg[ij],"hash storage error 4 in update_gol16, gene %llx not stored\n");
         if(newgolg[ij]!=gene0) hashgeneactivity(newgolg[ij],"hash storage error 5 in update_gol16, gene %llx not stored\n");
@@ -1706,6 +1712,7 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
         // fprintf(stderr,"step %d ij %d golij %llx b3 %llx b3d %llx golg[ij] %llx newgol[ij] %llx newgolg[ij] %llx\n",totsteps,ij,golij,b3,b3d,golg[ij],newgol[ij],newgolg[ij]);
     }
     
+    if(randomsoup) random_soup(newgol,newgolg);
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records including activities, NB all sites have genes in gol16 but don't record activity for zerogene
         if(gol[ij]) hashgeneextinction(golg[ij],"hash storage error 4 in update_gol64, gene %llx not stored\n");
         if(newgolg[ij]!=gene0) hashgeneactivity(newgolg[ij],"hash storage error 5 in update_gol64, gene %llx not stored\n");
@@ -1782,6 +1789,7 @@ void update_gol2match(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_
         newgolgstats[ij] = statflag;
     } // for ij
 
+    if(randomsoup) random_soup(newgol,newgolg);
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records including activities
         if(gol[ij]>>1) hashgeneextinction(golg[ij],"hash storage error 3 in update_gol2, gene %llx not stored\n");
         if(newgol[ij]>>1) hashgeneactivity(newgolg[ij],"hash storage error 4 in update_gol2, gene %llx not stored\n");
@@ -2084,7 +2092,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     overwritemask = runparams[3];
     survivalmask = runparams[4];
     colorfunction = runparams[5];
-    inittype = runparams[6];
+    initfield = runparams[6];
 
     pmutmask = (unsigned int) simparams[0];                                 // low values of pmutmask <32 are interpreted as -nlog2pmut
     if(pmutmask<32) pmutmask = (0x1 << (32-pmutmask)) - 0x1ull;                  // NB if pmut==0, pmutmask==zero, no mutation.
@@ -2177,7 +2185,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     hashtable_init(&genetable,sizeof(genedata),N2<<2,0);     // initialize dictionary for genes
 #endif
     notfirst = 1;
-    if (inittype==1) {           // input from file genepat.dat with max size of 32*32 characters
+    if (initfield==1) {           // input from file genepat.dat with max size of 32*32 characters
         golgin = (char *) malloc(32* 32 * sizeof(char));
         icf=readFile(golgin, "genepat.dat");
         if (icf != 32*32) {
@@ -2207,8 +2215,8 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         }
 
     }
-    else {  // inittype gives linear size of random block for initialization (0 => full frame, as before)
-        Nf = inittype;
+    else {  // initfield gives linear size of random block for initialization (0 => full frame, as before)
+        Nf = initfield;
         if (Nf==0 || Nf>N) Nf=N;
         for (ij=0; ij<N2; ij++) {
             gol[ij] = 0ull;
@@ -2253,6 +2261,31 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     fprintf(stderr,"population size %d with %d different genes\n",cnt,hcnt);
 #endif
 }
+//.......................................................................................................................................................
+extern inline void random_soup(uint64_t newgol[],uint64_t newgolg[]) {
+    int Nf,i,j,ij,i0,j0,k;
+    uint64_t g;
+    static unsigned int rmask = (1 << 15) - 1;
+    
+    Nf = initfield;
+    if (Nf==0 || Nf>N) Nf=N;
+    i0 = j0 = (N>>1)-(Nf>>1);
+    for (i=0; i<Nf; i++) {
+        for (j=0; j<Nf; j++) {
+            ij=i0+i+N*(j0+j);
+            if(!newgol[ij]) {       // check whether this OK for selection 10,11 with genes everywhere and hashdelete
+                if (selection<10) newgol[ij] = ((rand() & rmask) < initial1density)?1ull:0ull;
+                else if(selection==10 || selection==11) for (k=0;k<NbP;k++) newgol[ij] |= ((rand() & rmask) < initial1density)?(1ull<<(k<<2)):0ull;
+                else for (k=0;k<NbP;k++) newgol[ij] |= ((rand() & rmask) < initial1density)?(1ull<<k):0ull;
+                if (newgol[ij]) {  // if live cell or multiplane, fill with random genome g
+                    for (g=0ull,k=0; k<NbG; k++) g = (g << 1) | (rand() & 0x1);g=gene0^g;   // replace with rand128 in parallel
+                    newgolg[ij] = g;
+                    hashaddgene(newgolg[ij],rootgene);
+                }
+            }
+        }
+    }
+}
 //------------------------------------------------------- set ...---------------------------------------------------------------------------
 void set_colorfunction(int colorfunctionval) {
     if(colorfunction>8) fprintf(stderr,"error colorfunction value passed %d too large\n",colorfunctionval);
@@ -2269,6 +2302,10 @@ int setget_act_ymax(int actymax) {                  // sets ymax for activities 
 void set_selectedgene(uint64_t gene) {
     selectedgene=gene;
     fprintf(stderr,"selected gene set to %llx\n",selectedgene);
+}
+//.......................................................................................................................................................
+void set_randomsoup() {
+    randomsoup=1-randomsoup;
 }
 //.......................................................................................................................................................
 void set_offsets(int dx,int dy,int dt) {
