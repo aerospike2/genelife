@@ -21,6 +21,8 @@ uint_array = npct.ndpointer(dtype=np.uint32, ndim=1, flags='CONTIGUOUS')
 libcd = npct.load_library("libgenelife", ".")
 
 # setup the return types and argument types
+libcd.get_log2N.restype = c_int
+libcd.get_log2N.argtypes = []
 libcd.genelife_update.restype = None
 libcd.genelife_update.argtypes = [ c_int, c_int, c_int]
 libcd.initialize.restype = None
@@ -83,6 +85,9 @@ libcd.set_displayplanes.restype = None
 libcd.set_displayplanes.argtypes = [c_uint32]
 libcd.set_surviveover64.restype = None
 libcd.set_surviveover64.argtypes = [uint_array, c_int]
+
+def get_log2N():
+    return libcd.get_log2N()
 
 def genelife_update(nsteps, nhist, nstat):
     return libcd.genelife_update(nsteps, nhist, nstat)

@@ -6,8 +6,7 @@ import matplotlib.animation as animation
 import matplotlib
 import genelife_update_module as genelife
 
-
-log2N = 9                       #  log2N=7 => N=128
+log2N = genelife.get_log2N()                       #  log2N=7 => N=128 get value from C library which is where it must be changed
 N = 2**log2N
 N2 = N*N
 Nmask = N-1

@@ -254,11 +254,11 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
 // update_gol2match     update version for 2 parallel gol planes, coupled by a gene on one plane by matching of neighborhood : sel 13
 //.......................................................................................................................................................
 // tracestats           record the current stats in time trace
-// get_stats            get the traced statistics from python
+// get_stats            get the traced statistics from C to python
 // countconfigs         count the configs with pthon specified offsets in (x,y,t)
 //.......................................................................................................................................................
-// get_hist             get the histogram from python
-// get_activities       get the activity statistics from python
+// get_hist             get the histogram from C to python
+// get_activities       get the activity statistics from C to python
 //.......................................................................................................................................................
 // genelife_update      call update, collect statistics if required and rotate planes
 // initialize_planes    initialize periodic sequence of planes to record rolling time window of up to maxPlanes time points (≤8)
@@ -276,10 +276,11 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
 // set_rulemod          set rulemod from python
 // set_surviveover      set the two masks for survival and overwrite from python (survivalmask, overwritemask)
 //.......................................................................................................................................................
-// get_curgol           get current gol array from python
-// get_curgolg          get current golg array from python
-// get_acttrace         get current acttrace array from python
-// get_curgolgstats     get current golgstats array from python
+// get_log2N            get the current log2N value from C to python
+// get_curgol           get current gol array from C to python
+// get_curgolg          get current golg array from C to python
+// get_acttrace         get current acttrace array C to python
+// get_curgolgstats     get current golgstats array C to python
 //.......................................................................................................................................................
 // cmpfunc              compare gene values as numerical unsigned numbers
 // cmpfunc1             compare gene counts in population
@@ -2342,6 +2343,11 @@ void set_surviveover64(unsigned int surviveover[], int len ) {
     else fprintf(stderr,"surviveover64 needs two parameters, %d provided\n",len);
 }
 //------------------------------------------------------- get ... ---------------------------------------------------------------------------
+//.......................................................................................................................................................
+int get_log2N(){
+    return(log2N);
+}
+//.......................................................................................................................................................
 void get_curgol(uint64_t outgol[], int NN){
     int ij;
     for (ij=0; ij<NN; ij++) {
