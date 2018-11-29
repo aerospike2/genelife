@@ -144,6 +144,7 @@ uint64_t displayplanes;             // mask for displaying planes in selection m
 uint64_t displayoneplane;           // display one plane only if <64, all planes if 64
 int randomsoup=0;                   // whether to continue random input of genes and gol states into the square central region defined by initfield
 int vscrolling=0;                   // whether to do vertical scrolling to track upwards growth (losing all states that fall off downward cliff)
+int last_scrolled = 0;              // whether vscrolling applied on last time step (needed for correct glider detection)
 //------------------------------------------------ arrays for time tracing -----------------------------------------------------------------------------
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
@@ -905,27 +906,34 @@ extern inline void pack49neighbors(uint64_t gol[],uint64_t golp[]) {            
 }
 //.......................................................................................................................................................
 extern inline void compare_neighbors(uint64_t a[],uint64_t b[], int dx, int dy) {  // routine to compare packed pack neighbours with shift, result in a
-   unsigned int ij;
+    unsigned int ij,ijs,scrollN;
     uint64_t bij;
+   
+    if (last_scrolled) scrollN = N;
+    else scrollN = 0;
     
     for (ij=0;ij<N2;ij++) {
-        bij=b[deltaxy(ij,dx,dy)];
+        ijs=(ij-scrollN)&N2mask;
+        bij=b[deltaxy(ijs,dx,dy)];
         a[ij] = (a[ij]|bij) ? a[ij]^bij : rootgene;
     }
 }
 //.......................................................................................................................................................
 extern inline void compare_all_neighbors(uint64_t a[],uint64_t b[]) {  // routine to compare packed pack neighbours with shift, result in a
-    unsigned int ij;
-    unsigned int d;
-    int k;
+    unsigned int ij,ijs,scrollN;
+    unsigned int d, k;
     uint64_t aij,bijk;
     int nbx[8] = {0,1,0,-1,1,1,-1,-1};   // N E S W NE SE SW NW
     int nby[8] = {-1,0,1,0,-1,1,1,-1};
     
+    if (last_scrolled) scrollN = N;
+    else scrollN = 0;
+    
     for (ij=0;ij<N2;ij++) {
+        ijs=(ij-scrollN)&N2mask;
         aij = a[ij];
         for (a[ij]=0ull,k=0;k<8;k++) {
-            bijk=b[deltaxy(ij,nbx[k],nby[k])];
+            bijk=b[deltaxy(ijs,nbx[k],nby[k])];
             POPCOUNT64C((aij^bijk),d);
             d = (aij&&bijk) ? d : 0xff;
             a[ij]|=((uint64_t) d)<<(k<<3);
@@ -959,6 +967,7 @@ void v_scroll(uint64_t newgol[],uint64_t newgolg[]) {
             break;
         }
     }
+    last_scrolled = scroll_needed;                          // global variable needed for correct glider detection if scrolling
   
     for (ij=0;ij<N;ij++) {                                  // delete genes in bottom buffer row
         if(newgol[ij]) {
@@ -1229,8 +1238,8 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
 
     if(randomsoup) random_soup(newgol,newgolg);
     if(vscrolling) v_scroll(newgol,newgolg);
-
     if (colorfunction==8) packandcompare(newgol,working,golmix);
+    
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
@@ -1338,7 +1347,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
     if(randomsoup) random_soup(newgol,newgolg);
     if(vscrolling) v_scroll(newgol,newgolg);
     if (colorfunction==8) packandcompare(newgol,working,golmix);
-    
+
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
@@ -1474,7 +1483,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
     if(randomsoup) random_soup(newgol,newgolg);
     if(vscrolling) v_scroll(newgol,newgolg);
     if (colorfunction==8) packandcompare(newgol,working,golmix);
-    
+
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
@@ -2210,7 +2219,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     else if (selection<10)
         codingmask = (1ull<<ncoding)-1ull;                                  // coding mask used to encode number of bits per LUT (1-4)
     startgenechoice = simparams[4];
-    if (selection=>16 && selection<=19) displayplanes=0x1111111111111111ull;
+    if (selection>=16 && selection<=19) displayplanes=0x1111111111111111ull;
     else if (selection>=20) displayplanes= ~0;
     
     fprintf(stderr,"___________________________________________________________________________________________\n");
@@ -2351,7 +2360,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     }
 
     for (ij=0; ij<N2; ij++) {
-        if((gol[ij] && ((selection<14)||(selection>=20)))||(selection>=16)&&(selection<=19)||((gol[ij]>>1)&&(selection==14 || selection==15))) {
+        if((gol[ij] && ((selection<14)||(selection>=20)))||((selection>=16)&&(selection<=19))||((gol[ij]>>1)&&(selection==14 || selection==15))) {
             hashaddgene(golg[ij],rootgene);
         }
     }
@@ -2459,6 +2468,7 @@ void set_surviveover64(unsigned int surviveover[], int len ) {
 //.......................................................................................................................................................
 void set_vscrolling() {
     vscrolling=1-vscrolling;
+    if(!vscrolling) last_scrolled = 0;
 }
 //------------------------------------------------------- get ... ---------------------------------------------------------------------------
 //.......................................................................................................................................................
