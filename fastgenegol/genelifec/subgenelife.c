@@ -221,6 +221,21 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
     xxxx = (xxxx + (xxxx >> 4)) & m4;          /* put count of each 8 bits into those 8 bits */ \
     val = (xxxx * h01) >> 56;}                 /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
 //.......................................................................................................................................................
+const uint64_t r1 = 0x1111111111111111ull;
+#define PATTERN4(x, pat, found) {              /* find numebr of 4-bit aligned 4-bit copies of pattern pat in 64-bit x */ \
+    uint64_t xxxx;                             /* define working variable */ \
+    xxxx=(uint64_t) pat;                       /* copy pat to ensure it is not assumed to be a variable that can be changed */ \
+    xxxx|=xxxx<<4;                             /* doubles the pattern to the left */ \
+    xxxx|=xxxx<<8;                             /* doubles the patterns to the left : now 4 copies */ \
+    xxxx|=xxxx<<16;                            /* doubles the patterns to the left : now 8 copies */ \
+    xxxx|=xxxx<<32;                            /* doubles the patterns to the left : now 16 copies */ \
+    xxxx ^= (uint64_t) x;                      /* xor x argument with 16 copies of pat */ \
+    if (xxxx) {                                /* need to exclude the 16 match case as the fast count fails here */ \
+        xxxx = ~xxxx;                          /* invert difference map to yield identity map, 4 ones if match at a position */ \
+        xxxx &= (xxxx>>1)&(xxxx>>2)&(xxxx>>3); /* convert 4-bit set of identity patterns to 1/0 decision at bit 0 of 4 bit pattern */ \
+        found = ((xxxx&r1) * r1) >> 60;}       /* found is returned as the number of patterns found at any of the 16 positions : <16 */ \
+    else found = 16;}                          /* match at all positions */
+//.......................................................................................................................................................
 #define FIRST1INDEX(v, c) {                    /* starting point 64bit from Sean Eron Anderson https://graphics.stanford.edu/~seander/bithacks.html#ZerosOnRightParallel */  \
     uint64_t mmmm,mmmq;                        /* note also arguments must be of types uint64_t and int respectivley */ \
     int cccc;                                  /* takes on successive integer values 32,16,84,2,1 */ \
@@ -240,7 +255,8 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
 // colorgenes           colour genes specified at current time point
 //.......................................................................................................................................................
 // randprob             random event with probability determined by a 32 bit unsigned integer iprob as iprob / 2^32 using RAND128
-// selectone            select one (or none) of two genes based on selection model parameter selection :  returns birth and newgene
+// selectone_of_2       select one (or none) of two genes based on selection model parameter selection :  returns birth and newgene
+// selectone_of_s       select one (or none) of s genes based on selection model parameter selection :  returns birth and newgene
 // selectone_nbs        select one of two genes based on pattern of their live 2nd shell neighbours and their genetic encoding
 // selectdifft1         select the gene at the single active neighbour position : algorithm could be optimized
 // selectdifft2         select the right or left of two genes bunched with least number of empty genes between them
@@ -248,6 +264,8 @@ const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,
 // selectdifft4         select the most central (left) of four live neighbours or first one in canonical rotation
 // selectdifft5         select the most central (left) of five live neighbours or first one in canonical rotation
 // selectdifft6         select the most central (left) of six live neighbours or first one in canonical rotation
+// selectdifft7         select the most central (left) of seven live neighbours or first one in canonical rotation
+// selectdifft          select the most central (left) of sum live neighbours or first one in canonical rotation : calls 1 of selectdifft1-7
 //.......................................................................................................................................................
 // pack012neighbors     pack all up to 2nd neighbours in single word
 // pack0123neighbors    pack all up to 3rd neighbours in single word
@@ -352,7 +370,8 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                         case 7 : g2c = (gene>>8)&((1ull<<ncoding)-1ull);
                                  gdiff = gene&0xff;POPCOUNT64C(gdiff,d2);d = d2>7? 7 : d2;
                                  mask = g2c ? 0xf0f0f0ff : ((0x1f+(d<<5))<<8)+(((gdiff>>4)&0xf)<<27)+(((gdiff&0xf)<<4)<<16)+0xff; break;
-                        case 8 : mask = (((gene>>16)&0xff)<<24)+((gene&0xffff)<<8)+0xff;break;       // not yet optimal for ncoding > 1
+                        case 8 : if (repscheme&0x1) {mask = (((gene>>8)&0xff)<<24)+(((gene>>16)&0xff)<<16)+((gene&0xffff)<<8)+0xff;break;}
+                                 else {mask = (((gene>>8)&0xff)<<24)+((gene&0xffff)<<8)+0xff;break;}  // not yet optimal for ncoding > 1
                         case 9 : mask = (((gene>>36)&0xff)<<24)+((gene&0xffff)<<8)+0xff;break;       // does not capture full function
                         case 10: for (d=0,mask=0;d<16;d++) {d2=(gene>>(d<<2))&0xf;d2=(d2!=d)?1:0;mask+=(d2*0x2a)<<((d%3)<<3);}
                                 mask = (mask<<8)+0x7f7f7fff;break;  // 0x2a is 42, approx 1/6 (ie <16/3) of 255
@@ -414,7 +433,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
         }
     }
     else if(colorfunction==4){                                  //activities
-        int popmax = 1000;                                      // need to bring this parameter up to python
+        int popmax = 100;                                      // need to bring this parameter up to python
         for (ij=0; ij<NN2; ij++) {
             gene=acttrace[ij];
             if (gene == rootgene) mask = 0x3f3f3fff;            // grey color for background, all root genes
@@ -500,7 +519,7 @@ extern inline uint64_t randprob(unsigned int uprob, unsigned int randnr) {
     return(randnr < uprob ? 1ull : 0ull);
 }
 //------------------------------------------------------- selectone ------------------------------------------------------------
-extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene, unsigned int kch) {
+extern inline void selectone_of_2(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene, unsigned int kch) {
 // birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene. Non-random result.
     unsigned int k,d0,d1,d2,d3,dd,swap;                  // number of ones in various gene combinations
     uint64_t livegenes[2],gdiff,gdiff0,gdiff1; // various gene combinations
@@ -598,6 +617,89 @@ extern inline void selectone(int s, uint64_t nb2i, int nb[], uint64_t golg[], ui
             exit(1);
     }
 }
+extern inline int selectone_of_s(int s, uint64_t nbsi, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene, uint64_t *nbmask) {
+// result is number of equally fit best neighbours that could be the ancestor (0 if no birth allowed, 1 if unique) and list of these neighbour indices
+// birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene. Non-random result.
+    unsigned int k,nbest,d[8],dS,dB,d0, d1;              // number of ones in various gene combinations
+    uint64_t livegenes[8],gdiff,maxval,nbmsk; // various gene combinations
+
+    if(selection < 2) {
+        for(k=0;k<s;k++) {
+            livegenes[k] = golg[nb[(nbsi>>(k<<2))&0x7]];
+            POPCOUNT64C(livegenes[k],d[k]);
+        }
+    }
+    switch (selection) {
+        case 0:                                          // integer value of sequence as fitness
+            for(maxval=0ull,k=0;k<s;k++) maxval = livegenes[k]>= maxval ? livegenes[k] : maxval; // find value of fittest gene
+            for(nbmsk=0ull,nbest=0,k=0;k<s;k++) nbmsk |= (livegenes[k]==maxval) ? 1ull<<nbest++ : 0ull; // find set of genes with equal best value
+            *birth = (nbest>0 && nbest!=s) ? 1ull: 0ull; // birth condition is genes not all same
+            for(k=0;k<s;k++) if((nbmsk>>k)&0x1) break;
+            *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
+            break;
+        case 1:                                          // number of ones in sequence as fitness
+            for(maxval=0ull,k=0;k<s;k++) maxval = d[k]>= maxval ? d[k] : maxval; // find value of fittest gene
+            for(nbmsk=0ull,nbest=0,k=0;k<s;k++) nbmsk |= (d[k]==maxval) ? 1ull<<nbest++ : 0ull; // find set of genes with equal best value
+            *birth = (nbest>0 && nbest!=s) ? 1ull: 0ull; // birth condition is genes not all same
+            for(k=0;k<s;k++) if((nbmsk>>k)&0x1) break;
+            *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
+            break;
+        case 2:                                          // neutral selection
+            for(nbmsk=0ull,nbest=0,k=0;k<s;k++) nbmsk |= 1ull<<nbest++; // find set of genes with equal best value : in this case all of them
+            *birth = 1ull;                               // birth condition is always true
+            for(k=0;k<s;k++) if((nbmsk>>k)&0x1) break;
+            *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
+            break;
+        case 3:                                          // neutral selection but birth only occurs if some sequences are different
+            for(gdiff=0ull,k=1;k<s;k++) if ((gdiff=livegenes[0]^livegenes[k])) break; // test whether all genes the same
+            if (gdiff) for(nbmsk=0ull,nbest=0,k=0;k<s;k++) nbmsk |= 1ull<<nbest++; // find set of genes with equal best value : in this case all of them
+            else { nbest = 0; nbmsk = 0ull;}
+            *birth = gdiff;                              // birth condition is genes not all same
+            for(k=0;k<s;k++) if((nbmsk>>k)&0x1) break;
+            *newgene = livegenes[k&0x7];             // choose first of selected set to replicate (can make positional dependent choice instead externally)
+            break;
+        case 8:                                          // lut penalty of gene in fixed length encoding : first 8 bits survival, next 8 bits birth
+            for(k=0;k<s;k++) {
+                livegenes[k] = golg[nb[(nbsi>>(k<<2))&0x7]];
+                if(repscheme&0x1) {
+                    PATTERN4(livegenes[k],0x0,d0)
+                    PATTERN4(~livegenes[k]&0x8888888888888888ull,0x8,d1)
+                    d0=d1-d0;
+                    PATTERN4(livegenes[k]&0x8888888888888888ull,0x8,d1)
+                    d[k]=48-d0-2*d1;
+                }
+                else {
+                    POPCOUNT64C(livegenes[k]&0xffull,dS);
+                    POPCOUNT64C((livegenes[k]>>8)&0xffull,dB);
+                    d[k]=8-dS+16-(dB<<1);
+                }
+            }
+            for(maxval=0ull,k=0;k<s;k++) maxval = d[k]>= maxval ? d[k] : maxval; // find value of fittest gene
+            for(nbmsk=0ull,nbest=0,k=0;k<s;k++) nbmsk |= (d[k]==maxval) ? 1ull<<nbest++ : 0ull; // find set of genes with equal best value
+            *birth = 1ull;                               // birth condition is always met since maxval set is always > 0
+            for(k=0;k<s;k++) if((nbmsk>>k)&0x1) break;
+            *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
+            break;
+        case 9:                                          // lut penalty of gene in variable length encoding :
+            for(k=0;k<s;k++) {
+                livegenes[k] = golg[nb[(nbsi>>(k<<2))&0x7]];
+                POPCOUNT64C(livegenes[k]&0xffull,dS);
+                POPCOUNT64C((livegenes[k]>>8)&0xffull,dB);
+                d[k]=24-dS-(dB<<1);
+            }
+            for(maxval=0ull,k=0;k<s;k++) maxval = d[k]>= maxval ? d[k] : maxval; // find value of fittest gene
+            for(nbmsk=0ull,nbest=0,k=0;k<s;k++) nbmsk |= (d[k]==maxval) ? 1ull<<nbest++ : 0ull; // find set of genes with equal best value
+            *birth = 1ull;                               // birth condition is always met since maxval set is always > 0
+            for(k=0;k<s;k++) if((nbmsk>>k)&0x1) break;
+            *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
+            break;
+        default:
+            fprintf(stderr,"Error: s = %d live gene selection %d is not implemented\n",s,selection);
+            exit(1);
+    }
+    *nbmask = nbmsk;
+    return(nbest);
+}
 //------------------------------------------------------- selectone_nbs -------------------------------------------------------------------------------------
 extern inline void selectone_nbs(int s, uint64_t nb2i, int nb[], uint64_t gol[], uint64_t golg[], uint64_t * birth, uint64_t *newgene) {
 // birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene.
@@ -650,6 +752,7 @@ extern inline unsigned int selectdifft1(uint64_t nbmask, int *crot) {
             kmin = k;                                        // no of times rotated to right
         }
     }
+    *crot = kmin;
     return(kmin);                                            // replication of live nb in bit 0 of canonical rotation
 }
 //.......................................................................................................................................................
@@ -796,6 +899,37 @@ extern inline unsigned int selectdifft6(uint64_t nbmask, int *crot) {
     } //switch
     if (canonical) return((kmin+7)&0x7);                    // replication of live nb in bit 0 of canonical rotation
     else  return((kmin+k)&0x7);                             // replication of live nb in other bit of canonical rotation
+}
+//...................................................................................................................................................
+extern inline unsigned int selectdifft7(uint64_t nbmask, int *crot) {
+// selection based on canonical rotation
+    int k,kmin;
+    uint64_t nbmaskr, nbmaskrm;
+
+    for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {       // compute canonical rotation (minimum) of this mask
+        nbmaskr = ((nbmaskr & 0x1ull)<<7) | (nbmaskr>>1);    // 8 bit rotate right
+        if (nbmaskr < nbmaskrm) {                            // choose minimal value of mask rotation
+            nbmaskrm = nbmaskr;                              // neighbor mask rotate min is current rotation
+            kmin = k;                                        // no of times rotated to right
+        }
+    }
+    *crot = kmin;
+    return((kmin+3)&0x7);                                    // replication of live nb in bit 3 (middle) of canonical rotation
+}
+//...................................................................................................................................................
+extern inline unsigned int selectdifft(int sum, uint64_t nbmask, int *crot) {
+        int kch;
+        switch(sum) {
+                    case 1:  kch=selectdifft1(nbmask, crot); break;
+                    case 2:  kch=selectdifft2(nbmask, crot); break;
+                    case 3:  kch=selectdifft3(nbmask, crot); break;
+                    case 4:  kch=selectdifft4(nbmask, crot); break;
+                    case 5:  kch=selectdifft5(nbmask, crot); break;
+                    case 6:  kch=selectdifft6(nbmask, crot); break;
+                    case 7:  kch=selectdifft7(nbmask, crot); break;
+                    default: kch=0;
+        }
+        return(kch);
 }
 //------------------------------------------------------- hash gene inline fns ----------------------------------------------------------------------
 extern inline void hashaddgene(uint64_t gene,uint64_t ancestor) {
@@ -1127,14 +1261,14 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                           if(nb[nbc]!=nbch) nb2i = (nbc<<(k1++<<2))+nb2i;
                       }
                       if (add2nd) selectone_nbs(s,nb2i,nb,gol,golg,&birth,&newgene);  //2nd nb modulation
-                      else selectone(s,nb2i,nb,golg,&birth,&newgene,kch);
+                      else selectone_of_2(s,nb2i,nb,golg,&birth,&newgene,kch);
                       if (birth==0ull) {                                    // optional reset of ancestor & birth if no ancestors chosen in selectone
                         if((enforcebirth&0x1)||rulemodij)  {                // birth cannot fail or genes don't matter or no modification to gol rules
                             newgene = golg[nbch];
                             birth = 1ull;
                         }
                       }
-                      else statflag |= F_2select;                           // ancestor has been chosen in selectone
+                      else statflag |= F_2select;                           // ancestor has been chosen in selectone_of_2
                   }
                   else {
                       newgene = golg[nbch];
@@ -1159,7 +1293,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                                 newgene = golg[nb[kch]];
                                 birth = 1ull;
                             }
-                            else selectone(s,nb1i,nb,golg,&birth,&newgene,kch);
+                            else selectone_of_2(s,nb1i,nb,golg,&birth,&newgene,kch);
                             if(repscheme & R_10_13_2birth_k4) {             // birth only on the active subset of 4 canonical 2-live nb configs if any are active
                                 if(~repscheme & (R_10_2birth_k0<<(kch-1))) birth = 0ull;   // cancel birth if chosen configuration not active
                             }
@@ -1262,13 +1396,13 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
             = 0000 0100 0000 0110
             = 0x0406
                                                                                                                 */
-    int s, s1, s2or3, k, nmut, idx;
+    int s, s2or3, k, nmut, kch, crot, nbest;
     unsigned int survivemask;
     unsigned int birthmask;
     int nb[8],  ij, i, j, jp1, jm1, ip1, im1;
-    uint64_t genecode, gols, nb1i, randnr, r2;
-    uint64_t newgene, ancestor, livegenes[8];
-    uint64_t  birth, statflag, ncodingmask, allcoding;
+    uint64_t genecode, gols, nb1i, nbmask, found, randnr, r2;
+    uint64_t newgene, ancestor;
+    uint64_t  survive, birth, statflag, ncodingmask, allcoding;
     
     survivemask=survivalmask&0xff;                                          // 8 bits of repscheme 0-7 used to limit space of rules for survival
     birthmask=(survivalmask>>8)&0xff;                                       // 8 bits of repscheme 8-15 used to limit space of rules for birth
@@ -1281,53 +1415,70 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                         // toroidal i+1, i-1
         nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1;           // new order of nbs
         nb[4]=jp1+ip1; nb[5]=jp1+i; nb[6]=jp1+im1; nb[7]=j*N+im1;
-        for (s=0,k=0,nb1i=0,genecode=allcoding;k<8;k++) {                   // packs non-zero nb indices in first up to 8*4 bits
+        for (s=0,k=0,nb1i=0;k<8;k++) {                                      // packs non-zero nb indices in first up to 8*4 bits
             gols=gol[nb[k]];                                                // whether neighbor is alive
             s += gols;                                                      // s is number of live nbs
             nb1i = (nb1i << (gols<<2)) + (gols*k);                          // nb1i is packed list of live neighbour indices
-            genecode &= gols?golg[nb[k]]:allcoding;                         // and of live neighbours encodes birth rule & survival rule
         }
         statflag = 0ull;
-        s2or3 = (s>>2) ? 0ull : (s>>1);                                     // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
-        gols = s2or3 ? (gol[ij] ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;   // GoL calculation next state for non-genetic gol plane
-        s1 = s-1;                                                           // s1 more efficient indexing to 1-8 live neighbours
-        birth = 0;
+        birth = 0ull;
+        if (s) {
+            if (repscheme&0x1) {
+                for (genecode=0ull,k=0;k<8;k++)                             // decodes genes with variable length encoding
+                    if (gol[nb[k]]) {
+                        if (gol[ij]) {
+                            PATTERN4(golg[nb[k]], (s&0x7), found);          //survival?
+                            genecode |= found? 1ull << (s-1) : 0ull;
+                        }
+                        else {
+                            PATTERN4(golg[nb[k]], (s|0x8), found);          //birth?
+                            genecode |= found? 1ull << (s-1+8) : 0ull;
+                        }
+                    }
+                survive = ((genecode&survivemask)>>(s-1)) & 0x1ull;
+                genecode>>=8;
+                birth   = ((genecode&birthmask  )>>(s-1)) & 0x1ull;
+            }
+            else {
+                for (genecode=allcoding,k=0;k<8;k++)                        // decodes genes with fixed length encoding
+                    genecode &= gol[nb[k]]?golg[nb[k]]:allcoding;           // and of live neighbours encodes birth rule & survival rule
+                survive=(((genecode>>((s-1)<<(ncoding-1))) & ncodingmask) == ncodingmask) && ((survivemask>>(s-1))&1ull) ? 1 : 0;
+                genecode>>=8;
+                birth=(((genecode>>((s-1)<<(ncoding-1))) & ncodingmask) == ncodingmask) && ((birthmask>>(s-1))&1ull) ? 1 : 0;
+            }
+            s2or3 = (s>>2) ? 0ull : (s>>1);                                 // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
+            gols = s2or3 ? (gol[ij] ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull; // GoL calculation next state for non-genetic gol plane
+        }
+        else survive = birth = s2or3 = gols = 0ull;
+
         if(gol[ij]) {                                                       // death/survival
-            if(s && (((genecode>>(s1<<(ncoding-1))) & ncodingmask) == ncodingmask) && ((survivemask>>s1)&1ull)) {       // survival coded by and of neighbour genes
-            // if((((gene>>(s1<<(ncoding-1))) & ncodingmask) == ncodingmask) && ((survivemask>>s1)&1ull)) {        // alternative survival coded by central gene
+            if(survive) {                                                   // survival coded
                 statflag |= F_survival;
                 newgol[ij]  = gol[ij];                                      // new game of life cell value same as old
                 newgolg[ij] = golg[ij];                                     // gene stays same
             }
-            else {                                                          // gene bit = 0 => death
+            else {                                                          // death
                 statflag |= F_death;
                 newgol[ij]  = 0ull;                                         // new game of life cell value dead
                 newgolg[ij] = 0ull;                                         // gene dies
                 hashdeletegene(golg[ij],"step %d hash delete error 2 in update, gene %llx not stored\n");
             }
         }
-        else{                                                               // birth/nobirth
-            genecode = genecode >> (8<<(ncoding-1));
-            if(s && (((genecode>>(s1<<(ncoding-1))) & ncodingmask) == ncodingmask) && ((birthmask>>s1)&1ull)) { // birth
-                birth = 1;                                                  // NB gene birth is coupled to gol state birth
-                newgol[ij]  = 1ull;
-                statflag |= F_birth;
-            }
-            else {                                                          // no birth
-                newgol[ij] = gol[ij];
-                newgolg[ij] = golg[ij];
-            }
-        }
-        if(newgol[ij]!=gols) {
-            statflag |= F_notgolrul;
-            if(newgol[ij]) statflag |= F_nongolchg;
-        }
-        if(birth){                                                          // birth
+        else if(birth) { // birth
+            newgol[ij]  = 1ull;
+            statflag |= F_birth;
             RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
-            for(k=0;k<s;k++) livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];   // live neighbour genes
-            // figure out newgene by random choice for now
-            idx = ((randnr>>52)&0xf) % s;                                   // choose random for now
-            newgene = livegenes[idx];
+            if (repscheme & 0x8) {
+                kch = ((randnr>>52)&0xf) % s;                               // choose random in this option only
+                newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
+            }
+            else {
+                nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&nbmask);
+                if(nbest>1) {
+                    kch=selectdifft(nbest,nbmask, &crot);
+                    newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
+                }
+            }
             // compute random events for single bit mutation, as well as mutation position nmut
             r2 = randprob(pmutmask, (unsigned int) randnr);
             nmut = (randnr >> 57) & 0x3f;                                   // choose mutation position for length 64 gene : from bits 57+ of randnr
@@ -1339,6 +1490,15 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
             if (r2) statflag = statflag | F_mutation;
             if(gol[ij]) hashdeletegene(golg[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n");
             hashaddgene(newgene,ancestor);
+        }
+        else {                                                               // no birth, stays empty
+            newgol[ij] = gol[ij];
+            newgolg[ij] = golg[ij];
+        }
+
+        if(newgol[ij]!=gols) {
+            statflag |= F_notgolrul;
+            if(newgol[ij]) statflag |= F_nongolchg;
         }
         if(gol[ij]) statflag |= F_golstate;                                 // this is the last gol state, not the new state
         newgolgstats[ij] = statflag;
@@ -2158,7 +2318,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
 #ifdef HASH
     int hcnt;
 #endif
-    int ij,ij1,i0,j0,i,j,Nf,k,cnt,icf,nstartgenes;
+    int ij,ij1,i0,j0,i,j,Nf,k,cnt,icf,nstartgenes,found;
     unsigned int ncodingin;
     uint64_t g;
     static unsigned int rmask = (1 << 15) - 1;
@@ -2166,11 +2326,20 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     uint64_t startgenes[16];
     char *golgin;
     
-    g=1ull;
+    /* g=1ull;
     for(j=0;j<10;j++) {
         FIRST1INDEX(g,k);
         fprintf(stderr,"test of first1index cnt %d val %llx index %d\n",j,g,k);
         g*=42;
+    } */
+
+    g=1ull;
+    for(k=0;k<10;k++) {
+    for(j=0;j<16;j++) {
+        PATTERN4(g,j,found);
+        fprintf(stderr,"test of pattern4 pat %x val %llx found? %d\n",j,g,found);
+    }
+    g*=42;
     }
     
     srand(1234567); // Range: rand returns numbers in the range of [0, RAND_MAX ), and RAND_MAX is specified with a minimum value of 32,767. i.e. 15 bit
@@ -2248,7 +2417,10 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         case 6:
         case 7: for (k=0;k<8;k++) startgenes[k]=(0x1ull<<(4+k*8))-1ull; break;
         case 8:
-        case 9: for (k=0;k<8;k++)   startgenes[k] = (codingmask<<((8+3-1)<<(ncoding-1)))|(codingmask<<((2-1)<<(ncoding-1)))|(codingmask<<((3-1)<<(ncoding-1)));break;
+        case 9: if(repscheme&0x1)
+                    for (k=0;k<8;k++)   startgenes[k] = 0xb32ull;
+                else
+                    for (k=0;k<8;k++)   startgenes[k] = (codingmask<<((8+3-1)<<(ncoding-1)))|(codingmask<<((2-1)<<(ncoding-1)))|(codingmask<<((3-1)<<(ncoding-1)));break;
         case 10:
         case 11:
         case 12:
@@ -2656,7 +2828,7 @@ void countspecieshash() {}  /* dummy routine, no effect */
 //------------------------------------------------------- activitieshash ---------------------------------------------------------------------------
 #ifdef HASH
 int activitieshash() {  /* count activities of all currently active species */
-    int i, j, ij, ij1, x, nspecies, nspeciesnow;
+    int i, j, ij, ij1, x, nspecies, nspeciesnow, popcnt0, popcnt1;
     int *gindices,*popln,*activities;
     double act;
     uint64_t *genes;
@@ -2720,7 +2892,17 @@ int activitieshash() {  /* count activities of all currently active species */
         gene = genes[j];
         ij = (x&Nmask)+activities[j]*N;
         // if(ij >= 0 && ij<N2)
-        acttrace[ij] = gene;
+        if(acttrace[ij]==rootgene)                                      // only one genotype to plot
+            acttrace[ij] = gene;
+        else {                                                          // plot species color with largest current population size if chpoice of multiple
+            if((genedataptr = (genedata *) hashtable_find(&genetable, acttrace[ij])) != NULL)
+               popcnt0 = genedataptr->popcount;
+            else popcnt0 = 0;
+            if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL)
+               popcnt1 = genedataptr->popcount;
+            else popcnt1 = 0;
+            if(popcnt1 >= popcnt0) acttrace[ij]=gene;
+        }
         //else
         //    fprintf(stderr,"error activity ij out of range activities[j] %d\n",activities[j]);
     }
