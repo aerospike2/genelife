@@ -645,7 +645,7 @@ extern inline int selectone_of_s(int s, uint64_t nbsi, int nb[], uint64_t golg[]
     unsigned int k,nbest,d[8],dS,dB,d0, d1;              // number of ones in various gene combinations
     uint64_t livegenes[8],gdiff,maxval,nbmsk; // various gene combinations
 
-    if((repscheme&0x7) < 2) {
+    if((repscheme&0x7) < 4) {
         for(k=0;k<s;k++) {
             livegenes[k] = golg[nb[(nbsi>>(k<<2))&0x7]];
             POPCOUNT64C(livegenes[k],d[k]);
