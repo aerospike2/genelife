@@ -345,9 +345,9 @@ const uint64_t r1 = 0x1111111111111111ull;
 //--------------------------------------------------------------------------------------------------------------------------------------------------------
 //------------------------------------------------------- colorgenes -------------------------------------------------------------------------------------
 void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2) {
-    uint64_t gene, gdiff, g2c, mask;
-    int ij,d,d2,k,activity,popcount;
-    unsigned int d1;
+    uint64_t gene, gdiff, g2c, mask, codemask;
+    int ij,k,activity,popcount;
+    unsigned int d,d0,d1,d2;
     unsigned int color[3],colormax;
     double rescalecolor;
     static int numones[16]={0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4};
@@ -385,12 +385,16 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                         case 7 : g2c = (gene>>8)&((1ull<<ncoding)-1ull);
                                  gdiff = gene&0xff;POPCOUNT64C(gdiff,d2);d = d2>7? 7 : d2;
                                  mask = g2c ? 0xf0f0f0ff : ((0x1f+(d<<5))<<8)+(((gdiff>>4)&0xf)<<27)+(((gdiff&0xf)<<4)<<16)+0xff; break;
-                        case 8 : mask = (((gene>>8)&0xff)<<24)+(((gene>>16)&0xff)<<16)+((gene&0xffff)<<8)+0xff;break;
-                        case 9 : mask = (((gene>>8)&0xff)<<24)+((gene&0xffff)<<8)+0xff;break;  // not yet optimal for ncoding > 1
-                        case 10:
-                        case 11: mask = (((gene>>36)&0xff)<<24)+((gene&0xffff)<<8)+0xff;break;       // does not capture full function
-                        case 12:
-                        case 13: mask = 0x000000ff;  // NYI
+                        case 8 : codemask=(0x1ull<<(8*ncoding))-1;mask = (((gene>>(8*ncoding))&codemask)<<(28-ncoding))+((gene&codemask)<<(12-ncoding))+0xff;break;
+                        case 9 : PATTERN4(gene,0x0,d0);PATTERN4(~gene&0x8888888888888888ull,0x8,d1);PATTERN4(gene&0x8888888888888888ull,0x8,d2);
+                                mask = (d2<<26)+((d1-d0)<<10)+0xff; break;
+                        case 10: POPCOUNT64C(gene&0x7ffffull,d1); POPCOUNT64C((gene>>32)&0x7ffffull,d2);
+                                 mask = (d2<<27)+(d1<<11)+0xff; break;
+                        case 11:
+                        case 13: PATTERN8(gene,0x00,d0);PATTERN8(~gene&0x8080808080808080ull,0x80,d1);PATTERN8(gene&0x8080808080808080ull,0x80,d2);
+                                 mask = (d2<<27)+((d1-d0)<<11)+0xff; break;
+                        case 12: POPCOUNT64C(gene&0xffffffffull,d1); POPCOUNT64C((gene>>32)&0xffffffffull,d2);
+                                 mask = (d2<<27)+(d1<<11)+0xff; break;
                         case 14:
                         case 15: mask = ((gene>>40)<<8)+0xff; break;
                         case 16:
@@ -516,7 +520,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                         d1 = (d1 > 63) ? 0 : (63-d1);
                         d1 = (d1 < 48) ? 0 : d1-48;                 // 0 to 15 : perfect match is 15  (4 bits)
                         d1 = (d1==0xf) ? 0x1f : d1;                 // perfect match separated to value 31 (5 bits) for better contrast
-                        if(k<3) mask+=d1<<(3+(k<<3));                // perfect match has full intensity colour
+                        if(k<3) mask+=d1<<(3+(k<<3));               // perfect match has full intensity colour
                         else if (k==3 && d1==0x1f) mask = (d1<<3)+(d1<<11)+(d1<<19); // the fourth channel has white colour : no others shown
                         else if (k<7 && d1==0x1f) mask+= (d1<<(3+((k-4)<<3)))+(d1<<(3+((k<6?k-3:0)<<3))); // mixed colours for NE SE SW
                         else if(d1==0x1f) mask+= (d1<<3)+(d1<<10)+(d1<<18); // mixed colour for NW
@@ -643,15 +647,16 @@ extern inline void selectone_of_2(int s, uint64_t nb2i, int nb[], uint64_t golg[
 extern inline int selectone_of_s(int s, uint64_t nbsi, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene, uint64_t *nbmask) {
 // result is number of equally fit best neighbours that could be the ancestor (0 if no birth allowed, 1 if unique) and list of these neighbour indices
 // birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene. Non-random result.
-    unsigned int k,nbest,d[8],dS,dB,d0, d1;              // number of ones in various gene combinations
-    uint64_t livegenes[8],gdiff,maxval,nbmsk; // various gene combinations
+    unsigned int k,nbest;                             // index for neighbours and number in best fitness category
+    unsigned int d[8],dS,dB,d0,d1,d2;                     // number of ones in various gene combinations
+    uint64_t livegenes[8],gdiff,maxval,nbmsk;
 
-    if((repscheme&0x7) < 4) {
-        for(k=0;k<s;k++) {
-            livegenes[k] = golg[nb[(nbsi>>(k<<2))&0x7]];
-            POPCOUNT64C(livegenes[k],d[k]);
-        }
+
+    for(k=0;k<s;k++) {
+        livegenes[k] = golg[nb[(nbsi>>(k<<2))&0x7]];
+        POPCOUNT64C(livegenes[k],d[k]);
     }
+
     switch (repscheme&0x7) {
         case 0:                                          // integer value of sequence as fitness : smallest or largest
         case 1:
@@ -659,7 +664,7 @@ extern inline int selectone_of_s(int s, uint64_t nbsi, int nb[], uint64_t golg[]
             else              for(maxval=~0ull,k=0;k<s;k++) maxval = livegenes[k] <= maxval ? livegenes[k] : maxval; // find value of fittest gene min value
             for(nbmsk=0ull,nbest=0,k=0;k<s;k++) nbmsk |= (livegenes[k]==maxval) ? 1ull<<nbest++ : 0ull; // find set of genes with equal best value
             *birth = (nbest>0 && nbest!=s) ? 1ull: 0ull; // birth condition is genes not all same
-            for(k=0;k<s;k++) if((nbmsk>>k)&0x1) break;
+            for(k=0;k<s;k++) if((nbmsk>>k)&0x1) break;   // eecute loop until first live neighbour found at k (a one)
             *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
             break;
         case 2:
@@ -686,43 +691,60 @@ extern inline int selectone_of_s(int s, uint64_t nbsi, int nb[], uint64_t golg[]
             *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
             break;
         case 6:
-          if(selection==8) {                             // lut penalty of gene in fixed length encoding : first 8 bits survival, next 8 bits birth
-            for(k=0;k<s;k++) {
-                livegenes[k] = golg[nb[(nbsi>>(k<<2))&0x7]];
-                if(repscheme&0x1) {
-                    PATTERN4(livegenes[k],0x0,d0)
-                    PATTERN4(~livegenes[k]&0x8888888888888888ull,0x8,d1)
-                    d0=d1-d0;
-                    PATTERN4(livegenes[k]&0x8888888888888888ull,0x8,d1)
-                    d[k]=48-d0-2*d1;
-                }
-                else {
+          switch(selection) {
+            case 8:                                          // totalistic lut penalty of gene in fixed length encoding : first 8 bits survival, next 8 bits birth
+                for(k=0;k<s;k++) {
+                    livegenes[k] = golg[nb[(nbsi>>(k<<2))&0x7]];
                     POPCOUNT64C(livegenes[k]&0xffull,dS);
                     POPCOUNT64C((livegenes[k]>>8)&0xffull,dB);
-                    d[k]=8-dS+16-(dB<<1);
+                    d[k]=24-dS-(dB<<1);
                 }
-            }
-            for(maxval=0ull,k=0;k<s;k++) maxval = d[k]>= maxval ? d[k] : maxval; // find value of fittest gene
-            for(nbmsk=0ull,nbest=0,k=0;k<s;k++) nbmsk |= (d[k]==maxval) ? 1ull<<nbest++ : 0ull; // find set of genes with equal best value
-            *birth = 1ull;                               // birth condition is always met since maxval set is always > 0
-            for(k=0;k<s;k++) if((nbmsk>>k)&0x1) break;
-            *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
-            break;
+                break;
+            case 9:                                          // totalistic lut penalty of gene in variable length encoding : 4 bit patterns S 0xxx  B 1xxx
+                for(k=0;k<s;k++) {
+                    livegenes[k] = golg[nb[(nbsi>>(k<<2))&0x7]];
+                    PATTERN4(livegenes[k],0x0,d0)
+                    PATTERN4(~livegenes[k]&0x8888888888888888ull,0x8,d1)
+                    PATTERN4(livegenes[k]&0x8888888888888888ull,0x8,d2)
+                    d[k]=48-(d1-d0)-2*d2;
+                }
+                break;
+            case 10:
+                for(k=0;k<s;k++) {
+                    livegenes[k] = golg[nb[(nbsi>>(k<<2))&0x7]];
+                    POPCOUNT64C(livegenes[k]&0x7ffffull,dS);        // 19 coding bits for survival
+                    POPCOUNT64C((livegenes[k]>>32)&0x7ffffull,dB);  // 19 coding bits for birth
+                    d[k]=57-dS-(dB<<1);
+                }
+                break;
+            case 11:
+            case 13:                                        // dist. or canon. lut penalty of gene in variable length encoding : 8 bit patterns S 0xxxrrrr  B 1xxxrrrr
+                for(k=0;k<s;k++) {
+                    livegenes[k] = golg[nb[(nbsi>>(k<<2))&0x7]];
+                    PATTERN8(livegenes[k],0x00,d0)
+                    PATTERN8(~livegenes[k]&0x8080808080808080ull,0x80,d1)
+                    PATTERN8(livegenes[k]&0x8080808080808080ull,0x80,d2)
+                    d[k]=24-(d1-d0)-2*d2;
+                }
+                break;
+            case 12:                                        // canon. lut penalty in fixed length encoding 32 bit survival 32 bit birth
+                 for(k=0;k<s;k++) {
+                    livegenes[k] = golg[nb[(nbsi>>(k<<2))&0x7]];
+                    POPCOUNT64C(livegenes[k]&0xffffffffull,dS);        // 32 coding bits for survival
+                    POPCOUNT64C((livegenes[k]>>32)&0xffffffffull,dB);  // 32 coding bits for birth
+                    d[k]=96-dS-(dB<<1);
+                }
+                break;
+            default:
+                fprintf(stderr,"Error: selectone_of_s for selection %d is not implemented\n",selection);
+                exit(1);
           }
-          else {                                         // lut penalty of gene in variable length encoding :
-            for(k=0;k<s;k++) {
-                livegenes[k] = golg[nb[(nbsi>>(k<<2))&0x7]];
-                POPCOUNT64C(livegenes[k]&0xffull,dS);
-                POPCOUNT64C((livegenes[k]>>8)&0xffull,dB);
-                d[k]=24-dS-(dB<<1);
-            }
-            for(maxval=0ull,k=0;k<s;k++) maxval = d[k]>= maxval ? d[k] : maxval; // find value of fittest gene
-            for(nbmsk=0ull,nbest=0,k=0;k<s;k++) nbmsk |= (d[k]==maxval) ? 1ull<<nbest++ : 0ull; // find set of genes with equal best value
-            *birth = 1ull;                               // birth condition is always met since maxval set is always > 0
-            for(k=0;k<s;k++) if((nbmsk>>k)&0x1) break;
-            *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
-            break;
-          }
+          for(maxval=0ull,k=0;k<s;k++) maxval = d[k]>= maxval ? d[k] : maxval; // find value of fittest gene
+          for(nbmsk=0ull,nbest=0,k=0;k<s;k++) nbmsk |= (d[k]==maxval) ? 1ull<<nbest++ : 0ull; // find set of genes with equal best value
+          *birth = 1ull;                               // birth condition is always met since maxval set is always > 0
+          for(k=0;k<s;k++) if((nbmsk>>k)&0x1) break;
+          *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
+          break;
         default:
             fprintf(stderr,"Error: s = %d live gene repscheme %d is not implemented\n",s,repscheme);
             exit(1);
@@ -2591,11 +2613,11 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         case 6:
         case 7: for (k=0;k<8;k++) startgenes[k]=(0x1ull<<(4+k*8))-1ull; break;
         case 8: for (k=0;k<8;k++)   startgenes[k] = (codingmask<<((8+3-1)<<(ncoding-1)))|(codingmask<<((2-1)<<(ncoding-1)))|(codingmask<<((3-1)<<(ncoding-1)));break;
-        case 9: for (k=0;k<8;k++)   startgenes[k] = 0xb32ull; break;
+        case 9: for (k=0;k<8;k++)   startgenes[k] = 0xb32ull; break;                          //GoL rule for survival in totalistic LUT case, depending on ncoding
         case 10:
-        case 11: for (k=0;k<8;k++)   startgenes[k] = 0xfull|(0x7full<<4)|(0x7full<<36);break; //gol rule for survival surv2 1st 4 surv3 next 7 birth3 7 bits from 32+4
+        case 11: for (k=0;k<8;k++)   startgenes[k] = 0x7ull|(0xfull<<3)|(0xfull<<35);break;   //GoL rule for survival surv s=2,3 and birth 3 for dist LUT model
         case 12:
-        case 13:
+        case 13: for (k=0;k<8;k++)   startgenes[k] = 0xfull|(0x7full<<4)|(0x7full<<36);break; //GoL rule for survival surv2 1st 4 surv3 next 7 birth3 7 bits from 32+4
         case 14:
         case 15:for (k=0;k<8;k++)   startgenes[k] =((0x1ull<<k*3)-1ull)<<20;break;
         case 16:
