@@ -1186,10 +1186,12 @@ void v_scroll(uint64_t newgol[],uint64_t newgolg[]) {
 }
 //.......................................................................................................................................................
 void random_soup(uint64_t newgol[],uint64_t newgolg[]) {
-    int Nf,i,j,ij,i0,j0,k;
+    int Nf,i,j,ij,i0,j0,i1,j1,d,k;
     uint64_t randnr,mask;
     static unsigned int rmask = (1 << 15) - 1;
+    unsigned int density;
     
+    density = initial1density;
     mask=(NbG==64 ? ~0 :(1ull<<NbG)-1ull);
     Nf = initfield;
     if (Nf==0 || Nf>N) Nf=N;
@@ -1198,10 +1200,14 @@ void random_soup(uint64_t newgol[],uint64_t newgolg[]) {
     for (i=0; i<Nf; i++) {
         for (j=0; j<Nf; j++) {
             ij=i0+i+N*(j0+j);
+            i1 = i<j ? i : j;                               // swap so that i1<=j1
+            j1 = i<j ? j : i;
+            d= j1< (Nf>>1) ? i1 : (i1 < Nf-j1 ? i1 : Nf-j1); // find Manhatten distance to border ij1
+            density = d <= 16 ? initial1density >> (8-(d>>1)) : initial1density;
             if(!newgol[ij]) {       // check whether this OK for selection 16-19 with genes everywhere and hashdelete
-                if (selection<14) newgol[ij] = ((rand() & rmask) < initial1density)?1ull:0ull;
-                else if(selection>=16 && selection<=19) for (k=0;k<NbP;k++) newgol[ij] |= ((rand() & rmask) < initial1density)?(1ull<<(k<<2)):0ull;
-                else for (k=0;k<NbP;k++) newgol[ij] |= ((rand() & rmask) < initial1density)?(1ull<<k):0ull;
+                if (selection<14) newgol[ij] = ((rand() & rmask) < density)?1ull:0ull;
+                else if(selection>=16 && selection<=19) for (k=0;k<NbP;k++) newgol[ij] |= ((rand() & rmask) < density)?(1ull<<(k<<2)):0ull;
+                else for (k=0;k<NbP;k++) newgol[ij] |= ((rand() & rmask) < density)?(1ull<<k):0ull;
                 if (newgol[ij]) {  // if live cell or multiplane, fill with random genome g
                     RAND128P(randnr);
                     newgolg[ij] = gene0^(randnr&mask);
@@ -1449,8 +1455,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
             = 0x0406
                                                                                                                 */
     int s, s2or3, k, nmut, kch, crot, nbest;
-    unsigned int survivemask;
-    unsigned int birthmask;
+    unsigned int survivemask,birthmask,rulemodij;
     int nb[8],  ij, i, j, jp1, jm1, ip1, im1;
     uint64_t genecode, gols, nb1i, nbmask, found, randnr, r2;
     uint64_t newgene, ancestor;
@@ -1477,28 +1482,35 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         if (s) {
             s2or3 = (s>>2) ? 0ull : (s>>1);                                 // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
             gols = s2or3 ? (gol[ij] ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull; // GoL calculation next state for non-genetic gol plane
-            if (selection==9) {                                             // selection == 9
-                for (genecode=0ull,k=0;k<8;k++)                             // decodes genes with variable length encoding
-                    if (gol[nb[k]]) {
-                        if (gol[ij]) {
-                            PATTERN4(golg[nb[k]], (s&0x7), found);          //survival?
-                            genecode |= found? 1ull << (s-1) : 0ull;
+            rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1);   // if rulemod bit 1 is on then split into half planes with/without mod
+            if(rulemodij) {
+                if (selection==9) {                                             // selection == 9
+                    for (genecode=0ull,k=0;k<8;k++)                             // decodes genes with variable length encoding
+                        if (gol[nb[k]]) {
+                            if (gol[ij]) {
+                                PATTERN4(golg[nb[k]], (s&0x7), found);          //survival?
+                                genecode |= found? 1ull << (s-1) : 0ull;
+                            }
+                            else {
+                                PATTERN4(golg[nb[k]], (s|0x8), found);          //birth?
+                                genecode |= found? 1ull << (s-1+8) : 0ull;
+                            }
                         }
-                        else {
-                            PATTERN4(golg[nb[k]], (s|0x8), found);          //birth?
-                            genecode |= found? 1ull << (s-1+8) : 0ull;
-                        }
-                    }
-                survive = ((genecode&survivemask)>>(s-1)) & 0x1ull;
-                genecode>>=8;
-                birth   = ((genecode&birthmask  )>>(s-1)) & 0x1ull;
+                    survive = ((genecode&survivemask)>>(s-1)) & 0x1ull;
+                    genecode>>=8;
+                    birth   = ((genecode&birthmask  )>>(s-1)) & 0x1ull;
+                }
+                else {                                                          // selection == 8
+                    for (genecode=allcoding,k=0;k<8;k++)                        // decodes genes with fixed length encoding
+                        genecode &= gol[nb[k]]?golg[nb[k]]:allcoding;           // and of live neighbours encodes birth rule & survival rule
+                    survive=(((genecode>>((s-1)<<(ncoding-1))) & ncodingmask) == ncodingmask) && ((survivemask>>(s-1))&1ull) ? 1 : 0;
+                    genecode>>=8;
+                    birth=(((genecode>>((s-1)<<(ncoding-1))) & ncodingmask) == ncodingmask) && ((birthmask>>(s-1))&1ull) ? 1 : 0;
+                }
             }
-            else {                                                          // selection == 8
-                for (genecode=allcoding,k=0;k<8;k++)                        // decodes genes with fixed length encoding
-                    genecode &= gol[nb[k]]?golg[nb[k]]:allcoding;           // and of live neighbours encodes birth rule & survival rule
-                survive=(((genecode>>((s-1)<<(ncoding-1))) & ncodingmask) == ncodingmask) && ((survivemask>>(s-1))&1ull) ? 1 : 0;
-                genecode>>=8;
-                birth=(((genecode>>((s-1)<<(ncoding-1))) & ncodingmask) == ncodingmask) && ((birthmask>>(s-1))&1ull) ? 1 : 0;
+            else {
+                    survive = s2or3;
+                    birth = s2or3&s&0x1&~gol[ij];
             }
         }
         else survive = birth = s2or3 = gols = 0ull;
@@ -1576,7 +1588,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
     if we exclude the cases s=0,2,7,8, then there are 19 bits required to distinguish these cases
                                                                                                                 */
     int s, smid, s2, se, s0, s2or3, k, nmut, crot, found, nbest;
-    uint64_t birthsurvivemask,survive,birth;
+    uint64_t birthsurvivemask,survive,birth,rulemodij;
     static uint64_t summasks[5] = {0x7ull,0xfull,0x1full,0xfull,0x7ull};
     static int sumoffs[5] = {0,3,7,12,16};
     int nb[8], ij, i, j, jp1, jm1, ip1, im1;
@@ -1605,36 +1617,43 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
         if (smid) {
             s2or3 = (s>>2) ? 0ull : (s>>1);                                    // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
             gols = s2or3 ? (gol[ij] ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;  // GoL calculation next state for non-genetic gol plane
-            if (gol[ij]) survive = (birthsurvivemask>>sumoffs[s2])&summasks[s2] ? 1ull : 0ull;
-            else birth = (birthsurvivemask>>(32+sumoffs[s2]))&summasks[s2] ? 1ull : 0ull;
-            if (survive|birth) {
-                s0 = s-4 > 0 ? s-4 : 0;
-                survive= (birthsurvivemask>>(sumoffs[s2]+se-s0))&0x1ull;       // refine decisions for specific combination of s and se
-                birth  = (birthsurvivemask>>(32+sumoffs[s2]+se-s0))&0x1ull;    // only allowed if birthsurvivemask permits (ask this before consulting genes)
-                if (survive|birth) {                                           // complete determination of birth or survival
-                    if (selection==11) {
-                        for (k=0;k<8;k++)                                      // decodes genes with variable length encoding only for current s,se
-                            if (gol[nb[k]]) {                                  // combine information from genes of all live neighbours
-                                if (gol[ij]) {
-                                    PATTERN8(golg[nb[k]], ((s<<4)|(se-s0)), found);//final decision for survival?
-                                    survive |= found? 1ull : 0ull;
+            rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1);   // if rulemod bit 1 is on then split into half planes with/without mod
+            if (rulemodij) {
+                if (gol[ij]) survive = (birthsurvivemask>>sumoffs[s2])&summasks[s2] ? 1ull : 0ull;
+                else birth = (birthsurvivemask>>(32+sumoffs[s2]))&summasks[s2] ? 1ull : 0ull;
+                if (survive|birth) {
+                    s0 = s-4 > 0 ? s-4 : 0;
+                    survive= (birthsurvivemask>>(sumoffs[s2]+se-s0))&0x1ull;       // refine decisions for specific combination of s and se
+                    birth  = (birthsurvivemask>>(32+sumoffs[s2]+se-s0))&0x1ull;    // only allowed if birthsurvivemask permits (ask this before consulting genes)
+                    if (survive|birth) {                                           // complete determination of birth or survival
+                        if (selection==11) {
+                            for (k=0;k<8;k++)                                      // decodes genes with variable length encoding only for current s,se
+                                if (gol[nb[k]]) {                                  // combine information from genes of all live neighbours
+                                    if (gol[ij]) {
+                                        PATTERN8(golg[nb[k]], ((s<<4)|(se-s0)), found);//final decision for survival?
+                                        survive |= found? 1ull : 0ull;
+                                    }
+                                    else {
+                                        PATTERN8(golg[nb[k]], (((8|s)<<4)|(se-s0)), found);//final decision for birth?
+                                        birth |= found? 1ull : 0ull;
+                                    }
                                 }
-                                else {
-                                    PATTERN8(golg[nb[k]], (((8|s)<<4)|(se-s0)), found);//final decision for birth?
-                                    birth |= found? 1ull : 0ull;
-                                }
+                        }
+                        else {                                                      // selection == 10
+                            for (genecode=~0ull,k=0;k<8;k++)                        // assembles genetic environment from live neighbours by and of genes
+                                genecode &= gol[nb[k]]?golg[nb[k]]:~0ull;           // and of live neighbours encodes birth rule & survival rule
+                            genecode&=birthsurvivemask;
+                            if (gol[ij]) survive |= (genecode>>(sumoffs[s2]+(se-s0)))&0x1ull;
+                            else {
+                                birth |= (genecode>>(32+sumoffs[s2]+(se-s0)))&0x1ull;
                             }
-                    }
-                    else {                                                      // selection == 10
-                        for (genecode=~0ull,k=0;k<8;k++)                        // assembles genetic environment from live neighbours by and of genes
-                            genecode &= gol[nb[k]]?golg[nb[k]]:~0ull;           // and of live neighbours encodes birth rule & survival rule
-                        genecode&=birthsurvivemask;
-                        if (gol[ij]) survive |= (genecode>>(sumoffs[s2]+(se-s0)))&0x1ull;
-                        else {
-                            birth |= (genecode>>(32+sumoffs[s2]+(se-s0)))&0x1ull;
                         }
                     }
                 }
+            }
+            else {
+                survive = s2or3;
+                birth = s2or3&s&0x1&~gol[ij];
             }
         }
         else survive = birth = s2or3 = gols = 0ull;
@@ -1715,7 +1734,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
     if we exclude the cases s=0,1,7,8 which can create growth artefacts, then there are 32 bits
                                                                                                                 */
     int s, smid, s2, s2or3, k, nmut, crot, found, nbest;
-    uint64_t birthsurvivemask,survive,birth;
+    uint64_t birthsurvivemask,survive,birth,rulemodij;
     static uint64_t summasks[5] = {0xfull,0x7full,0x3ffull,0x7full,0xfull};
     static int sumoffs[5] = {0,4,11,21,28};
     int nb[8], ij, i, j, jp1, jm1, ip1, im1;
@@ -1743,37 +1762,44 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
         if (smid) {
             s2or3 = (s>>2) ? 0ull : (s>>1);                                    // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
             gols = s2or3 ? (gol[ij] ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;  // GoL calculation next state for non-genetic gol plane
-            if (gol[ij]) survive = (birthsurvivemask>>sumoffs[s2])&summasks[s2] ? 1ull : 0ull;
-            else birth = (birthsurvivemask>>(32+sumoffs[s2]))&summasks[s2] ? 1ull : 0ull;
-            if (survive|birth) {
-                for (k=0,nbmask=0;k<8;k++) nbmask |= (gol[nb[k]]<<k);          // constuct mask of live bits for 8 neighbours
-                kch = selectdifft(s, nbmask, &crot);                           // find the canonical rotation index of the live neighbour configuration
-                survive= (birthsurvivemask>>(sumoffs[s2]+crot))&0x1ull;        // refine decisions for specific canonical rotation configuration
-                birth  = (birthsurvivemask>>(32+sumoffs[s2]+crot))&0x1ull;     // only allowed if birthsurvivemask permits (ask this before consulting genes)
-                if (survive|birth) {                                           // complete determination of birth or survival
-                    if (selection==13) {
-                        for (k=0;k<8;k++)                                      // decodes genes with variable length encoding only for current s,crot
-                            if (gol[nb[k]]) {                                  // combine information from genes of all live neighbours
-                                if (gol[ij]) {
-                                    PATTERN8(golg[nb[k]], ((s<<4)|crot), found);//final decision for survival?
-                                    survive |= found? 1ull : 0ull;
+            rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1); // if rulemod bit 1 is on then split into half planes with/without mod
+            if (rulemodij) {
+                if (gol[ij]) survive = (birthsurvivemask>>sumoffs[s2])&summasks[s2] ? 1ull : 0ull;
+                else birth = (birthsurvivemask>>(32+sumoffs[s2]))&summasks[s2] ? 1ull : 0ull;
+                if (survive|birth) {
+                    for (k=0,nbmask=0;k<8;k++) nbmask |= (gol[nb[k]]<<k);      // constuct mask of live bits for 8 neighbours
+                    kch = selectdifft(s, nbmask, &crot);                       // find the canonical rotation index of the live neighbour configuration
+                    survive= (birthsurvivemask>>(sumoffs[s2]+crot))&0x1ull;    // refine decisions for specific canonical rotation configuration
+                    birth  = (birthsurvivemask>>(32+sumoffs[s2]+crot))&0x1ull; // only allowed if birthsurvivemask permits (ask this before consulting genes)
+                    if (survive|birth) {                                       // complete determination of birth or survival
+                        if (selection==13) {
+                            for (k=0;k<8;k++)                                  // decodes genes with variable length encoding only for current s,crot
+                                if (gol[nb[k]]) {                              // combine information from genes of all live neighbours
+                                    if (gol[ij]) {
+                                        PATTERN8(golg[nb[k]], ((s<<4)|crot), found); //final decision for survival?
+                                        survive |= found? 1ull : 0ull;
+                                    }
+                                    else {
+                                        PATTERN8(golg[nb[k]], (((8|s)<<4)|crot), found); //final decision for birth?
+                                        birth |= found? 1ull : 0ull;
+                                    }
                                 }
-                                else {
-                                    PATTERN8(golg[nb[k]], (((8|s)<<4)|crot), found);//final decision for birth?
-                                    birth |= found? 1ull : 0ull;
-                                }
+                        }
+                        else {                                                 // selection == 12
+                            for (genecode=~0ull,k=0;k<8;k++)                   // assembles genetic environment from live neighbours by and of genes
+                                genecode &= gol[nb[k]]?golg[nb[k]]:~0ull;      // and of live neighbours encodes birth rule & survival rule
+                            genecode&=birthsurvivemask;
+                            if (gol[ij]) survive |= (genecode>>(sumoffs[s2]+crot))&0x1ull;
+                            else {
+                                birth |= (genecode>>(32+sumoffs[s2]+crot))&0x1ull;
                             }
-                    }
-                    else {                                                      // selection == 12
-                        for (genecode=~0ull,k=0;k<8;k++)                        // assembles genetic environment from live neighbours by and of genes
-                            genecode &= gol[nb[k]]?golg[nb[k]]:~0ull;           // and of live neighbours encodes birth rule & survival rule
-                        genecode&=birthsurvivemask;
-                        if (gol[ij]) survive |= (genecode>>(sumoffs[s2]+crot))&0x1ull;
-                        else {
-                            birth |= (genecode>>(32+sumoffs[s2]+crot))&0x1ull;
                         }
                     }
                 }
+            }
+            else {
+                survive = s2or3;
+                birth = s2or3&s&0x1&~gol[ij];
             }
         }
         else survive = birth = s2or3 = gols = 0ull;
