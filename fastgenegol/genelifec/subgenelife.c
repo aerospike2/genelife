@@ -1200,10 +1200,13 @@ void random_soup(uint64_t newgol[],uint64_t newgolg[]) {
     for (i=0; i<Nf; i++) {
         for (j=0; j<Nf; j++) {
             ij=i0+i+N*(j0+j);
+            
+            // making next two lines optional under control of randomsoup == 2 is not compatible with toggling, postpone this
             i1 = i<j ? i : j;                               // swap so that i1<=j1
             j1 = i<j ? j : i;
             d= j1< (Nf>>1) ? i1 : (i1 < Nf-j1 ? i1 : Nf-j1); // find Manhatten distance to border ij1
             density = d <= 16 ? initial1density >> (8-(d>>1)) : initial1density;
+            
             if(!newgol[ij]) {       // check whether this OK for selection 16-19 with genes everywhere and hashdelete
                 if (selection<14) newgol[ij] = ((rand() & rmask) < density)?1ull:0ull;
                 else if(selection>=16 && selection<=19) for (k=0;k<NbP;k++) newgol[ij] |= ((rand() & rmask) < density)?(1ull<<(k<<2)):0ull;
