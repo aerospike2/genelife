@@ -352,7 +352,7 @@ def step(count=True):
     if not dispinit:
         display_init()
 
-    update_sim(0, 1, 0, 1, 0, 0, count)
+    update_sim(1, 1, 0, 1, 0, 0, count)
     caption = "Gene Life at iteration %d" % framenr
     pg.display.set_caption(caption)
 
