@@ -14,7 +14,7 @@
 #include <time.h>
 #include <math.h>
 //-----------------------------------------------------------size of array -------------------------------------------------------------------------
-const int log2N = 9;                // toroidal array of side length N = 2 to the power of log2N
+const int log2N = 8;                // toroidal array of side length N = 2 to the power of log2N
 const int N = 0x1 << log2N;         // only side lengths powers of 2 allowed to enable efficient implementation of periodic boundaries
 const int N2 = N*N;                 // number of sites in square-toroidal array
 const int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
@@ -158,6 +158,7 @@ double log2ymax = 25.0;             // activity scale max 2^25 = 33.5 * 10^6
 int activitymax;                    // max of activity in genealogical record of current population
 uint64_t genealogytrace[N2];        // image trace of genealogies for N most frequently populated genes
 uint64_t working[N2];               // working space array for calculating genealogies and doing neighbour bit packing
+uint64_t genegol[16];               // genes encoding for GoL in various selection models index+8
 //------------------------------------------------ planes and configuration offsets----------------------------------------------------------------------
 int offdx=0,offdy=0,offdt=0;        // display chosen offsets for glider analysis with colorfunction 8
 int Noff = 9;                       // number of offsets
@@ -969,19 +970,57 @@ extern inline unsigned int selectdifft7(uint64_t nbmask, int *crot) {
     return((kmin+3)&0x7);                                    // replication of live nb in bit 3 (middle) of canonical rotation
 }
 //...................................................................................................................................................
-extern inline unsigned int selectdifft(int sum, uint64_t nbmask, int *crot) {
+extern inline unsigned int selectdifft(int sum, uint64_t nbmask, int *crot, int *nsame) {
         int kch;
+        *nsame = 0;
         switch(sum) {
                     case 1:  kch=selectdifft1(nbmask, crot); break;
-                    case 2:  kch=selectdifft2(nbmask, crot); break;
+                    case 2:  kch=selectdifft2(nbmask, crot);
+                             if (*crot==3) *nsame = 2; break;
                     case 3:  kch=selectdifft3(nbmask, crot); break;
-                    case 4:  kch=selectdifft4(nbmask, crot); break;
+                    case 4:  kch=selectdifft4(nbmask, crot);
+                             if (*crot==2) *nsame = 2;
+                             else if (*crot==9) *nsame = 4; break;
                     case 5:  kch=selectdifft5(nbmask, crot); break;
-                    case 6:  kch=selectdifft6(nbmask, crot); break;
+                    case 6:  kch=selectdifft6(nbmask, crot);
+                             if (*crot==3) *nsame = 2;break;
                     case 7:  kch=selectdifft7(nbmask, crot); break;
                     default: kch=0;
         }
         return(kch);
+}
+//...................................................................................................................................................
+extern inline uint64_t disambiguate(unsigned int kch, uint64_t nb1i, int nb[], uint64_t golg[], int nsame, uint64_t *birth, uint64_t randnr) {
+    uint64_t gene,newgene;
+    unsigned int d,dmin;
+    int k;
+    
+    switch ((repscheme>>8)&0x7) {
+        case 0:  kch += ((nsame-1)&(randnr>>32))<< (nsame ==4 ? 1 : 2);                  // random choice
+                 kch &=0x7; return( golg[nb[(nb1i>>(kch<<2))&0x7]]);
+        case 1:  return( golg[nb[(nb1i>>(kch<<2))&0x7]]);                                // ignore asymmetry issue, continue regardless;
+        case 2:  birth = 0; return(0ull);                                                // abandom birth attempt
+        case 3:  for (newgene=~0ull,k=0;k<nsame;k++) {                                   // choose minimum value gene
+                     kch+=k*(nsame==4 ? 2 : 4);
+                     gene=golg[nb[(nb1i>>(kch<<2))&0x7]];
+                     if (gene<newgene) newgene = gene;
+                 }; return(newgene);
+        case 4:  for (newgene=~0ull,dmin=64+1,k=0;k<nsame;k++) {                         // choose least nr ones gene or minimum value if same
+                     kch+=k*(nsame==4 ? 2 : 4);
+                     gene=golg[nb[(nb1i>>(kch<<2))&0x7]];
+                     POPCOUNT64C(gene,d);
+                     if(d<dmin) newgene = gene;
+                     else if (d==dmin && newgene < gene) newgene = gene;
+                 }; return(newgene);
+        case 5:  for (newgene=~0ull,k=0;k<nsame;k++) {                                   // choose AND of ambiguous alternative gene
+                     kch+=k*(nsame==4 ? 2 : 4);
+                     newgene&=golg[nb[(nb1i>>(kch<<2))&0x7]];
+                 }; return(newgene);
+        case 6:  if ( selection<14)return(genegol[selection-8]);                         // choose gene with GoL encoding : needs fixing for odd selection
+        case 7:  return(randnr);                                                         // choose random gene : should really update randnr outside to ensure indept
+        default: fprintf(stderr,"Error in switch of ambiguous rotation resolution, should never reach here\n");
+                 return(0ull);
+    }
 }
 //------------------------------------------------------- hash gene inline fns ----------------------------------------------------------------------
 extern inline void hashaddgene(uint64_t gene,uint64_t ancestor) {
@@ -1457,7 +1496,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
             = 0000 0100 0000 0110
             = 0x0406
                                                                                                                 */
-    int s, s2or3, k, nmut, kch, crot, nbest;
+    int s, s2or3, k, nmut, kch, crot, nbest, nsame;
     unsigned int survivemask,birthmask,rulemodij;
     int nb[8],  ij, i, j, jp1, jm1, ip1, im1;
     uint64_t genecode, gols, nb1i, nbmask, found, randnr, r2;
@@ -1540,25 +1579,32 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
                 newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
             }
             else {
-                nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&nbmask);  // selection scheme depends on repscheme parameter
+                nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&nbmask);// selection scheme depends on repscheme parameter
                 if(nbest>1) {
-                    kch=selectdifft(nbest,nbmask, &crot);
-                    newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
+                    kch=selectdifft(nbest,nbmask, &crot, &nsame);
+                    if(nsame) newgene = disambiguate(kch, nb1i,nb, golg, nsame, &birth, randnr); // restore symmetry via one of 8 repscheme options
+                    else newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
                 }
             }
-            // compute random events for single bit mutation, as well as mutation position nmut
-            r2 = randprob(pmutmask, (unsigned int) randnr);
-            nmut = (randnr >> 57) & 0x3f;                                   // choose mutation position for length 64 gene : from bits 57+ of randnr
-            // complete calculation of newgol and newgolg, including mutation
-            ancestor = newgene;
-            newgene = newgene ^ (r2<<nmut);                                 // introduce single mutation with probability pmut = probmut
-            newgol[ij]  =  1L;                                              // new game of life cell value: alive
-            newgolg[ij] =  newgene;                                         // if birth then newgene
-            if (r2) statflag = statflag | F_mutation;
-            if(gol[ij]) hashdeletegene(golg[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n");
-            hashaddgene(newgene,ancestor);
+            if (birth) {                                                    // ask again because disambiguate may turn off birth
+                // compute random events for single bit mutation, as well as mutation position nmut
+                r2 = randprob(pmutmask, (unsigned int) randnr);
+                nmut = (randnr >> 57) & 0x3f;                               // choose mutation position for length 64 gene : from bits 57+ of randnr
+                // complete calculation of newgol and newgolg, including mutation
+                ancestor = newgene;
+                newgene = newgene ^ (r2<<nmut);                             // introduce single mutation with probability pmut = probmut
+                newgol[ij]  =  1L;                                          // new game of life cell value: alive
+                newgolg[ij] =  newgene;                                     // if birth then newgene
+                if (r2) statflag = statflag | F_mutation;
+                if(gol[ij]) hashdeletegene(golg[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n");
+                hashaddgene(newgene,ancestor);
+            }
+            else {                                                          // no birth, stays empty
+                newgol[ij] = gol[ij];
+                newgolg[ij] = golg[ij];
+            }
         }
-        else {                                                               // no birth, stays empty
+        else {                                                              // no birth, stays empty
             newgol[ij] = gol[ij];
             newgolg[ij] = golg[ij];
         }
@@ -1590,7 +1636,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
     there are a nr of partitions               1  2  3  4  5  4  3  2  1   total 25
     if we exclude the cases s=0,2,7,8, then there are 19 bits required to distinguish these cases
                                                                                                                 */
-    int s, smid, s2, se, s0, s2or3, k, nmut, crot, found, nbest;
+    int s, smid, s2, se, s0, s2or3, k, nmut, crot, found, nbest, nsame;
     uint64_t birthsurvivemask,survive,birth,rulemodij;
     static uint64_t summasks[5] = {0x7ull,0xfull,0x1full,0xfull,0x7ull};
     static int sumoffs[5] = {0,3,7,12,16};
@@ -1686,21 +1732,28 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
                 else {
                     nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&nbmask);  // selection scheme depends on repscheme parameter
                     if(nbest>1) {
-                        kch=selectdifft(nbest,nbmask, &crot);
-                        newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
+                        kch=selectdifft(nbest,nbmask, &crot, &nsame);
+                        if(nsame) newgene = disambiguate(kch, nb1i,nb, golg, nsame, &birth, randnr); // restore symmetry via one of 8 repscheme options
+                        else newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
                     }
                 }
-                // compute random events for single bit mutation, as well as mutation position nmut
-                r2 = randprob(pmutmask, (unsigned int) randnr);
-                nmut = (randnr >> 57) & 0x3f;                                   // choose mutation position for length 64 gene : from bits 57+ of randnr
-                // complete calculation of newgol and newgolg, including mutation
-                ancestor = newgene;
-                newgene = newgene ^ (r2<<nmut);                                 // introduce single mutation with probability pmut = probmut
-                newgol[ij]  =  1L;                                              // new game of life cell value: alive
-                newgolg[ij] =  newgene;                                         // if birth then newgene
-                if (r2) statflag = statflag | F_mutation;
-                if(gol[ij]) hashdeletegene(golg[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n");
-                hashaddgene(newgene,ancestor);
+                if (birth) {                                                    // renewed query as possibly updated in disambiguate
+                    // compute random events for single bit mutation, as well as mutation position nmut
+                    r2 = randprob(pmutmask, (unsigned int) randnr);
+                    nmut = (randnr >> 57) & 0x3f;                               // choose mutation position for length 64 gene : from bits 57+ of randnr
+                    // complete calculation of newgol and newgolg, including mutation
+                    ancestor = newgene;
+                    newgene = newgene ^ (r2<<nmut);                             // introduce single mutation with probability pmut = probmut
+                    newgol[ij]  =  1L;                                          // new game of life cell value: alive
+                    newgolg[ij] =  newgene;                                     // if birth then newgene
+                    if (r2) statflag = statflag | F_mutation;
+                    if(gol[ij]) hashdeletegene(golg[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n");
+                    hashaddgene(newgene,ancestor);
+                }
+                else {                                                          // no birth, stays empty
+                    newgol[ij] = gol[ij];
+                    newgolg[ij] = golg[ij];
+                }
             }
             else {                                                          // no birth
                 newgol[ij] = gol[ij];
@@ -1736,7 +1789,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
     there are a nr of canonical rotations      1  1  4  7 10  7  4  1  1   total 36
     if we exclude the cases s=0,1,7,8 which can create growth artefacts, then there are 32 bits
                                                                                                                 */
-    int s, smid, s2, s2or3, k, nmut, crot, found, nbest;
+    int s, smid, s2, s2or3, k, nmut, crot, found, nbest, nsame;
     uint64_t birthsurvivemask,survive,birth,rulemodij;
     static uint64_t summasks[5] = {0xfull,0x7full,0x3ffull,0x7full,0xfull};
     static int sumoffs[5] = {0,4,11,21,28};
@@ -1771,7 +1824,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
                 else birth = (birthsurvivemask>>(32+sumoffs[s2]))&summasks[s2] ? 1ull : 0ull;
                 if (survive|birth) {
                     for (k=0,nbmask=0;k<8;k++) nbmask |= (gol[nb[k]]<<k);      // constuct mask of live bits for 8 neighbours
-                    kch = selectdifft(s, nbmask, &crot);                       // find the canonical rotation index of the live neighbour configuration
+                    kch = selectdifft(s, nbmask, &crot, &nsame);                       // find the canonical rotation index of the live neighbour configuration
                     survive= (birthsurvivemask>>(sumoffs[s2]+crot))&0x1ull;    // refine decisions for specific canonical rotation configuration
                     birth  = (birthsurvivemask>>(32+sumoffs[s2]+crot))&0x1ull; // only allowed if birthsurvivemask permits (ask this before consulting genes)
                     if (survive|birth) {                                       // complete determination of birth or survival
@@ -1807,24 +1860,23 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
         }
         else survive = birth = s2or3 = gols = 0ull;
 
-        if(gol[ij]) {                                                       // death/survival   (careful! genecode changed during this processing)
+        if(gol[ij]) {                                                           // death/survival   (careful! genecode changed during this processing)
             if(survive) {
                 statflag |= F_survival;
-                newgol[ij]  = gol[ij];                                      // new game of life cell value same as old
-                newgolg[ij] = golg[ij];                                     // gene stays same
+                newgol[ij]  = gol[ij];                                          // new game of life cell value same as old
+                newgolg[ij] = golg[ij];                                         // gene stays same
             }
-            else {                                                          // gene bit = 0 => death
+            else {                                                              // gene bit = 0 => death
                 statflag |= F_death;
-                newgol[ij]  = 0ull;                                         // new game of life cell value dead
-                newgolg[ij] = 0ull;                                         // gene dies
+                newgol[ij]  = 0ull;                                             // new game of life cell value dead
+                newgolg[ij] = 0ull;                                             // gene dies
                 hashdeletegene(golg[ij],"step %d hash delete error 2 in update, gene %llx not stored\n");
             }
         }
-        else{                                                               // birth/nobirth
+        else{                                                                   // birth/nobirth
             if(birth) {
                 statflag |= F_birth;
                 newgol[ij]  = 1ull;
-                newgene = golg[nb[kch]];                                    // deterministic choice of gene via selectdifftn functions
                 RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
                 if (repscheme & 0x8) {
                     kch = ((randnr>>52)&0xf) % s;                               // choose random in this option only
@@ -1833,23 +1885,29 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
                 else {
                     nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&nbmask);  // selection scheme depends on repscheme parameter
                     if(nbest>1) {
-                        kch=selectdifft(nbest,nbmask, &crot);
-                        newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
+                        kch=selectdifft(nbest,nbmask, &crot, &nsame);
+                        if(nsame) newgene = disambiguate(kch, nb1i,nb, golg, nsame, &birth, randnr); // restore symmetry via one of 8 repscheme options
+                        else newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
                     }
                 }
-                // compute random events for single bit mutation, as well as mutation position nmut
-                r2 = randprob(pmutmask, (unsigned int) randnr);
-                nmut = (randnr >> 57) & 0x3f;                                   // choose mutation position for length 64 gene : from bits 57+ of randnr
-                // complete calculation of newgol and newgolg, including mutation
-                ancestor = newgene;
-                newgene = newgene ^ (r2<<nmut);                                 // introduce single mutation with probability pmut = probmut
-                newgol[ij]  =  1L;                                              // new game of life cell value: alive
-                newgolg[ij] =  newgene;                                         // if birth then newgene
-                if (r2) statflag = statflag | F_mutation;
-                if(gol[ij]) hashdeletegene(golg[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n");
-                hashaddgene(newgene,ancestor);
+                if (birth) {                                                    // renewed query as possibly updated in disambiguate
+                    // compute random events for single bit mutation, as well as mutation position nmut
+                    r2 = randprob(pmutmask, (unsigned int) randnr);
+                    nmut = (randnr >> 57) & 0x3f;                                   // choose mutation position for length 64 gene : from bits 57+ of randnr
+                    // complete calculation of newgol and newgolg, including mutation
+                    ancestor = newgene;
+                    newgene = newgene ^ (r2<<nmut);                                 // introduce single mutation with probability pmut = probmut
+                    newgolg[ij] =  newgene;                                         // if birth then newgene
+                    if (r2) statflag = statflag | F_mutation;
+                    if(gol[ij]) hashdeletegene(golg[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n");
+                    hashaddgene(newgene,ancestor);
+                }
+                else {                                                          // no birth, stays empty
+                    newgol[ij] = gol[ij];
+                    newgolg[ij] = golg[ij];
+                }
             }
-            else {                                                          // no birth
+            else {                                                              // no birth
                 newgol[ij] = gol[ij];
                 newgolg[ij] = golg[ij];
             }
@@ -2585,6 +2643,10 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     survivalmask = runparams[4];
     colorfunction = runparams[5];
     initfield = runparams[6];
+    
+    randomsoup = 0;
+    vscrolling = last_scrolled = 0;
+    quadrants = -1;
 
     pmutmask = (unsigned int) simparams[0];                                 // low values of pmutmask <32 are interpreted as -nlog2pmut
     if(pmutmask<32) pmutmask = (0x1 << (32-pmutmask)) - 0x1ull;                  // NB if pmut==0, pmutmask==zero, no mutation.
@@ -2632,31 +2694,38 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
 
     if (selection >= 16 && selection <=24) nstartgenes = 16;                 // need more start genes for these case but numbers arbitrary
     else nstartgenes = 8;
+
     switch (selection) {
-        case 0: for (k=0;k<4;k++) { startgenes[k] = 0xf0f0f0f0f0f0f0f0; startgenes[k+4] = 0x0f0f0f0f0f0f0f0f;} break;
-        case 1: for (k=0;k<8;k++)   startgenes[k] = ((0x1ull<<k*3)-1ull)<<20;break;
+        case 0:  for (k=0;k<4;k++) { startgenes[k] = 0xf0f0f0f0f0f0f0f0; startgenes[k+4] = 0x0f0f0f0f0f0f0f0f;} break;
+        case 1:  for (k=0;k<8;k++)   startgenes[k] = ((0x1ull<<k*3)-1ull)<<20;break;
         case 2:
-        case 3: for (k=0;k<8;k++)   startgenes[k] =(((0x1ull<<20)-1ull)<<20)+((0x1ull<<k)-0x1ull);break;
-        case 4: for (k=0;k<8;k++)  {g = 0xff0ull; startgenes[k] = k<4 ? g+1 : ~((g<<16));} break;
-        case 5: for (k=0;k<8;k++)  {g = 0xf0ull + k; startgenes[k] = k<4 ? g : (~g)|(0xfull<<16);} break;
+        case 3:  for (k=0;k<8;k++)   startgenes[k] =(((0x1ull<<20)-1ull)<<20)+((0x1ull<<k)-0x1ull);break;
+        case 4:  for (k=0;k<8;k++)  {g = 0xff0ull; startgenes[k] = k<4 ? g+1 : ~((g<<16));} break;
+        case 5:  for (k=0;k<8;k++)  {g = 0xf0ull + k; startgenes[k] = k<4 ? g : (~g)|(0xfull<<16);} break;
         case 6:
-        case 7: for (k=0;k<8;k++) startgenes[k]=(0x1ull<<(4+k*8))-1ull; break;
-        case 8: for (k=0;k<8;k++)   startgenes[k] = (codingmask<<((8+3-1)<<(ncoding-1)))|(codingmask<<((2-1)<<(ncoding-1)))|(codingmask<<((3-1)<<(ncoding-1)));break;
-        case 9: for (k=0;k<8;k++)   startgenes[k] = 0xb32ull; break;                          //GoL rule for survival in totalistic LUT case, depending on ncoding
-        case 10:
-        case 11: for (k=0;k<8;k++)   startgenes[k] = 0x7ull|(0xfull<<3)|(0xfull<<35);break;   //GoL rule for survival surv s=2,3 and birth 3 for dist LUT model
-        case 12:
-        case 13: for (k=0;k<8;k++)   startgenes[k] = 0xfull|(0x7full<<4)|(0x7full<<36);break; //GoL rule for survival surv2 1st 4 surv3 next 7 birth3 7 bits from 32+4
+        case 7:  for (k=0;k<8;k++) startgenes[k]=(0x1ull<<(4+k*8))-1ull; break;
+        case 8:  genegol[selection-8] = (codingmask<<((8+3-1)<<(ncoding-1)))|(codingmask<<((2-1)<<(ncoding-1)))|(codingmask<<((3-1)<<(ncoding-1)));
+                 for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];break;
+        case 9:  genegol[selection-8] = 0xb32ull;                                 //GoL rule for survival in totalistic LUT case, variable length encoding
+                 for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];  break;
+        case 10: genegol[selection-8] = 0x7ull|(0xfull<<3)|(0xfull<<35);          //GoL rule for survival in cordner/edge dist LUT case
+                 for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];break;
+        case 11: genegol[selection] = 0xb3b2b1b033323130;genegol[selection-8] = 0xb3b2b1b030222120;
+                 for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8*(k&0x1)];break;
+        case 12: genegol[selection-8] = 0xfull|(0x7full<<4)|(0x7full<<36);        //GoL rule for survival surv2 1st 4 surv3 next 7 birth3 7 bits from 32+4, canonical case
+                 for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];break;
+        case 13: genegol[selection] = 0xb6b5b4b3b2b1b036;genegol[selection-8] = 3332313023222120;  //GoL rule for survival surv2 1st 4 surv3 next 7 birth3 7 bits from 32+4
+                 for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8*(k&0x1)];break;
         case 14:
-        case 15:for (k=0;k<8;k++)   startgenes[k] =((0x1ull<<k*3)-1ull)<<20;break;
+        case 15: for (k=0;k<8;k++)   startgenes[k] =((0x1ull<<k*3)-1ull)<<20;break;
         case 16:
-        case 17:for (k=0;k<16;k++)  startgenes[k] = gene0;                     // first set all startgenes as uncoupled
-                for (k=0;k<NbP;k++) startgenes[k] = (startgenes[k] & (~(0xfull<<(k<<2)))) | ((k+1)%NbP)<<(k<<2);break; // couple plane k+1 to k in startgene k
+        case 17: for (k=0;k<16;k++)  startgenes[k] = gene0;                      // first set all startgenes as uncoupled
+                 for (k=0;k<NbP;k++) startgenes[k] = (startgenes[k] & (~(0xfull<<(k<<2)))) | ((k+1)%NbP)<<(k<<2);break; // couple plane k+1 to k in startgene k
         case 18:
-        case 19:for (k=0;k<16;k++)  startgenes[k] = gene0;                     // first set all startgenes as uncoupled
-                for (k=0;k<NbP;k++) startgenes[k] = 6<<(k<<2); break;          // coupled to neighbour plane before and after
+        case 19: for (k=0;k<16;k++)  startgenes[k] = gene0;                      // first set all startgenes as uncoupled
+                 for (k=0;k<NbP;k++) startgenes[k] = 6<<(k<<2); break;           // coupled to neighbour plane before and after
         case 20:
-        case 21:for (k=0;k<16;k++)  startgenes[k] = (k<<2)>NbP ? 0ull : (NbP==64) ? ~0ull : (1ull<<NbP)-1;break;
+        case 21: for (k=0;k<16;k++)  startgenes[k] = (k<<2)>NbP ? 0ull : (NbP==64) ? ~0ull : (1ull<<NbP)-1;break;
 
         default: for (k=0;k<8;k++) startgenes[k]=(0x1ull<<(4+k*8))-1ull;
 

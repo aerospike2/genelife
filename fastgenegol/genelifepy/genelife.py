@@ -7,16 +7,19 @@ import matplotlib
 import genelife_update_module as genelife
 import pygame as pg
 
-
+# Variables that are read-only in python notebook
 log2N = genelife.get_log2N()                       #  log2N=7 => N=128 get value from C library which is where it must be changed
 N = 2**log2N
 N2 = N*N
 Nmask = N-1
+Width = N
+Height = N
+
 NbP = 1
 gol = np.zeros(N2,np.uint64)
 golg = np.zeros(N2,np.uint64)
 golgstats = np.zeros(N2,np.uint64)
-                                    # graphics
+                                                   # graphics
 cgrid = np.zeros((N,N),np.int32)
 cgolg =np.zeros(N2,np.int32)
 colorfunction = 0
@@ -24,22 +27,13 @@ scr= None
 screen = None
 scalex2 = False
 cancol=[]
-caption = None
-selectiontext0007 = ["largest value","most ones","scissors-well-stone-paper","not well ordered","two target","predator prey","cooperative","neutral"];
-selectiontext0815 = ["sum fixed","sum variable","edge fixed","edge variable","canonical fixed","canonical variable","match 2nd layer","NYI"];
-selectiontext1623 = ["2-16 plane pairwise","2-16 plane pairwise","2-16 plane nearby","2-16 plane nearby","2-64 plane matching","2-64 plane matching","2-64 plane matching","2-64 plane matching"]
+caption = ""
 
-Width = N                           # value specified in imported genelife.py
-Height = N
 dispinit = False
 updatesenabled = True
 displayplanes=0xffff
 displayoneplane=64
 mat = []
-ndisp = 100
-nskip = 0
-nhist = 0
-nstat = 0
 
 gogo = True
 pixeldat = ""
@@ -48,28 +42,34 @@ mouseclicked = False
 mouseclicked2 = False
 pause = 0
 ymax = 10000
-maxPlane = 4
-offdx = offdy=offdt=0
-quadrants = -1
 oldymax = ymax
+maxPlane = 4
+offdx = offdy = offdt = 0
+quadrants = -1
 
                                     # counter and toggle initialization
-nrun = 1
+
 cnt = 0
 framenr = 0
 savecnt = 0                         # counter for saved images
 randomsoup = 0
 vscrolling = 0
+
+# testval = 0
+
                                     # parameter initialization
 runparams = np.zeros(7,np.int32)    # 7 parameters passed to C
 simparams = np.zeros(5,np.int32)    # 5 parameters passed to C
-
+nrun = 1
+ndisp = 100
+nskip = 0
+nhist = 0
+nstat = 0
 selection = 0
 rulemod = 0
 repscheme=0
 survivalmask=0
 overwritemask=0
-surviveover = np.array([survivalmask,overwritemask],dtype=np.uint32)
 
 ncoding=0
 nlog2pmut=0
@@ -90,6 +90,12 @@ npoffsets = np.array(flatoff,np.int32)
 # setup of color map : black for 0, colors for 1 to LEN+1 or 257 for colormethod 0 or 1
 #-----------------------------------------------------------------------------------------------------------
 
+def mytest(param=7):
+    """mytest"""
+    # global test.testval
+    test.testval = test.testval+1+param
+    print test.testval
+#-----------------------------------------------------------------------------------------------------------
 def rand_cmap(nlabels, type='bright', first_color_black=True, last_color_black=False, verbose=True):
     """
     Creates a random colormap to be used together with matplotlib. Useful for segmentation tasks
@@ -209,15 +215,16 @@ def init_button_arrays():
             for i in range(ncanon[l][j]):
                 cancol[l][k]=cancolors[l][j]
                 k = k+1
+    return(cancol)
 #-----------------------------------------------------------------------------------------------------------
+
 def init_buttons():    # initialize parameter buttons
     global repscheme,survivalmask,overwritemask,selection,ncoding,displayplanes
-    global cancol
     global scr
     global Height,Width
     global log2N,NbP
 
-    init_button_arrays()
+    cancol=init_button_arrays()
     pg.draw.rect(scr,[50,50,50],[0,Height+8,Width,5])
     if selection<8:
         for k in range(18):
@@ -252,6 +259,7 @@ def init_buttons():    # initialize parameter buttons
             elif k<21:
                 bit = (repscheme>>(k-16))&0x1
                 pg.draw.rect(scr,cancol[4][k]*(1+bit),[k<<(log2N-6),Height+8,3,5])
+    return(cancol)
 #-----------------------------------------------------------------------------------------------------------
 
 def display_init():
@@ -293,7 +301,7 @@ def show0(count=True):
     caption = "Gene Life at iteration %d" % framenr
     pg.display.set_caption(caption)
 
-    init_buttons()                           # initialize parameter buttons
+    cancol=init_buttons()                           # initialize parameter buttons
     
     colorgrid()
     # pg.transform.scale2x(scr,screen)       # use this for standard dithered display
@@ -302,6 +310,26 @@ def show0(count=True):
     pg.display.flip()
     if(count):
         genelife.countspecieshash()
+#-----------------------------------------------------------------------------------------------------------
+
+def update_sim(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
+    global gol, cgrid
+    global golg
+    global log2N
+    global runparams
+    global cnt,framenr
+
+    cnt = cnt+nrun
+    if cnt % ndisp == 0:  # insert the non-displayed iterations & count species : NB nrun must divide ndisp
+        genelife.genelife_update(nskip, nhist, nstat)
+        framenr = framenr + nskip
+        if(count):
+            genelife.countspecieshash()
+    genelife.genelife_update(nrun, nhist, nstat)
+    framenr = framenr+nrun
+    colorgrid()  # sets  cgrid
+    return
+
 #-----------------------------------------------------------------------------------------------------------
 
 def step(count=True):
@@ -314,7 +342,7 @@ def step(count=True):
     if not dispinit:
         display_init()
 
-    update_sim(count)
+    update_sim(0, 1, 0, 1, 0, 0, count)
     caption = "Gene Life at iteration %d" % framenr
     pg.display.set_caption(caption)
 
@@ -332,7 +360,7 @@ def step(count=True):
 # +/- keys reserved for activity ymax : actually the crossover value in N* act/(ymax+act)
 # keys lower case - decrement, upper case - increment, alt - input value: y,Y ymax q,Q quadrant
 # misc. keys save image
-def run(count=True):
+def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     global framenr
     global scr, screen, scalex2
     global N,NbP
@@ -346,15 +374,17 @@ def run(count=True):
     global Height,Width
     global dispinit
     global randomsoup,vscrolling
-    global selectiontext0007, selectiontext0815, selectiontext1623
-    global surviveover
     global gogo,pause,mouseclicked,mouseclicked2,pixeldat,paramdat
     global ymax,maxPlane,offdx,offdy,offdt,quadrants,oldymax,displayoneplane
     global parhelp
-    
+
+    selectiontext0007 = ["largest value","most ones","scissors-well-stone-paper","not well ordered","two target","predator prey","cooperative","neutral"];
+    selectiontext0815 = ["sum fixed","sum variable","edge fixed","edge variable","canonical fixed","canonical variable","match 2nd layer","NYI"];
+    selectiontext1623 = ["2-16 plane pairwise","2-16 plane pairwise","2-16 plane nearby","2-16 plane nearby","2-64 plane matching","2-64 plane matching","2-64 plane matching","2-64 plane matching"]
+
     if not dispinit:
         display_init()
-    init_buttons()
+    cancol=init_buttons()
     
     surviveover = np.array([survivalmask,overwritemask],dtype=np.uint32)
     gogo = True
@@ -586,7 +616,7 @@ def run(count=True):
                     genelife.set_vscrolling()
         if (not mouseclicked and not pause):
             if updatesenabled:
-                update_sim(count)
+                update_sim(nrun, ndisp, nskip, niter, nhist, nstat, count)
             else:
                 colorgrid()
         nspecies=genelife.get_nspecies()
@@ -608,25 +638,6 @@ def run(count=True):
         if scalex2:
             pg.transform.scale2xact(scr,screen)  # use this for custom pygame no smoother
         pg.display.update()                    # copies the screen to the display (or use .flip())
-#-----------------------------------------------------------------------------------------------------------
-
-def update_sim(count=True):
-    global gol, cgrid
-    global golg
-    global log2N
-    global runparams
-    global cnt,framenr,nrun,nskip,ndisp,nhist,nstat
-
-    cnt = cnt+1
-    if cnt % ndisp == 0:  # insert the non-displayed iterations & count species
-        genelife.genelife_update(nskip, nhist, nstat)
-        framenr = framenr + nskip
-        if(count):
-            genelife.countspecieshash()
-    genelife.genelife_update(nrun, nhist, nstat)
-    framenr = framenr+nrun
-    colorgrid()  # sets  cgrid
-    return
 #-----------------------------------------------------------------------------------------------------------
 
 def parhelp():
@@ -693,7 +704,8 @@ def parhelp():
 
 if __name__ == '__main__':
     """ main program with example parameters"""
-    nrun=1; ndisp=1000; nskip=0; niter=1;    # simulation time stepping parameters
+    nrun=1; ndisp=1000; nskip=0; niter=1;    # simulation time stepping parameters: nrun CA updates per step, ndisp nr steps to display before skip,
+                                             # nskip nr of CA updates to skip over display, niter nr of repeats of disp-skip cycle
     nhist = 0                                # set to n to turn on histogram configurations every nth step
     nstat = 0                                # set to n to turn on statistics trace every nth step
     rulemod = runparams[0] = 1               # 0,1 whether to allow GoL rule modifications
@@ -725,5 +737,5 @@ if __name__ == '__main__':
     cnt=0
     show0()
     # step()
-    run()
+    run(nrun, ndisp, nskip, niter, nhist, nstat, count)
     
