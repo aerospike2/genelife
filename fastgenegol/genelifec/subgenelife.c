@@ -2926,7 +2926,8 @@ void set_displayplanes(unsigned int displayplanes_in) {
 void set_surviveover64(unsigned int surviveover[], int len ) {
     if (len==2) {
         survivalmask = surviveover[0];
-        overwritemask = surviveover[1];
+        if(selection<8) overwritemask = surviveover[1];
+        else birthmask = surviveover[1];
     }
     else fprintf(stderr,"surviveover64 needs two parameters, %d provided\n",len);
 }
