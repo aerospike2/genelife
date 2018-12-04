@@ -108,7 +108,6 @@
 		521FDCF41F287ECE00F08FFB /* fastgol.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgol.c; path = genelifec/fastgol.c; sourceTree = SOURCE_ROOT; };
 		52416DA51F27425C00721D17 /* libcos_doubles.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libcos_doubles.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		52416DB61F27771500721D17 /* libgenelife.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libgenelife.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
-		525B557F21B669CA00C37CAF /* test.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = test.py; sourceTree = "<group>"; };
 		5275A1281F292FA40062765F /* dispgenegol */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = dispgenegol; sourceTree = BUILT_PRODUCTS_DIR; };
 		5275A1301F2930E90062765F /* cos_doubles.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = cos_doubles.c; path = cos/cos_doubles.c; sourceTree = SOURCE_ROOT; };
 		5275A1311F2930E90062765F /* cos_doubles.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = cos_doubles.h; path = cos/cos_doubles.h; sourceTree = SOURCE_ROOT; };
@@ -194,7 +193,6 @@
 				5206B81421507F2E00394209 /* activity.py */,
 				5206B81321507EF500394209 /* display.py */,
 				521FDCEB1F287DEE00F08FFB /* genelife.py */,
-				525B557F21B669CA00C37CAF /* test.py */,
 				521FDCEC1F287DEE00F08FFB /* genelife_update_module.py */,
 			);
 			path = genelifepy;

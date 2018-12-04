@@ -8,7 +8,7 @@ import genelife_update_module as genelife
 import pygame as pg
 
 # Variables that are read-only in python notebook
-log2N = genelife.get_log2N()                       #  log2N=7 => N=128 get value from C library which is where it must be changed
+log2N = genelife.get_log2N()                #  log2N=7 => N=128 get value from C library which is where it must be changed
 N = 2**log2N
 N2 = N*N
 Nmask = N-1
@@ -19,7 +19,7 @@ NbP = 1
 gol = np.zeros(N2,np.uint64)
 golg = np.zeros(N2,np.uint64)
 golgstats = np.zeros(N2,np.uint64)
-                                                   # graphics
+                                            # graphics
 cgrid = np.zeros((N,N),np.int32)
 cgolg =np.zeros(N2,np.int32)
 colorfunction = 0
@@ -47,37 +47,46 @@ maxPlane = 4
 offdx = offdy = offdt = 0
 quadrants = -1
 
-                                    # counter and toggle initialization
+                                         # counter and toggle initialization
 
 cnt = 0
 framenr = 0
-savecnt = 0                         # counter for saved images
+savecnt = 0                              # counter for saved images
 randomsoup = 0
 vscrolling = 0
+                                         # parameter initialization
+runparams = np.zeros(8,np.int32)         # 8 parameters passed to C
+simparams = np.zeros(5,np.int32)         # 5 parameters passed to C
+nrun=1; ndisp=1000; nskip=0; niter=1;    # simulation time stepping parameters: nrun CA updates per step, ndisp nr steps to display before skip,
+                                         # nskip nr of CA updates to skip over display, niter nr of repeats of disp-skip cycle
+nhist = 0                                # set to n to turn on histogram configurations every nth step
+nstat = 0                                # set to n to turn on statistics trace every nth step
+rulemod = runparams[0] = 1               # 0,1 whether to allow GoL rule modifications
+                                         # with rulemod 1 2-live-nb birth, 3-live-nb non-birth & non-survival possible
+repscheme = runparams[1] = 8             # repscheme bit 3 (val 0x8) determines whether random choice of ancestor amongst live neighbours
+                                         # repscheme mod 8 i.e. 0-7 determines selection scheme based on gene
+                                         # 0 minimum gene as value  # 1 maximum gene as value
+                                         # 2 minimum number of ones # 3 maximum number of ones
+                                         # 4 neutral selection # 5 neutral but different selection
+                                         # 6 penalty function -1 for a survival rule -2 for a birth rule  # 7 not allowed
+selection = runparams[2] = 10            # fitness for 2 live neighbor rule : 0-6 see subgenelife.c code
+overwritemask = runparams[3]= 0x3        # whether to overwrite existing genes and allow birth
+survivalmask = runparams[4] = 0x06       # for selection=8-13 this is the GoL survival mask
+birthmask = runparams[7] = 0x04          # for selection=8-13 this is the GoL birth mask
+colorfunction = runparams[5] = 0         # color function 0(hash), >=1(fnal), 2 nongulstate or color gol planes, 3 notgolrul yellow
+                                         # 4 activities 5 genealogy steps 6 genealogy temporal 7 activity scaled colors
+initfield = runparams[6] = 100           # 1 init via 32x32 genepat.dat, n>1 init via nxn rand array
+nlog2pmut = simparams[0] = 8             # log2 gene mutation probability (0 or >56 means no mutation)
+initial1density = simparams[1] =  16384  # initial 1 density in GOL state
+                                         # 16384 = nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
+initialrdensity = simparams[2] = 32768   # initial density of random genes, 0 if all initial gens are startgenes
+ncoding = simparams[3] = 0               # for selection 10, non zero value means grow plane community from 0
+                                         # otherwise (selection<10) no of bits used to encode valid connection functions 1-16
+                                         # for selection==8, lut, ncoding 1,2,3 bits per lut entry : 0 implies 3.
+startgenechoice = simparams[4] = 8       # initialize genes to startgene number 0-8 : 8 is random choice of 0-7
 
-# testval = 0
 
-                                    # parameter initialization
-runparams = np.zeros(7,np.int32)    # 7 parameters passed to C
-simparams = np.zeros(5,np.int32)    # 5 parameters passed to C
-nrun = 1
-ndisp = 100
-nskip = 0
-nhist = 0
-nstat = 0
-selection = 0
-rulemod = 0
-repscheme=0
-survivalmask=0
-overwritemask=0
-
-ncoding=0
-nlog2pmut=0
-initfield=100
-startgenechoice=0
-initial1density=16284
-initialrdensity = 32768
-                                    # offset initialization
+                                         # offset initialization
 offsets = [[-1, 0,-1],
            [ 1, 0,-1],
            [ 0,-1,-1],
@@ -678,12 +687,23 @@ def parhelp():
         print ""
         print "Additional control bits for selection are in repscheme"
         print "______________________________________________________"
-        print "repscheme mod 8 i.e. 0-7 determines selection scheme based on gene"
+        print "repscheme bits 0-3 : currently only bit 2 is used"
+        print "   bit 2 determines choice of neighbour in canonical rotation : most central/different (0) or first bit (1)"
+        print "repscheme bits 4-7 determine selection scheme based on gene"
         print "   # 0 minimum gene as value  # 1 maximum gene as value "
         print "   # 2 minimum number of ones # 3 maximum number of ones"
         print "   # 4 neutral selection # 5 neutral but different selection"
         print "   # 6 penalty function -1 for a survival rule -2 for a birth rule  # 7 not allowed"
-        print "repscheme bit 3 (val 0x8) overrides with random choice of ancestor amongst live neighbours"
+        print "   bit 7 (val 0x8x) overrides with random choice of ancestor amongst live neighbours"
+        print "repscheme bits 8-10 determine disambiguation method for symmetric cases sum=2,crot=3 and sum=4,crot=2,9"
+        print "   0 random choice : this involves a departure from determinism for these cases"
+        print "   1 ignore problem and choose selected bit of canonical configuration : live with minimal asymmetry"
+        print "   2 disallow birth : effectively modifies the rules and is like excluding this LUT entry from the table"
+        print "   3 choose lesser in value of genes if different (otherwise it makes no difference)"
+        print "   4 choose gene with least number of ones and if same, then lesser in value"
+        print "   5 choose AND of genes : this is a symmetric solution"
+        print "   6 choose a default gene such as the gene coding for the Game of Life LUT in these cases"
+        print "   7 generate a random gene to give birth to for these ambiguous instances"
     print ""
     print "Other controls:"
     print "_______________"
@@ -703,33 +723,7 @@ def parhelp():
 #-----------------------------------------------------------------------------------------------------------
 
 if __name__ == '__main__':
-    """ main program with example parameters"""
-    nrun=1; ndisp=1000; nskip=0; niter=1;    # simulation time stepping parameters: nrun CA updates per step, ndisp nr steps to display before skip,
-                                             # nskip nr of CA updates to skip over display, niter nr of repeats of disp-skip cycle
-    nhist = 0                                # set to n to turn on histogram configurations every nth step
-    nstat = 0                                # set to n to turn on statistics trace every nth step
-    rulemod = runparams[0] = 1               # 0,1 whether to allow GoL rule modifications
-                                             # with rulemod 1 2-live-nb birth, 3-live-nb non-birth & non-survival possible
-    repscheme = runparams[1] = 8             # repscheme bit 3 (val 0x8) determines whether random choice of ancestor amongst live neighbours
-                                             # repscheme mod 8 i.e. 0-7 determines selection scheme based on gene
-                                             # 0 minimum gene as value  # 1 maximum gene as value
-                                             # 2 minimum number of ones # 3 maximum number of ones
-                                             # 4 neutral selection # 5 neutral but different selection
-                                             # 6 penalty function -1 for a survival rule -2 for a birth rule  # 7 not allowed
-    selection = runparams[2] = 10            # fitness for 2 live neighbor rule : 0-6 see subgenelife.c code
-    overwritemask = runparams[3]= 0x00000078 # for selection=10-11 this is the GoL birth mask
-    survivalmask = runparams[4] = 0x0000007f # for selection=10-11 this is the GoL survival mask
-    colorfunction = runparams[5] = 0         # color function 0(hash), >=1(fnal), 2 nongulstate or color gol planes, 3 notgolrul yellow
-                                             # 4 activities 5 genealogy steps 6 genealogy temporal 7 activity scaled colors
-    initfield = runparams[6] = 100            # 1 init via 32x32 genepat.dat, n>1 init via nxn rand array
-    nlog2pmut = simparams[0] = 8             # log2 gene mutation probability (0 or >56 means no mutation)
-    initial1density = simparams[1] =  16384  # initial 1 density in GOL state
-                                             # 16384 = nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
-    initialrdensity = simparams[2] = 0       # initial density of random genes
-    ncoding = simparams[3] = 0               # for selection 10, non zero value means grow plane community from 0
-                                             # otherwise (selection<10) no of bits used to encode valid connection functions 1-16
-                                             # for selection==8, lut, ncoding 1,2,3 bits per lut entry : 0 implies 3.
-    startgenechoice = simparams[4] = 8       # initialize genes to startgene number 0-8 : 8 is random choice of 0-7
+    """ main program to run with default example parameters (see global parameters above) """
     
     genelife.initialize_planes(npoffsets)
     genelife.initialize(runparams,simparams)

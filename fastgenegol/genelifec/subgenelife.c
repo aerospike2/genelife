@@ -39,10 +39,13 @@ unsigned int repscheme = 1;         // replication scheme: lowest 10 bits define
                                     // 0,1 select birth 2,3 neighbour choice 4,5 enforce birth 6,7 2nd,1st neighbour genes 8,9 no successive nonGoL
                                     // bits 10-13 specify 4-bit mask for 2-live neighbour birth onl for those of the 4 canonical configurations set
                                     // bits 14-20 activate quadrant exploration of specific subset of the first 5 pairs of repscheme and survival and overwrite masks
-unsigned int survivalmask = 0x2;    // survive mask for two (bit 1) and three (bit 0) live neighbours
-                                    // for selection=8,9 this is 16-bit birthsurvivemask, for selection=10,11 it is 64-bit on survive/birthmasks to restrict luts
-unsigned int overwritemask = 0x2;   // bit mask for 4 cases of overwrite: bit 0. s==3  bit 1. special birth s==2
-                                    // for selection=10,11 it is 32-bit birthmask to restrict luts
+unsigned int survivalmask = 0x3;    // for selection 0-7 survive mask for two (bit 1) and three (bit 0) live neighbours
+                                    // for selection=8,9 it is 16-bit and for 10-11 it is 19-bit and 12-13 32-bit survival mask to restrict luts
+unsigned int birthmask = 0x0;       // for selection 0-7 unused, birth control is done via bits 0,1,4,5 of repscheme
+                                    // for selection=8,9 it is 16-bit and for 10-11 it is 19-bit and 12-13 32-bit birthmask to restrict luts
+unsigned int overwritemask = 0x3;   // for selection 0-7 bit mask for 4 cases of overwrite: bit 0. s==3  bit 1. special birth s==2
+                                    // for selection=8,9 it is 16-bit and for 10-11 it is 19-bit and 12-13 32-bit birthmask to restrict luts
+
 int ncoding = 1;                    // byte 0 of python ncoding : number of coding bits per gene function
 int ncoding2 = 0;                   // byte 1 of python ncoding: number of coding bits per gene function for masks in connection with repscheme add2ndmask1st R_6,7
 int NbP;                            // byte 2 of python ncoding: number of bit planes used for parallel gol planes packed into gol long unsigned integer : used for selection = 14+
@@ -651,17 +654,17 @@ extern inline int selectone_of_s(int s, uint64_t nbsi, int nb[], uint64_t golg[]
     unsigned int k,nbest;                             // index for neighbours and number in best fitness category
     unsigned int d[8],dS,dB,d0,d1,d2;                     // number of ones in various gene combinations
     uint64_t livegenes[8],gdiff,maxval,nbmsk;
-
+    unsigned int repselect = (repscheme>>4)&0x7;
 
     for(k=0;k<s;k++) {
         livegenes[k] = golg[nb[(nbsi>>(k<<2))&0x7]];
         POPCOUNT64C(livegenes[k],d[k]);
     }
 
-    switch (repscheme&0x7) {
+    switch (repselect) {
         case 0:                                          // integer value of sequence as fitness : smallest or largest
         case 1:
-            if(repscheme&0x1) for(maxval= 0ull,k=0;k<s;k++) maxval = livegenes[k] >= maxval ? livegenes[k] : maxval; // find value of fittest gene max value
+            if(repselect&0x1) for(maxval= 0ull,k=0;k<s;k++) maxval = livegenes[k] >= maxval ? livegenes[k] : maxval; // find value of fittest gene max value
             else              for(maxval=~0ull,k=0;k<s;k++) maxval = livegenes[k] <= maxval ? livegenes[k] : maxval; // find value of fittest gene min value
             for(nbmsk=0ull,nbest=0,k=0;k<s;k++) nbmsk |= (livegenes[k]==maxval) ? 1ull<<nbest++ : 0ull; // find set of genes with equal best value
             *birth = (nbest>0 && nbest!=s) ? 1ull: 0ull; // birth condition is genes not all same
@@ -670,7 +673,7 @@ extern inline int selectone_of_s(int s, uint64_t nbsi, int nb[], uint64_t golg[]
             break;
         case 2:
         case 3:                                          // number of ones in sequence as fitness
-            if(repscheme&0x1) for(maxval= 0ull,k=0;k<s;k++) maxval = d[k]>= maxval ? d[k] : maxval; // find value of fittest gene max nr ones
+            if(repselect&0x1) for(maxval= 0ull,k=0;k<s;k++) maxval = d[k]>= maxval ? d[k] : maxval; // find value of fittest gene max nr ones
             else              for(maxval=~0ull,k=0;k<s;k++) maxval = d[k]<= maxval ? d[k] : maxval; // find value of fittest gene min nr ones
             for(nbmsk=0ull,nbest=0,k=0;k<s;k++) nbmsk |= (d[k]==maxval) ? 1ull<<nbest++ : 0ull; // find set of genes with equal best value
             *birth = (nbest>0 && nbest!=s) ? 1ull: 0ull; // birth condition is genes not all same
@@ -747,7 +750,7 @@ extern inline int selectone_of_s(int s, uint64_t nbsi, int nb[], uint64_t golg[]
           *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
           break;
         default:
-            fprintf(stderr,"Error: s = %d live gene repscheme %d is not implemented\n",s,repscheme);
+            fprintf(stderr,"Error: s = %d live gene repselect %d is not implemented\n",s,repselect);
             exit(1);
     }
     *nbmask = nbmsk;
@@ -1497,14 +1500,12 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
             = 0x0406
                                                                                                                 */
     int s, s2or3, k, nmut, kch, crot, nbest, nsame;
-    unsigned int survivemask,birthmask,rulemodij;
+    unsigned int rulemodij;
     int nb[8],  ij, i, j, jp1, jm1, ip1, im1;
     uint64_t genecode, gols, nb1i, nbmask, found, randnr, r2;
     uint64_t newgene, ancestor;
     uint64_t  survive, birth, statflag, ncodingmask, allcoding;
     
-    survivemask=survivalmask&0xff;                                          // 8 bits of repscheme 0-7 used to limit space of rules for survival
-    birthmask=(survivalmask>>8)&0xff;                                       // 8 bits of repscheme 8-15 used to limit space of rules for birth
     ncodingmask = (1ull<<ncoding)-1ull;                                     // mask for number of bits coding for each lut rule: <=4 for birth and survival case
     if (ncoding==4) allcoding = 0xffffffffffffffff;                         // mask for total gene coding region
     else allcoding = (1ull<<(ncoding*8*2))-1ull;
@@ -1538,14 +1539,14 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
                                 genecode |= found? 1ull << (s-1+8) : 0ull;
                             }
                         }
-                    survive = ((genecode&survivemask)>>(s-1)) & 0x1ull;
+                    survive = ((genecode&survivalmask)>>(s-1)) & 0x1ull;
                     genecode>>=8;
                     birth   = ((genecode&birthmask  )>>(s-1)) & 0x1ull;
                 }
                 else {                                                          // selection == 8
                     for (genecode=allcoding,k=0;k<8;k++)                        // decodes genes with fixed length encoding
                         genecode &= gol[nb[k]]?golg[nb[k]]:allcoding;           // and of live neighbours encodes birth rule & survival rule
-                    survive=(((genecode>>((s-1)<<(ncoding-1))) & ncodingmask) == ncodingmask) && ((survivemask>>(s-1))&1ull) ? 1 : 0;
+                    survive=(((genecode>>((s-1)<<(ncoding-1))) & ncodingmask) == ncodingmask) && ((survivalmask>>(s-1))&1ull) ? 1 : 0;
                     genecode>>=8;
                     birth=(((genecode>>((s-1)<<(ncoding-1))) & ncodingmask) == ncodingmask) && ((birthmask>>(s-1))&1ull) ? 1 : 0;
                 }
@@ -2643,6 +2644,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     survivalmask = runparams[4];
     colorfunction = runparams[5];
     initfield = runparams[6];
+    birthmask=runparams[7];
     
     randomsoup = 0;
     vscrolling = last_scrolled = 0;
