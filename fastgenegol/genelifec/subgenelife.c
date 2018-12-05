@@ -14,7 +14,7 @@
 #include <time.h>
 #include <math.h>
 //-----------------------------------------------------------size of array -------------------------------------------------------------------------
-const int log2N = 10;                // toroidal array of side length N = 2 to the power of log2N
+const int log2N = 8;                // toroidal array of side length N = 2 to the power of log2N
 const int N = 0x1 << log2N;         // only side lengths powers of 2 allowed to enable efficient implementation of periodic boundaries
 const int N2 = N*N;                 // number of sites in square-toroidal array
 const int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
@@ -1586,14 +1586,14 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         }
         else if(birth) { // birth
             RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
-            if (repscheme & 0x8) {
+            if (repscheme & 0x80) {
                 kch = ((randnr>>32)&0xffff) % s;                            // choose random in this option only
                 newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
             }
             else {
                 nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&nbmask);// selection scheme depends on repscheme parameter
                 if(nbest>1) {
-                    kch=selectdifft(nbest,nbmask, &crot, &nsame);
+                    kch=selectdifft(nbest,nbmask,&crot,&nsame);              // nsame gives the number of undistinguished positions in canonical rotation
                     if(nsame) newgene = disambiguate(kch, nb1i, nb, golg, nsame, &birth, randnr); // restore symmetry via one of 8 repscheme options
                     else newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
                 }
@@ -1738,7 +1738,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
         else{                                                                       // birth/nobirth
             if(birth) {
                 RAND128P(randnr);                                                   // inline exp so compiler recognizes auto-vec,
-                if (repscheme & 0x8) {
+                if (repscheme & 0x80) {
                     kch = ((randnr>>32)&0xffff) % s;                                // choose random in this option only
                     newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
                 }
@@ -1893,7 +1893,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
         else{                                                                   // birth/nobirth
             if(birth) {
                 RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
-                if (repscheme & 0x8) {
+                if (repscheme & 0x80) {
                     kch = ((randnr>>32)&0xffff) % s;                            // choose random in this option only
                     newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
                 }
