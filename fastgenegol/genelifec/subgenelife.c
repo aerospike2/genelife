@@ -654,7 +654,7 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
 // birth is returned 1 if ancestors satisfy selection condition. Selection of which of genes to copy is newgene. Non-random result.
     unsigned int k,nbest;                                 // index for neighbours and number in best fitness category
     unsigned int d[8],dS,dB,d0,d1,d2;                     // number of ones in various gene combinations
-    uint64_t livegenes[8],gdiff,maxval,nbmsk;
+    uint64_t livegenes[8],gdiff,extrval,bestnbmask;
     unsigned int repselect = (repscheme>>4)&0x7;
 
     for(k=0;k<s;k++) {
@@ -665,37 +665,38 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
     switch (repselect) {
         case 0:                                          // integer value of sequence as fitness : smallest or largest
         case 1:
-            if(repselect&0x1) for(maxval= 0ull,k=0;k<s;k++) maxval = (livegenes[k] >= maxval ? livegenes[k] : maxval); // find value of fittest gene max value
-            else              for(maxval=~0ull,k=0;k<s;k++) maxval = (livegenes[k] <= maxval ? livegenes[k] : maxval); // find value of fittest gene min value
-            for(nbmsk=0ull,nbest=0,k=0;k<s;k++) nbmsk |= ((livegenes[k]==maxval) ? 1ull<<nbest++ : 0ull); // find set of genes with equal best value
+            if(repselect&0x1) for(extrval= 0ull,k=0;k<s;k++) extrval = (livegenes[k] >= extrval ? livegenes[k] : extrval); // find value of fittest gene max value
+            else              for(extrval=~0ull,k=0;k<s;k++) extrval = (livegenes[k] <= extrval ? livegenes[k] : extrval); // find value of fittest gene min value
+            for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= ((livegenes[k]==extrval) ? 1ull<< (k+0*nbest++) : 0ull); // find set of genes with equal best value
             *birth = (nbest>0) ? 1ull: 0ull;             // birth condition may include later that genes not all same
-            for(k=0;k<s;k++) if((nbmsk>>k)&0x1) break;   // execute loop until first optimal live neighbour found at k (a one)
+            for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;   // execute loop until first optimal live neighbour found at k (a one)
             *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
             break;
         case 2:
         case 3:                                          // number of ones in sequence as fitness
-            if(repselect&0x1) for(maxval= 0ull,k=0;k<s;k++) maxval = (d[k]>= maxval ? d[k] : maxval); // find value of fittest gene max nr ones
-            else              for(maxval=~0ull,k=0;k<s;k++) maxval = (d[k]<= maxval ? d[k] : maxval); // find value of fittest gene min nr ones
-            for(nbmsk=0ull,nbest=0,k=0;k<s;k++) nbmsk |= (d[k]==maxval ? 1ull<<nbest++ : 0ull); // find set of genes with equal best value
+            if(repselect&0x1) for(extrval= 0ull,k=0;k<s;k++) extrval = (d[k]>= extrval ? d[k] : extrval); // find value of fittest gene max nr ones
+            else              for(extrval=~0ull,k=0;k<s;k++) extrval = (d[k]<= extrval ? d[k] : extrval); // find value of fittest gene min nr ones
+            for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= (d[k]==extrval ? 1ull<<(k+0*nbest++) : 0ull); // find set of genes with equal best value
             *birth = ((nbest>0) ? 1ull: 0ull);           // birth condition may include later that genes not all same
-            for(k=0;k<s;k++) if((nbmsk>>k)&0x1) break;
+            for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
             *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
             break;
         case 4:                                          // neutral selection
-            for(nbmsk=0ull,nbest=0,k=0;k<s;k++) nbmsk |= 1ull<<nbest++; // find set of genes with equal best value : in this case all of them
+            for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= 1ull<<(k+0*nbest++); // find set of genes with equal best value : in this case all of them
             *birth = 1ull;                               // birth condition is always true
-            for(k=0;k<s;k++) if((nbmsk>>k)&0x1) break;
+            for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
             *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
             break;
         case 5:                                          // neutral selection but birth only occurs if some sequences are different
             for(gdiff=0ull,k=1;k<s;k++) if ((gdiff=livegenes[0]^livegenes[k])) break; // test whether all genes the same
-            if (gdiff) for(nbmsk=0ull,nbest=0,k=0;k<s;k++) nbmsk |= 1ull<<nbest++; // find set of genes with equal best value : in this case all of them
-            else { nbest = 0; nbmsk = 0ull;}
+            if (gdiff) for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= 1ull<<(k+0*nbest++); // find set of genes with equal best value : in this case all of them
+            else { nbest = 0; bestnbmask = 0ull;}
             *birth = gdiff ? 1ull : 0ull;                // birth condition is genes not all same
-            for(k=0;k<s;k++) if((nbmsk>>k)&0x1) break;
+            for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
             *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
             break;
         case 6:
+        case 7:
           switch(selection) {
             case 8:                                          // totalistic lut penalty of gene in fixed length encoding : first 8 bits survival, next 8 bits birth
                 for(k=0;k<s;k++) {
@@ -744,17 +745,18 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
                 fprintf(stderr,"Error: selectone_of_s for selection %d is not implemented\n",selection);
                 exit(1);
           }
-          for(maxval=0ull,k=0;k<s;k++) maxval = d[k]>= maxval ? d[k] : maxval; // find value of fittest gene
-          for(nbmsk=0ull,nbest=0,k=0;k<s;k++) nbmsk |= (d[k]==maxval) ? 1ull<<nbest++ : 0ull; // find set of genes with equal best value
-          *birth = 1ull;                               // birth condition is always met since maxval set is always > 0
-          for(k=0;k<s;k++) if((nbmsk>>k)&0x1) break;
+          for(extrval=0ull,k=0;k<s;k++) extrval = d[k]>= extrval ? d[k] : extrval; // find value of fittest gene
+          for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= (d[k]==extrval) ? 1ull<<(k+0*nbest++) : 0ull; // find set of genes with equal best value
+          *birth = 1ull;                               // birth condition is always met since extrval set is always > 0
+          for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
           *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
           break;
         default:
             fprintf(stderr,"Error: s = %d live gene repselect %d is not implemented\n",s,repselect);
             exit(1);
     }
-    *nbmask = nbmsk;
+    for (*nbmask=0ull,k=0;k<s;k++)
+        *nbmask |= ((bestnbmask>>k)&0x1ull)<<((nb1i>>(k<<2))&0x7);
     return(nbest);
 }
 //------------------------------------------------------- selectone_nbs -------------------------------------------------------------------------------------
@@ -825,18 +827,21 @@ extern inline unsigned int selectdifft2(uint64_t nbmask, int *crot) {
             kmin = k;                                        // no of times rotated to right
         }
     }
-    switch (nbmaskrm) {                                        //              x03    x05    x09    x11
-        case 0x03ull : k = 1; *crot = 0; break;                // 00000011    |01.|  <-
-        case 0x05ull : k = 2; *crot = 1; break;                // 00000101    |...|  |0.2|  <-
-        case 0x09ull : k = 3; *crot = 2; break;                // 00001001    |...|  |...|  |0..|   <-
-        case 0x11ull : k = 4; *crot = 3; break;                // 00010001           |...|  |..3|  |0..|   <-
-        default  : {                                           //                           |...|  |...|
-                                                               //                                  |..4|
-            fprintf(stderr,"Error in canonical rotation for two live neighbours nbmaskrm = %llx for mask %llx\n",nbmaskrm,nbmask); k = 0;
-        } //default case
-    } //switch
-    if (canonical) return(kmin);                           // replication of live nb in bit 0 of canonical rotation
-    else  return((kmin+k)&0x7);                            // replication of live nb in other bit of canonical rotation
+    if (canonical) return(kmin);                             // replication of live nb in bit 0 of canonical rotation
+    else {
+        switch (nbmaskrm) {                                        //              x03    x05    x09    x11
+            case 0x03ull : k = 1; *crot = 0; break;                // 00000011    |01.|  <-
+            case 0x05ull : k = 2; *crot = 1; break;                // 00000101    |...|  |0.2|  <-
+            case 0x09ull : k = 3; *crot = 2; break;                // 00001001    |...|  |...|  |0..|   <-
+            case 0x11ull : k = 4; *crot = 3; break;                // 00010001           |...|  |..3|  |0..|   <-
+            default  : {                                           //                           |...|  |...|
+                                                                   //                                  |..4|
+                fprintf(stderr,"Error in canonical rotation for two live neighbours nbmaskrm = %llx for mask %llx\n",nbmaskrm,nbmask); k = 0;
+            } //default case
+        } //switch
+        return((kmin+k)&0x7);                               // replication of live nb in other bit of canonical rotation
+    }
+
 }
 //.......................................................................................................................................................
 extern inline unsigned int selectdifft3(uint64_t nbmask, int *crot) {
@@ -913,7 +918,7 @@ extern inline unsigned int selectdifft5(uint64_t nbmask, int *crot) {
             kmin = k;                                                 // no of times rotated to right
         }
     }
-    if (canonical) return((kmin+7)&0x7);                              // replication of live neigbour in bit 0 of canonical rotation
+    if (canonical) return(kmin);                                      // replication of live neigbour in bit 0 of canonical rotation
     else {                                                            // replication of live neighbour in most different position
         switch (nbmaskrm) {                              //              x1f    x2f    x3d    x3b    x57    x37    x5b
             case 0x1full : k = 2; *crot = 0; break;      // 00011111    |012|  <-
@@ -944,18 +949,20 @@ extern inline unsigned int selectdifft6(uint64_t nbmask, int *crot) {
             kmin = k;                                        // no of times rotated to right
         }
     }
-    switch (nbmaskrm) {                                        //              x3f    x5f    x6f    x77
-        case 0x3full : k = 2; *crot = 0; break;                // 00111111    |012|  <-
-        case 0x5full : k = 3; *crot = 1; break;                // 01011111    |..3|  |012|  <-
-        case 0x6full : k = 3; *crot = 2; break;                // 01101111    |.54|  |..3|  |012|   <-
-        case 0x77ull : k = 4; *crot = 3; break;                // 01110111           |6.4|  |..3|  |012|   <-
-        default  : {                                           //                           |65.|  |...|
-                                                               //                                  |654|
-            fprintf(stderr,"Error in canonical rotation for six live neighbours nbmaskrm = %llx for mask %llx\n",nbmaskrm,nbmask); k = 0;
-        } //default case
-    } //switch
-    if (canonical) return((kmin+7)&0x7);                    // replication of live nb in bit 0 of canonical rotation
-    else  return((kmin+k)&0x7);                             // replication of live nb in other bit of canonical rotation
+    if (canonical) return(kmin);                             // replication of live neigbour in bit 0 of canonical rotation
+    else {
+        switch (nbmaskrm) {                                        //              x3f    x5f    x6f    x77
+            case 0x3full : k = 2; *crot = 0; break;                // 00111111    |012|  <-
+            case 0x5full : k = 3; *crot = 1; break;                // 01011111    |..3|  |012|  <-
+            case 0x6full : k = 3; *crot = 2; break;                // 01101111    |.54|  |..3|  |012|   <-
+            case 0x77ull : k = 4; *crot = 3; break;                // 01110111           |6.4|  |..3|  |012|   <-
+            default  : {                                           //                           |65.|  |...|
+                                                                   //                                  |654|
+                fprintf(stderr,"Error in canonical rotation for six live neighbours nbmaskrm = %llx for mask %llx\n",nbmaskrm,nbmask); k = 0;
+            } //default case
+        } //switch
+        return((kmin+k)&0x7);                             // replication of live nb in other bit of canonical rotation
+    }
 }
 //...................................................................................................................................................
 extern inline unsigned int selectdifft7(uint64_t nbmask, int *crot) {
@@ -971,12 +978,14 @@ extern inline unsigned int selectdifft7(uint64_t nbmask, int *crot) {
         }
     }
     *crot = kmin;
-    return((kmin+3)&0x7);                                    // replication of live nb in bit 3 (middle) of canonical rotation
+    if (canonical) return(kmin);                    // replication of live nb in bit 0 of canonical rotation
+    else  return((kmin+3)&0x7);                             // replication of live nb in bit 3 (middle) of canonical rotation
 }
 //...................................................................................................................................................
 extern inline unsigned int selectdifft(int sum, uint64_t nbmask, int *crot, int *nsame) {
         int kch;
         *nsame = 0;
+    
         switch(sum) {
                     case 1:  return(selectdifft1(nbmask, crot));
                     case 2:  kch=selectdifft2(nbmask, crot);
@@ -1593,9 +1602,10 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
             else {
                 nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&nbmask);// selection scheme depends on repscheme parameter
                 if(nbest>1) {
-                    kch=selectdifft(nbest,nbmask,&crot,&nsame);              // nsame gives the number of undistinguished positions in canonical rotation
+                    kch=selectdifft(nbest,nbmask,&crot,&nsame);              // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
                     if(nsame) newgene = disambiguate(kch, nb1i, nb, golg, nsame, &birth, randnr); // restore symmetry via one of 8 repscheme options
-                    else newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
+                    else newgene = golg[nb[kch]];
+                    // fprintf(stderr,"lut step %d ij %d s %d nbest %d nbmask %llx nsame %d crot %d newgene %llx nb1i %llx kch %d gol[nb[kch]] %llx\n",totsteps, ij, s, nbest, nbmask, nsame, crot, newgene, nb1i, kch, gol[nb[kch]]);
                 }
             }
             if (birth) {                                                    // ask again because disambiguate may turn off birth
@@ -1743,12 +1753,11 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
                     newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
                 }
                 else {
-                    nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&nbmask);   // selection scheme depends on repscheme parameter
+                    nbest=selectone_of_s(s, nb1i, nb, golg, &birth, &newgene, &nbmask); // selection scheme depends on repscheme parameter
                     if(nbest>1) {
-                        kch=selectdifft(nbest,nbmask, &crot, &nsame);
+                        kch=selectdifft(nbest, nbmask, &crot, &nsame);
                         if(nsame) newgene = disambiguate(kch, nb1i, nb, golg, nsame, &birth, randnr); // restore symmetry via one of 8 repscheme options
-                        else
-                            newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
+                        else newgene = golg[nb[kch]];
                     }
                 }
                 if (birth) {                                                        // renewed query as possibly updated in disambiguate
@@ -1902,7 +1911,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
                     if(nbest>1) {
                         kch=selectdifft(nbest,nbmask, &crot, &nsame);
                         if(nsame) newgene = disambiguate(kch, nb1i, nb, golg, nsame, &birth, randnr); // restore symmetry via one of 8 repscheme options
-                        else newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
+                        else newgene = golg[nb[kch]];
                     }
                 }
                 if (birth) {                                                    // renewed query as possibly updated in disambiguate
