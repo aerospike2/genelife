@@ -202,19 +202,20 @@ def init_button_arrays():
                                                       # no of entries per color region
     ncanon.append([2,2,2,2,2,4,2,2])                  # selection 0-7
     ncanon.append([8,8])                              # selection 8,9
-    ncanon.append([3,4,5,4,3,3,4,5,4,3])              # selection 10,11
+    ncanon.append([2,3,4,5,4,3,2,2,3,4,5,4,3,2])      # selection 10,11
     ncanon.append([4,7,10,7,4,4,7,10,7,4])            # selection 12,13
     ncanon.append([16,1,1,1,1,1])                     # selection 16-19
                                                       # colors for different color regions for buttons, colorvals must be < 128
     cancolors.append([[0,100,0],[0,50,100],[0,80,80],[100,0,0],[100,100,0],[50,100,0],[0,0,127],[0,100,50]]) # selection 0-7
     cancolors.append([[0,0,127],[0,100,0]])          # selection 8,9
-    cancolors.append([[100,0,0],[0,100,0],[0,0,127],[0,100,0],[100,0,0],[100,0,0],[0,100,0],[0,0,127],[0,100,0],[100,0,0]]) # selection 10,11
-    cancolors.append([[100,0,0],[0,100,0],[0,0,127],[0,100,0],[100,0,0],[100,0,0],[0,100,0],[0,0,127],[0,100,0],[100,0,0]]) # selection 12,13
+    cancolors.append([[0,0,127],[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[0,0,127],
+                      [0,127,0],[50,127,0],[60,120,0],[100,120,0],[80,120,0],[50,120,0],[0,127,0]]) # selection 10,11
+    cancolors.append([[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[50,127,0],[80,120,0],[100,120,0],[80,120,0],[50,127,0]])  # selection 12,13
     cancolors.append([[100,0,0],[100,100,0],[0,80,80],[0,0,127],[0,100,0],[80,0,80]]) # selection 16-19
                                                      # lists of colors for individual buttons expanded from above, first initialize to zero
     cancol.append(np.zeros((18,3),np.int32))
     cancol.append(np.zeros((16,3),np.int32))
-    cancol.append(np.zeros((38,3),np.int32))
+    cancol.append(np.zeros((46,3),np.int32))
     cancol.append(np.zeros((64,3),np.int32))
     cancol.append(np.zeros((21,3),np.int32))
     
@@ -249,10 +250,12 @@ def init_buttons():    # initialize parameter buttons
             pg.draw.rect(scr,cancol[1][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3,5])
             pg.draw.rect(scr,cancol[1][k+8]*(1+((birthmask>>(k))&0x1)),[(k+8)<<(log2N-6),Height+8,3,5])
     elif selection<12:
-        for k in range(19):
+        # pg.draw.rect(scr,[200,200,200],[(23<<(log2N-6))-1,Height+6,1,9])
+        for k in range(23):
             pg.draw.rect(scr,cancol[2][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3,5])
-            pg.draw.rect(scr,cancol[2][k+19]*(1+((birthmask>>(k))&0x1)),[(k+19)<<(log2N-6),Height+8,3,5])
+            pg.draw.rect(scr,cancol[2][k+23]*(1+((birthmask>>(k))&0x1)),[(k+23)<<(log2N-6),Height+8,3,5])
     elif selection<14:
+        # pg.draw.rect(scr,[200,200,200],[(32<<(log2N-6))-1,Height+6,1,9])
         for k in range(32):
             pg.draw.rect(scr,cancol[3][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3,5])
             pg.draw.rect(scr,cancol[3][k+32]*(1+((birthmask>>(k))&0x1)),[(k+32)<<(log2N-6),Height+8,3,5])
@@ -462,14 +465,14 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                                 genelife.set_surviveover64(surviveover)
                         elif selection < 12:
                             if k<38:
-                                if k<19:
+                                if k<23:
                                     survivalmask = survivalmask ^ (1<<k)
                                     print ("survivalmask changed to %x" % (survivalmask))
                                     pg.draw.rect(scr,cancol[2][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3,5])
                                 else:
-                                    birthmask = birthmask ^ (1<<(k-19))
+                                    birthmask = birthmask ^ (1<<(k-23))
                                     print ("birthmask changed to %x" % (birthmask))
-                                    pg.draw.rect(scr,cancol[2][k]*(1+((birthmask>>(k-19))&0x1)),[k<<(log2N-6),Height+8,3,5])
+                                    pg.draw.rect(scr,cancol[2][k]*(1+((birthmask>>(k-23))&0x1)),[k<<(log2N-6),Height+8,3,5])
                                 surviveover[0],surviveover[1]= survivalmask,birthmask
                                 genelife.set_surviveover64(surviveover)
                         elif selection<14:
@@ -477,11 +480,11 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                                 if k<32:
                                     survivalmask = survivalmask ^ (1<<k)
                                     print ("survivalmask changed to %x" % (survivalmask))
-                                    pg.draw.rect(scr,cancol[2][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3,5])
+                                    pg.draw.rect(scr,cancol[3][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3,5])
                                 else:
                                     birthmask = birthmask ^ (1<<(k-32))
                                     print ("birthmask changed to %x" % (birthmask))
-                                    pg.draw.rect(scr,cancol[2][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+8,3,5])
+                                    pg.draw.rect(scr,cancol[3][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+8,3,5])
                                 surviveover[0],surviveover[1]= survivalmask,birthmask
                                 genelife.set_surviveover64(surviveover)
                         elif selection < 16:
@@ -489,12 +492,12 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                         elif selection < 20:
                             if k<NbP:
                                 displayplanes = displayplanes ^ (1<<k)
-                                pg.draw.rect(scr,cancol[3][k]*(1+((displayplanes>>k)&0x1)),[k<<(log2N-6),Height+8,3,5])
+                                pg.draw.rect(scr,cancol[4][k]*(1+((displayplanes>>k)&0x1)),[k<<(log2N-6),Height+8,3,5])
                                 genelife.set_displayplanes(displayplanes)
                             elif k>=16 and k<21:
                                 repscheme = repscheme ^ (1<<(k-16))
                                 print ("repscheme changed to %x" % (repscheme))
-                                pg.draw.rect(scr,cancol[3][k]*(1+((repscheme>>(k-16))&0x1)),[k<<(log2N-6),Height+8,3,5])
+                                pg.draw.rect(scr,cancol[4][k]*(1+((repscheme>>(k-16))&0x1)),[k<<(log2N-6),Height+8,3,5])
                                 genelife.set_repscheme(repscheme)
                     else: # selection >= 20
                         if colorfunction < 4 or colorfunction == 8:

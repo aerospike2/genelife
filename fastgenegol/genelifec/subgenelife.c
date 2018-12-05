@@ -1507,28 +1507,30 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
     int nb[8],  ij, i, j, jp1, jm1, ip1, im1;
     uint64_t genecode, gols, nb1i, nbmask, found, randnr, r2;
     uint64_t newgene, ancestor;
-    uint64_t  survive, birth, statflag, ncodingmask, allcoding;
+    uint64_t  survive, birth, smask, bmask, statflag, ncodingmask, allcoding;
     
-    ncodingmask = (1ull<<ncoding)-1ull;                                     // mask for number of bits coding for each lut rule: <=4 for birth and survival case
-    if (ncoding==4) allcoding = 0xffffffffffffffff;                         // mask for total gene coding region
+    smask = (uint64_t) survivalmask;                                            // convert to 64 bit mask for efficient usage here
+    bmask = (uint64_t) birthmask;
+    ncodingmask = (1ull<<ncoding)-1ull;                                         // mask for number of bits coding for each lut rule: <=4 for birth and survival case
+    if (ncoding==4) allcoding = 0xffffffffffffffff;                             // mask for total gene coding region
     else allcoding = (1ull<<(ncoding*8*2))-1ull;
-    for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
-        i = ij & Nmask;  j = ij >> log2N;                                   // row & column
-        jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
-        ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                         // toroidal i+1, i-1
-        nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1;           // new order of nbs
+    for (ij=0; ij<N2; ij++) {                                                   // loop over all sites of 2D torus with side length N
+        i = ij & Nmask;  j = ij >> log2N;                                       // row & column
+        jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                       // toroidal (j+1)*N and (j-1)*N
+        ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                             // toroidal i+1, i-1
+        nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1;               // new order of nbs
         nb[4]=jp1+ip1; nb[5]=jp1+i; nb[6]=jp1+im1; nb[7]=j*N+im1;
-        for (s=0,k=0,nb1i=0;k<8;k++) {                                      // packs non-zero nb indices in first up to 8*4 bits
-            gols=gol[nb[k]];                                                // whether neighbor is alive
-            s += gols;                                                      // s is number of live nbs
-            nb1i = (nb1i << (gols<<2)) + (gols*k);                          // nb1i is packed list of live neighbour indices
+        for (s=0,nb1i=0ull,k=0;k<8;k++) {                                       // packs non-zero nb indices in first up to 8*4 bits
+            gols=gol[nb[k]];                                                    // whether neighbor is alive
+            s += gols;                                                          // s is number of live nbs
+            nb1i = (nb1i << (gols<<2)) + (gols*k);                              // nb1i is packed list of live neighbour indices
         }
         statflag = 0ull;
         birth = 0ull;
         if (s) {
-            s2or3 = (s>>2) ? 0ull : (s>>1);                                 // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
-            gols = s2or3 ? (gol[ij] ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull; // GoL calculation next state for non-genetic gol plane
-            rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1);   // if rulemod bit 1 is on then split into half planes with/without mod
+            s2or3 = (s>>2) ? 0ull : (s>>1);                                     // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
+            gols = s2or3 ? (gol[ij] ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;   // GoL calculation next state for non-genetic gol plane
+            rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1);  // if rulemod bit 1 is on then split into half planes with/without mod
             if(rulemodij) {
                 if (selection==9) {                                             // selection == 9
                     for (genecode=0ull,k=0;k<8;k++)                             // decodes genes with variable length encoding
@@ -1542,16 +1544,16 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
                                 genecode |= found? 1ull << (s-1+8) : 0ull;
                             }
                         }
-                    survive = ((genecode&survivalmask)>>(s-1)) & 0x1ull;
+                    survive = ((genecode&smask)>>(s-1)) & 0x1ull;
                     genecode>>=8;
-                    birth   = ((genecode&birthmask  )>>(s-1)) & 0x1ull;
+                    birth   = ((genecode&bmask)>>(s-1)) & 0x1ull;
                 }
                 else {                                                          // selection == 8
                     for (genecode=allcoding,k=0;k<8;k++)                        // decodes genes with fixed length encoding
                         genecode &= gol[nb[k]]?golg[nb[k]]:allcoding;           // and of live neighbours encodes birth rule & survival rule
-                    survive=(((genecode>>((s-1)<<(ncoding-1))) & ncodingmask) == ncodingmask) && ((survivalmask>>(s-1))&1ull) ? 1 : 0;
+                    survive=(((genecode>>((s-1)<<(ncoding-1))) & ncodingmask) == ncodingmask) && ((smask>>(s-1))&1ull) ? 1 : 0;
                     genecode>>=8;
-                    birth=(((genecode>>((s-1)<<(ncoding-1))) & ncodingmask) == ncodingmask) && ((birthmask>>(s-1))&1ull) ? 1 : 0;
+                    birth=(((genecode>>((s-1)<<(ncoding-1))) & ncodingmask) == ncodingmask) && ((bmask>>(s-1))&1ull) ? 1 : 0;
                 }
             }
             else {
@@ -1577,7 +1579,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         else if(birth) { // birth
             RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
             if (repscheme & 0x8) {
-                kch = ((randnr>>52)&0xf) % s;                               // choose random in this option only
+                kch = ((randnr>>32)&0xffff) % s;                            // choose random in this option only
                 newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
             }
             else {
@@ -1629,76 +1631,78 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
 }
-//------------------------------------------------------- update_lut_canon_rot -----------------------------------------------------------------------------------
+//------------------------------------------------------------- update_lut_dist -----------------------------------------------------------------------------------
 void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 10,11
 // update GoL for toroidal field which has side length which is a binary power of 2
 // encode without if structures for optimal vector treatment
 /*
     configurations are distinguished by number of ones in two classes (corner,edge-centred) of the 8-bit live neighbour pattern
     for the different s values                 0  1  2  3  4  5  6  7  8
-    there are a nr of partitions               1  2  3  4  5  4  3  2  1   total 25
-    if we exclude the cases s=0,2,7,8, then there are 19 bits required to distinguish these cases
+    there are a nr of partitions               1  2  3  4  5  4  3  2  1   total 25   with se the number in edge centred sites NSEW
+    chosen nr of partitions for exploration    0  2  3  4  5  4  3  2  0   total 23
+    if we exclude the cases s = 0,8, then there are 23 bits required to distinguish these cases
                                                                                                                 */
-    int s, smid, s2, se, s0, s2or3, k, nmut, crot, found, nbest, nsame;
-    uint64_t birthsurvivemask,survive,birth,rulemodij;
-    static uint64_t summasks[5] = {0x7ull,0xfull,0x1full,0xfull,0x7ull};
-    static int sumoffs[5] = {0,3,7,12,16};
+    int s, s1, se, s0, s2or3, k, nmut, crot, found, nbest, nsame;
+    uint64_t survive,birth,smask,bmask,rulemodij;
+    static uint64_t summasks[7] = {0x3ull,0x7ull,0xfull,0x1full,0xfull,0x7ull,0x3ull};
+    static int sumoffs[7] = {0,2,5,9,14,18,21};
     int nb[8], ij, i, j, jp1, jm1, ip1, im1;
     unsigned int kch=0;
     uint64_t genecode, gols, nb1i, nbmask, randnr, r2;
     uint64_t newgene, ancestor;
     uint64_t statflag;
     
-    canonical = repscheme & R_2_canonical_nb;
-    birthsurvivemask=(((uint64_t) overwritemask)<<32);                         // 32 bits of overwritemask used to limit space of rules for birth
-    birthsurvivemask|=(uint64_t) survivalmask;                                 // 32 bits of survival used to limit space of rules for survival
-    for (ij=0; ij<N2; ij++) {                                                  // loop over all sites of 2D torus with side length N
-        i = ij & Nmask;  j = ij >> log2N;                                      // row & column
-        jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                      // toroidal (j+1)*N and (j-1)*N
-        ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                            // toroidal i+1, i-1
-        nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1;              // new order of nbs
+    canonical = repscheme & R_2_canonical_nb;                                      // set global choice of canonical rotation bit choice for selectdifftx
+    smask = (uint64_t) survivalmask;                                               // convert to 64 bit mask for efficient usage here
+    bmask = (uint64_t) birthmask;
+
+    for (ij=0; ij<N2; ij++) {                                                      // loop over all sites of 2D torus with side length N
+        i = ij & Nmask;  j = ij >> log2N;                                          // row & column
+        jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                          // toroidal (j+1)*N and (j-1)*N
+        ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                                // toroidal i+1, i-1
+        nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1;                  // new order of nbs
         nb[4]=jp1+ip1; nb[5]=jp1+i; nb[6]=jp1+im1; nb[7]=j*N+im1;
-        for (s=se=0,k=0,nb1i=0;k<8;k++) {                                      // packs non-zero nb indices in first up to 8*4 bits
-            gols=gol[nb[k]];                                                   // whether neighbor is alive
-            s += gols;                                                         // s is number of live nbs
-            se += k&0x1&gols;                                                  // se is number of edge-centred live neighbours (odd k)
-            nb1i = (nb1i << (gols<<2)) + (gols*k);                             // nb1i is packed list of live neighbour indices
+        for (s=se=0,nb1i=0ull,k=0;k<8;k++) {                                       // packs non-zero nb indices in first up to 8*4 bits
+            gols=gol[nb[k]];                                                       // whether neighbor is alive
+            s += gols;                                                             // s is number of live nbs
+            se += k&0x1&gols;                                                      // se is number of edge-centred live neighbours (odd k)
+            nb1i = (nb1i << (gols<<2)) + (gols*k);                                 // nb1i is packed list of live neighbour indices
         }
-        smid = s>1 && s<7; s2 = s-2;                                           // s in mid-range for possible lut rule
+
         statflag = newgene = survive = birth = 0ull;
-        if (smid) {
-            s2or3 = (s>>2) ? 0ull : (s>>1);                                    // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
-            gols = s2or3 ? (gol[ij] ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;  // GoL calculation next state for non-genetic gol plane
-            rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1);   // if rulemod bit 1 is on then split into half planes with/without mod
+        if (s>0 && s<8) {
+            s1 = s-1;
+            s2or3 = (s>>2) ? 0ull : (s>>1);                                        // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
+            gols = s2or3 ? (gol[ij] ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;      // GoL calculation next state for non-genetic gol plane
+            rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1);     // if rulemod bit 1 is on then split into half planes with/without mod
             if (rulemodij) {
-                if (gol[ij]) survive = (birthsurvivemask>>sumoffs[s2])&summasks[s2] ? 1ull : 0ull;
-                else birth = (birthsurvivemask>>(32+sumoffs[s2]))&summasks[s2] ? 1ull : 0ull;
+                if (gol[ij]) survive = (smask>>sumoffs[s1])&summasks[s1] ? 1ull : 0ull;
+                else           birth = (bmask>>sumoffs[s1])&summasks[s1] ? 1ull : 0ull;
                 if (survive|birth) {
-                    s0 = s-4 > 0 ? s-4 : 0;
-                    survive= (birthsurvivemask>>(sumoffs[s2]+se-s0))&0x1ull;       // refine decisions for specific combination of s and se
-                    birth  = (birthsurvivemask>>(32+sumoffs[s2]+se-s0))&0x1ull;    // only allowed if birthsurvivemask permits (ask this before consulting genes)
+                    s0 = (s-4 > 0 ? s-4 : 0);
+                    if (gol[ij]) survive = (smask>>(sumoffs[s1]+se-s0))&0x1ull;    // refine decisions for specific combination of s and se
+                    else           birth = (bmask>>(sumoffs[s1]+se-s0))&0x1ull;    // only allowed if birth,survivalmask permits (ask this before consulting genes)
                     if (survive|birth) {                                           // complete determination of birth or survival
                         if (selection==11) {
+                            survive=birth=0ull;
                             for (k=0;k<8;k++)                                      // decodes genes with variable length encoding only for current s,se
                                 if (gol[nb[k]]) {                                  // combine information from genes of all live neighbours
                                     if (gol[ij]) {
-                                        PATTERN8(golg[nb[k]], ((s<<4)|(se-s0)), found);//final decision for survival?
+                                        PATTERN8(golg[nb[k]], ((s<<4)|(se-s0)), found); //survival rule found? final decision for survival
                                         survive |= found? 1ull : 0ull;
                                     }
                                     else {
-                                        PATTERN8(golg[nb[k]], (((8|s)<<4)|(se-s0)), found);//final decision for birth?
+                                        PATTERN8(golg[nb[k]], (((8|s)<<4)|(se-s0)), found); //birth rule found? final decision for birth
                                         birth |= found? 1ull : 0ull;
                                     }
                                 }
-                        }
+                            }
                         else {                                                      // selection == 10
                             for (genecode=~0ull,k=0;k<8;k++)                        // assembles genetic environment from live neighbours by and of genes
-                                genecode &= gol[nb[k]]?golg[nb[k]]:~0ull;           // and of live neighbours encodes birth rule & survival rule
-                            genecode&=birthsurvivemask;
-                            if (gol[ij]) survive |= (genecode>>(sumoffs[s2]+(se-s0)))&0x1ull;
-                            else {
-                                birth |= (genecode>>(32+sumoffs[s2]+(se-s0)))&0x1ull;
-                            }
+                                genecode &= (gol[nb[k]]?golg[nb[k]]:~0ull);         // and of live neighbours encodes birth rule & survival rule
+                            genecode &= (bmask << 32)|smask;                        // not required as now already tested above
+                            if (gol[ij]) survive &= (genecode>>(sumoffs[s1]+(se-s0)))&0x1ull;
+                            else         birth   &= (genecode>>(32+sumoffs[s1]+(se-s0)))&0x1ull;
                         }
                     }
                 }
@@ -1710,54 +1714,55 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
         }
         else survive = birth = s2or3 = gols = 0ull;
 
-        if(gol[ij]) {                                                       // death/survival   (careful! genecode changed during this processing)
+        if(gol[ij]) {                                                               // death/survival   (careful! genecode changed during this processing)
             if(survive) {
                 statflag |= F_survival;
-                newgol[ij]  = gol[ij];                                      // new game of life cell value same as old
-                newgolg[ij] = golg[ij];                                     // gene stays same
+                newgol[ij]  = gol[ij];                                              // new game of life cell value same as old
+                newgolg[ij] = golg[ij];                                             // gene stays same
             }
-            else {                                                          // gene bit = 0 => death
+            else {                                                                  // gene bit = 0 => death
                 statflag |= F_death;
-                newgol[ij]  = 0ull;                                         // new game of life cell value dead
-                newgolg[ij] = 0ull;                                         // gene dies
+                newgol[ij]  = 0ull;                                                 // new game of life cell value dead
+                newgolg[ij] = 0ull;                                                 // gene dies
                 hashdeletegene(golg[ij],"step %d hash delete error 2 in update, gene %llx not stored\n");
             }
         }
-        else{                                                               // birth/nobirth
+        else{                                                                       // birth/nobirth
             if(birth) {
-                RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
+                RAND128P(randnr);                                                   // inline exp so compiler recognizes auto-vec,
                 if (repscheme & 0x8) {
-                    kch = ((randnr>>52)&0xf) % s;                               // choose random in this option only
+                    kch = ((randnr>>32)&0xffff) % s;                                // choose random in this option only
                     newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
                 }
                 else {
-                    nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&nbmask);  // selection scheme depends on repscheme parameter
+                    nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&nbmask);   // selection scheme depends on repscheme parameter
                     if(nbest>1) {
                         kch=selectdifft(nbest,nbmask, &crot, &nsame);
                         if(nsame) newgene = disambiguate(kch, nb1i, nb, golg, nsame, &birth, randnr); // restore symmetry via one of 8 repscheme options
-                        else newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
+                        else
+                            newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
                     }
                 }
-                if (birth) {                                                    // renewed query as possibly updated in disambiguate
+                if (birth) {                                                        // renewed query as possibly updated in disambiguate
                     statflag |= F_birth;
                     // compute random events for single bit mutation, as well as mutation position nmut
                     r2 = randprob(pmutmask, (unsigned int) randnr);
-                    nmut = (randnr >> 57) & 0x3f;                               // choose mutation position for length 64 gene : from bits 57+ of randnr
+                    nmut = (randnr >> 57) & 0x3f;                                   // choose mutation position for length 64 gene : from bits 57+ of randnr
                     // complete calculation of newgol and newgolg, including mutation
                     ancestor = newgene;
-                    newgene = newgene ^ (r2<<nmut);                             // introduce single mutation with probability pmut = probmut
-                    newgol[ij]  =  1ull;                                        // new game of life cell value: alive
-                    newgolg[ij] =  newgene;                                     // if birth then newgene
+                    newgene = newgene ^ (r2<<nmut);                                 // introduce single mutation with probability pmut = probmut
+                    newgol[ij]  =  1ull;                                            // new game of life cell value: alive
+                    newgolg[ij] =  newgene;                                         // if birth then newgene
                     if (r2) statflag = statflag | F_mutation;
                     if(gol[ij]) hashdeletegene(golg[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n");
                     hashaddgene(newgene,ancestor);
                 }
-                else {                                                          // no birth, stays empty
+                else {                                                              // no birth, stays empty
                     newgol[ij] = gol[ij];
                     newgolg[ij] = golg[ij];
                 }
             }
-            else {                                                          // no birth
+            else {                                                                  // no birth
                 newgol[ij] = gol[ij];
                 newgolg[ij] = golg[ij];
             }
@@ -1768,7 +1773,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
             if(newgol[ij]) statflag |= F_nongolchg;
         }
 
-        if(gol[ij]) statflag |= F_golstate;                                 // this is the last gol state, not the new state
+        if(gol[ij]) statflag |= F_golstate;                                         // this is the last gol state, not the new state
         newgolgstats[ij] = statflag;
     }  // end for ij
 
@@ -1810,7 +1815,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
         ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                            // toroidal i+1, i-1
         nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1;              // new order of nbs
         nb[4]=jp1+ip1; nb[5]=jp1+i; nb[6]=jp1+im1; nb[7]=j*N+im1;
-        for (s=0,k=0,nb1i=0;k<8;k++) {                                         // packs non-zero nb indices in first up to 8*4 bits
+        for (s=0,nb1i=0ull,k=0;k<8;k++) {                                      // packs non-zero nb indices in first up to 8*4 bits
             gols=gol[nb[k]];                                                   // whether neighbor is alive
             s += gols;                                                         // s is number of live nbs
             nb1i = (nb1i << (gols<<2)) + (gols*k);                             // nb1i is packed list of live neighbour indices
@@ -1879,7 +1884,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
             if(birth) {
                 RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
                 if (repscheme & 0x8) {
-                    kch = ((randnr>>52)&0xf) % s;                               // choose random in this option only
+                    kch = ((randnr>>32)&0xffff) % s;                            // choose random in this option only
                     newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
                 }
                 else {
@@ -2711,7 +2716,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
                  for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];break;
         case 9:  genegol[selection-8] = 0xb32ull;                                 //GoL rule for survival in totalistic LUT case, variable length encoding
                  for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];  break;
-        case 10: genegol[selection-8] = 0x7ull|(0xfull<<3)|(0xfull<<35);          //GoL rule for survival in cordner/edge dist LUT case
+        case 10: genegol[selection-8] = (0x7ull<<2)|(0xfull<<5)|(0xfull<<37);          //GoL rule for survival in cordner/edge dist LUT case
                  for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];break;
         case 11: genegol[selection] = 0xb3b2b1b033323130;genegol[selection-8] = 0xb3b2b1b030222120;
                  for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8*(k&0x1)];break;
