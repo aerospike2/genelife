@@ -1230,13 +1230,11 @@ void v_scroll(uint64_t newgol[],uint64_t newgolg[]) {
     }
 }
 //.......................................................................................................................................................
-void random_soup(uint64_t gol[],uint64_t golg[],uint64_t newgol[],uint64_t newgolg[]) {
+void random_soup(uint64_t newgol[],uint64_t newgolg[]) {
     int Nf,i,j,ij,i0,j0,i1,j1,d,k;
     uint64_t randnr,mask;
     static unsigned int rmask = (1 << 15) - 1;
     unsigned int density;
-    
-    if (totsteps & 0xf) return;          // only execute once every 16 time steps
     
     density = initial1density;
     mask=(NbG==64 ? ~0 :(1ull<<NbG)-1ull);
@@ -1252,21 +1250,15 @@ void random_soup(uint64_t gol[],uint64_t golg[],uint64_t newgol[],uint64_t newgo
             i1 = i<j ? i : j;                               // swap so that i1<=j1
             j1 = i<j ? j : i;
             d= j1< (Nf>>1) ? i1 : (i1 < Nf-j1 ? i1 : Nf-j1); // find Manhatten distance to border ij1
-            density = (d <= 8 ? (initial1density >> (16-(d<<1))) : initial1density);
+            density = d <= 16 ? initial1density >> (8-(d>>1)) : initial1density;
             
             if(!newgol[ij]) {       // check whether this OK for selection 16-19 with genes everywhere and hashdelete
                 if (selection<14) newgol[ij] = ((rand() & rmask) < density)?1ull:0ull;
                 else if(selection>=16 && selection<=19) for (k=0;k<NbP;k++) newgol[ij] |= ((rand() & rmask) < density)?(1ull<<(k<<2)):0ull;
                 else for (k=0;k<NbP;k++) newgol[ij] |= ((rand() & rmask) < density)?(1ull<<k):0ull;
-                
-                if (newgol[ij]) {  // if live cell or multiplane, fill with game of life genome or random genome
-                    if (selection<8) {
-                        RAND128P(randnr);
-                        newgolg[ij] = gene0^(randnr&mask);
-                    }
-                    else {
-                        newgolg[ij] = genegol[selection-8];
-                    }
+                if (newgol[ij]) {  // if live cell or multiplane, fill with random genome g
+                    RAND128P(randnr);
+                    newgolg[ij] = gene0^(randnr&mask);
                     hashaddgene(newgolg[ij],rootgene);
                 }
             }
@@ -1484,7 +1476,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
         newgolgstats[ij] = statflag;
     }  // end for ij
 
-    if(randomsoup) random_soup(gol,golg,newgol,newgolg);
+    if(randomsoup) random_soup(newgol,newgolg);
     if(vscrolling) v_scroll(newgol,newgolg);
     if (colorfunction==8) packandcompare(newgol,working,golmix);
     
@@ -1630,7 +1622,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         newgolgstats[ij] = statflag;
     }  // end for ij
 
-    if(randomsoup) random_soup(gol,golg,newgol,newgolg);
+    if(randomsoup) random_soup(newgol,newgolg);
     if(vscrolling) v_scroll(newgol,newgolg);
     if (colorfunction==8) packandcompare(newgol,working,golmix);
 
@@ -1785,7 +1777,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
         newgolgstats[ij] = statflag;
     }  // end for ij
 
-    if(randomsoup) random_soup(gol,golg,newgol,newgolg);
+    if(randomsoup) random_soup(newgol,newgolg);
     if(vscrolling) v_scroll(newgol,newgolg);
     if (colorfunction==8) packandcompare(newgol,working,golmix);
 
@@ -1805,7 +1797,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
     if we exclude the cases s=0,1,7,8 which can create growth artefacts, then there are 32 bits
                                                                                                                 */
     int s, smid, s2, s2or3, k, nmut, crot, found, nbest, nsame;
-    uint64_t survive,birth,smask,bmask,rulemodij;
+    uint64_t birthsurvivemask,survive,birth,rulemodij;
     static uint64_t summasks[5] = {0xfull,0x7full,0x3ffull,0x7full,0xfull};
     static int sumoffs[5] = {0,4,11,21,28};
     int nb[8], ij, i, j, jp1, jm1, ip1, im1;
@@ -1815,9 +1807,8 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
     uint64_t statflag;
     
     canonical = repscheme & R_2_canonical_nb;
-    smask = (uint64_t) survivalmask;                                           // 32 bits of survivalmask used to limit space of rules, convert to 64 bit masks for efficient usage here
-    bmask = (uint64_t) birthmask;                                              // 32 bits of birthmask
-
+    birthsurvivemask=(((uint64_t) overwritemask)<<32);                         // 32 bits of overwritemask used to limit space of rules for birth
+    birthsurvivemask|=(uint64_t) survivalmask;                                 // 32 bits of survival used to limit space of rules for survival
     for (ij=0; ij<N2; ij++) {                                                  // loop over all sites of 2D torus with side length N
         i = ij & Nmask;  j = ij >> log2N;                                      // row & column
         jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                      // toroidal (j+1)*N and (j-1)*N
@@ -1836,16 +1827,15 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
             gols = s2or3 ? (gol[ij] ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;  // GoL calculation next state for non-genetic gol plane
             rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1); // if rulemod bit 1 is on then split into half planes with/without mod
             if (rulemodij) {
-                if (gol[ij]) survive = (smask>>sumoffs[s2])&summasks[s2] ? 1ull : 0ull;
-                else           birth = (bmask>>sumoffs[s2])&summasks[s2] ? 1ull : 0ull;
+                if (gol[ij]) survive = (birthsurvivemask>>sumoffs[s2])&summasks[s2] ? 1ull : 0ull;
+                else birth = (birthsurvivemask>>(32+sumoffs[s2]))&summasks[s2] ? 1ull : 0ull;
                 if (survive|birth) {
                     for (k=0,nbmask=0;k<8;k++) nbmask |= (gol[nb[k]]<<k);      // constuct mask of live bits for 8 neighbours
-                    kch = selectdifft(s, nbmask, &crot, &nsame);               // find the canonical rotation index of the live neighbour configuration
-                    survive= (smask>>(sumoffs[s2]+crot))&0x1ull;               // refine decisions for specific canonical rotation configuration
-                    birth  = (bmask>>(sumoffs[s2]+crot))&0x1ull;               // only allowed if birth/survivemask permits (ask this before consulting genes)
+                    kch = selectdifft(s, nbmask, &crot, &nsame);                       // find the canonical rotation index of the live neighbour configuration
+                    survive= (birthsurvivemask>>(sumoffs[s2]+crot))&0x1ull;    // refine decisions for specific canonical rotation configuration
+                    birth  = (birthsurvivemask>>(32+sumoffs[s2]+crot))&0x1ull; // only allowed if birthsurvivemask permits (ask this before consulting genes)
                     if (survive|birth) {                                       // complete determination of birth or survival
                         if (selection==13) {
-                            survive=birth=0ull;
                             for (k=0;k<8;k++)                                  // decodes genes with variable length encoding only for current s,crot
                                 if (gol[nb[k]]) {                              // combine information from genes of all live neighbours
                                     if (gol[ij]) {
@@ -1861,10 +1851,10 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
                         else {                                                 // selection == 12
                             for (genecode=~0ull,k=0;k<8;k++)                   // assembles genetic environment from live neighbours by and of genes
                                 genecode &= gol[nb[k]]?golg[nb[k]]:~0ull;      // and of live neighbours encodes birth rule & survival rule
-                            genecode&=(bmask<<32)|smask;                       // actually no longer needed since test done above
+                            genecode&=birthsurvivemask;
                             if (gol[ij]) survive |= (genecode>>(sumoffs[s2]+crot))&0x1ull;
                             else {
-                                birth &= (genecode>>(32+sumoffs[s2]+crot))&0x1ull;
+                                birth |= (genecode>>(32+sumoffs[s2]+crot))&0x1ull;
                             }
                         }
                     }
@@ -1898,7 +1888,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
                     newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
                 }
                 else {
-                    nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&nbmask); // selection scheme depends on repscheme parameter
+                    nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&nbmask);  // selection scheme depends on repscheme parameter
                     if(nbest>1) {
                         kch=selectdifft(nbest,nbmask, &crot, &nsame);
                         if(nsame) newgene = disambiguate(kch, nb1i, nb, golg, nsame, &birth, randnr); // restore symmetry via one of 8 repscheme options
@@ -1910,11 +1900,11 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
                     newgol[ij]  = 1ull;
                     // compute random events for single bit mutation, as well as mutation position nmut
                     r2 = randprob(pmutmask, (unsigned int) randnr);
-                    nmut = (randnr >> 57) & 0x3f;                               // choose mutation position for length 64 gene : from bits 57+ of randnr
+                    nmut = (randnr >> 57) & 0x3f;                                   // choose mutation position for length 64 gene : from bits 57+ of randnr
                     // complete calculation of newgol and newgolg, including mutation
                     ancestor = newgene;
-                    newgene = newgene ^ (r2<<nmut);                             // introduce single mutation with probability pmut = probmut
-                    newgolg[ij] =  newgene;                                     // if birth then newgene
+                    newgene = newgene ^ (r2<<nmut);                                 // introduce single mutation with probability pmut = probmut
+                    newgolg[ij] =  newgene;                                         // if birth then newgene
                     if (r2) statflag = statflag | F_mutation;
                     if(gol[ij]) hashdeletegene(golg[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n");
                     hashaddgene(newgene,ancestor);
@@ -1939,7 +1929,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
         newgolgstats[ij] = statflag;
     }  // end for ij
 
-    if(randomsoup) random_soup(gol,golg,newgol,newgolg);
+    if(randomsoup) random_soup(newgol,newgolg);
     if(vscrolling) v_scroll(newgol,newgolg);
     if (colorfunction==8) packandcompare(newgol,working,golmix);
 
@@ -2075,7 +2065,7 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
       } // end else (s3)
     } // for ij
     
-    if(randomsoup) random_soup(gol,golg,newgol,newgolg);
+    if(randomsoup) random_soup(newgol,newgolg);
     if(vscrolling) v_scroll(newgol,newgolg);
     for (ij=0; ij<N2; ij++) {  // complete missing hash table records including activities, NB all sites have genes in gol16 but don't record activity for zerogene
         hashgeneextinction(golg[ij],"hash storage error 4 in update_gol16, gene %llx not stored\n");
@@ -2264,7 +2254,7 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
         // fprintf(stderr,"step %d ij %d golij %llx b3 %llx b3d %llx golg[ij] %llx newgol[ij] %llx newgolg[ij] %llx\n",totsteps,ij,golij,b3,b3d,golg[ij],newgol[ij],newgolg[ij]);
     }
     
-    if(randomsoup) random_soup(gol,golg,newgol,newgolg);
+    if(randomsoup) random_soup(newgol,newgolg);
     if(vscrolling) v_scroll(newgol,newgolg);
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records including activities, NB all sites have genes in gol16 but don't record activity for zerogene
         if(gol[ij]) hashgeneextinction(golg[ij],"hash storage error 4 in update_gol64, gene %llx not stored\n");
@@ -2342,7 +2332,7 @@ void update_gol2match(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_
         newgolgstats[ij] = statflag;
     } // for ij
 
-    if(randomsoup) random_soup(gol,golg,newgol,newgolg);
+    if(randomsoup) random_soup(newgol,newgolg);
     if(vscrolling) v_scroll(newgol,newgolg);
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records including activities
         if(gol[ij]>>1) hashgeneextinction(golg[ij],"hash storage error 3 in update_gol2, gene %llx not stored\n");
