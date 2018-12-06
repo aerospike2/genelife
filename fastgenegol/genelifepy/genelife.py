@@ -205,7 +205,7 @@ def init_button_arrays():
     ncanon.append([2,3,4,5,4,3,2,2,3,4,5,4,3,2])      # selection 10,11
     ncanon.append([4,7,10,7,4,4,7,10,7,4])            # selection 12,13
     ncanon.append([16,1,1,1,1,1])                     # selection 16-19
-                                                      # colors for different color regions for buttons, colorvals must be < 128
+                                                      # colors [R,G,B] for different color regions for buttons, colorvals must be < 128
     cancolors.append([[0,100,0],[0,50,100],[0,80,80],[100,0,0],[100,100,0],[50,100,0],[0,0,127],[0,100,50]]) # selection 0-7
     cancolors.append([[0,0,127],[0,100,0]])          # selection 8,9
     cancolors.append([[0,0,127],[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[0,0,127],
