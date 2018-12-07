@@ -1549,7 +1549,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
     int nb[8],  ij, i, j, jp1, jm1, ip1, im1;
     uint64_t genecode, gols, nb1i, nbmask, found, randnr, r2;
     uint64_t newgene, ancestor;
-    uint64_t  survive, birth, smask, bmask, statflag, ncodingmask, allcoding;
+    uint64_t  survive, birth, overwrite, smask, bmask, statflag, ncodingmask, allcoding;
     
     smask = (uint64_t) survivalmask;                                            // convert to 64 bit mask for efficient usage here
     bmask = (uint64_t) birthmask;
@@ -1575,6 +1575,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
             gols = s2or3 ? (gol[ij] ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;   // GoL calculation next state for non-genetic gol plane
             rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1);  // if rulemod bit 1 is on then split into half planes with/without mod
             if(rulemodij) {
+                overwrite = overwritemask&(0x1ull<<s);
                 if (selection==9) {                                             // selection == 9
                     for (genecode=0ull,k=0;k<8;k++)                             // decodes genes with variable length encoding
                         if (gol[nb[k]]) {
@@ -1582,7 +1583,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
                                 PATTERN4(golg[nb[k]], (s&0x7), found);          //survival?
                                 genecode |= found? 1ull << (s-1) : 0ull;
                             }
-                            else {
+                            if (overwrite || !gol[ij]) {
                                 PATTERN4(golg[nb[k]], (s|0x8), found);          //birth?
                                 genecode |= found? 1ull << (s-1+8) : 0ull;
                             }
@@ -1595,7 +1596,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
                     for (genecode=allcoding,k=0;k<8;k++)                        // decodes genes with fixed length encoding
                         genecode &= (gol[nb[k]]?golg[nb[k]]:allcoding);         // and of live neighbours encodes birth rule & survival rule
                     survive=(((genecode>>((s-1)*ncoding)) & ncodingmask) == ncodingmask) && ((smask>>(s-1))&1ull) ? 1 : 0;
-                    birth=(((genecode>>((8+(s-1))*ncoding)) & ncodingmask) == ncodingmask) && ((bmask>>(s-1))&1ull) ? 1 : 0;
+                    if (overwrite || !gol[ij]) birth=(((genecode>>((8+(s-1))*ncoding)) & ncodingmask) == ncodingmask) && ((bmask>>(s-1))&1ull) ? 1 : 0;
                     // if(s ==3 && genecode!=genegol[selection-8]) fprintf(stderr,"genecode %llx != genegol %llx at ij %d\n",genecode,genegol[selection-8],ij);
                 }
             }
@@ -1606,20 +1607,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         }
         else survive = birth = s2or3 = gols = 0ull;
 
-        if(gol[ij]) {                                                       // death/survival
-            if(survive) {                                                   // survival coded
-                statflag |= F_survival;
-                newgol[ij]  = gol[ij];                                      // new game of life cell value same as old
-                newgolg[ij] = golg[ij];                                     // gene stays same
-            }
-            else {                                                          // death
-                statflag |= F_death;
-                newgol[ij]  = 0ull;                                         // new game of life cell value dead
-                newgolg[ij] = 0ull;                                         // gene dies
-                hashdeletegene(golg[ij],"step %d hash delete error 2 in update, gene %llx not stored\n");
-            }
-        }
-        else if(birth) { // birth
+        if(birth) { // birth
             RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
             if (repscheme & 0x80) {
                 kch = ((randnr>>32)&0xffff) % s;                            // choose random in this option only
@@ -1650,12 +1638,26 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
                 if(gol[ij]) hashdeletegene(golg[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n");
                 hashaddgene(newgene,ancestor);
             }
-            else {                                                          // no birth, stays empty
+            else {                                                          // no birth, stays as before
                 newgol[ij] = gol[ij];
                 newgolg[ij] = golg[ij];
+                if(gol[ij] && survive) statflag |= F_survival;              // could be failed overwrite birth attempt and survival
             }
         }
-        else {                                                              // no birth, stays empty
+        else if(gol[ij]) {                                                       // death/survival
+            if(survive) {                                                   // survival coded
+                statflag |= F_survival;
+                newgol[ij]  = gol[ij];                                      // new game of life cell value same as old
+                newgolg[ij] = golg[ij];                                     // gene stays same
+            }
+            else {                                                          // death
+                statflag |= F_death;
+                newgol[ij]  = 0ull;                                         // new game of life cell value dead
+                newgolg[ij] = 0ull;                                         // gene dies
+                hashdeletegene(golg[ij],"step %d hash delete error 2 in update, gene %llx not stored\n");
+            }
+        }
+        else {                                                              // empty and no birth, stays empty
             newgol[ij] = gol[ij];
             newgolg[ij] = golg[ij];
         }
@@ -2992,12 +2994,15 @@ void set_displayplanes(unsigned int displayplanes_in) {
 }
 //.......................................................................................................................................................
 void set_surviveover64(unsigned int surviveover[], int len ) {
-    if (len==2) {
+    if (len==3) {
         survivalmask = surviveover[0];
         if(selection<8) overwritemask = surviveover[1];
-        else birthmask = surviveover[1];
+        else {
+            birthmask = surviveover[1];
+            overwritemask = surviveover[2];
+        }
     }
-    else fprintf(stderr,"surviveover64 needs two parameters, %d provided\n",len);
+    else fprintf(stderr,"surviveover64 needs three parameters, %d provided\n",len);
 }
 //.......................................................................................................................................................
 void set_vscrolling() {
