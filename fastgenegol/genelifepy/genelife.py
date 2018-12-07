@@ -335,8 +335,7 @@ def update_sim(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     if cnt % ndisp == 0:  # insert the non-displayed iterations & count species : NB nrun must divide ndisp
         genelife.genelife_update(nskip, nhist, nstat)
         framenr = framenr + nskip
-        if(count):
-            genelife.countspecieshash()
+        if(count): genelife.countspecieshash()
     genelife.genelife_update(nrun, nhist, nstat)
     framenr = framenr+nrun
     colorgrid()  # sets  cgrid
@@ -531,8 +530,12 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             print framenr,pixeldat
                 elif event.button == 3:          # single plane choice right mouse button (-click)
                     mouse_pos = pg.mouse.get_pos()
-                    x = (int) (mouse_pos[0]//2)
-                    y = (int) (mouse_pos[1]//2)
+                    if scalex2:
+                        x = (int) (mouse_pos[0]//2)
+                        y = (int) (mouse_pos[1]//2)
+                    else:
+                        x = mouse_pos[0]
+                        y = mouse_pos[1]
                     if y >= N and selection>=20:
                         k=x>>(log2N-6)
                         if k<64:
