@@ -267,11 +267,26 @@ const uint64_t r1 = 0x1111111111111111ull;
     xxxx|=xxxx<<16;                            /* doubles the patterns to the left : now 4 copies */ \
     xxxx|=xxxx<<32;                            /* doubles the patterns to the left : now 8 copies */ \
     xxxx ^= (uint64_t) x;                      /* xor x argument with 8 copies of pat */ \
-    xxxx = ~xxxx;                              /* invert difference map to yield identity map, 4 ones if match at a position */ \
+    xxxx = ~xxxx;                              /* invert difference map to yield identity map, 8 ones if match at a position */ \
     xxxx &= xxxx>>1;                           /* convert 8-bit set of identity patterns to 1/0 decision */ \
     xxxx &= xxxx>>2;                           /*    at bit 0 of 8 bit pattern */ \
     xxxx &= xxxx>>4;                           /*    in 3 steps */  \
-    found = ((xxxx&h01) * h01) >> 56;}         /* found is returned as the number of patterns found at any of the 8 positions */ \
+    found = ((xxxx&h01) * h01) >> 56;}         /* found is returned as the number of patterns found at any of the 8 positions */
+//.......................................................................................................................................................
+// const uint64_t h01 = 0x0101010101010101;    /* multiplicand defined already for POPCOUNT24: used to sum up all 8 8-bit bytes */
+const uint64_t hf0 = 0xf0f0f0f0f0f0f0f0;
+#define PATTERN8M(x, pat, found) {             /* find number of 8-bit aligned 8-bit copies of pattern pat in 64-bit x with last 4 bits specifying a mask to match 1 if 1, 0 or 1 otherwise */ \
+    uint64_t xxxx;                             /* define working variable */ \
+    xxxx=(uint64_t) pat;                       /* copy pat to ensure it is not assumed to be a variable that can be changed */ \
+    xxxx|=xxxx<<8;                             /* doubles the pattern to the left : now 2 copies */ \
+    xxxx|=xxxx<<16;                            /* doubles the patterns to the left : now 4 copies */ \
+    xxxx|=xxxx<<32;                            /* doubles the patterns to the left : now 8 copies */ \
+    xxxx = ( hf0 & (xxxx ^ (uint64_t) x)) | ((hf0>>4) & (~xxxx  | (uint64_t) x));  /* xor x argument with 8 copies of pat for each byte upper 4 bits and or with */ \
+    xxxx = xxxx^hf0;                           /* invert difference map (first 4 bits) to yield identity map, 8 ones if match at a position */ \
+    xxxx &= xxxx>>1;                           /* convert 8-bit set of identity patterns to 1/0 decision */ \
+    xxxx &= xxxx>>2;                           /*    at bit 0 of 8 bit pattern */ \
+    xxxx &= xxxx>>4;                           /*    in 3 steps */  \
+    found = ((xxxx&h01) * h01) >> 56;}         /* found is returned as the number of patterns found at any of the 8 positions */
 //.......................................................................................................................................................
 #define FIRST1INDEX(v, c) {                    /* starting point 64bit from Sean Eron Anderson https://graphics.stanford.edu/~seander/bithacks.html#ZerosOnRightParallel */  \
     uint64_t mmmm,mmmq;                        /* note also arguments must be of types uint64_t and int respectivley */ \
@@ -1730,12 +1745,12 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
                             survive=birth=0ull;
                             for (k=0;k<8;k++)                                      // decodes genes with variable length encoding only for current s,se
                                 if (gol[nb[k]]) {                                  // combine information from genes of all live neighbours
-                                    if (gol[ij]) {
-                                        PATTERN8(golg[nb[k]], ((s<<4)|(se-s0)), found); //survival rule found? final decision for survival
-                                        survive |= found? 1ull : 0ull;
+                                    if (gol[ij]) {                                 // coding is 8 bits (b/s) (s1 2 1 0) (se subset mask 3 2 1 0)  (special case s==4,se==4 is x1110001)
+                                        PATTERN8M(golg[nb[k]], (s==4 && se==4) ? 0x71 : ((s<<4)|(1ull<<(se-s0))), found); //survival rule found? final decision for survival
+                                        survive |= found? 1ull : 0ull;                                                   // special case codes for 5th case se==4 for s==4
                                     }
                                     else {
-                                        PATTERN8(golg[nb[k]], (((8|s)<<4)|(se-s0)), found); //birth rule found? final decision for birth
+                                        PATTERN8M(golg[nb[k]], (s==4ull && se==4ull) ? 0xf1 :(((8|s)<<4)|(1ull<<(se-s0))), found); //birth rule found? final decision for birth
                                         birth |= found? 1ull : 0ull;
                                     }
                                 }

@@ -512,7 +512,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                                 print ("repscheme changed to %x" % (repscheme))
                                 pg.draw.rect(scr,cancol[4][k]*(1+((repscheme>>(k-16))&0x1)),[k<<(log2N-6),Height+8,3*sc,5*sc])
                                 genelife.set_repscheme(repscheme)
-                    else: # selection >= 20
+                    else: # y<N
                         if colorfunction < 4 or colorfunction == 8:
                             genelife.get_curgol(gol)    # get current gol,golg,golgstats arrays
                             genelife.get_curgolg(golg)
@@ -633,7 +633,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     elif pg.key.get_mods() & pg.KMOD_SHIFT:
                         if quadrants < 7: quadrants = quadrants+1
                     else:
-                        if quadrants > 0: quadrants = quadrants-1
+                        if quadrants >= 0: quadrants = quadrants-1
                     print "quadrants changed to ",quadrants
                     genelife.set_quadrant(quadrants)
                 elif event.key == pg.K_r:
