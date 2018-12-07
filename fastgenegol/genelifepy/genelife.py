@@ -98,14 +98,8 @@ npoffsets = np.array(flatoff,np.int32)
 
 # setup of color map : black for 0, colors for 1 to LEN+1 or 257 for colormethod 0 or 1
 #-----------------------------------------------------------------------------------------------------------
-
-def mytest(param=7):
-    """mytest"""
-    # global test.testval
-    test.testval = test.testval+1+param
-    print test.testval
-#-----------------------------------------------------------------------------------------------------------
 def rand_cmap(nlabels, type='bright', first_color_black=True, last_color_black=False, verbose=True):
+
     """
     Creates a random colormap to be used together with matplotlib. Useful for segmentation tasks
     :param nlabels: Number of labels (size of colormap)

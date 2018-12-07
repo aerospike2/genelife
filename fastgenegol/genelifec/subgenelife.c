@@ -275,14 +275,15 @@ const uint64_t r1 = 0x1111111111111111ull;
 //.......................................................................................................................................................
 // const uint64_t h01 = 0x0101010101010101;    /* multiplicand defined already for POPCOUNT24: used to sum up all 8 8-bit bytes */
 const uint64_t hf0 = 0xf0f0f0f0f0f0f0f0;
-#define PATTERN8M(x, pat, found) {             /* find number of 8-bit aligned 8-bit copies of pattern pat in 64-bit x with last 4 bits specifying a mask to match 1 if 1, 0 or 1 otherwise */ \
-    uint64_t xxxx;                             /* define working variable */ \
+#define PATTERN8M(x, pat, found) {             /* find number of 8-bit aligned 4+4-bit copies of pattern pat in 64-bit x with last 4 bits specifying a mask to match 1 if 1, 0 or 1 otherwise */ \
+    uint64_t xxxx,yyyy;                        /* define working variables */ \
+    yyyy=(uint64_t) x;                         /* make copy of x with correct type just in case */ \
     xxxx=(uint64_t) pat;                       /* copy pat to ensure it is not assumed to be a variable that can be changed */ \
     xxxx|=xxxx<<8;                             /* doubles the pattern to the left : now 2 copies */ \
     xxxx|=xxxx<<16;                            /* doubles the patterns to the left : now 4 copies */ \
     xxxx|=xxxx<<32;                            /* doubles the patterns to the left : now 8 copies */ \
-    xxxx = ( hf0 & (xxxx ^ (uint64_t) x)) | ((hf0>>4) & (~xxxx  | (uint64_t) x));  /* xor x argument with 8 copies of pat for each byte upper 4 bits and or with */ \
-    xxxx = xxxx^hf0;                           /* invert difference map (first 4 bits) to yield identity map, 8 ones if match at a position */ \
+    xxxx = ( hf0 & (xxxx^yyyy)) | ((hf0>>4) & (~xxxx|yyyy));  /* xor x argument with 8 copies of pat for each byte upper 4 bits and or with */ \
+    xxxx = xxxx^hf0;                           /* invert difference map (upper 4 bits) to yield identity map, 8 ones if match at a position */ \
     xxxx &= xxxx>>1;                           /* convert 8-bit set of identity patterns to 1/0 decision */ \
     xxxx &= xxxx>>2;                           /*    at bit 0 of 8 bit pattern */ \
     xxxx &= xxxx>>4;                           /*    in 3 steps */  \
@@ -1745,12 +1746,12 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
                             survive=birth=0ull;
                             for (k=0;k<8;k++)                                      // decodes genes with variable length encoding only for current s,se
                                 if (gol[nb[k]]) {                                  // combine information from genes of all live neighbours
-                                    if (gol[ij]) {                                 // coding is 8 bits (b/s) (s1 2 1 0) (se subset mask 3 2 1 0)  (special case s==4,se==4 is x1110001)
-                                        PATTERN8M(golg[nb[k]], (s==4 && se==4) ? 0x71 : ((s<<4)|(1ull<<(se-s0))), found); //survival rule found? final decision for survival
+                                    if (gol[ij]) {                                 // coding is 8 bits [(b/s) (s1 2 1 0) (se subset mask 3 2 1 0)]  (exception case s==4,se==4 is x0000001)
+                                        PATTERN8M(golg[nb[k]], (s==4 && se==4) ? 0x01 : ((s<<4)|(1ull<<(se-s0))), found); //survival rule found? final decision for survival
                                         survive |= found? 1ull : 0ull;                                                   // special case codes for 5th case se==4 for s==4
                                     }
                                     else {
-                                        PATTERN8M(golg[nb[k]], (s==4ull && se==4ull) ? 0xf1 :(((8|s)<<4)|(1ull<<(se-s0))), found); //birth rule found? final decision for birth
+                                        PATTERN8M(golg[nb[k]], (s==4ull && se==4ull) ? 0x81 :(((8|s)<<4)|(1ull<<(se-s0))), found); //birth rule found? final decision for birth
                                         birth |= found? 1ull : 0ull;
                                     }
                                 }
@@ -2687,7 +2688,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
 
     /* g=1ull;                                                              // test of PATTERN4
     for(k=0;k<10;k++) {
-        int found
+        int found;
         for(j=0;j<16;j++) {
             PATTERN4(g,j,found);
             fprintf(stderr,"test of pattern4 pat %x val %llx found? %d\n",j,g,found);
@@ -2695,6 +2696,15 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         g*=42;
     } */
     
+    /* g=1ull;                                                              // test of PATTERN8M
+    for(k=0;k<10;k++) {                                                     // note that 0 matches all lowest 4 bit sets : OK not used
+        int found;
+        for(j=0;j<64;j++) {
+            PATTERN8M(g,j,found);
+            fprintf(stderr,"test of pattern8M pat %x val %llx found? %d\n",j,g,found);
+        }
+        g*=42;
+    } */
     srand(1234567); // Range: rand returns numbers in the range of [0, RAND_MAX ), and RAND_MAX is specified with a minimum value of 32,767. i.e. 15 bit
     state[0] = rand();state[1] = rand();
     cnt = 0;
@@ -2781,12 +2791,12 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
                  for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];  break;
         case 10: genegol[selection-8] = (0x7ull<<2)|(0xfull<<5)|(0xfull<<37);          //GoL rule for survival in cordner/edge dist LUT case
                  for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];break;
-        case 11: genegol[selection] = 0xb3b2b1b033323130;genegol[selection-8] = 0xb3b2b1b030222120;
-                 for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8*(k&0x1)];break;
+        case 11: genegol[selection-8] = 0xbf3f27ull;
+                 for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];break;
         case 12: genegol[selection-8] = 0xfull|(0x7full<<4)|(0x7full<<36);        //GoL rule for survival surv2 1st 4 surv3 next 7 birth3 7 bits from 32+4, canonical case
                  for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];break;
         case 13: genegol[selection] = 0xb6b5b4b3b2b1b036;genegol[selection-8] = 3332313023222120;  //GoL rule for survival surv2 1st 4 surv3 next 7 birth3 7 bits from 32+4
-                 for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8*(k&0x1)];break;
+                 for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];break;
         case 14:
         case 15: for (k=0;k<8;k++)   startgenes[k] =((0x1ull<<k*3)-1ull)<<20;break;
         case 16:
