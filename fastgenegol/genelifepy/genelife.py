@@ -354,6 +354,52 @@ def update_sim(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
 
 #-----------------------------------------------------------------------------------------------------------
 
+def pr_params():
+    print "runparams[0] = rulemod = ",rulemod                  
+    print "runparams[1] = repscheme = %x"%repscheme
+    print "runparams[2] = selection = ",selection              
+    print "runparams[3] = overwritemask = %x"%overwritemask
+    print "runparams[4] = survivalmask = %x"%survivalmask      
+    print "runparams[7] = birthmask = %x"%birthmask                
+    print "runparams[5] = colorfunction = ",colorfunction            
+    print "runparams[6] = initfield = ",initfield                
+    print "simparams[0] = nlog2pmut = ",nlog2pmut                
+    print "simparams[1] = initial1density = ",initial1density          
+    print "simparams[2] = initialrdensity = ",initialrdensity          
+    print "simparams[3] = ncoding = ",ncoding                  
+    print "simparams[4] = startgenechoice = ",startgenechoice          
+    
+#-----------------------------------------------------------------------------------------------------------
+
+def set_params():
+    global rulemod,repscheme,survivalmask,birthmask,overwritemask,selection,ncoding
+    global startgenechoice,initialrdensity,initial1density,nlog2pmut,initfield
+    global colorfunction
+    global runparams, simparams
+    
+    runparams[0] = rulemod                   # 0,1 whether to allow GoL rule modifications
+                                                 # with rulemod 1 2-live-nb birth, 3-live-nb non-birth & non-survival possible
+    runparams[1] = repscheme                 # 
+    runparams[2] = selection                 # fitness for 2 live neighbor rule : 0-6 see subgenelife.c code
+    runparams[3] = overwritemask             # mask of 2 bits to overwrite instead of survival for 3(bit0) or 2(bit1) live nbs
+                                                 # for selection=9 this is the birth mask
+    runparams[4] = survivalmask              # 8 bit survival mask for allowing genes to modify LUTs
+    runparams[7] = birthmask                 # 8 bit birth mask for allowing genes to modify LUTs
+    runparams[5] = colorfunction             # color function 0(hash), >=1(fnal), 2 nongulstate or color gol planes, 3 notgolrul yellow
+                                             # 4 activities 5 genealogy steps 6 genealogy temporal 7 activity scaled colors
+    runparams[6] = initfield                 # 1 init via 32x32 genepat.dat, n>1 init via nxn rand array
+    simparams[0] = nlog2pmut                 # log2 gene mutation probability (0 or >56 means no mutation)
+    simparams[1] = initial1density           # initial 1 density in GOL state
+                                                 # 16384 = nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
+    simparams[2] = initialrdensity           # initial density of random genes
+    simparams[3] = ncoding                   # for selection 10, non zero value means grow plane community from 0
+                                                 # otherwise (selection<10) no of bits used to encode valid connection functions 1-16
+                                                 # for selection==8, lut, ncoding 1,2,3 bits per lut entry : 0 implies 3.
+    simparams[4] = startgenechoice           # initialize genes to startgene number 0-8 : 8 is random choice of 0-7
+    pr_params()
+    
+#-----------------------------------------------------------------------------------------------------------
+
 def step(count=True):
     """single step and update display and species counts"""
     global framenr
