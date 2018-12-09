@@ -26,6 +26,7 @@ colorfunction = 0
 scr= None
 screen = None
 scalex2 = False
+ncanon=[]
 cancol=[]
 caption = ""
 
@@ -188,7 +189,7 @@ def packrepscheme(repscheme,survivalmask,overwritemask):
 
 def init_button_arrays():
     """ initialize information for button area at base of display"""
-    global ncanon,cancolors,cancol
+    global ncanon
                                                       # initialize lists to empty
     ncanon = []                                       # lists of number of successive buttons with the same color
     cancolors = []                                    # lists of button colors
@@ -230,13 +231,16 @@ def init_buttons():    # initialize parameter buttons
     global scr,scalex2
     global Height,Width
     global log2N,NbP
+    global ncanon
 
     if scalex2:
         sc = 1
     else:
         sc = 2
     cancol=init_button_arrays()
+    pg.draw.rect(scr,[50,50,50],[0,Height+6,Width,1*sc])
     pg.draw.rect(scr,[50,50,50],[0,Height+8,Width,5*sc])
+
     if selection<8:
         for k in range(18):
             if k<14:
@@ -246,11 +250,19 @@ def init_buttons():    # initialize parameter buttons
             elif k<18:
                 bit = (overwritemask>>(k-16))&0x1
             pg.draw.rect(scr,cancol[0][k]*(1+bit),[k<<(log2N-6),Height+8,3*sc,5*sc])
+        j = 0;
+        for k in range(len(ncanon[0])):
+            pg.draw.rect(scr,[200,200,200],[(j<<(log2N-6))-1,Height+6,sc,sc])
+            j = j+ncanon[0][k]
     elif selection<10:
         for k in range(8):
             pg.draw.rect(scr,cancol[1][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3*sc,5*sc])
             pg.draw.rect(scr,cancol[1][k+8]*(1+((birthmask>>(k))&0x1)),[(k+8)<<(log2N-6),Height+8,3*sc,5*sc])
             pg.draw.rect(scr,cancol[1][k+16]*(1+((overwritemask>>(k))&0x1)),[(k+16)<<(log2N-6),Height+8,3*sc,5*sc])
+        j = 0;
+        for k in range(len(ncanon[1])):
+            pg.draw.rect(scr,[200,200,200],[(j<<(log2N-6))-1,Height+6,sc,sc])
+            j = j+ncanon[1][k]
     elif selection<12:
         # pg.draw.rect(scr,[200,200,200],[(23<<(log2N-6))-1,Height+6,1,9])
         for k in range(23):
@@ -258,16 +270,28 @@ def init_buttons():    # initialize parameter buttons
             pg.draw.rect(scr,cancol[2][k+23]*(1+((birthmask>>(k))&0x1)),[(k+23)<<(log2N-6),Height+8,3*sc,5*sc])
         for k in range(8):
             pg.draw.rect(scr,cancol[2][k+46]*(1+((overwritemask>>(k))&0x1)),[(k+46)<<(log2N-6),Height+8,3*sc,5*sc])
+        j = 0;
+        for k in range(len(ncanon[2])):
+            pg.draw.rect(scr,[200,200,200],[(j<<(log2N-6))-1,Height+6,sc,sc])
+            j = j+ncanon[2][k]
     elif selection<14:
         # pg.draw.rect(scr,[200,200,200],[(32<<(log2N-6))-1,Height+6,1,9])
         for k in range(32):
             pg.draw.rect(scr,cancol[3][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3*sc,5*sc])
             pg.draw.rect(scr,cancol[3][k+32]*(1+((birthmask>>(k))&0x1)),[(k+32)<<(log2N-6),Height+8,3*sc,5*sc])
+        j = 0;
+        for k in range(len(ncanon[3])):
+            pg.draw.rect(scr,[200,200,200],[(j<<(log2N-6))-1,Height+6,sc,sc])
+            j = j+ncanon[3][k]
     elif selection<16:
         # pg.draw.rect(scr,[200,200,200],[(32<<(log2N-6))-1,Height+6,1,9])
         for k in range(32):
             pg.draw.rect(scr,cancol[4][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3*sc,5*sc])
             pg.draw.rect(scr,cancol[4][k+32]*(1+((birthmask>>(k))&0x1)),[(k+32)<<(log2N-6),Height+8,3*sc,5*sc])
+        j = 0;
+        for k in range(len(ncanon[4])):
+            pg.draw.rect(scr,[200,200,200],[(j<<(log2N-6))-1,Height+6,sc,sc])
+            j = j+ncanon[4][k]
     elif selection>=16 and selection<=19:
         NbP = (ncoding>>16)&0xf
         displayplanes=(0x1<<NbP)-1
