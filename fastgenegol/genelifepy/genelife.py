@@ -198,23 +198,23 @@ def init_button_arrays():
     ncanon.append([2,2,2,2,2,4,2,2])                  # selection 0-7
     ncanon.append([8,8,8])                            # selection 8,9
     ncanon.append([2,3,4,5,4,3,2,2,3,4,5,4,3,2,8])    # selection 10,11
-    ncanon.append([4,7,10,7,4,4,7,10,7,4])            # selection 12,13
-    ncanon.append([1,2,6,10,13,1,2,6,10,13])          # selection 14,15
+    ncanon.append([4,7,10,7,4,4,7,10,7,4,8])          # selection 12,13
+    ncanon.append([1,2,6,10,13,1,2,6,10,13,8])        # selection 14,15
     ncanon.append([16,1,1,1,1,1])                     # selection 16-19
                                                       # colors [R,G,B] for different color regions for buttons, colorvals must be < 128
     cancolors.append([[0,100,0],[0,50,100],[0,80,80],[100,0,0],[100,100,0],[50,100,0],[0,0,127],[0,100,50]]) # selection 0-7
     cancolors.append([[0,0,127],[0,100,0],[100,0,0]]) # selection 8,9
     cancolors.append([[0,0,127],[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[0,0,127],
                       [0,127,0],[50,127,0],[60,120,0],[100,120,0],[80,120,0],[50,120,0],[0,127,0],[100,0,0]]) # selection 10,11
-    cancolors.append([[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[50,127,0],[80,120,0],[100,120,0],[80,120,0],[50,127,0]])  # selection 12,13
-    cancolors.append([[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[50,127,0],[80,120,0],[100,120,0],[80,120,0],[50,127,0]])  # selection 14,15
+    cancolors.append([[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[50,127,0],[80,120,0],[100,120,0],[80,120,0],[50,127,0],[100,0,0]])  # selection 12,13
+    cancolors.append([[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[50,127,0],[80,120,0],[100,120,0],[80,120,0],[50,127,0],[100,0,0]])  # selection 14,15
     cancolors.append([[100,0,0],[100,100,0],[0,80,80],[0,0,127],[0,100,0],[80,0,80]]) # selection 16-19
                                                      # lists of colors for individual buttons expanded from above, first initialize to zero
     cancol.append(np.zeros((18,3),np.int32))
     cancol.append(np.zeros((24,3),np.int32))
     cancol.append(np.zeros((54,3),np.int32))
-    cancol.append(np.zeros((64,3),np.int32))
-    cancol.append(np.zeros((64,3),np.int32))
+    cancol.append(np.zeros((72,3),np.int32))
+    cancol.append(np.zeros((72,3),np.int32))
     cancol.append(np.zeros((21,3),np.int32))
     
     for l in range(len(ncanon)):                    # buttons for different selection schemes
@@ -239,7 +239,7 @@ def init_buttons():    # initialize parameter buttons
         sc = 2
     cancol=init_button_arrays()
     pg.draw.rect(scr,[50,50,50],[0,Height+6,Width,1*sc])
-    pg.draw.rect(scr,[50,50,50],[0,Height+8,Width,5*sc])
+    pg.draw.rect(scr,[50,50,50],[0,Height+8,Width,6*sc])
 
     if selection<8:
         for k in range(18):
@@ -249,16 +249,16 @@ def init_buttons():    # initialize parameter buttons
                 bit = (survivalmask>>(k-14))&0x1
             elif k<18:
                 bit = (overwritemask>>(k-16))&0x1
-            pg.draw.rect(scr,cancol[0][k]*(1+bit),[k<<(log2N-6),Height+8,3*sc,5*sc])
+            pg.draw.rect(scr,cancol[0][k]*(1+bit),[k<<(log2N-6),Height+8,3*sc,3*sc])
         j = 0;
         for k in range(len(ncanon[0])):
             pg.draw.rect(scr,[200,200,200],[(j<<(log2N-6))-1,Height+6,sc,sc])
             j = j+ncanon[0][k]
     elif selection<10:
         for k in range(8):
-            pg.draw.rect(scr,cancol[1][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3*sc,5*sc])
-            pg.draw.rect(scr,cancol[1][k+8]*(1+((birthmask>>(k))&0x1)),[(k+8)<<(log2N-6),Height+8,3*sc,5*sc])
-            pg.draw.rect(scr,cancol[1][k+16]*(1+((overwritemask>>(k))&0x1)),[(k+16)<<(log2N-6),Height+8,3*sc,5*sc])
+            pg.draw.rect(scr,cancol[1][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3*sc,3*sc])
+            pg.draw.rect(scr,cancol[1][k+8]*(1+((birthmask>>(k))&0x1)),[(k+8)<<(log2N-6),Height+8,3*sc,3*sc])
+            pg.draw.rect(scr,cancol[1][k+16]*(1+((overwritemask>>(k))&0x1)),[(k+16)<<(log2N-6),Height+8,3*sc,3*sc])
         j = 0;
         for k in range(len(ncanon[1])):
             pg.draw.rect(scr,[200,200,200],[(j<<(log2N-6))-1,Height+6,sc,sc])
@@ -266,10 +266,10 @@ def init_buttons():    # initialize parameter buttons
     elif selection<12:
         # pg.draw.rect(scr,[200,200,200],[(23<<(log2N-6))-1,Height+6,1,9])
         for k in range(23):
-            pg.draw.rect(scr,cancol[2][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3*sc,5*sc])
-            pg.draw.rect(scr,cancol[2][k+23]*(1+((birthmask>>(k))&0x1)),[(k+23)<<(log2N-6),Height+8,3*sc,5*sc])
+            pg.draw.rect(scr,cancol[2][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3*sc,3*sc])
+            pg.draw.rect(scr,cancol[2][k+23]*(1+((birthmask>>(k))&0x1)),[(k+23)<<(log2N-6),Height+8,3*sc,3*sc])
         for k in range(8):
-            pg.draw.rect(scr,cancol[2][k+46]*(1+((overwritemask>>(k))&0x1)),[(k+46)<<(log2N-6),Height+8,3*sc,5*sc])
+            pg.draw.rect(scr,cancol[2][k+46]*(1+((overwritemask>>(k))&0x1)),[(k+46)<<(log2N-6),Height+8,3*sc,3*sc])
         j = 0;
         for k in range(len(ncanon[2])):
             pg.draw.rect(scr,[200,200,200],[(j<<(log2N-6))-1,Height+6,sc,sc])
@@ -277,8 +277,10 @@ def init_buttons():    # initialize parameter buttons
     elif selection<14:
         # pg.draw.rect(scr,[200,200,200],[(32<<(log2N-6))-1,Height+6,1,9])
         for k in range(32):
-            pg.draw.rect(scr,cancol[3][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3*sc,5*sc])
-            pg.draw.rect(scr,cancol[3][k+32]*(1+((birthmask>>(k))&0x1)),[(k+32)<<(log2N-6),Height+8,3*sc,5*sc])
+            pg.draw.rect(scr,cancol[3][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3*sc,3*sc])
+            pg.draw.rect(scr,cancol[3][k+32]*(1+((birthmask>>(k))&0x1)),[(k+32)<<(log2N-6),Height+8,3*sc,3*sc])
+        for k in range(8):
+            pg.draw.rect(scr,cancol[3][k+64]*(1+((overwritemask>>(k))&0x1)),[(k+32)<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
         j = 0;
         for k in range(len(ncanon[3])):
             pg.draw.rect(scr,[200,200,200],[(j<<(log2N-6))-1,Height+6,sc,sc])
@@ -286,8 +288,10 @@ def init_buttons():    # initialize parameter buttons
     elif selection<16:
         # pg.draw.rect(scr,[200,200,200],[(32<<(log2N-6))-1,Height+6,1,9])
         for k in range(32):
-            pg.draw.rect(scr,cancol[4][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3*sc,5*sc])
-            pg.draw.rect(scr,cancol[4][k+32]*(1+((birthmask>>(k))&0x1)),[(k+32)<<(log2N-6),Height+8,3*sc,5*sc])
+            pg.draw.rect(scr,cancol[4][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3*sc,3*sc])
+            pg.draw.rect(scr,cancol[4][k+32]*(1+((birthmask>>(k))&0x1)),[(k+32)<<(log2N-6),Height+8,3*sc,3*sc])
+        for k in range(8):
+            pg.draw.rect(scr,cancol[4][k+64]*(1+((overwritemask>>(k))&0x1)),[(k+32)<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
         j = 0;
         for k in range(len(ncanon[4])):
             pg.draw.rect(scr,[200,200,200],[(j<<(log2N-6))-1,Height+6,sc,sc])
@@ -299,12 +303,12 @@ def init_buttons():    # initialize parameter buttons
             NbP = 16
         for k in range(21):
             if k<NbP:
-                pg.draw.rect(scr,cancol[4][k]*2,[k<<(log2N-6),Height+8,3*sc,5*sc])
+                pg.draw.rect(scr,cancol[4][k]*2,[k<<(log2N-6),Height+8,3*sc,3*sc])
             elif k<16:
-                pg.draw.rect(scr,[80,80,80],[k<<(log2N-6),Height+8,3*sc,5*sc]) // grey
+                pg.draw.rect(scr,[80,80,80],[k<<(log2N-6),Height+8,3*sc,3*sc]) // grey
             elif k<21:
                 bit = (repscheme>>(k-16))&0x1
-                pg.draw.rect(scr,cancol[4][k]*(1+bit),[k<<(log2N-6),Height+8,3*sc,5*sc])
+                pg.draw.rect(scr,cancol[4][k]*(1+bit),[k<<(log2N-6),Height+8,3*sc,3*sc])
     return(cancol)
 #-----------------------------------------------------------------------------------------------------------
 
@@ -533,7 +537,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                                     bit = (overwritemask>>(k-16))&0x1
                                     print ("overwritemask changed to %x" % (overwritemask))
                                 survivalmask
-                                pg.draw.rect(scr,cancol[0][k]*(1+bit),[k<<(log2N-6),Height+8,3*sc,5*sc])
+                                pg.draw.rect(scr,cancol[0][k]*(1+bit),[k<<(log2N-6),Height+8,3*sc,3*sc])
                                 surviveover[0],surviveover[1]= survivalmask,overwritemask      # 2nd elt only picked up in C as overwrite for selection<8
                                 genelife.set_surviveover64(surviveover)
                                 genelife.set_repscheme(repscheme)
@@ -542,15 +546,15 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                                 if k<8:
                                     survivalmask = survivalmask ^ (1<<k)
                                     print ("survivalmask changed to %x" % (survivalmask))
-                                    pg.draw.rect(scr,cancol[1][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3*sc,5*sc])
+                                    pg.draw.rect(scr,cancol[1][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3*sc,3*sc])
                                 elif k<16:
                                     birthmask = birthmask ^ (1<<(k-8))
                                     print ("birthmask changed to %x" % (birthmask))
-                                    pg.draw.rect(scr,cancol[1][k]*(1+((birthmask>>(k-8))&0x1)),[k<<(log2N-6),Height+8,3*sc,5*sc])
+                                    pg.draw.rect(scr,cancol[1][k]*(1+((birthmask>>(k-8))&0x1)),[k<<(log2N-6),Height+8,3*sc,3*sc])
                                 else:
                                     overwritemask = overwritemask ^ (1<<(k-16))
                                     print ("overwritemask changed to %x" % (overwritemask))
-                                    pg.draw.rect(scr,cancol[1][k]*(1+((overwritemask>>(k-16))&0x1)),[k<<(log2N-6),Height+8,3*sc,5*sc])
+                                    pg.draw.rect(scr,cancol[1][k]*(1+((overwritemask>>(k-16))&0x1)),[k<<(log2N-6),Height+8,3*sc,3*sc])
                                 surviveover[0],surviveover[1],surviveover[2]= survivalmask,birthmask,overwritemask
                                 genelife.set_surviveover64(surviveover)
                         elif selection < 12:
@@ -558,15 +562,15 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                                 if k<23:
                                     survivalmask = survivalmask ^ (1<<k)
                                     print ("survivalmask changed to %x" % (survivalmask))
-                                    pg.draw.rect(scr,cancol[2][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3*sc,5*sc])
+                                    pg.draw.rect(scr,cancol[2][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3*sc,3*sc])
                                 elif k<46:
                                     birthmask = birthmask ^ (1<<(k-23))
                                     print ("birthmask changed to %x" % (birthmask))
-                                    pg.draw.rect(scr,cancol[2][k]*(1+((birthmask>>(k-23))&0x1)),[k<<(log2N-6),Height+8,3*sc,5*sc])
+                                    pg.draw.rect(scr,cancol[2][k]*(1+((birthmask>>(k-23))&0x1)),[k<<(log2N-6),Height+8,3*sc,3*sc])
                                 else:
                                     overwritemask = overwritemask ^ (1<<(k-46))
                                     print ("overwritemask changed to %x" % (overwritemask))
-                                    pg.draw.rect(scr,cancol[2][k]*(1+((overwritemask>>(k-46))&0x1)),[k<<(log2N-6),Height+8,3*sc,5*sc])
+                                    pg.draw.rect(scr,cancol[2][k]*(1+((overwritemask>>(k-46))&0x1)),[k<<(log2N-6),Height+8,3*sc,3*sc])
                                 surviveover[0],surviveover[1],surviveover[2]= survivalmask,birthmask,overwritemask
                                 genelife.set_surviveover64(surviveover)
                         elif selection<14:
@@ -574,11 +578,16 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                                 if k<32:
                                     survivalmask = survivalmask ^ (1<<k)
                                     print ("survivalmask changed to %x" % (survivalmask))
-                                    pg.draw.rect(scr,cancol[3][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3*sc,5*sc])
+                                    pg.draw.rect(scr,cancol[3][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3*sc,3*sc])
                                 else:
-                                    birthmask = birthmask ^ (1<<(k-32))
-                                    print ("birthmask changed to %x" % (birthmask))
-                                    pg.draw.rect(scr,cancol[3][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+8,3*sc,5*sc])
+                                    if y<N+12:
+                                        birthmask = birthmask ^ (1<<(k-32))
+                                        print ("birthmask changed to %x" % (birthmask))
+                                        pg.draw.rect(scr,cancol[3][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+8,3*sc,3*sc])
+                                    else:
+                                        overwritemask = overwritemask ^ (1<<(k-32))
+                                        print ("overwritemask changed to %x" % (overwritemask))
+                                        pg.draw.rect(scr,cancol[3][k+32]*(1+((overwritemask>>(k-32))&0x1)),[k<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
                                 surviveover[0],surviveover[1],surviveover[2]= survivalmask,birthmask,overwritemask
                                 genelife.set_surviveover64(surviveover)
                         elif selection<16:
@@ -586,22 +595,27 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                                 if k<32:
                                     survivalmask = survivalmask ^ (1<<k)
                                     print ("survivalmask changed to %x" % (survivalmask))
-                                    pg.draw.rect(scr,cancol[4][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3*sc,5*sc])
+                                    pg.draw.rect(scr,cancol[4][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+8,3*sc,3*sc])
                                 else:
-                                    birthmask = birthmask ^ (1<<(k-32))
-                                    print ("birthmask changed to %x" % (birthmask))
-                                    pg.draw.rect(scr,cancol[4][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+8,3*sc,5*sc])
+                                    if y<N+12:
+                                        birthmask = birthmask ^ (1<<(k-32))
+                                        print ("birthmask changed to %x" % (birthmask))
+                                        pg.draw.rect(scr,cancol[4][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+8,3*sc,3*sc])
+                                    else:
+                                        overwritemask = overwritemask ^ (1<<(k-32))
+                                        print ("overwritemask changed to %x" % (overwritemask))
+                                        pg.draw.rect(scr,cancol[4][k+32]*(1+((overwritemask>>(k-32))&0x1)),[k<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
                                 surviveover[0],surviveover[1],surviveover[2]= survivalmask,birthmask,overwritemask
                                 genelife.set_surviveover64(surviveover)
                         elif selection < 20:
                             if k<NbP:
                                 displayplanes = displayplanes ^ (1<<k)
-                                pg.draw.rect(scr,cancol[4][k]*(1+((displayplanes>>k)&0x1)),[k<<(log2N-6),Height+8,3*sc,5*sc])
+                                pg.draw.rect(scr,cancol[4][k]*(1+((displayplanes>>k)&0x1)),[k<<(log2N-6),Height+8,3*sc,3*sc])
                                 genelife.set_displayplanes(displayplanes)
                             elif k>=16 and k<21:
                                 repscheme = repscheme ^ (1<<(k-16))
                                 print ("repscheme changed to %x" % (repscheme))
-                                pg.draw.rect(scr,cancol[4][k]*(1+((repscheme>>(k-16))&0x1)),[k<<(log2N-6),Height+8,3*sc,5*sc])
+                                pg.draw.rect(scr,cancol[4][k]*(1+((repscheme>>(k-16))&0x1)),[k<<(log2N-6),Height+8,3*sc,3*sc])
                                 genelife.set_repscheme(repscheme)
                     else: # y<N
                         if colorfunction < 4 or colorfunction == 8:
