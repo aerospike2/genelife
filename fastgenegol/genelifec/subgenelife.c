@@ -304,6 +304,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // selectdifft7         select the most central (left) of seven live neighbours or first one in canonical rotation
 // selectdifft          select the most central (left) of sum live neighbours or first one in canonical rotation : calls 1 of selectdifft1-7
 // disambiguate         disambiguate the cases where the canonical rotation does not uniquely identify a pattern start point : 1 of 8 methods
+// testlut              tests LUT calculation via selectdifft: prepares shortcut array lookup
 //.......................................................................................................................................................
 // pack012neighbors     pack all up to 2nd neighbours in single word
 // pack0123neighbors    pack all up to 3rd neighbours in single word
@@ -686,6 +687,8 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
     uint64_t livegenes[8],gdiff,extrval,bestnbmask;
     unsigned int repselect = (repscheme>>4)&0x7;
 
+    if(s==0) {*birth = 1ull;  *newgene = genegol[selection-8];return(1);}
+
     for(k=0;k<s;k++) {
         livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];
         POPCOUNT64C(livegenes[k],d[k]);
@@ -763,6 +766,7 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
                 }
                 break;
             case 12:                                        // canon. lut penalty in fixed length encoding 32 bit survival 32 bit birth
+            case 14:
                  for(k=0;k<s;k++) {
                     livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];
                     POPCOUNT64C(livegenes[k]&0xffffffffull,dS);        // 32 coding bits for survival
@@ -1065,7 +1069,7 @@ extern inline uint64_t disambiguate(unsigned int kch, uint64_t nb1i, int nb[], u
                      kch+=k*(nsame==4 ? 2 : 4);
                      newgene&=golg[nb[(nb1i>>(kch<<2))&0x7]];
                  }; return(newgene);
-        case 6:  if ( selection<14) return(genegol[selection-8]);                        // choose gene with GoL encoding : needs fixing for selection 11,13
+        case 6:  if ( selection<16) return(genegol[selection-8]);                        // choose gene with GoL encoding : needs fixing for selection 11,13
         case 7:  return(randnr);                                                         // choose random gene : should really update randnr outside to ensure indept
         default: fprintf(stderr,"Error in switch of ambiguous rotation resolution, should never reach here\n");
                  return(0ull);
@@ -2023,7 +2027,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64
     static uint64_t summasks[5] = {0x1ull,0x3ull,0x3full,0x3ffull,0x1fffull};  // masks for s= 0,1,2,3,4 with nr cases 1,2,6,10,13
     static int sumoffs[5] = {0,1,3,9,19};                                      // cumulative offsets to start of coding region for s = 0,1,2,3,4
     static int csumoffs[5] = {0,2,4,12,26};                                    // start of indexing in confoffs for crot,kodd lookup for s = 0,1,2,3,4
-    static int confoffs[2+2+8+14+20] = {0,0,0,0,0,1,2,3,3,4,5,0,1,2,3,3,2,4,5,6,7,4,5,8,9,0,0,1,2,3,4,1,2,5,6,7,8,9,9,10,10,8,7,11,12}; // look up for crot*2+kodd to gene bit offset
+    static int confoffs[2+2+8+14+20] = {0,0, 0,0, 0,0,1,2,3,3,4,5, 0,1,2,3,3,2,4,5,6,7,4,5,8,9, 0,0,1,2,3,4,1,2,5,6,7,8,9,9,10,10,8,7,11,12}; // look up for crot*2+kodd to gene bit offset
     int nb[8], ij, i, j, jp1, jm1, ip1, im1;
     unsigned int kch=0;
     uint64_t genecode, gols, nb1i, nbmask, randnr, r2;
@@ -2057,7 +2061,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64
                 else           birth = (bmask>>sumoffs[s])&summasks[s] ? 1ull : 0ull;
                 if (survive|birth) {
                     for (k=0,nbmask=0;k<8;k++) nbmask |= (gol[nb[k]]<<k);      // constuct mask of live bits for 8 neighbours
-                    kch = selectdifft(s, nbmask, &crot, &kodd, &nsame);        // find the canonical rotation index of the live neighbour configuration
+                    kch = selectdifft(s, nbmask, &crot, &kodd, &nsame);        // find the canonical rotation index and odd/even offset of the live neighbour configuration
                     coff = sumoffs[s]+confoffs[csumoffs[s]+(crot<<1)+kodd];
                     survive= (smask>>(coff))&0x1ull;                           // refine decisions for specific canonical rotation configuration
                     birth  = (bmask>>(coff))&0x1ull;                           // only allowed if birth/survivemask permits (ask this before consulting genes)
