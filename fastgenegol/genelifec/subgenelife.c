@@ -340,7 +340,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // set_selectedgene     set selected gene for highlighting from current mouse selection in graphics window
 // set_offsets          set offsets for detection of glider structures in display for color function 8
 // set_quadrant         set the pair of bits in repscheme (or survivalmask or overwritemask) used for quadrant variation 0-6
-// set_randomsoup       toggle the randomsoup activation for continual updating of initialization field with random states and genes
+// set_randomsoup       change the randomsoup activation for continual updating of initialization field with random states and genes : 2,1,0
 // set_repscheme_bits   set the two of the repscheme (or survivalmask or overwritemask) bits corresponding to the selected quadrant
 // set_repscheme        set repscheme from python
 // set_rulemod          set rulemod from python
@@ -1283,7 +1283,8 @@ void random_soup(uint64_t gol[],uint64_t golg[],uint64_t newgol[],uint64_t newgo
     static unsigned int rmask = (1 << 15) - 1;
     unsigned int density;
     
-    if (totsteps & 0xf) return;          // only execute once every 16 time steps
+    if(randomsoup==2)
+        if (totsteps & 0xf) return;                             // only execute once every 16 time steps
     
     density = initial1density;
     mask=(NbG==64 ? ~0 :(1ull<<NbG)-1ull);
@@ -1294,19 +1295,18 @@ void random_soup(uint64_t gol[],uint64_t golg[],uint64_t newgol[],uint64_t newgo
     for (i=0; i<Nf; i++) {
         for (j=0; j<Nf; j++) {
             ij=i0+i+N*(j0+j);
-            
-            // making next two lines optional under control of randomsoup == 2 is not compatible with toggling, postpone this
-            i1 = i<j ? i : j;                               // swap so that i1<=j1
-            j1 = i<j ? j : i;
-            d= j1< (Nf>>1) ? i1 : (i1 < Nf-j1 ? i1 : Nf-j1); // find Manhatten distance to border ij1
-            density = (d <= 8 ? (initial1density >> (16-(d<<1))) : initial1density);
-            
-            if(!newgol[ij]) {       // check whether this OK for selection 16-19 with genes everywhere and hashdelete
+            if(randomsoup==2) {                                 // border feathering as well as intermittent every 16 steps
+                i1 = i<j ? i : j;                               // swap so that i1<=j1
+                j1 = i<j ? j : i;
+                d= j1< (Nf>>1) ? i1 : (i1 < Nf-j1 ? i1 : Nf-j1);// find Manhatten distance to border ij1
+                density = (d <= 8 ? (initial1density >> (16-(d<<1))) : initial1density);
+            }
+            if(!newgol[ij]) {                                   // check whether this OK for selection 16-19 with genes everywhere and hashdelete
                 if (selection<14) newgol[ij] = ((rand() & rmask) < density)?1ull:0ull;
                 else if(selection>=16 && selection<=19) for (k=0;k<NbP;k++) newgol[ij] |= ((rand() & rmask) < density)?(1ull<<(k<<2)):0ull;
                 else for (k=0;k<NbP;k++) newgol[ij] |= ((rand() & rmask) < density)?(1ull<<k):0ull;
                 
-                if (newgol[ij]) {  // if live cell or multiplane, fill with game of life genome or random genome
+                if (newgol[ij]) {                               // if live cell or multiplane, fill with game of life genome or random genome
                     if (selection<8) {
                         RAND128P(randnr);
                         newgolg[ij] = gene0^(randnr&mask);
@@ -3149,8 +3149,8 @@ void set_quadrant(int quadrant) {
     }
 }
 //.......................................................................................................................................................
-void set_randomsoup() {
-    randomsoup=1-randomsoup;
+void set_randomsoup(int randomsoupin) {
+    randomsoup=randomsoupin;
 }
 //.......................................................................................................................................................
 unsigned int set_repscheme_bits(int quadrant, int x, int y, int surviveover[]) {

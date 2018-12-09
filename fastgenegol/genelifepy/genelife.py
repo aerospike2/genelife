@@ -665,7 +665,12 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                                 updatesenabled=False
             elif event.type == pg.KEYDOWN:
                 if event.key == pg.K_h:
-                    parhelp()
+                    if pg.key.get_mods() & pg.KMOD_SHIFT:
+                        rulemod = rulemod ^ 2   # horizon mode with GoL in upper half toggled on/off
+                        print "rulemod changed to ",rulemod
+                        genelife.set_rulemod(rulemod)
+                    else:
+                        parhelp()
                 elif event.key == pg.K_SPACE:
                     pause = (pause+1)%2
                 elif event.key == pg.K_RIGHT:
@@ -709,13 +714,13 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     genelife.set_quadrant(quadrants)
                 elif event.key == pg.K_r:
                     if pg.key.get_mods() & pg.KMOD_SHIFT:
-                        randomsoup=1-randomsoup
+                        randomsoup = 2 if randomsoup !=2 else 0
                         print "randomsoup changed to ",randomsoup
-                        genelife.set_randomsoup()
+                        genelife.set_randomsoup(randomsoup)
                     else:
-                        rulemod = rulemod ^ 2
-                        print "rulemod changed to ",rulemod
-                        genelife.set_rulemod(rulemod)
+                        randomsoup = 1 if randomsoup !=1 else 0
+                        print "randomsoup changed to ",randomsoup
+                        genelife.set_randomsoup(randomsoup)
                 elif event.key == pg.K_s:
                     pg.image.save(screen, "images/genelife_%03d_%08x_%03d.jpeg" % (framenr,repscheme,savecnt))
                     print ("image saved "+"images/genelife_%03d_%08x_%03d.jpeg" % (framenr,repscheme,savecnt))
@@ -820,10 +825,11 @@ def parhelp():
     print "right mouse ","choose single plane for GoL display in colorfunction 2 for selection 16-19"
     print "<- , ->     ","decrement or increment the colorfunction analysis type mod 9"
     print "h           ","print this help"
+    print "H           ","toggle horizon mode on or off: upper half of array obeys unmodified GoL rule"
     print "<space>     ","pasue simulation"
     print "q,Q         ","incr or decr quadrant parameter choice : -1 = no quadrants, 0-4 are first 5 bit pairs of repscheme, 5,6 surv and overwrite"
-    print "r           ","toggle horizon mode on or off: upper half of array obeys unmodified GoL rule"
-    print "R           ","toggle random soup domain on or off"
+    print "r           ","toggle random soup domain on or off"
+    print "R           ","toggle intermittent feathered random soup domain on or off"
     print "s           ","save current image to file in image subdriectory"
     print "x,X y,Y t,T ","lower (lc) or raise (uc) the (dx,dy,dt) offsets for glider tracking (colorfn 8) (0,0,0)=(all 8 nnb dt=-1)"
     print "v           ","toggle vertical scroll tracking mode : following top most objects and losing lowest objects in contact with 0 row"
