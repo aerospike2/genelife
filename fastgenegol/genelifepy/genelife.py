@@ -760,8 +760,8 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                         print "randomsoup changed to ",randomsoup
                         genelife.set_randomsoup(randomsoup)
                 elif event.key == pg.K_s:
-                    pg.image.save(screen, "images/genelife_%03d_%08x_%03d.jpeg" % (framenr,repscheme,savecnt))
-                    print ("image saved "+"images/genelife_%03d_%08x_%03d.jpeg" % (framenr,repscheme,savecnt))
+                    pg.image.save(screen, "images/genelife_sel%02d_t%03d_r%08x_s%03d.jpeg" % (selection,framenr,repscheme,savecnt))
+                    print ("image saved "+"images/genelife_sel%02d_t%03d_r%08x_s%03d.jpeg" % (selection,framenr,repscheme,savecnt))
                     savecnt = savecnt + 1
                 elif event.key == pg.K_v:
                     vscrolling=1-vscrolling
