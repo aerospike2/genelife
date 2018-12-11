@@ -761,8 +761,7 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
                     d[k]=57-dS-(dB<<1);
                 }
                 break;
-            case 11:
-            case 13:                                        // dist. or canon. lut penalty of gene in variable length encoding : 8 bit patterns S 0xxxrrrr  B 1xxxrrrr
+            case 11:                                        // dist. lut penalty of gene in variable length encoding : 8 bit patterns S 0xxxrrrr  B 1xxxrrrr
                 for(k=0;k<s;k++) {
                     livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];
                     PATTERN8(livegenes[k],0x00,d0)
@@ -778,6 +777,24 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
                     POPCOUNT64C(livegenes[k]&0xffffffffull,dS);        // 32 coding bits for survival
                     POPCOUNT64C((livegenes[k]>>32)&0xffffffffull,dB);  // 32 coding bits for birth
                     d[k]=96-dS-(dB<<1);
+                }
+                break;
+            case 13:                                        // canon. lut penalty of gene in variable length encoding : 8 bit patterns S 0xxxwrrr  B 1xxxwrrr
+                for(k=0;k<s;k++) {                          // could be made more accurate by accounting for upper pair bit states for rest of 5-subset too
+                    livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];
+                    PATTERN8(livegenes[k]&0xffffffffffff,0x00,d0)
+                    PATTERN8(~livegenes[k]&0x808080808080ull,0x80,d1)
+                    PATTERN8(livegenes[k]&0x808080808080ull,0x80,d2)
+                    d[k]=24-(d1-d0)-2*d2;
+                }
+                break;
+            case 15:                                        // dist. or canon. lut penalty of gene in variable length encoding : 8 bit patterns S 0xxxwwrr  B 1xxxwwrr
+                for(k=0;k<s;k++) {                          // could be made more accurate by accounting for upper quartet bit states for rest of 6-subset too
+                    livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];
+                    PATTERN8(livegenes[k]&0xffffffffff,0x00,d0)
+                    PATTERN8(~livegenes[k]&0x8080808080ull,0x80,d1)
+                    PATTERN8(livegenes[k]&0x8080808080ull,0x80,d2)
+                    d[k]=24-(d1-d0)-2*d2;
                 }
                 break;
             default:
@@ -1953,7 +1970,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
                                                      totsteps,ij,s,gol[ij],crot,crot5,crotmod5,pat,genecode,overwrite,survive,birth); */
                             // if (overwrite && !gol[ij] && s==3) fprintf(stderr,"overwrite and golij!!!!!!!!!!!!!\n");
                             if (survivalgene & gol[ij]) {                     // survival determined by central gene in this case
-                                genecode = golg[nb[k]];
+                                genecode = golg[ij];
                                 if(crotmod5 > 2) for (genecode1=0ull,k1=0;k1<6;k1++) genecode1 |= ((genecode>>(48+(k1<<1)))&(0x1<<(crotmod5-3)))<<(k1<<3);
                                 else genecode1 = genecode & (0x010101010101 << crotmod5);
                                 genecode &= 0xf8f8f8f8f8f8;
@@ -2071,7 +2088,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64
         (vi) split the s-range allowed for birth and survival: S s=1-4 B s=3-5 ie 31 bits for survival and 33 for birth]
  
                                                                                                                 */
-    int s, se, slow, s2or3, k, kodd, coff, nmut, crot, found, nbest, nsame;
+    int s, se, slow, s2or3, k, k1, kodd, coff, nmut, crot, found, coffdiv6, coffmod6, pat, nbest, nsame;
     uint64_t survive,birth,overwrite,survivalgene,smask,bmask,rulemodij;
     static uint64_t summasks[5] = {0x1ull,0x3ull,0x3full,0x3ffull,0x1fffull};  // masks for s= 0,1,2,3,4 with nr cases 1,2,6,10,13
     static int sumoffs[9] = {0,1,3,9,19,32,42,48,50};                                      // cumulative offsets to start of coding region for s = 0,1,2,3,4,5,6,7,8
@@ -2081,7 +2098,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64
     static unsigned char lut[256];
     int nb[8], ij, i, j, jp1, jm1, ip1, im1;
     unsigned int kch=0;
-    uint64_t genecode, gols, nb1i, nbmask, randnr, r2;
+    uint64_t genecode, genecode1, gols, nb1i, nbmask, randnr, r2;
     uint64_t newgene, ancestor;
     uint64_t statflag;
     
@@ -2130,6 +2147,10 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64
                     for (k=0,nbmask=0;k<8;k++) nbmask |= (gol[nb[k]]<<k);      // constuct mask of live bits for 8 neighbours
                     kch = selectdifft(s, nbmask, &crot, &kodd, &nsame);        // find the canonical rotation index and odd/even offset of the live neighbour configuration
                     coff = confoffs[csumoffs[s]+(crot<<1)+kodd];
+                    coffdiv6 = coff >= 12 ? 2 : (coff >=6 ? 1 : 0);            // coff is in range 0-12 coffdiv6 0,1,2
+                    coffmod6 = coff-6*coffdiv6;                                // the 6 bits indexed by coffmod6 are stored in two places 0-1 in 8-bit word and 2-5 in quartet bits 40+
+                    pat = (s<<4)|(coffdiv6<<2)|0x1;
+                    genecode = 0ull;
                     survive= (smask>>(sumoffs[s]+coff))&0x1ull;                           // refine decisions for specific canonical rotation configuration
                     birth  = (bmask>>(sumoffs[s]+coff))&0x1ull;                           // only allowed if birth/survivemask permits (ask this before consulting genes)
                     if (survive|birth) {                                       // complete determination of birth or survival
@@ -2137,18 +2158,30 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64
                             survive=birth=0ull;
                             for (k=0;k<8;k++) {                                // decodes genes with variable length encoding only for current s,crot
                                 if (gol[nb[k]]) {                              // combine information from genes of all live neighbours
+                                    if ((!survivalgene && gol[ij]) || overwrite) {
+                                        genecode = golg[nb[k]];
+                                        if(coffmod6 > 1) for (genecode1=0ull,k1=0;k1<5;k1++) genecode1 |= ( (genecode>>(40+(k1<<2)+coffmod6-2)) & 0x1ull ) << (k1<<3);
+                                        else genecode1 = (genecode >> coffmod6) & 0x0101010101; // prepare lookup in all 5 modules on gene : in this case coff subset bits in right place
+                                        genecode &= 0xfcfcfcfcfc; //
+                                        genecode |= genecode1;                 // replace lowest 2 bits of 8-bit part of 12-bit modules with appropriate coff subset bits
+                                    }
                                     if (!survivalgene && gol[ij]) {
-                                        PATTERN8(golg[nb[k]], ((s<<4)|coff), found); //final decision for survival?  NB all 0 seq encodes survival with 0 live nbs
+                                        PATTERN8(genecode, pat, found); //final decision for survival?  NB all 0 seq encodes survival with 0 live nbs
                                         survive |= found? 1ull : 0ull;
                                     }
                                     if (overwrite) {
-                                        PATTERN8(golg[nb[k]], (((8|s)<<4)|coff), found); //final decision for birth?
+                                        PATTERN8(genecode, (0x80|pat), found); //final decision for birth?
                                         birth |= found? 1ull : 0ull;
                                     }
                                 }
                             }
                             if (survivalgene && gol[ij]) {                     // survival determined by central gene in this case
-                                PATTERN8(golg[ij], ((s<<4)|coff), found);      //final decision for survival?  NB all 0 seq encodes survival with 0 live nbs
+                                genecode = golg[ij];
+                                if(coffmod6 > 1) for (genecode1=0ull,k1=0;k1<5;k1++) genecode1 |= ( (genecode>>(40+(k1<<2)+coffmod6-2)) & 0x1ull ) << (k1<<3);
+                                else genecode1 = (genecode >> coffmod6) & 0x0101010101; // prepare lookup in all 5 modules on gene : in this case coff subset bits in right place
+                                genecode &= 0xfcfcfcfcfc; //
+                                genecode |= genecode1;                 // replace lowest 2 bits of 8-bit part of 12-bit modules with appropriate coff subset bits
+                                PATTERN8(genecode, pat, found);      //final decision for survival?  NB all 0 seq encodes survival with 0 live nbs
                                 survive |= found? 1ull : 0ull;
                             }
                         }
@@ -3040,12 +3073,12 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
                  for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];break;
         case 12: genegol[selection-8] = 0xfull|(0x7full<<4)|(0x7full<<36);        //GoL rule for survival surv2 1st 4 surv3 next 7 birth3 7 bits from 32+4, canonical case
                  for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];break;
-        case 13: genegol[selection-8] = 0x00cd00bbb73b3727;                       //GoL rule for S23 B3 with modular encoding
+        case 13: genegol[selection-8] = 0x00cd00bbb73b3727;                       //GoL rule for S23 B3 with modular encoding for canonical rotation case
                  for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];break;
         case 14: genegol[selection-8] = (0x3full<<3)|(0x3ffull<<9)|(0x3ffull<<(32+9)); //GoL rule for S23 B3 for 2D_sym case with 1,2,6,10,13 configs for s=0,1,2,3,4
                  for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];break;
-        case 15: for (k=0;k<8;k++)   startgenes[k] =((0x1ull<<k*3)-1ull)<<20;break; // NYI fix
-        
+        case 15: genegol[selection-8] = 0x03f3ffb7b3373323;                       //GoL rule for S23 B3 with modular encoding for 2D_sym case
+                 for (k=0;k<8;k++)   startgenes[k] =genegol[selection-8];break;
         case 16:
         case 17: for (k=0;k<16;k++)  startgenes[k] = gene0;                      // first set all startgenes as uncoupled
                  for (k=0;k<NbP;k++) startgenes[k] = (startgenes[k] & (~(0xfull<<(k<<2)))) | ((k+1)%NbP)<<(k<<2);break; // couple plane k+1 to k in startgene k
@@ -3057,7 +3090,6 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         case 24: for (k=0;k<8;k++)   startgenes[k] =((0x1ull<<k*3)-1ull)<<20;break;
 
         default: for (k=0;k<8;k++) startgenes[k]=(0x1ull<<(4+k*8))-1ull;
-
     }
 
     if ( livesites !=NULL) {
