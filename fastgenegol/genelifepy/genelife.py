@@ -632,6 +632,18 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                                 pixeldat = ""
                             else:
                                 pixeldat = "(%d,%d) gol %016x gene %016x status %016x" % (x,y,gol[x+y*N],golg[x+y*N],golgstats[x+y*N])
+                                if selection == 8:
+                                    for k in xrange(16):
+                                        pg.draw.rect(scr,cancol[1][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                elif selection == 10:
+                                    for k in xrange(46):
+                                        pg.draw.rect(scr,cancol[2][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                elif selection == 12:
+                                    for k in xrange(64):
+                                        pg.draw.rect(scr,cancol[3][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                elif selection == 14:
+                                    for k in xrange(64):
+                                        pg.draw.rect(scr,cancol[4][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
                         elif colorfunction == 4:
                             genelife.get_acttrace(golg)
                             pixeldat = "(%d,%d) gene %016x" % (x,y,golg[x+y*N])
@@ -658,6 +670,22 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
             elif event.type==pg.MOUSEBUTTONUP:
                 mouseclicked = False
                 mouseclicked2 = False
+                if selection == 8:                                  # reset mask control buttons to survivalmask and birthmask control colours
+                    for k in xrange(16):
+                        if k<8: pg.draw.rect(scr,cancol[1][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                        else: pg.draw.rect(scr,cancol[1][k]*(1+((birthmask>>(k-8))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                elif selection == 10:
+                    for k in xrange(46):
+                        if k<23: pg.draw.rect(scr,cancol[2][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                        else: pg.draw.rect(scr,cancol[2][k]*(1+((birthmask>>(k-23))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                elif selection==12:
+                    for k in xrange(64):
+                        if k<32: pg.draw.rect(scr,cancol[3][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                        else: pg.draw.rect(scr,cancol[3][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                elif selection==14:
+                    for k in xrange(64):
+                        if k<32: pg.draw.rect(scr,cancol[4][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                        else: pg.draw.rect(scr,cancol[4][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                 if selection>=20:
                     displayoneplane=64
                     genelife.set_displayoneplane(displayoneplane)
@@ -678,6 +706,18 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             genelife.get_curgolg(golg)
                             genelife.get_curgolgstats(golgstats)
                             pixeldat = "(%d,%d) gol %016x gene %016x status %016x" % (x,y,gol[x+y*N],golg[x+y*N],golgstats[x+y*N])
+                            if selection == 8:
+                                for k in xrange(16):
+                                    pg.draw.rect(scr,cancol[1][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                            elif selection ==10:
+                                for k in xrange(46):
+                                    pg.draw.rect(scr,cancol[2][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                            elif selection ==12:
+                                for k in xrange(64):
+                                    pg.draw.rect(scr,cancol[3][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                            elif selection ==14:
+                                for k in xrange(64):
+                                    pg.draw.rect(scr,cancol[4][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
                         elif colorfunction == 4:
                             genelife.get_acttrace(golg)
                             pixeldat = "(%d,%d) gene %016x" % (x,y,golg[x+y*N])
