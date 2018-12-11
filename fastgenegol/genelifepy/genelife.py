@@ -527,15 +527,15 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                                 if k<14:
                                     repscheme = repscheme ^ (1<<k)
                                     bit = (repscheme>>k)&0x1
-                                    print ("repscheme changed to %x" % (repscheme))
+                                    print ("step %d repscheme changed to %x" % (framenr,repscheme))
                                 elif k<16:
                                     survivalmask = survivalmask ^ (1<<(k-14))
                                     bit = (survivalmask>>(k-14))&0x1
-                                    print ("survivalmask changed to %x" % (survivalmask))
+                                    print ("step %d survivalmask changed to %x" % (framenr,survivalmask))
                                 else:
                                     overwritemask = overwritemask ^ (1<<(k-16))
                                     bit = (overwritemask>>(k-16))&0x1
-                                    print ("overwritemask changed to %x" % (overwritemask))
+                                    print ("step %d overwritemask changed to %x" % (framenr,overwritemask))
                                 survivalmask
                                 pg.draw.rect(scr,cancol[0][k]*(1+bit),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 surviveover[0],surviveover[1]= survivalmask,overwritemask      # 2nd elt only picked up in C as overwrite for selection<8
@@ -545,15 +545,15 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             if k<24:
                                 if k<8:
                                     survivalmask = survivalmask ^ (1<<k)
-                                    print ("survivalmask changed to %x" % (survivalmask))
+                                    print ("step %d survivalmask changed to %x" % (framenr,survivalmask))
                                     pg.draw.rect(scr,cancol[1][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 elif k<16:
                                     birthmask = birthmask ^ (1<<(k-8))
-                                    print ("birthmask changed to %x" % (birthmask))
+                                    print ("step %d birthmask changed to %x" % (framenr,birthmask))
                                     pg.draw.rect(scr,cancol[1][k]*(1+((birthmask>>(k-8))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 else:
                                     overwritemask = overwritemask ^ (1<<(k-16))
-                                    print ("overwritemask changed to %x" % (overwritemask))
+                                    print ("step %d overwritemask changed to %x" % (framenr,overwritemask))
                                     pg.draw.rect(scr,cancol[1][k]*(1+((overwritemask>>(k-16))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 surviveover[0],surviveover[1],surviveover[2]= survivalmask,birthmask,overwritemask
                                 genelife.set_surviveover64(surviveover)
@@ -561,15 +561,15 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             if k<54:
                                 if k<23:
                                     survivalmask = survivalmask ^ (1<<k)
-                                    print ("survivalmask changed to %x" % (survivalmask))
+                                    print ("step %d survivalmask changed to %x" % (framenr,survivalmask))
                                     pg.draw.rect(scr,cancol[2][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 elif k<46:
                                     birthmask = birthmask ^ (1<<(k-23))
-                                    print ("birthmask changed to %x" % (birthmask))
+                                    print ("step %d birthmask changed to %x" % (framenr,birthmask))
                                     pg.draw.rect(scr,cancol[2][k]*(1+((birthmask>>(k-23))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 else:
                                     overwritemask = overwritemask ^ (1<<(k-46))
-                                    print ("overwritemask changed to %x" % (overwritemask))
+                                    print ("step %d overwritemask changed to %x" % (framenr,overwritemask))
                                     pg.draw.rect(scr,cancol[2][k]*(1+((overwritemask>>(k-46))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 surviveover[0],surviveover[1],surviveover[2]= survivalmask,birthmask,overwritemask
                                 genelife.set_surviveover64(surviveover)
@@ -577,16 +577,16 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             if k<64:
                                 if k<32:
                                     survivalmask = survivalmask ^ (1<<k)
-                                    print ("survivalmask changed to %x" % (survivalmask))
+                                    print ("step %d survivalmask changed to %x" % (framenr,survivalmask))
                                     pg.draw.rect(scr,cancol[3][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 else:
                                     if y<N+12:
                                         birthmask = birthmask ^ (1<<(k-32))
-                                        print ("birthmask changed to %x" % (birthmask))
+                                        print ("step %d birthmask changed to %x" % (framenr,birthmask))
                                         pg.draw.rect(scr,cancol[3][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                     else:
                                         overwritemask = overwritemask ^ (1<<(k-32))
-                                        print ("overwritemask changed to %x" % (overwritemask))
+                                        print ("step %d overwritemask changed to %x" % (framenr,overwritemask))
                                         pg.draw.rect(scr,cancol[3][k+32]*(1+((overwritemask>>(k-32))&0x1)),[k<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
                                 surviveover[0],surviveover[1],surviveover[2]= survivalmask,birthmask,overwritemask
                                 genelife.set_surviveover64(surviveover)
@@ -594,16 +594,16 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             if k<64:
                                 if k<32:
                                     survivalmask = survivalmask ^ (1<<k)
-                                    print ("survivalmask changed to %x" % (survivalmask))
+                                    print ("step %d survivalmask changed to %x" % (framenr,survivalmask))
                                     pg.draw.rect(scr,cancol[4][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 else:
                                     if y<N+12:
                                         birthmask = birthmask ^ (1<<(k-32))
-                                        print ("birthmask changed to %x" % (birthmask))
+                                        print ("step %d birthmask changed to %x" % (framenr,birthmask))
                                         pg.draw.rect(scr,cancol[4][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                     else:
                                         overwritemask = overwritemask ^ (1<<(k-32))
-                                        print ("overwritemask changed to %x" % (overwritemask))
+                                        print ("step %d overwritemask changed to %x" % (framenr,overwritemask))
                                         pg.draw.rect(scr,cancol[4][k+32]*(1+((overwritemask>>(k-32))&0x1)),[k<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
                                 surviveover[0],surviveover[1],surviveover[2]= survivalmask,birthmask,overwritemask
                                 genelife.set_surviveover64(surviveover)
@@ -614,7 +614,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                                 genelife.set_displayplanes(displayplanes)
                             elif k>=16 and k<21:
                                 repscheme = repscheme ^ (1<<(k-16))
-                                print ("repscheme changed to %x" % (repscheme))
+                                print ("step %d repscheme changed to %x" % (framenr,repscheme))
                                 pg.draw.rect(scr,cancol[4][k]*(1+((repscheme>>(k-16))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 genelife.set_repscheme(repscheme)
                     else: # y<N
@@ -627,11 +627,12 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                                 survivalmask  = surviveover[0]
                                 overwritemask = surviveover[1]
                                 repscheme=packrepscheme(repscheme,survivalmask,overwritemask)
-                                print ("repscheme changed to %x" % (repscheme))
+                                print ("step %d repscheme changed to %x" % (framenr,repscheme))
                                 quadrants = -1
                                 pixeldat = ""
                             else:
                                 pixeldat = "(%d,%d) gol %016x gene %016x status %016x" % (x,y,gol[x+y*N],golg[x+y*N],golgstats[x+y*N])
+                                print ("step %d pixel data %s" % (framenr,pixeldat))
                                 if selection == 8:
                                     for k in xrange(16):
                                         pg.draw.rect(scr,cancol[1][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
@@ -651,7 +652,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             genelife.get_genealogytrace(golg)
                             pixeldat = "(%d,%d) gene %016x" % (x,y,golg[x+y*N])
                             genelife.set_selectedgene(golg[x+y*N])
-                            print framenr,pixeldat
+                            print ("step %d pixel data %s" % (framenr,pixeldat))
                 elif event.button == 3:          # single plane choice right mouse button (-click)
                     mouse_pos = pg.mouse.get_pos()
                     if scalex2:
@@ -745,7 +746,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                 if event.key == pg.K_h:
                     if pg.key.get_mods() & pg.KMOD_SHIFT:
                         rulemod = rulemod ^ 2   # horizon mode with GoL in upper half toggled on/off
-                        print "rulemod changed to ",rulemod
+                        print ("step %d rulemod changed to %x (Horizon mode)" % (framenr,rulemod))
                         genelife.set_rulemod(rulemod)
                     else:
                         parhelp()
@@ -754,32 +755,34 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                 elif event.key == pg.K_RIGHT:
                     colorfunction = (colorfunction + 1) % 9
                     genelife.set_colorfunction(colorfunction)
+                    print 'step',framenr,'colorfunction changed to',colorfunction
                 elif event.key == pg.K_LEFT:
                     colorfunction = (colorfunction - 1) % 9
                     genelife.set_colorfunction(colorfunction)
+                    print 'step',framenr,'colorfunction changed to',colorfunction
                 elif event.key == pg.K_PLUS or event.key == pg.K_KP_PLUS or event.key == pg.K_EQUALS:
                     ymax = ymax * 2
                     oldymax = genelife.setget_act_ymax(ymax)
-                    print 'new ymax =',ymax
+                    print 'step',framenr,'new ymax =',ymax
                 elif event.key == pg.K_MINUS:
                     ymax = ymax / 2
                     oldymax = genelife.setget_act_ymax(ymax)
-                    print 'new ymax =',ymax
+                    print 'step',framenr,'new ymax =',ymax
                 elif event.key == pg.K_x:
                     if pg.key.get_mods() & pg.KMOD_SHIFT: offdx = offdx+1
                     else: offdx = offdx-1
-                    print "offset dx changed to ",offdx
+                    print 'step',framenr,"offset dx changed to ",offdx
                     genelife.set_offsets(offdx,offdx,offdt)
                 elif event.key == pg.K_y:
                     if pg.key.get_mods() & pg.KMOD_SHIFT: offdy = offdy+1
                     else: offdy = offdy-1
-                    print "offset dy changed to ",offdy
+                    print 'step',framenr,"offset dy changed to ",offdy
                     genelife.set_offsets(offdx,offdy,offdt)
                 elif event.key == pg.K_t:
                     if pg.key.get_mods() & pg.KMOD_SHIFT:
                         if(offdt<0): offdt = offdt+1
                     elif offdt>-maxPlane+1: offdt = offdt-1
-                    print "offset dt changed to ",offdt
+                    print 'step',framenr,"offset dt changed to ",offdt
                     genelife.set_offsets(offdx,offdy,offdt)
                 elif event.key == pg.K_q:
                     if pg.key.get_mods() & pg.KMOD_ALT:
@@ -788,16 +791,16 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                         if quadrants < 7: quadrants = quadrants+1
                     else:
                         if quadrants >= 0: quadrants = quadrants-1
-                    print "quadrants changed to ",quadrants
+                    print 'step',framenr,"quadrants changed to ",quadrants
                     genelife.set_quadrant(quadrants)
                 elif event.key == pg.K_r:
                     if pg.key.get_mods() & pg.KMOD_SHIFT:
                         randomsoup = 2 if randomsoup !=2 else 0
-                        print "randomsoup changed to ",randomsoup
+                        print 'step',framenr,"randomsoup changed to ",randomsoup
                         genelife.set_randomsoup(randomsoup)
                     else:
                         randomsoup = 1 if randomsoup !=1 else 0
-                        print "randomsoup changed to ",randomsoup
+                        print 'step',framenr,"randomsoup changed to ",randomsoup
                         genelife.set_randomsoup(randomsoup)
                 elif event.key == pg.K_s:
                     pg.image.save(screen, "images/genelife_sel%02d_t%03d_r%08x_s%03d.jpeg" % (selection,framenr,repscheme,savecnt))
@@ -805,7 +808,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     savecnt = savecnt + 1
                 elif event.key == pg.K_v:
                     vscrolling=1-vscrolling
-                    print "vscrolling changed to ",vscrolling
+                    print 'step',framenr,"vscrolling changed to ",vscrolling
                     genelife.set_vscrolling()
         if (not mouseclicked and not pause):
             if updatesenabled:
@@ -852,40 +855,43 @@ def parhelp():
             print "Control bits for masks to enable gene encoded LUTs (left to right):"
             print "___________________________________________________________________"
             print "Masks for LUT rules for sums 2-6 for survival /left half) and birth (right half)"
-            print "blue      ","survival for sum=1-8 separate buttons for the 8 non-zero sums"
-            print "green     ","birth    for sum=1-8 separate buttons for the 8 non-zero sums"
+            print "blue         ","survival  for sum=1-8 separate buttons for the 8 non-zero sums"
+            print "green        ","birth     for sum=1-8 separate buttons for the 8 non-zero sums"
+            print "red          ","overwrite for sum=1-8 separate buttons for the 8 non-zero sums"
         elif selection < 12:
             print "Control bits for masks to enable gene encoded LUTs (left to right):"
             print "___________________________________________________________________"
-            print "Distance dept (2 classes) LUT rules for s,se s 2-6 for survival /left half) and birth (right half)"
-            print "red      ","sum=2,6 separate buttons for the  3 cases NSEW sum se = 0,1,2 or 2,3,4"
-            print "green    ","sum=3,5 separate buttons for the  4 cases NSEW sum se = 0,1,2,3 or 1,2,3,4"
-            print "blue     ","sum=4   separate buttons for the 5 cases NSEW sum se = 0,1,2,3,4"
+            print "Distance dept (2 classes) LUT rules for s,se s 1-7 for survival /left half) and birth (right half)"
+            print "blue-purple ","survival sum=1-7 separate buttons for s = 1-7 se = 0-1 0-2 0-3 0-4 1-4 2-4 3-4"
+            print "green-yellow","birth    sum=1-7 separate buttons for s = 1-7 se = 0-1 0-2 0-3 0-4 1-4 2-4 3-4"
+            print "red          ","overwrite for sum=1-8 separate buttons for the 8 non-zero sums"
         elif selection < 14:
             print "Control bits for masks to enable gene encoded LUTs (left to right):"
             print "___________________________________________________________________"
-            print "A finer division of LUT rules for sums 2-6 for survival /left half) and birth (right half)"
-            print "red      ","sum=2,6 separate buttons for the  4 canonical rotations"
-            print "green    ","sum=3,5 separate buttons for the  7 canonical rotations"
-            print "blue     ","sum=4   separate buttons for the 10 canonical rotations"
+            print "Canonical rotation LUT rules for sums 2-6 for survival /left half) and birth (right half)"
+            print "blue-purple ","survival sum=2-6 separate buttons for s = 2-6 canonical rotns = 4 7 10 7 4"
+            print "green-yellow","birth    sum=2-6 separate buttons for s = 2-6 canonical rotns = 4 7 10 7 4"
+            print "red          ","overwrite for sum=1-8 separate buttons for the 8 non-zero sums"
         elif selection < 16:
             print "Control bits for masks to enable gene encoded LUTs (left to right):"
             print "___________________________________________________________________"
-            print "A finer division of LUT rules for sums 0-4 for survival /left half) and birth (right half)"
-            print "red      ","sum=2,6 separate buttons for the  4 canonical rotations"
-            print "green    ","sum=3,5 separate buttons for the  7 canonical rotations"
-            print "blue     ","sum=4   separate buttons for the 10 canonical rotations"
+            print "Full 2D symmetry LUT rules for sums 0-4 for survival /left half) and birth (right half)"
+            print "blue-purple ","survival sum=0-4 separate buttons for s = 0-4 pattern offset = 1 2 6 10 13"
+            print "green-yellow","birth    sum=0-4 separate buttons for s = 2-6 pattern offset = 1 2 6 10 13"
+            print "red          ","overwrite for sum=1-8 separate buttons for the 8 non-zero sums"
         print ""
         print "Additional control bits for selection are in repscheme"
         print "______________________________________________________"
         print "repscheme bits 0-3 : currently only bit 2 is used"
+        print "   bit 0 determines choice of gene(s) for survival : live neighbors (0) central gene (1)"
         print "   bit 2 determines choice of neighbour in canonical rotation : most central/different (0) or first bit (1)"
+        print "   bits 1,3 reserved for future definition : currently no effect"
         print "repscheme bits 4-7 determine selection scheme based on gene"
-        print "   # 0 minimum gene as value  # 1 maximum gene as value "
-        print "   # 2 minimum number of ones # 3 maximum number of ones"
-        print "   # 4 neutral selection # 5 neutral but different selection"
-        print "   # 6 penalty function -1 for a survival rule -2 for a birth rule  # 7 not allowed"
-        print "   bit 7 (val 0x8x) overrides with random choice of ancestor amongst live neighbours"
+        print "   # 0 minimum gene as value (penalizes proliferation) # 1 maximum gene as value (rewards proliferation)"
+        print "   # 2 minimum number of ones (penalizes proliferation) # 3 maximum number of ones (rewards proliferation)"
+        print "   # 4 neutral selection # 5 neutral but different selection (will not survive homogeneous gene start)"
+        print "   # 6 penalty function -1 for a survival rule -2 for a birth rule  # 7 reserved, currently same as 6"
+        print "   bit 7 (val 0x8x) overrides bits 4-6 with random choice of ancestor amongst live neighbours"
         print "repscheme bits 8-10 determine disambiguation method for symmetric cases sum=2,crot=3 and sum=4,crot=2,9"
         print "   0 random choice : this involves a departure from determinism for these cases"
         print "   1 ignore problem and choose selected bit of canonical configuration : live with minimal asymmetry"
