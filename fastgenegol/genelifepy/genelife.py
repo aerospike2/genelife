@@ -202,7 +202,7 @@ def init_button_arrays():
     ncanon.append([1,2,6,10,13,1,2,6,10,13,8])        # selection 14,15
     ncanon.append([16,1,1,1,1,1])                     # selection 16-19
                                                       # colors [R,G,B] for different color regions for buttons, colorvals must be < 128
-    cancolors.append([[0,100,0],[0,50,100],[0,80,80],[100,0,0],[100,100,0],[50,100,0],[0,0,127],[0,100,50]]) # selection 0-7
+    cancolors.append([[0,100,0],[0,50,100],[0,80,80],[0,100,50],[100,100,0],[50,100,0],[0,0,127],[100,0,0]]) # selection 0-7
     cancolors.append([[0,0,127],[0,100,0],[100,0,0]]) # selection 8,9
     cancolors.append([[0,0,127],[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[0,0,127],
                       [0,127,0],[50,127,0],[60,120,0],[100,120,0],[80,120,0],[50,120,0],[0,127,0],[100,0,0]]) # selection 10,11
@@ -844,11 +844,11 @@ def parhelp():
         print "Green    ","0. selective birth for 3-live-nbs  ","1. selective birth for 2-live-nbs"
         print "Mid Blue ","2. canonical 0 position vs difft   ","3. bypass selection for 2-live-nbs"
         print "Teal blue","4. enforce birth for 3-live-nbs    ","5. enforce birth for 2-live-nbs"
-        print "Red      ","6. 2nd neighbour genetic modulation","7. 1st neighbour genetic masking"
+        print "Green      ","6. 2nd neighbour genetic modulation","7. 1st neighbour genetic masking"
         print "Yellow   ","8. enforce GoL rule if non GoL rule","9. enforce GoL rule last change by non GoL rule */"
         print "Green    ","10-13. allow 2-nb birth only for active subset of 4 canonical configs"
         print "Blue     ","14. Survival for 3-live-nbs        ","15. Survival for 2-live-nbs"
-        print "Green    ","16. Gene overwrite for 3-live-nbs  ","17. Gene overwrite for 2-live-nbs"
+        print "Red    ","16. Gene overwrite for 3-live-nbs  ","17. Gene overwrite for 2-live-nbs"
     elif selection < 16:
         print ""
         if selection < 10:
@@ -884,8 +884,9 @@ def parhelp():
         print "______________________________________________________"
         print "repscheme bits 0-3 : currently only bit 2 is used"
         print "   bit 0 determines choice of gene(s) for survival : live neighbors (0) central gene (1)"
+        print "   bit 1 determines combination of nb gene function for even LUT selection 8-14: AND (0) OR (1)"
         print "   bit 2 determines choice of neighbour in canonical rotation : most central/different (0) or first bit (1)"
-        print "   bits 1,3 reserved for future definition : currently no effect"
+        print "   bit 3 reserved for future definition : currently no effect"
         print "repscheme bits 4-7 determine selection scheme based on gene"
         print "   # 0 minimum gene as value (penalizes proliferation) # 1 maximum gene as value (rewards proliferation)"
         print "   # 2 minimum number of ones (penalizes proliferation) # 3 maximum number of ones (rewards proliferation)"

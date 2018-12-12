@@ -84,6 +84,7 @@ int colorfunction = 0;              // color function choice of 0: hash or 1: fu
 #define R_20_quadrant_over 0x100000 /* q6 1: quarter the spatial domain with overwrite values for 2,3 live nbs: only in update ie for selection<8 */
 //.................................................. LUT repscheme (selection 8-15) repscheme bits .......................................................
 #define R_0_survivalgene  0x1       /* 1: survival gene chosen from central existing gene 0: survival gene taken from neighbours as in birth */
+#define R_1_nb_OR_AND     0x2       /* 1: OR of neighbours determines genetic LUT in selection 8,10,12,14 0: AND of neighbours */
 #define R_2_canonical_nb  0x4       /* 1: choose live neighbour at zero bit in canonical rotation 0: choose most difft position */
 #define R_46_repselect    0x70      /* 0-7 choice of selection mechanism for LUT genes : 0: min 1: max 2: min 1s 3: max 1s 4: neutral 5: neutral difft 6,7: c-S-2B */
 #define R_7_random_resln  0x80      /* 1: random choice amongst selected live neighbours 0: deterministic choice based on gene content and position */
@@ -1636,8 +1637,12 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
                     birth   = ((genecode&bmask)>>(s-1)) & 0x1ull;
                 }
                 else {                                                          // selection == 8
-                    for (genecode=allcoding,k=0;k<8;k++)                        // decodes genes with fixed length encoding
-                        genecode &= (gol[nb[k]]?golg[nb[k]]:allcoding);         // and of live neighbours encodes birth rule & survival rule
+                    if(repscheme&R_1_nb_OR_AND)
+                        for (genecode=0ull,k=0;k<8;k++)                         // decodes genes with fixed length encoding by OR
+                            genecode |= (gol[nb[k]]?golg[nb[k]]:0ull);          // OR of live neighbours encodes birth rule & survival rule
+                    else
+                        for (genecode=allcoding,k=0;k<8;k++)                    // decodes genes with fixed length encoding by AND
+                            genecode &= (gol[nb[k]]?golg[nb[k]]:allcoding);     // AND of live neighbours encodes birth rule & survival rule
                     if(survivalgene) genecode = (genecode&(0xffffffffull<<32)) | (golg[ij]&0xffffffffull);  // if central gene determines survival
                     survive=(((genecode>>((s-1)*ncoding)) & ncodingmask) == ncodingmask) && ((smask>>(s-1))&1ull) ? 1 : 0;
                     if (overwrite || !gol[ij]) birth=(((genecode>>((8+(s-1))*ncoding)) & ncodingmask) == ncodingmask) && ((bmask>>(s-1))&1ull) ? 1 : 0;
@@ -1799,8 +1804,12 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
                             }
                         }
                         else {                                                      // selection == 10
-                            for (genecode=~0ull,k=0;k<8;k++)                        // assembles genetic environment from live neighbours by and of genes
-                                genecode &= (gol[nb[k]]?golg[nb[k]]:~0ull);         // and of live neighbours encodes birth rule & survival rule
+                            if(repscheme&R_1_nb_OR_AND)
+                                for (genecode=0ull,k=0;k<8;k++)                     // decodes genes with fixed length encoding by OR
+                                    genecode |= (gol[nb[k]]?golg[nb[k]]:0ull);      // OR of live neighbours encodes birth rule & survival rule
+                            else
+                                for (genecode=~0ull,k=0;k<8;k++)                    // decodes genes with fixed length encoding by AND
+                                    genecode &= (gol[nb[k]]?golg[nb[k]]:~0ull);     // AND of live neighbours encodes birth rule & survival rule
                             if(survivalgene) genecode = (genecode&(0xffffffffull<<32)) | (golg[ij]&0xffffffffull);  // if central gene determines survival
                             genecode &= (bmask << 32)|smask;                        // not required as now already tested above
                             if (gol[ij]) survive &= (genecode>>(sumoffs[s1]+(se-s0)))&0x1ull;
@@ -1980,8 +1989,12 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
                             }
                         }
                         else {                                                 // selection == 12
-                            for (genecode=~0ull,k=0;k<8;k++)                   // assembles genetic environment from live neighbours by and of genes
-                                genecode &= gol[nb[k]]?golg[nb[k]]:~0ull;      // and of live neighbours encodes birth rule & survival rule
+                            if(repscheme&R_1_nb_OR_AND)
+                                for (genecode=0ull,k=0;k<8;k++)                     // decodes genes with fixed length encoding by OR
+                                    genecode |= (gol[nb[k]]?golg[nb[k]]:0ull);      // OR of live neighbours encodes birth rule & survival rule
+                            else
+                                for (genecode=~0ull,k=0;k<8;k++)                    // decodes genes with fixed length encoding by AND
+                                    genecode &= (gol[nb[k]]?golg[nb[k]]:~0ull);     // AND of live neighbours encodes birth rule & survival rule
                             if(survivalgene) genecode = (genecode&(0xffffffffull<<32)) | (golg[ij]&0xffffffffull);  // if central gene determines survival
                             genecode&=(bmask<<32)|smask;                       // actually no longer needed since test done above
                             if (gol[ij]) survive |= (genecode>>(sumoffs[s2]+crot))&0x1ull;
@@ -2186,8 +2199,12 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64
                             }
                         }
                         else {                                                 // selection == 14
-                            for (genecode=~0ull,k=0;k<8;k++)                   // assembles genetic environment from live neighbours by and of genes
-                                genecode &= gol[nb[k]]?golg[nb[k]]:~0ull;      // and of live neighbours encodes birth rule & survival rule
+                            if(repscheme&R_1_nb_OR_AND)
+                                for (genecode=0ull,k=0;k<8;k++)                     // decodes genes with fixed length encoding by OR
+                                    genecode |= (gol[nb[k]]?golg[nb[k]]:0ull);      // OR of live neighbours encodes birth rule & survival rule
+                            else
+                                for (genecode=~0ull,k=0;k<8;k++)                    // decodes genes with fixed length encoding by AND
+                                    genecode &= (gol[nb[k]]?golg[nb[k]]:~0ull);     // AND of live neighbours encodes birth rule & survival rule
                             if(survivalgene) genecode = (genecode&(0xffffffffull<<32)) | (golg[ij]&0xffffffffull);  // if central gene determines survival
                             genecode&=(bmask<<32)|smask;                       // actually no longer needed since test done above
                             if (gol[ij]) survive |= (genecode>>(sumoffs[s]+coff))&0x1ull;
