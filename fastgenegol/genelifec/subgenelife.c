@@ -756,8 +756,8 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
             case 10:
                 for(k=0;k<s;k++) {
                     livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]];
-                    POPCOUNT64C(livegenes[k]&0x7ffffull,dS);        // 19 coding bits for survival
-                    POPCOUNT64C((livegenes[k]>>32)&0x7ffffull,dB);  // 19 coding bits for birth
+                    POPCOUNT64C(livegenes[k]&0x7fffffull,dS);        // 23 coding bits for survival
+                    POPCOUNT64C((livegenes[k]>>32)&0x7fffffull,dB);  // 23 coding bits for birth
                     d[k]=57-dS-(dB<<1);
                 }
                 break;
