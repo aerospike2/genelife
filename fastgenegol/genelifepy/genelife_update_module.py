@@ -75,6 +75,8 @@ libcd.set_quadrant.restype = None
 libcd.set_quadrant.argtypes = [c_int]
 libcd.set_randomsoup.restype = None
 libcd.set_randomsoup.argtypes = [c_int]
+libcd.set_rbackground.restype = None
+libcd.set_rbackground.argtypes = [c_int,c_int]
 libcd.set_repscheme_bits.restype = c_uint32
 libcd.set_repscheme_bits.argtypes = [c_int,c_int,c_int, uint_array]
 libcd.set_repscheme.restype = None
@@ -170,6 +172,9 @@ def set_quadrant(quadrant):
 
 def set_randomsoup(randomsoup):
     return libcd.set_randomsoup(randomsoup)
+
+def set_rbackground(rbackground,randomsoup):
+    return libcd.set_rbackground(rbackground,randomsoup)
 
 def set_repscheme_bits(quadrant, x, y, surviveover):
     return libcd.set_repscheme_bits(quadrant, x, y, surviveover)

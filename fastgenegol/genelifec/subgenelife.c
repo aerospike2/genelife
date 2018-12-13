@@ -148,14 +148,21 @@ uint64_t *golgstats, *newgolgstats; // pointers to 64 bit masks for different ev
 uint64_t golmix[N2];                // array for calculating coupling of genes between planes for multiplane genelife, or for packing configs
 uint64_t gene0;                     // uncoupled planes background gene, non zero for selection==16,17
 uint64_t selectedgene;              // gene currently selected interactively in graphics window
+uint64_t genegol[16];               // genes encoding for GoL in various LUT selection models indexed as selection-8
+//---------------------------------------------------------additional variables set in simulation--------------------------------------------------------
 unsigned int canonical;             // current value of choice of canonical position repscheme bit 2 : needed globally in ...difft2-6 routines
 int quadrants=-1;                   // integer choice of bit pair from repscheme/survivalmask/overwritemask for quadrant division of array (-1 none)
 uint64_t displayplanes;             // mask for displaying planes in selection models 16+
 uint64_t displayoneplane;           // display one plane only if <64, all planes if 64
-int randomsoup=0;                   // whether to continue random input of genes and gol states into the square central region defined by initfield
+int randomsoup=0;                   // 1,2 steady or intermittent random input of genes and gol states into the square central region defined by initfield
+int rbackground=0;                  // integer background rate of random gene input per frame per site : rate is rbackground/32768 (nonzero overides soup)
+                                    // the gene input depends on randomsoup value: 2 GoL 1 random
 int vscrolling=0;                   // whether to do vertical scrolling to track upwards growth (losing all states that fall off downward cliff)
 int last_scrolled = 0;              // whether vscrolling applied on last time step (needed for correct glider detection)
-//------------------------------------------------ arrays for time tracing -----------------------------------------------------------------------------
+int ymax = 2000;                    // activity scale max for plotting : will be adjusted dynamically or by keys
+double log2ymax = 25.0;             // activity scale max 2^25 = 33.5 * 10^6
+int activitymax;                    // max of activity in genealogical record of current population
+//------------------------------------------------ arrays for time tracing, activity and genealogies ----------------------------------------------------
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
 int *livesites = NULL;              // dynamic array pointer for statistics of number of live sites over time
@@ -163,12 +170,8 @@ int *genestats = NULL;              // dynamic array pointer for statistics of n
 int *stepstats = NULL;              // dynamic array pointer for statistics of site update types over time
 int *configstats = NULL;            // dynamic array pointer for statistics of gol site configurations (x,y,t) offsets
 uint64_t acttrace[N2];              // scrolled trace of last N time points of activity gene trace
-int ymax = 2000;                    // activity scale max for plotting : will be adjusted dynamically or by keys
-double log2ymax = 25.0;             // activity scale max 2^25 = 33.5 * 10^6
-int activitymax;                    // max of activity in genealogical record of current population
 uint64_t genealogytrace[N2];        // image trace of genealogies for N most frequently populated genes
 uint64_t working[N2];               // working space array for calculating genealogies and doing neighbour bit packing
-uint64_t genegol[16];               // genes encoding for GoL in various selection models index+8
 //------------------------------------------------ planes and configuration offsets----------------------------------------------------------------------
 int offdx=0,offdy=0,offdt=0;        // display chosen offsets for glider analysis with colorfunction 8
 int Noff = 9;                       // number of offsets
@@ -347,7 +350,8 @@ const uint64_t r1 = 0x1111111111111111ull;
 // set_selectedgene     set selected gene for highlighting from current mouse selection in graphics window
 // set_offsets          set offsets for detection of glider structures in display for color function 8
 // set_quadrant         set the pair of bits in repscheme (or survivalmask or overwritemask) used for quadrant variation 0-6
-// set_randomsoup       change the randomsoup activation for continual updating of initialization field with random states and genes : 2,1,0
+// set_randomsoup       change the randomsoup activation for rbackground if nonzero or continual updating of init field with random states and genes : 2,1,0
+// set_rbackground      set the backround random live gene input rate per frame and site to rbackground/32768
 // set_repscheme_bits   set the two of the repscheme (or survivalmask or overwritemask) bits corresponding to the selected quadrant
 // set_repscheme        set repscheme from python
 // set_rulemod          set rulemod from python
@@ -1306,6 +1310,26 @@ void random_soup(uint64_t gol[],uint64_t golg[],uint64_t newgol[],uint64_t newgo
     uint64_t randnr,mask;
     static unsigned int rmask = (1 << 15) - 1;
     unsigned int density;
+    
+    if(rbackground) {                                           // homogeneous random background at rate rbackground/32768 per site per frame
+        for(ij=0;ij<N2;ij++) {
+            if((rand()&rmask) < rbackground) {
+                if (!newgol[ij]) {                               // if live cell or multiplane, fill with game of life genome or random genome
+                    if(randomsoup!=2 || selection < 8) {            // random gene if randomsoup non zero
+                        RAND128P(randnr);
+                        newgolg[ij] = randnr;
+                        newgol[ij] = 1ull;
+                    }
+                    else {
+                        newgolg[ij] = genegol[selection-8];         // otherwise GoL gene
+                        newgol[ij] = 1ull;
+                    }
+                    hashaddgene(newgolg[ij],rootgene);
+                }
+            }
+        }
+        return;
+    }
     
     if(randomsoup==2)
         if (totsteps & 0xf) return;                             // only execute once every 16 time steps
@@ -3005,6 +3029,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     statcnts = 0;
     quadrants = -1;
     displayoneplane=64;
+    rbackground = 0;
     
     // writeFile("genepat.dat");                                            // can be used to initialize formatted template for gene input of 32x32 array
 
@@ -3255,6 +3280,12 @@ void set_quadrant(int quadrant) {
 //.......................................................................................................................................................
 void set_randomsoup(int randomsoupin) {
     randomsoup=randomsoupin;
+}
+//.......................................................................................................................................................
+void set_rbackground(int rbackgroundin, int randomsoupin) {
+    rbackground=rbackgroundin;
+    randomsoup=randomsoupin;
+    if(!rbackground) randomsoup=0;   // do not leave patch randomsoup variable active when turning off random background
 }
 //.......................................................................................................................................................
 unsigned int set_repscheme_bits(int quadrant, int x, int y, int surviveover[]) {

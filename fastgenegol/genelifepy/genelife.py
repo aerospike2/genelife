@@ -794,7 +794,11 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     print 'step',framenr,"quadrants changed to ",quadrants
                     genelife.set_quadrant(quadrants)
                 elif event.key == pg.K_r:
-                    if pg.key.get_mods() & pg.KMOD_SHIFT:
+                    if pg.key.get_mods() & pg.KMOD_ALT:
+                        rbackground,randomsoup = input("Enter rbackground [0-32768] and randomsoup (2 GoL gene, 1 random gene:")
+                        print 'step',framenr,"rbackground changed to ",rbackground,"with gene input",randomsoup,"(2 GoL,1 random)"
+                        genelife.set_rbackground(rbackground,randomsoup)
+                    elif pg.key.get_mods() & pg.KMOD_SHIFT:
                         randomsoup = 2 if randomsoup !=2 else 0
                         print 'step',framenr,"randomsoup changed to ",randomsoup
                         genelife.set_randomsoup(randomsoup)
