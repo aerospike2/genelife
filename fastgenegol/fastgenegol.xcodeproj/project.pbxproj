@@ -106,6 +106,8 @@
 		521FDCF01F287E7100F08FFB /* fastgenegol.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgenegol.c; path = genelifec/fastgenegol.c; sourceTree = SOURCE_ROOT; };
 		521FDCF11F287E7100F08FFB /* fastgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgenelife.c; path = genelifec/fastgenelife.c; sourceTree = SOURCE_ROOT; };
 		521FDCF41F287ECE00F08FFB /* fastgol.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgol.c; path = genelifec/fastgol.c; sourceTree = SOURCE_ROOT; };
+		5222384B21C80E620099504F /* quadhash.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = quadhash.h; sourceTree = "<group>"; };
+		5222384C21C80E620099504F /* quadhash.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = quadhash.c; sourceTree = "<group>"; };
 		52416DA51F27425C00721D17 /* libcos_doubles.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libcos_doubles.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		52416DB61F27771500721D17 /* libgenelife.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libgenelife.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		5275A1281F292FA40062765F /* dispgenegol */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = dispgenegol; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -121,7 +123,7 @@
 		528F91A31F333095008DD596 /* SyncServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SyncServices.framework; path = System/Library/Frameworks/SyncServices.framework; sourceTree = SDKROOT; };
 		528F91A51F333143008DD596 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		52A14B3E2177387E000E2ED4 /* hashtable.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hashtable.h; sourceTree = "<group>"; };
-		52DB371F21507BCF0087F098 /* subgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = subgenelife.c; path = genelifec/subgenelife.c; sourceTree = SOURCE_ROOT; };
+		52DB371F21507BCF0087F098 /* subgenelife.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c; fileEncoding = 4; name = subgenelife.c; path = genelifec/subgenelife.c; sourceTree = SOURCE_ROOT; };
 		52F19B3021ABE7F900D33844 /* sumtest.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = sumtest.c; sourceTree = "<group>"; };
 		52F19B3121ADF18500D33844 /* lsb64.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = lsb64.c; sourceTree = "<group>"; };
 		52F19B3621ADF3C900D33844 /* lsb64 */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = lsb64; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -209,6 +211,8 @@
 				5206B81121507E2200394209 /* actgenelife.c */,
 				5206B80F21507E0B00394209 /* dispgenelife.c */,
 				52F19B3021ABE7F900D33844 /* sumtest.c */,
+				5222384B21C80E620099504F /* quadhash.h */,
+				5222384C21C80E620099504F /* quadhash.c */,
 				52DB371F21507BCF0087F098 /* subgenelife.c */,
 			);
 			path = genelifec;
@@ -448,7 +452,7 @@
 			isa = PBXProject;
 			attributes = {
 				LastUpgradeCheck = 0940;
-				ORGANIZATIONNAME = "Ruhr Universität Bochum";
+				ORGANIZATIONNAME = ECLT;
 				TargetAttributes = {
 					521C1455214DDE9400E17A8F = {
 						CreatedOnToolsVersion = 9.4.1;

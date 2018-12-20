@@ -120,6 +120,7 @@ int colorfunction = 0;              // color function choice of 0: hash or 1: fu
 #define HASHTABLE_SIZE_T uint64_t
 #include "hashtable.h"              // Gustavsson's file was modified because the 64bit to 32bit key compression code produces 0 for some values
 hashtable_t genetable;
+hashtable_t quadtable;
 typedef struct genedata {           // value of keys stored for each gene encountered in simulation
             int popcount;           // initialized to 1
             int firstbirthframe;    // initialized to 0
@@ -133,7 +134,26 @@ genedata ginitdata = {1,0,-1,0,0,rootgene};  // initialization data structure fo
 genedata *genedataptr;              // pointer to a genedata instance
 HASHTABLE_SIZE_T const* genotypes;  // pointer to stored hash table keys (which are the genotypes)
 genedata* geneitems;                // list of genedata structured items stored in hash table
-#endif
+//.......................................................................................................................................................
+struct quadnode;
+typedef union quad {                // node pointer and 64-bit patterns occupy the same memory : access Union elts as quad.node or quad.patt
+    struct quadnode * node;
+    uint64_t patt;
+} quad;
+typedef struct quadnode {           // stored quadtree binary pattern nodes for population over time (currently only for analysis not computation)
+   struct quadnode *next;           // hash-linked list of elements with same key
+   quad nw, ne, sw, se;             // constant pointers to quadnodes or 64-bit patterns : we terminate one level higher than Gosper & golly
+   struct quadnode *res;            // store cached value associated with the node (optional here)
+   unsigned char isnode,active;     // 1 if this is a node not a pattern and an active part of the current time step CA resp.
+   unsigned short reserve;
+   unsigned int hits;               // number of references to finding this pattern
+   unsigned int pop1s;              // 32 bit number of 1s in quadnode
+   unsigned int firsttime;          // first time node is identified
+} quadnode;
+quadnode quadinit = {NULL,0ull,0ull,0ull,0ull,NULL,0,1,0,1,0,0};
+quadnode * qimage;
+int quadcollisions = 0;
+#endif                              // HASH
 //-------------------------------------------------------------------------------------------------------------------------------------------------------
 int totsteps=0;                     // total number of simulation steps
 int totdisp=0;                      // total number of displayed steps
@@ -319,6 +339,8 @@ const uint64_t r1 = 0x1111111111111111ull;
 // pack012neighbors     pack all up to 2nd neighbours in single word
 // pack0123neighbors    pack all up to 3rd neighbours in single word
 // pack49neighbors      fast routine to pack all up to 3rd neighbours in single word : oder of bits dictated by hiearchical assembly
+// pack16neighbors      pack 4x4 blocks in single uint64_t word using 16 bits
+// pack64neighbors      pack 8x8 blocks in single uint64_t (long) word with 64 bits
 // compare_neighbors    compare packed pack neighbours with one given x,y shift of arbitrary size
 // compare_all_neighbors compare packed pack neighbours with all nearest neighbour x,y shifts
 // packandcompare       pack and compare either all 1-shifted 3-neighbourhoods with t=-1 or chosen (dx,dy,dt) 3-neighbourhoods
@@ -411,7 +433,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 gene = golg[ij];
                 POPCOUNT64C(gene,d);                                        // assigns number of ones in gene to d
                 switch (selection) {
-                        case 0 : gdiff=(gene>>40); mask = ((((gene&0xff)<<16)+(((gene>>8)&0xff)<<8)+(gene>>16))<<8) + 0xff; break;  // MSByte red shade, next 8 green, next 8 blue: highest=white
+                        case 0 : gdiff=(gene>>40); mask = ((((gdiff&0xff)<<16)+(((gdiff>>8)&0xff)<<8)+(gdiff>>16))<<8) + 0xff; break;  // MSByte red shade, next 8 green, next 8 blue: highest=white
                         case 1 : mask = d==64? 0x0000ffff : ((((63-d)<<18)+(abs((int)d-32)<<10)+(d<<2))<<8) + 0xff; break;  // number of ones determine color gradient blue to red (all 1s red)
                         case 2 :
                         case 3 : d = d & 0x3; mask = d==3 ? 0xf0f0f0ff : ((0xff<<(d<<3))<<8)+0xff; break;  // scissors-stone-well-paper: red-green-blue-white
@@ -736,6 +758,7 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
             else { nbest = 0; bestnbmask = 0ull;}
             *birth = gdiff ? 1ull : 0ull;                // birth condition is genes not all same
             for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
+            if (k==s) {k=0;*birth = 0ull;}               // avoid analyze error, and be on safe side
             *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
             break;
         case 6:
@@ -1120,14 +1143,14 @@ extern inline void hashaddgene(uint64_t gene,uint64_t ancestor) {
 #endif
 }
 //.......................................................................................................................................................
-extern inline void hashdeletegene(uint64_t gene,char errorformat[]) {
+extern inline void hashdeletegene(uint64_t gene,const char errorformat[]) {
 #ifdef HASH
         if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) genedataptr->popcount--;
         else fprintf(stderr,errorformat,totsteps,gene);     // errorformat must contain %d and %llx format codes in this order
 #endif
 }
 //.......................................................................................................................................................
-extern inline void hashreplacegene(uint64_t gene1,uint64_t gene2,uint64_t ancestor,char errorformat[]) {
+extern inline void hashreplacegene(uint64_t gene1,uint64_t gene2,uint64_t ancestor,const char errorformat[]) {
 #ifdef HASH
         genedata gdata;
         if((genedataptr = (genedata *) hashtable_find(&genetable, gene1)) != NULL) genedataptr->popcount--;
@@ -1145,7 +1168,7 @@ extern inline void hashreplacegene(uint64_t gene1,uint64_t gene2,uint64_t ancest
 #endif
 }
 //.......................................................................................................................................................
-extern inline void hashgeneextinction(uint64_t gene,char errorformat[]) {
+extern inline void hashgeneextinction(uint64_t gene,const char errorformat[]) {
 #ifdef HASH
         if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
             if(genedataptr->popcount == 0) {
@@ -1157,11 +1180,117 @@ extern inline void hashgeneextinction(uint64_t gene,char errorformat[]) {
 #endif
 }
 //.......................................................................................................................................................
-extern inline void hashgeneactivity(uint64_t gene,char errorformat[]) {
+extern inline void hashgeneactivity(uint64_t gene, const char errorformat[]) {
 #ifdef HASH
         if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) genedataptr->activity ++;
         else fprintf(stderr,errorformat,4,totsteps,gene);
 #endif
+}
+//------------------------------------------------------- hash quadtree inline fns ----------------------------------------------------------------------
+extern inline uint64_t patt_hash(const uint64_t a, const uint64_t b, const uint64_t c, const uint64_t d) {
+   uint64_t r = (65537*(d)+257*(c)+17*(b)+5*(a));
+   r += (r >> 11);
+   return r ;
+}
+
+extern inline uint64_t node_hash(const void *a, const void *b, const void *c, const void *d) {
+   uint64_t r = (65537*(uint64_t)(d)+257*(uint64_t)(c)+17*(uint64_t)(b)+5*(uint64_t)(a));
+   r += (r >> 11);
+   return r ;
+}
+
+extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, const uint64_t sw, const uint64_t se) {
+#ifdef HASH
+        quadnode *q;
+        uint64_t h;
+        int nr1,nr1s;
+        h = patt_hash(nw,ne,sw,se);
+        if((q = (quadnode *) hashtable_find(&quadtable, h)) != NULL) {
+                                                        // check if pattern found in hash table is correct
+            if( nw == q->nw.patt &&  ne == q->ne.patt && sw == q->sw.patt && se ==q->se.patt && !q->isnode) {
+                q->hits++;q->active=1;
+            }
+            else {                                      // collision in hash table at leaf level
+                quadcollisions++;
+                fprintf(stderr,"quadhash collision\n"); // simple recording for now, later do chaining or whatever
+            }
+        }
+        else {                                           // new node or pattern, save in hash table
+            quadinit.isnode=0;
+            quadinit.nw.patt=nw;
+            quadinit.ne.patt=ne;
+            quadinit.sw.patt=sw;
+            quadinit.se.patt=se;
+            quadinit.firsttime=totsteps;
+            POPCOUNT64C(nw,nr1);nr1s=nr1;
+            POPCOUNT64C(ne,nr1);nr1s+=nr1;
+            POPCOUNT64C(sw,nr1);nr1s+=nr1;
+            POPCOUNT64C(se,nr1);nr1s+=nr1;
+            quadinit.pop1s =nr1s;
+            hashtable_insert(&quadtable, h,(quadnode *) &quadinit);
+            q = (quadnode *) hashtable_find(&quadtable, h);
+        }
+        return(q);
+#else
+        return(NULL);
+#endif
+}
+
+extern inline quadnode * hash_node_find(const quadnode * nw, const quadnode* ne, const quadnode* sw, const quadnode* se) {
+#ifdef HASH
+        quadnode *q;
+        uint64_t h;
+        h = node_hash(nw,ne,sw,se);
+        if((q = (quadnode *) hashtable_find(&quadtable, h)) != NULL) {
+            if(nw == q->nw.node && ne == q->ne.node && sw == q->sw.node && se ==q->se.node && q->isnode) { // node found in hash table
+                q->hits++;q->active=1;
+            }
+            else {                                       // collision in hash table at node level
+                quadcollisions++;
+                fprintf(stderr,"quadhash collision\n");  // simple recording for now, later do chaining or whatever
+            }
+        }
+        else {                                           // new node or pattern, save in hash table
+            quadinit.isnode=1;
+            quadinit.nw.node=(quadnode *)nw;
+            quadinit.ne.node=(quadnode *)ne;
+            quadinit.sw.node=(quadnode *)sw;
+            quadinit.se.node=(quadnode *)se;
+            quadinit.firsttime=totsteps;
+            quadinit.pop1s=nw->pop1s+ne->pop1s+sw->pop1s+se->pop1s;
+            hashtable_insert(&quadtable, h,(quadnode *) &quadinit);
+            q = (quadnode *) hashtable_find(&quadtable, h);
+        }
+        return(q);
+#else
+        return(NULL);
+#endif
+}
+
+quadnode * quadimage(uint64_t gol[]) {                                          // routine to generate a quadtree for an entire binary image of long words
+                                                                                // makes use of global linear and quadratic size variables N and N2 for gol
+    unsigned int ij,ij1,n;
+    uint64_t golp[N2>>6];
+    quadnode * golq[N2>>8];
+    extern void pack64neighbors(uint64_t gol[],uint64_t golp[]);
+    
+    pack64neighbors(gol,golp);
+
+    n=N>>3;
+    for (ij=ij1=0;ij<n*n;ij+=2,ij1++) {
+        golq[ij1]=hash_patt_find(golp[(ij+n)],golp[(ij+n)+1],golp[ij],golp[ij+1]); // hash_patt_find(nw,ne,sw,se) adds quad leaf entry if pattern not found
+        ij+= ((ij+2)&(n-1)) ? 0 : n;                                            // skip odd rows since these are the northern parts of quads generated on even rows
+    }
+    
+    for(n >>= 1; n>1; n>>= 1) {
+        for (ij=ij1=0;ij<n*n;ij+=2,ij1++) {
+            golq[ij1]=hash_node_find(golq[(ij+n)],golq[(ij+n)+1],golq[ij],golq[ij+1]); // hash_node_find(nw,ne,sw,se) adds quad node entry if node not found
+            ij+= ((ij+2)&(n-1)) ? 0 : n;                                        // skip odd rows since these are the northern parts of quads generated on even rows
+        }
+    }
+    if(golq[0]!=NULL)
+        if(golq[0]->hits > 1) fprintf(stderr,"image already found at t = %d\n",golq[0]->firsttime);
+    return(golq[0]);
 }
 //------------------------------------------------------- pack012,3neighbors -------------------------------------------------------------------------------
 #define deltaxy(ij,x,y)  (ij - (ij&Nmask) + (((ij+(x))&Nmask) + (y)*N)) & N2mask
@@ -1209,6 +1338,28 @@ extern inline void pack49neighbors(uint64_t gol[],uint64_t golp[]) {            
              golp[ij] |= gol[deltaxy(ij,nbx[k],nby[k])]<<(1<<k);                  // 8x8 packed arrays
     for (ij=0;ij<N2;ij++) golp[ij] = golp[ij]&0xfac8ffccfafaffffull;              // masks out 15 values in top row and left column to give 7x7 neighbourhoods
                                                                                   // mask removes bit numbers 16,18,24,26,32,33,36,37,48,49,50,52,53,56,58
+}
+//.......................................................................................................................................................
+extern inline void pack16neighbors(uint64_t gol[],uint64_t golp[]) {              // routine to pack 4x4 subarrays into single words
+    unsigned int ij,ij1,k;
+    
+    for (ij1=0;ij1<(N2>>6);ij1++) golp[ij1]=0ull;
+    for(k=0;k<16;k++)
+        for (ij=ij1=0;ij<N2;ij+=4,ij1++) {
+             golp[ij1] |= gol[deltaxy(ij,k&0x3,k>>2)]<<k;                         // 4x4 packed arrays
+             ij+= ((ij+4)&(N-1)) ? 0 : (4-1)*N;
+        }
+}
+//.......................................................................................................................................................
+extern void pack64neighbors(uint64_t gol[],uint64_t golp[]) {                     // routine to pack 8x8 subarrays into single words
+    unsigned int ij,ij1,k;
+    
+    for (ij1=0;ij1<(N2>>6);ij1++) golp[ij1]=0ull;
+    for(k=0;k<64;k++)
+        for (ij=ij1=0;ij<N2;ij+=8,ij1++) {
+             golp[ij1] |= gol[deltaxy(ij,k&0x7,k>>3)]<<k;                         // 8x8 packed arrays, assuming gol is lowest 1 bit only and golp length N2>>6
+             ij+= ((ij+8)&(N-1)) ? 0 : (8-1)*N;
+        }
 }
 //.......................................................................................................................................................
 extern inline void compare_neighbors(uint64_t a[],uint64_t b[], int dx, int dy) {  // routine to compare packed pack neighbours with shift, result in a
@@ -1587,6 +1738,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
+    qimage = quadimage(newgol);
 
 }
 //------------------------------------------------------- update_lut_sum -----------------------------------------------------------------------------------
@@ -1751,6 +1903,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
+    qimage = quadimage(newgol);
 }
 //------------------------------------------------------------- update_lut_dist -----------------------------------------------------------------------------------
 void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 10,11
@@ -1920,7 +2073,9 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-}//------------------------------------------------------- update_lut_canon_rot -----------------------------------------------------------------------------------
+    qimage = quadimage(newgol);
+}
+//------------------------------------------------------- update_lut_canon_rot -----------------------------------------------------------------------------------
 void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 12,13
 /*
     configurations are distinguished by number of ones and the canonical rotation of the 8-bit live neighbour pattern
@@ -2105,6 +2260,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
+    qimage = quadimage(newgol);
 }
 //------------------------------------------------------- update_lut_2Dsym -----------------------------------------------------------------------------------
 void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 14,15
@@ -2315,6 +2471,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
+    qimage = quadimage(newgol);
 }
 //------------------------------------------------------- update_gol16 -----------------------------------------------------------------------------------
 void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]) {     // selection models 16-19
@@ -2954,7 +3111,7 @@ void initialize_planes(int offs[],  int No) {
 #endif
 }
 //------------------------------------------------------- readFile and writeFile ---------------------------------------------------------------
-int readFile(char * code, char *fileName) {
+int readFile(char * code, const char *fileName) {
   FILE *file;
   char tmp;
   int cnt;
@@ -3158,8 +3315,12 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     golgstats = planesgs[curPlane];
 
 #ifdef HASH
-    if(notfirst) hashtable_term(&genetable);
+    if(notfirst) {
+        hashtable_term(&genetable);
+        hashtable_term(&quadtable);
+    }
     hashtable_init(&genetable,sizeof(genedata),N2<<2,0);     // initialize dictionary for genes
+    hashtable_init(&quadtable,sizeof(quad),N2<<2,0);         // initialize dictionary for quadtree patterns
 #endif
     notfirst = 1;
     if (initfield==1) {           // input from file genepat.dat with max size of 32*32 characters
@@ -3224,18 +3385,19 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         acttrace[ij]=rootgene;                 // initialize activity traces to root gene
         genealogytrace[ij] = rootgene;
     }
-
+    
+#ifdef HASH
     for (ij=0; ij<N2; ij++) {
         if((gol[ij] && ((selection<16)||(selection>=20)))||((selection>=16)&&(selection<=19))||((gol[ij]>>1)&&(selection==24 || selection==25))) {
             hashaddgene(golg[ij],rootgene);
         }
     }
-
-#ifdef HASH
     // it is possible to enumerate keys and values
     hcnt=hashtable_count(&genetable);
     genotypes = hashtable_keys( &genetable );
     fprintf(stderr,"population size %d with %d different genes\n",cnt,hcnt);
+    
+    qimage = quadimage(gol);
 #endif
 }
 //------------------------------------------------------- set ...---------------------------------------------------------------------------
@@ -3348,39 +3510,39 @@ void set_vscrolling() {
 }
 //------------------------------------------------------- get ... ---------------------------------------------------------------------------
 //.......................................................................................................................................................
-int get_log2N(){
+int get_log2N() {
     return(log2N);
 }
 //.......................................................................................................................................................
-void get_curgol(uint64_t outgol[], int NN){
+void get_curgol(uint64_t outgol[], int NN) {
     int ij;
     for (ij=0; ij<NN; ij++) {
 	    outgol[ij] = planes[curPlane][ij];
     }
 }
 //.......................................................................................................................................................
-void get_curgolg(uint64_t outgolg[], int NN){
+void get_curgolg(uint64_t outgolg[], int NN) {
     int ij;
     for (ij=0; ij<NN; ij++) {
 	    outgolg[ij] = planesg[curPlane][ij];
     }
 }
 //.......................................................................................................................................................
-void get_acttrace(uint64_t outgolg[], int NN){
+void get_acttrace(uint64_t outgolg[], int NN) {
     int ij;
     for (ij=0; ij<NN; ij++) {
         outgolg[ij] = acttrace[ij];
     }
 }
 //.......................................................................................................................................................
-void get_genealogytrace(uint64_t outgolg[], int NN){
+void get_genealogytrace(uint64_t outgolg[], int NN) {
     int ij;
     for (ij=0; ij<NN; ij++) {
         outgolg[ij] = genealogytrace[ij];
     }
 }
 //.......................................................................................................................................................
-int get_nspecies(){
+int get_nspecies() {
     int k,nspecies,nspeciesnow;
     nspecies = hashtable_count(&genetable);
     geneitems = (genedata*) hashtable_items( &genetable );
@@ -3390,7 +3552,7 @@ int get_nspecies(){
     return(nspeciesnow);
 }
 //.......................................................................................................................................................
-void get_curgolgstats(uint64_t outgolgstats[], int NN){
+void get_curgolgstats(uint64_t outgolgstats[], int NN) {
     int ij;
     for (ij=0; ij<NN; ij++) {
         outgolgstats[ij] = golgstats[ij];                       // Note that golgstats is not dealt with in planes !
@@ -3399,12 +3561,12 @@ void get_curgolgstats(uint64_t outgolgstats[], int NN){
 //------------------------------------------------------- countspecies ---------------------------------------------------------------------------
 int cmpfunc (const void * pa, const void * pb) {
    // return ( *(int*)pa - *(int*)pb );
-   return ((*(uint64_t*)pa > *(uint64_t*)pb)  ? 1 : -1);
+   return ((*(const uint64_t *)pa > *(const uint64_t *)pb)  ? 1 : -1);
 }
 
 int cmpfunc1 ( const void *pa, const void *pb ) {
-    const uint64_t *a = pa;
-    const uint64_t *b = pb;
+    const uint64_t *a = (const uint64_t *) pa;
+    const uint64_t *b = (const uint64_t *) pb;
     if(a[1] == b[1])
         return a[0] > b[0] ? 1 : -1;
     else
@@ -3479,11 +3641,11 @@ void countspecies() {                                                       // c
 //.......................................................................................................................................................
 #ifdef HASH
 int cmpfunc2 (const void * pa, const void * pb) {
-   return ( genotypes[*(int*)pa] > genotypes[*(int*)pb] ? 1 : -1);
+   return ( genotypes[*(const int*)pa] > genotypes[*(const int*)pb] ? 1 : -1);
 }
 
 int cmpfunc3 (const void * pa, const void * pb) {
-   return ( geneitems[*(int*)pa].popcount < geneitems[*(int*)pb].popcount ? 1 : -1);
+   return ( geneitems[*(const int*)pa].popcount < geneitems[*(const int*)pb].popcount ? 1 : -1);
 }
 
 void countspecieshash() {  /* counts numbers of all different species using qsort first */
@@ -3667,14 +3829,14 @@ int get_sorted_popln_act( int gindices[], uint64_t genes[], int popln[], int act
 //------------------------------------------------------- genealogies ---------------------------------------------------------------------------
 #ifdef HASH
 int cmpfunc4 (const void * pa, const void * pb) {
-   return ( geneitems[*(int*)pa].firstbirthframe > geneitems[*(int*)pb].firstbirthframe ? 1 : -1);
+   return ( geneitems[*(const int *)pa].firstbirthframe > geneitems[*(const int *)pb].firstbirthframe ? 1 : -1);
 }
 
 int cmpfunc5 (const void * pa, const void * pb) {               // sort according to ancestry in genealogytrace
 
    int i1,i2,ij1,ij2,j;
    uint64_t gene1,gene2;
-   i1=*(int*)pa; i2=*(int*)pb;
+   i1=*(const int *)pa; i2=*(const int *)pb;
    
    for (j=0;j<genealogydepth;j++) {
         ij1 = i1+j*N; ij2 = i2+j*N;
@@ -3687,7 +3849,7 @@ int cmpfunc5 (const void * pa, const void * pb) {               // sort accordin
 int cmpfunc6 (const void * pa, const void * pb) {               // sort according to ancestry in genealogytrace using activity ordering
    int i1,i2,ij1,ij2,j;
    uint64_t gene1,gene2;
-   i1=*(int*)pa; i2=*(int*)pb;
+   i1=*(const int *)pa; i2=*(const int *)pb;
    int act1,act2;
    
    for (j=0;j<genealogydepth;j++) {
@@ -3705,10 +3867,10 @@ int cmpfunc6 (const void * pa, const void * pb) {               // sort accordin
     return(0);
 }
 
-int cmpfunc7 (const void * pa, const void * pb) {               // sort according to ancestry in genealogytrace using activity ordering
+int cmpfunc7 (const void * pa, const void * pb) {               // sort according to ancestry in genealogytrace using popln size ordering
    int i1,i2,ij1,ij2,j;
    uint64_t gene1,gene2;
-   i1=*(int*)pa; i2=*(int*)pb;
+   i1=*(const int *)pa; i2=*(const int *)pb;
    int pop1,pop2;
    
    for (j=0;j<genealogydepth;j++) {

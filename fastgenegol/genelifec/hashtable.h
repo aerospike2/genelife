@@ -452,7 +452,7 @@ static HASHTABLE_U32 hashtable_internal_calculate_hash( HASHTABLE_U64 key )
     }                                                   // JSMcCaskill modified to avoid zero in some cases
     if (count!=0) fprintf(stderr,"hash zero key corrected for key %llx with count %d\n",firstkey,count);
     if (!(HASHTABLE_U32) key) {                         // JSMcCaskill modified to avoid zero in some cases
-        fprintf(stderr,"stopping for input %llx key is zero in hashtable.h line 442\n",firstkey);
+        fprintf(stderr,"stopping for input key %llx is hashed to zero in hashtable_internal_calculate_hash\n",firstkey);
         exit(1);
     }
     HASHTABLE_ASSERT( key );
