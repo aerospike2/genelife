@@ -135,6 +135,7 @@ genedata *genedataptr;              // pointer to a genedata instance
 HASHTABLE_SIZE_T const* genotypes;  // pointer to stored hash table keys (which are the genotypes)
 genedata* geneitems;                // list of genedata structured items stored in hash table
 //.......................................................................................................................................................
+int quadtree = 0;
 struct quadnode;
 typedef union quad {                // node pointer and 64-bit patterns occupy the same memory : access Union elts as quad.node or quad.patt
     struct quadnode * node;
@@ -1188,8 +1189,11 @@ extern inline void hashgeneactivity(uint64_t gene, const char errorformat[]) {
 }
 //------------------------------------------------------- hash quadtree inline fns ----------------------------------------------------------------------
 extern inline uint64_t patt_hash(const uint64_t a, const uint64_t b, const uint64_t c, const uint64_t d) {
-   uint64_t r = (65537*(d)+257*(c)+17*(b)+5*(a));
+   uint64_t r;
+   r=(a>>13)+(b>>23)+(c>>29)+(d>>31);
+   r += ((d<<16)+(c<<8)+(b<<4)+(a<<2)) +(a+b+c+d);
    r += (r >> 11);
+   // r=r*11400714819323198549ull;
    return r ;
 }
 
@@ -1212,7 +1216,8 @@ extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, co
             }
             else {                                      // collision in hash table at leaf level
                 quadcollisions++;
-                fprintf(stderr,"quadhash collision\n"); // simple recording for now, later do chaining or whatever
+                fprintf(stderr,"at %d quadhash pattern collision %llx %llx %llx %llx hash %llx collides %llx %llx %llx %llx\n",
+                 totsteps,nw,ne,sw,se,h,q->nw.patt,q->ne.patt,q->sw.patt,q->se.patt);  // simple recording for now, later do chaining or whatever
             }
         }
         else {                                           // new node or pattern, save in hash table
@@ -1242,12 +1247,16 @@ extern inline quadnode * hash_node_find(const quadnode * nw, const quadnode* ne,
         uint64_t h;
         h = node_hash(nw,ne,sw,se);
         if((q = (quadnode *) hashtable_find(&quadtable, h)) != NULL) {
-            if(nw == q->nw.node && ne == q->ne.node && sw == q->sw.node && se ==q->se.node && q->isnode) { // node found in hash table
+            if(nw == q->nw.node && ne == q->ne.node && sw == q->sw.node && se == q->se.node && q->isnode) { // node found in hash table
                 q->hits++;q->active=1;
+                /* fprintf(stderr,"at %d quadhash node repeat %llx %llx %llx %llx hash %llx\n", totsteps,
+                    (uint64_t) nw,(uint64_t) ne,(uint64_t) sw,(uint64_t) se,(uint64_t) h);  // simple recording for now, later do chaining or whatever */
             }
             else {                                       // collision in hash table at node level
                 quadcollisions++;
-                fprintf(stderr,"quadhash collision\n");  // simple recording for now, later do chaining or whatever
+                fprintf(stderr,"at %d quadhash node collision %llx %llx %llx %llx hash %llx collides %llx %llx %llx %llx\n", totsteps,
+                    (uint64_t) nw,(uint64_t) ne,(uint64_t) sw,(uint64_t) se,(uint64_t) h,
+                    (uint64_t) q->nw.node, (uint64_t) q->ne.node, (uint64_t) q->sw.node, (uint64_t) q->se.node);  // simple recording for now, later do chaining or whatever
             }
         }
         else {                                           // new node or pattern, save in hash table
@@ -1260,6 +1269,8 @@ extern inline quadnode * hash_node_find(const quadnode * nw, const quadnode* ne,
             quadinit.pop1s=nw->pop1s+ne->pop1s+sw->pop1s+se->pop1s;
             hashtable_insert(&quadtable, h,(quadnode *) &quadinit);
             q = (quadnode *) hashtable_find(&quadtable, h);
+            /* fprintf(stderr,"at %d quadhash node stored %llx %llx %llx %llx hash %llx\n", totsteps,
+                    (uint64_t) nw,(uint64_t) ne,(uint64_t) sw,(uint64_t) se,(uint64_t) h);  // simple recording for now, later do chaining or whatever */
         }
         return(q);
 #else
@@ -1277,13 +1288,19 @@ quadnode * quadimage(uint64_t gol[]) {                                          
     pack64neighbors(gol,golp);
 
     n=N>>3;
+    /* for(ij=0;ij<n*n;ij++) {
+        if (ij%8 == 0) fprintf(stderr,"\n step %d ij %d",totsteps,ij);
+        fprintf(stderr," %llx ",golp[ij]);
+    }
+    fprintf(stderr,"\n"); */
     for (ij=ij1=0;ij<n*n;ij+=2,ij1++) {
         golq[ij1]=hash_patt_find(golp[(ij+n)],golp[(ij+n)+1],golp[ij],golp[ij+1]); // hash_patt_find(nw,ne,sw,se) adds quad leaf entry if pattern not found
         ij+= ((ij+2)&(n-1)) ? 0 : n;                                            // skip odd rows since these are the northern parts of quads generated on even rows
     }
-    
+    // fprintf(stderr,"8x8 patterns found\n");
     for(n >>= 1; n>1; n>>= 1) {
         for (ij=ij1=0;ij<n*n;ij+=2,ij1++) {
+            // fprintf(stderr,"n %d ij1 %d\n",n,ij1);
             golq[ij1]=hash_node_find(golq[(ij+n)],golq[(ij+n)+1],golq[ij],golq[ij+1]); // hash_node_find(nw,ne,sw,se) adds quad node entry if node not found
             ij+= ((ij+2)&(n-1)) ? 0 : n;                                        // skip odd rows since these are the northern parts of quads generated on even rows
         }
@@ -1738,7 +1755,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    qimage = quadimage(newgol);
+    if(quadtree) qimage = quadimage(newgol);
 
 }
 //------------------------------------------------------- update_lut_sum -----------------------------------------------------------------------------------
@@ -1903,7 +1920,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    qimage = quadimage(newgol);
+    if(quadtree) qimage = quadimage(newgol);
 }
 //------------------------------------------------------------- update_lut_dist -----------------------------------------------------------------------------------
 void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 10,11
@@ -2073,7 +2090,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    qimage = quadimage(newgol);
+    if(quadtree) qimage = quadimage(newgol);
 }
 //------------------------------------------------------- update_lut_canon_rot -----------------------------------------------------------------------------------
 void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 12,13
@@ -2260,7 +2277,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    qimage = quadimage(newgol);
+    if(quadtree) qimage = quadimage(newgol);
 }
 //------------------------------------------------------- update_lut_2Dsym -----------------------------------------------------------------------------------
 void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 14,15
@@ -2471,7 +2488,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    qimage = quadimage(newgol);
+    if(quadtree) qimage = quadimage(newgol);
 }
 //------------------------------------------------------- update_gol16 -----------------------------------------------------------------------------------
 void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]) {     // selection models 16-19
@@ -3320,7 +3337,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         hashtable_term(&quadtable);
     }
     hashtable_init(&genetable,sizeof(genedata),N2<<2,0);     // initialize dictionary for genes
-    hashtable_init(&quadtable,sizeof(quad),N2<<2,0);         // initialize dictionary for quadtree patterns
+    hashtable_init(&quadtable,sizeof(quadnode),N2<<2,0);         // initialize dictionary for quadtree patterns
 #endif
     notfirst = 1;
     if (initfield==1) {           // input from file genepat.dat with max size of 32*32 characters
@@ -3397,7 +3414,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     genotypes = hashtable_keys( &genetable );
     fprintf(stderr,"population size %d with %d different genes\n",cnt,hcnt);
     
-    qimage = quadimage(gol);
+    if(quadtree) qimage = quadimage(gol);
 #endif
 }
 //------------------------------------------------------- set ...---------------------------------------------------------------------------

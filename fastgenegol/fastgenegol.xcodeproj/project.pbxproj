@@ -123,7 +123,7 @@
 		528F91A31F333095008DD596 /* SyncServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SyncServices.framework; path = System/Library/Frameworks/SyncServices.framework; sourceTree = SDKROOT; };
 		528F91A51F333143008DD596 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		52A14B3E2177387E000E2ED4 /* hashtable.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hashtable.h; sourceTree = "<group>"; };
-		52DB371F21507BCF0087F098 /* subgenelife.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c; fileEncoding = 4; name = subgenelife.c; path = genelifec/subgenelife.c; sourceTree = SOURCE_ROOT; };
+		52DB371F21507BCF0087F098 /* subgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = subgenelife.c; path = genelifec/subgenelife.c; sourceTree = SOURCE_ROOT; };
 		52F19B3021ABE7F900D33844 /* sumtest.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = sumtest.c; sourceTree = "<group>"; };
 		52F19B3121ADF18500D33844 /* lsb64.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = lsb64.c; sourceTree = "<group>"; };
 		52F19B3621ADF3C900D33844 /* lsb64 */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = lsb64; sourceTree = BUILT_PRODUCTS_DIR; };
