@@ -120,7 +120,6 @@ int colorfunction = 0;              // color function choice of 0: hash or 1: fu
 #define HASHTABLE_SIZE_T uint64_t
 #include "hashtable.h"              // Gustavsson's file was modified because the 64bit to 32bit key compression code produces 0 for some values
 hashtable_t genetable;
-hashtable_t quadtable;
 typedef struct genedata {           // value of keys stored for each gene encountered in simulation
             int popcount;           // initialized to 1
             int firstbirthframe;    // initialized to 0
@@ -135,14 +134,20 @@ genedata *genedataptr;              // pointer to a genedata instance
 HASHTABLE_SIZE_T const* genotypes;  // pointer to stored hash table keys (which are the genotypes)
 genedata* geneitems;                // list of genedata structured items stored in hash table
 //.......................................................................................................................................................
-int quadtree = 0;
-struct quadnode;
+hashtable_t quadtable;              // hash tabel for quad tree
+int quadtree = 0;                   // whether to do quadtree calculation
+struct quadkey;
+typedef struct quadkey {
+    struct quadkey *next;
+    uint64_t key;
+} quadkey;
+struct quadnode;                    // prototype for quadtree node defined below with recursive elements
 typedef union quad {                // node pointer and 64-bit patterns occupy the same memory : access Union elts as quad.node or quad.patt
-    struct quadnode * node;
+    struct quadnode *node;
     uint64_t patt;
 } quad;
 typedef struct quadnode {           // stored quadtree binary pattern nodes for population over time (currently only for analysis not computation)
-   struct quadnode *next;           // hash-linked list of elements with same key
+   struct quadkey *next;            // hash-linked list of elements starting with same key : follow hash key chain
    quad nw, ne, sw, se;             // constant pointers to quadnodes or 64-bit patterns : we terminate one level higher than Gosper & golly
    struct quadnode *res;            // store cached value associated with the node (optional here)
    unsigned char isnode,active;     // 1 if this is a node not a pattern and an active part of the current time step CA resp.
@@ -153,7 +158,10 @@ typedef struct quadnode {           // stored quadtree binary pattern nodes for 
 } quadnode;
 quadnode quadinit = {NULL,0ull,0ull,0ull,0ull,NULL,0,1,0,1,0,0};
 quadnode * qimage;
+quadkey *freenodes;
+int quadchainmem = 0;
 int quadcollisions = 0;
+int nquadpatterns = 0;
 #endif                              // HASH
 //-------------------------------------------------------------------------------------------------------------------------------------------------------
 int totsteps=0;                     // total number of simulation steps
@@ -1130,17 +1138,17 @@ extern inline uint64_t disambiguate(unsigned int kch, uint64_t nb1i, int nb[], u
 //------------------------------------------------------- hash gene inline fns ----------------------------------------------------------------------
 extern inline void hashaddgene(uint64_t gene,uint64_t ancestor) {
 #ifdef HASH
-        genedata gdata;
-        if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) genedataptr->popcount++;
-        else {
-            gdata=ginitdata;
-            gdata.firstbirthframe = totsteps;
-            gdata.firstancestor = ancestor;
-            hashtable_insert(&genetable, gene,(genedata *) &gdata);
-        }
-        if(ancestor != rootgene)
-            if((genedataptr = (genedata *) hashtable_find(&genetable, ancestor)) == NULL)
-                fprintf(stderr,"error in hashaddgene, the ancestor %llx of gene %llx to be stored is not stored\n",ancestor,gene);
+    genedata gdata;
+    if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) genedataptr->popcount++;
+    else {
+        gdata=ginitdata;
+        gdata.firstbirthframe = totsteps;
+        gdata.firstancestor = ancestor;
+        hashtable_insert(&genetable, gene,(genedata *) &gdata);
+    }
+    if(ancestor != rootgene)
+        if((genedataptr = (genedata *) hashtable_find(&genetable, ancestor)) == NULL)
+            fprintf(stderr,"error in hashaddgene, the ancestor %llx of gene %llx to be stored is not stored\n",ancestor,gene);
 #endif
 }
 //.......................................................................................................................................................
@@ -1153,31 +1161,31 @@ extern inline void hashdeletegene(uint64_t gene,const char errorformat[]) {
 //.......................................................................................................................................................
 extern inline void hashreplacegene(uint64_t gene1,uint64_t gene2,uint64_t ancestor,const char errorformat[]) {
 #ifdef HASH
-        genedata gdata;
-        if((genedataptr = (genedata *) hashtable_find(&genetable, gene1)) != NULL) genedataptr->popcount--;
-        else fprintf(stderr,errorformat,totsteps,gene1);
-        if((genedataptr = (genedata *) hashtable_find(&genetable, gene2)) != NULL) genedataptr->popcount++;
-        else {
-            gdata=ginitdata;
-            gdata.firstbirthframe = totsteps;
-            gdata.firstancestor = ancestor;
-            hashtable_insert(&genetable, gene2,(genedata *) &gdata);
-        }
-        if(ancestor != rootgene)
-            if((genedataptr = (genedata *) hashtable_find(&genetable, ancestor)) == NULL)
-                fprintf(stderr,"error in hashreplacegene, the ancestor %llx of gene %llx to be stored is not stored\n",ancestor,gene2);
+    genedata gdata;
+    if((genedataptr = (genedata *) hashtable_find(&genetable, gene1)) != NULL) genedataptr->popcount--;
+    else fprintf(stderr,errorformat,totsteps,gene1);
+    if((genedataptr = (genedata *) hashtable_find(&genetable, gene2)) != NULL) genedataptr->popcount++;
+    else {
+        gdata=ginitdata;
+        gdata.firstbirthframe = totsteps;
+        gdata.firstancestor = ancestor;
+        hashtable_insert(&genetable, gene2,(genedata *) &gdata);
+    }
+    if(ancestor != rootgene)
+        if((genedataptr = (genedata *) hashtable_find(&genetable, ancestor)) == NULL)
+            fprintf(stderr,"error in hashreplacegene, the ancestor %llx of gene %llx to be stored is not stored\n",ancestor,gene2);
 #endif
 }
 //.......................................................................................................................................................
 extern inline void hashgeneextinction(uint64_t gene,const char errorformat[]) {
 #ifdef HASH
-        if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
-            if(genedataptr->popcount == 0) {
-                genedataptr->lastextinctionframe = totsteps;
-                genedataptr->nextinctions++;
-            }
+    if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
+        if(genedataptr->popcount == 0) {
+            genedataptr->lastextinctionframe = totsteps;
+            genedataptr->nextinctions++;
         }
-        else fprintf(stderr,errorformat,3,totsteps,gene);
+    }
+    else fprintf(stderr,errorformat,3,totsteps,gene);
 #endif
 }
 //.......................................................................................................................................................
@@ -1189,20 +1197,49 @@ extern inline void hashgeneactivity(uint64_t gene, const char errorformat[]) {
 }
 //------------------------------------------------------- hash quadtree inline fns ----------------------------------------------------------------------
 extern inline uint64_t patt_hash(const uint64_t a, const uint64_t b, const uint64_t c, const uint64_t d) {
-   uint64_t r;
-   r=(a>>13)+(b>>23)+(c>>29)+(d>>31);
-   r += ((d<<16)+(c<<8)+(b<<4)+(a<<2)) +(a+b+c+d);
-   r += (r >> 11);
-   // r=r*11400714819323198549ull;
-   return r ;
+                                                        // this hash function works much better than that used in golly for example
+    uint64_t a1,b1,c1,d1,r;
+    a1 = a^0x7f0e1d2c3b4a5968ull;
+    b1 = b^0xf0e1d2c3b4a59687ull;
+    c1 = c^0xba9876543210fedcull;
+    d1 = d^0x456789abcdef0123ull;
+    r =  (a1>>13)+(b1>>23)+(c1>>29)+(d1>>31);
+    r += ((d1<<16)+(c1<<8)+(b1<<4)+(a1<<2)) + (a1+b1+c1+d1);
+    r += (r >> 11);
+    // r=r*11400714819323198549ull;
+    return r ;
 }
-
+//.......................................................................................................................................................
+quadkey * newkey() {                                   // free keys kept in a linked list, allocated 1024 at a time
+    quadkey *q;
+    int i;
+    uint64_t randnr;
+    const int blocksize = 1024;
+   
+    if (freenodes == 0) {
+        freenodes = (quadkey *) calloc(blocksize, sizeof(quadkey)) ;
+        if (freenodes == 0) {
+            fprintf(stderr,"No more memory can be allocated for quadkey chains.\n") ;
+            exit(1);
+        }
+        quadchainmem += blocksize * sizeof(quadkey) ;
+        for(i=0;i<(blocksize-1);i++) {
+            freenodes[i].next = freenodes+i+1;
+            RAND128P(randnr);
+            freenodes[i].key = randnr;
+        }
+    }
+    q = freenodes;
+    freenodes = freenodes->next;
+    return q ;
+}
+//.......................................................................................................................................................
 extern inline uint64_t node_hash(const void *a, const void *b, const void *c, const void *d) {
    uint64_t r = (65537*(uint64_t)(d)+257*(uint64_t)(c)+17*(uint64_t)(b)+5*(uint64_t)(a));
    r += (r >> 11);
    return r ;
 }
-
+//.......................................................................................................................................................
 extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, const uint64_t sw, const uint64_t se) {
 #ifdef HASH
         quadnode *q;
@@ -1217,7 +1254,10 @@ extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, co
             else {                                      // collision in hash table at leaf level
                 quadcollisions++;
                 fprintf(stderr,"at %d quadhash pattern collision %llx %llx %llx %llx hash %llx collides %llx %llx %llx %llx\n",
-                 totsteps,nw,ne,sw,se,h,q->nw.patt,q->ne.patt,q->sw.patt,q->se.patt);  // simple recording for now, later do chaining or whatever
+                        totsteps,nw,ne,sw,se,h,q->nw.patt,q->ne.patt,q->sw.patt,q->se.patt);
+                while(q->next != NULL && (q = (quadnode *) hashtable_find(&quadtable, q->next->key)) != NULL) {
+                // CODE DEVELOPMENT UP TO HERE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                }
             }
         }
         else {                                           // new node or pattern, save in hash table
@@ -1240,7 +1280,7 @@ extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, co
         return(NULL);
 #endif
 }
-
+//.......................................................................................................................................................
 extern inline quadnode * hash_node_find(const quadnode * nw, const quadnode* ne, const quadnode* sw, const quadnode* se) {
 #ifdef HASH
         quadnode *q;
@@ -1277,7 +1317,7 @@ extern inline quadnode * hash_node_find(const quadnode * nw, const quadnode* ne,
         return(NULL);
 #endif
 }
-
+//.......................................................................................................................................................
 quadnode * quadimage(uint64_t gol[]) {                                          // routine to generate a quadtree for an entire binary image of long words
                                                                                 // makes use of global linear and quadratic size variables N and N2 for gol
     unsigned int ij,ij1,n;
@@ -3031,7 +3071,10 @@ void genelife_update (int nsteps, int nhist, int nstat) {
         newgolgstats = planesgs[newPlane];
 
         totsteps++;
-        if(!(totsteps%10)) fprintf(stderr,"iteration step %d\r",totsteps);
+        if(!(totsteps%10)) {
+            nquadpatterns = hashtable_count(&quadtable);
+            fprintf(stderr,"iteration step %d nquadpatterns %d\r",totsteps,nquadpatterns);
+        }
         
         if (selection<8)        update(gol,golg,newgol,newgolg);              // calculate next iteration with selection
         else if (selection<10)  update_lut_sum(gol,golg,newgol,newgolg);      // calculate next iteration for lut sum version s= 1-8
@@ -3204,6 +3247,8 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     quadrants = -1;
     displayoneplane=64;
     rbackground = 0;
+    nquadpatterns = 0;
+    quadcollisions = 0;
     
     // writeFile("genepat.dat");                                            // can be used to initialize formatted template for gene input of 32x32 array
 
