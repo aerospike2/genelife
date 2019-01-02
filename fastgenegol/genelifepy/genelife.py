@@ -476,6 +476,17 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     selectiontext0007 = ["largest value","most ones","scissors-well-stone-paper","not well ordered","two target","predator prey","cooperative","neutral"];
     selectiontext0815 = ["sum fixed","sum variable","edge fixed","edge variable","canonical fixed","canonical variable","2D sym fixed","2D sym variable"];
     selectiontext1623 = ["2-16 plane pairwise","2-16 plane pairwise","2-16 plane nearby","2-16 plane nearby","2-64 plane matching","2-64 plane matching","2-64 plane matching","2-64 plane matching"]
+    
+    buttonhelp0007 =    ["0. selective birth for 3-live-nbs ","1. selective birth for 2-live-nbs ",
+                         "2. canonical 0 position vs difft  ","3. bypass selection for 2-live-nbs ",
+                         "4. enforce birth for 3-live-nbs ","5. enforce birth for 2-live-nbs ",
+                         "6. 2nd nb genetic modulation ","7. 1st nb genetic masking ",
+                         "8. enforce GoL if non GoL rule ","9. enforce GoL last change by non GoL ",
+                         "10. allow 2-nb birth for canonical config 0 ","11. allow 2-nb birth for canonical config 1 ",
+                         "12. allow 2-nb birth for canonical config 2 ","13. allow 2-nb birth for canonical config 3 ",
+                         "14. Survival for 3-live-nbs ","15. Survival for 2-live-nbs ",
+                         "16. Gene overwrite for 3-live-nbs ","17. Gene overwrite for 2-live-nbs "]
+    buttonhelp = ""
     if scalex2:
         sc = 1
     else:
@@ -653,7 +664,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             pixeldat = "(%d,%d) gene %016x" % (x,y,golg[x+y*N])
                             genelife.set_selectedgene(golg[x+y*N])
                             print ("step %d pixel data %s" % (framenr,pixeldat))
-                elif event.button == 3:          # single plane choice right mouse button (-click)
+                elif event.button == 3:          # info on button or single plane choice (selection>=20) right mouse button (-click)
                     mouse_pos = pg.mouse.get_pos()
                     if scalex2:
                         x = (int) (mouse_pos[0]//2)
@@ -661,16 +672,22 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     else:
                         x = mouse_pos[0]
                         y = mouse_pos[1]
-                    if y >= N and selection>=20:
-                        k=x>>(log2N-6)
-                        if k<64:
-                            displayoneplane=k
-                            genelife.set_displayoneplane(displayoneplane)
+                    if y >= N:
+                        if selection>=20:
+                            k=x>>(log2N-6)
+                            if k<64:
+                                displayoneplane=k
+                                genelife.set_displayoneplane(displayoneplane)
+                        elif selection < 8:   # info
+                            k=x>>(log2N-6)
+                            if k<18:
+                                buttonhelp = buttonhelp0007[k]
                     mouseclicked2 = True
 
             elif event.type==pg.MOUSEBUTTONUP:
                 mouseclicked = False
                 mouseclicked2 = False
+                buttonhelp = ""
                 if selection == 8:                                  # reset mask control buttons to survivalmask and birthmask control colours
                     for k in xrange(16):
                         if k<8: pg.draw.rect(scr,cancol[1][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
@@ -742,6 +759,18 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                                 genelife.set_displayoneplane(displayoneplane)
                             if updatesenabled:
                                 updatesenabled=False
+                    if selection<8:
+                        mouse_pos = pg.mouse.get_pos()
+                        if scalex2:
+                            x = (int) (mouse_pos[0]//2)
+                            y = (int) (mouse_pos[1]//2)
+                        else:
+                            x = mouse_pos[0]
+                            y = mouse_pos[1]
+                        if y >= N:
+                            k=x>>(log2N-6)
+                            if k<18:
+                                buttonhelp = buttonhelp0007[k]
             elif event.type == pg.KEYDOWN:
                 if event.key == pg.K_h:
                     if pg.key.get_mods() & pg.KMOD_SHIFT:
@@ -822,7 +851,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
         nspecies=genelife.get_nspecies()
         caption = "Gene Life at step %d coloring %d nspecies %d " % (framenr,colorfunction,nspecies)
         if selection < 8:
-            caption = caption + "pairwise selection " + selectiontext0007[selection] + " "
+            caption = caption + "pairwise selection " + selectiontext0007[selection] + " " + buttonhelp
         elif selection<16:
             caption = caption + "LUT encoding " + selectiontext0815[selection-8] + " "
         elif selection<23:
@@ -843,7 +872,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
 def parhelp():
     """ definition of parameters"""
     if selection < 8:
-        print "Control bits (left to right):"
+        print "Control bits (left to right, also in caption on right mouse click): "
         print "____________________________"
         print "Green    ","0. selective birth for 3-live-nbs  ","1. selective birth for 2-live-nbs"
         print "Mid Blue ","2. canonical 0 position vs difft   ","3. bypass selection for 2-live-nbs"
