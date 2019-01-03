@@ -209,6 +209,15 @@ typedef struct equivrec {           // equivalence record
   // short unsigned int size;
 } equivrec;
 equivrec equiv[N2<<2];              // equivalences between labels
+typedef struct component {
+    short unsigned int N,S,E,W;
+    unsigned int first;
+    unsigned int corner;
+    unsigned int Nside;
+    quadnode * quad;
+} component;
+component complist[N2<<2];
+int ncomponents = 0;
 //------------------------------------------------ planes and configuration offsets----------------------------------------------------------------------
 int offdx=0,offdy=0,offdt=0;        // display chosen offsets for glider analysis with colorfunction 8
 int Noff = 9;                       // number of offsets
@@ -1351,15 +1360,15 @@ extern inline quadnode * hash_node_find(const quadnode * nw, const quadnode* ne,
 #endif
 }
 //.......................................................................................................................................................
-quadnode * quadimage(uint64_t gol[],int N) {                                    // routine to generate a quadtree for an entire binary image of long words
+quadnode * quadimage(uint64_t gol[],int N,int offset) {                                    // routine to generate a quadtree for an entire binary image of long words
                                                                                 // makes use of global linear and quadratic size variable N2 for sizing internal arrays golp,golq
                                                                                 // assumes that N is power of 2 and >=16
     unsigned int ij,ij1,n;
     uint64_t golp[N2>>6];
     quadnode * golq[N2>>8];
-    extern void pack64neighbors(uint64_t gol[],uint64_t golp[],int N);
+    extern void pack64neighbors(uint64_t gol[],uint64_t golp[],int N,int offset);
     
-    pack64neighbors(gol,golp,N);
+    pack64neighbors(gol,golp,N,offset);
     if(N<16) fprintf(stderr,"Error: attempting to quadtree image with size less than 16x16\n");
     n=N>>3;
                             /*  for(ij=0;ij<n*n;ij++) {
@@ -1384,14 +1393,33 @@ quadnode * quadimage(uint64_t gol[],int N) {                                    
     return(golq[0]);
 }
 //.......................................................................................................................................................
-quadnode * extract_components(short unsigned int label[],short unsigned int nlabel) {
+void extract_components(short unsigned int label[],short unsigned int nlabel) {
     int i,ij;
-    short unsigned int ilabel=0;
-    unsigned int *ordlabel;
-    
-    ordlabel=(unsigned int *) calloc(nlabel,sizeof(unsigned int));                // stores indices of first site with component
+    short unsigned int k,nside;
+
     for (ij=0;ij<N2;ij++) {
-        if (label[ij] && !ordlabel[label[ij]]) ordlabel[label[ij]]=ij+1;          // ij+1 to avoid confusion of ij==0 with new component
+        if (label[ij] && !complist[label[ij]].first) {
+            complist[label[ij]].first=ij+1;                                                             // ij+1 to avoid confusion of ij==0 with new component
+            complist[label[ij]].E=N;
+            complist[label[ij]].S=N;
+        }
+    }
+    for (ij=0;ij<N2;ij++) {
+        if (label[ij]) {
+            if (complist[label[ij]].W > (ij&(N-1))) complist[label[ij]].W=(ij&(N-1));                   // adjust left boundary
+            else if (complist[label[ij]].E < (ij&(N-1))) complist[label[ij]].E=(ij&(N-1));              // adjust right boundary
+            if (complist[label[ij]].N > (ij>>log2N)) complist[label[ij]].N=(ij>>log2N);                 // adjust top boundary
+            else if (complist[label[ij]].S < (ij>>log2N)) complist[label[ij]].S=(ij>>log2N);            // adjust bottom boundary
+        }
+    }
+    for(i=1;i<nlabel;i++) {
+        for(k=1;k<(1+complist[i].E-complist[i].W);k=k<<1);                                              // find nside as power of two square side length to fit component
+        nside = k;                                                                                      // east-west minimum power of two side length
+        for(k=1;k<(1+complist[i].S-complist[i].N);k=k<<1);
+        nside = k > nside ? k : nside;                                                                  // larger of east-west and south-north minimum power of two side lengths
+        complist[i].Nside = nside <16 ? 16 : nside;
+        complist[i].corner = N*complist[i].N +complist[i].W;                                            // top left corner of component square image
+        complist[i].quad = quadimage(gol,complist[i].Nside,complist[i].corner);                         // quadtree hash code of component image
     }
 }
 //------------------------------------------------------- pack012,3neighbors -------------------------------------------------------------------------------
@@ -1453,15 +1481,16 @@ extern inline void pack16neighbors(uint64_t gol[],uint64_t golp[]) {            
         }
 }
 //.......................................................................................................................................................
-extern void pack64neighbors(uint64_t gol[],uint64_t golp[],int N) {                     // routine to pack 8x8 subarrays into single words
-    unsigned int ij,ij1,k;
-    int N2 = N*N;
-    
-    for (ij1=0;ij1<(N2>>6);ij1++) golp[ij1]=0ull;
+extern void pack64neighbors(uint64_t gol[],uint64_t golp[],int n,int offset) {                     // routine to pack 8x8 subarrays into single words
+    unsigned int ij,ij1,k,log2n;
+    unsigned int n2 = n*n;
+    for(log2n=k=1;k<n;k<<=1,log2n++);
+    for (ij1=0;ij1<(n2>>6);ij1++) golp[ij1]=0ull;
     for(k=0;k<64;k++)
-        for (ij=ij1=0;ij<N2;ij+=8,ij1++) {
-             golp[ij1] |= gol[deltaxy(ij,k&0x7,k>>3)]<<k;                         // 8x8 packed arrays, assuming gol is lowest 1 bit only and golp length N2>>6
-             ij+= ((ij+8)&(N-1)) ? 0 : (8-1)*N;
+        for (ij=ij1=0;ij<n2;ij+=8,ij1++) {
+             // golp[ij1] |= gol[deltaxy(ij,k&0x7,k>>3)]<<k;
+             golp[ij1] |= gol[deltaxy(offset,(ij&(n-1))+(k&0x7),(ij>>log2n)+(k>>3))]<<k; // 8x8 packed arrays, assuming gol is lowest 1 bit only and golp length N2>>6
+             ij+= ((ij+8)&(n-1)) ? 0 : (8-1)*n;
         }
 }
 //.......................................................................................................................................................
@@ -1959,7 +1988,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    if(quadtree) qimage = quadimage(newgol,N);
+    if(quadtree) qimage = quadimage(newgol,N,0);
 
 }
 //------------------------------------------------------- update_lut_sum -----------------------------------------------------------------------------------
@@ -2124,7 +2153,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    if(quadtree) qimage = quadimage(newgol,N);
+    if(quadtree) qimage = quadimage(newgol,N,0);
 }
 //------------------------------------------------------------- update_lut_dist -----------------------------------------------------------------------------------
 void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 10,11
@@ -2294,7 +2323,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    if(quadtree) qimage = quadimage(newgol,N);
+    if(quadtree) qimage = quadimage(newgol,N,0);
 }
 //------------------------------------------------------- update_lut_canon_rot -----------------------------------------------------------------------------------
 void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 12,13
@@ -2481,7 +2510,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    if(quadtree) qimage = quadimage(newgol,N);
+    if(quadtree) qimage = quadimage(newgol,N,0);
 }
 //------------------------------------------------------- update_lut_2Dsym -----------------------------------------------------------------------------------
 void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 14,15
@@ -2692,7 +2721,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    if(quadtree) qimage = quadimage(newgol,N);
+    if(quadtree) qimage = quadimage(newgol,N,0);
 }
 //------------------------------------------------------- update_gol16 -----------------------------------------------------------------------------------
 void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]) {     // selection models 16-19
@@ -3623,7 +3652,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     genotypes = hashtable_keys( &genetable );
     fprintf(stderr,"population size %d with %d different genes\n",cnt,hcnt);
     
-    if(quadtree) qimage = quadimage(gol,N);
+    if(quadtree) qimage = quadimage(gol,N,0);
 #endif
 }
 //------------------------------------------------------- set ...---------------------------------------------------------------------------
