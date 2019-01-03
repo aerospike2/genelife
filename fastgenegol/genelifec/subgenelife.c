@@ -201,6 +201,14 @@ int *configstats = NULL;            // dynamic array pointer for statistics of g
 uint64_t acttrace[N2];              // scrolled trace of last N time points of activity gene trace
 uint64_t genealogytrace[N2];        // image trace of genealogies for N most frequently populated genes
 uint64_t working[N2];               // working space array for calculating genealogies and doing neighbour bit packing
+//.......................................................................................................................................................
+short unsigned int label[N2];       // labels for connected component labelling
+typedef struct equivrec {           // equivalence record
+  short unsigned int parent;
+  short unsigned int rank;
+  // short unsigned int size;
+} equivrec;
+equivrec equiv[N2<<2];              // equivalences between labels
 //------------------------------------------------ planes and configuration offsets----------------------------------------------------------------------
 int offdx=0,offdy=0,offdt=0;        // display chosen offsets for glider analysis with colorfunction 8
 int Noff = 9;                       // number of offsets
@@ -345,6 +353,13 @@ const uint64_t r1 = 0x1111111111111111ull;
 // disambiguate         disambiguate the cases where the canonical rotation does not uniquely identify a pattern start point : 1 of 8 methods
 // testlut              tests LUT calculation via selectdifft: prepares shortcut array lookup
 //.......................................................................................................................................................
+// patt_hash            hash function for a pattern specified by 4 64-bit (8x8) patterns
+// newkey               assign one of free keys kept in a linked list, allocated 1024 at a time (used if hash-key already occupied with different quadtree)
+// node_hash            hash function for a node specified by 4 64-bit pointers
+// hash_patt_find       find quadtree hash for pattern (leaf of quadtree consists of 4 64bit integers defining a 16x16 pixel array)
+// hash_node_find       find quadtree hash for node (node is specified by its four quadrant pointers (64 bit))
+// quadimage            construct quadtree for an entire image, reporting if the image has been found previously
+//.......................................................................................................................................................
 // pack012neighbors     pack all up to 2nd neighbours in single word
 // pack0123neighbors    pack all up to 3rd neighbours in single word
 // pack49neighbors      fast routine to pack all up to 3rd neighbours in single word : oder of bits dictated by hiearchical assembly
@@ -353,6 +368,11 @@ const uint64_t r1 = 0x1111111111111111ull;
 // compare_neighbors    compare packed pack neighbours with one given x,y shift of arbitrary size
 // compare_all_neighbors compare packed pack neighbours with all nearest neighbour x,y shifts
 // packandcompare       pack and compare either all 1-shifted 3-neighbourhoods with t=-1 or chosen (dx,dy,dt) 3-neighbourhoods
+//.......................................................................................................................................................
+// lab_union            disjoint rank union of equivalence classes returning common root
+// label_cell           label a cell (site) in the cellular automata with first pass label of connected component
+// label_components     do two-pass fast component labelling with 8-neighbour using Suzuki decision tree, rank union and periodic BCs
+// extract_components   extract labelled components to list of subimages embedded in square of side 2^n, each stored in a quadtree hash table
 //.......................................................................................................................................................
 // update               update gol, golg, golgstats for a single synchronous time step : for selection 0-7 with fixed GoL rule departures in repscheme
 // update_lut_sum       update version for gene encoding look up table for totalistic survival and birth (disallowing 0 live neighbour entries) sel 8,9
@@ -613,6 +633,18 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 cgolg[ij] = (int) mask;
         }
     }
+    else if(colorfunction==9) {         // colorfunction based on unique labelling of separate components in image
+        for (ij=0; ij<NN2; ij++) {
+            if (gol[ij]) {
+                gene = (uint64_t) label[ij];
+                mask = gene * 11400714819323198549ull;
+                mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
+                mask |= 0x808080ff; // ensure brighter color at risk of improbable redundancy, make alpha opaque
+                cgolg[ij] = (int) mask;
+            }
+            else cgolg[ij] = 0;
+        }
+    }
 }
 //.......................................................................................................................................................
 void colorgenes(int cgolg[], int NN2) {
@@ -721,6 +753,7 @@ extern inline void selectone_of_2(int s, uint64_t nb2i, int nb[], uint64_t golg[
             exit(1);
     }
 }
+//.......................................................................................................................................................
 extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene, uint64_t *nbmask) {
 // result is number of equally fit best neighbours that could be the ancestor (0 if no birth allowed, 1 if unique) and list of these neighbour indices
 // birth is returned 1 if ancestors satisfy selection condition. Selection of which of genes to copy is newgene. Non-random result.
@@ -1318,29 +1351,30 @@ extern inline quadnode * hash_node_find(const quadnode * nw, const quadnode* ne,
 #endif
 }
 //.......................................................................................................................................................
-quadnode * quadimage(uint64_t gol[]) {                                          // routine to generate a quadtree for an entire binary image of long words
-                                                                                // makes use of global linear and quadratic size variables N and N2 for gol
+quadnode * quadimage(uint64_t gol[],int N) {                                    // routine to generate a quadtree for an entire binary image of long words
+                                                                                // makes use of global linear and quadratic size variable N2 for sizing internal arrays golp,golq
+                                                                                // assumes that N is power of 2 and >=16
     unsigned int ij,ij1,n;
     uint64_t golp[N2>>6];
     quadnode * golq[N2>>8];
-    extern void pack64neighbors(uint64_t gol[],uint64_t golp[]);
+    extern void pack64neighbors(uint64_t gol[],uint64_t golp[],int N);
     
-    pack64neighbors(gol,golp);
-
+    pack64neighbors(gol,golp,N);
+    if(N<16) fprintf(stderr,"Error: attempting to quadtree image with size less than 16x16\n");
     n=N>>3;
-    /* for(ij=0;ij<n*n;ij++) {
-        if (ij%8 == 0) fprintf(stderr,"\n step %d ij %d",totsteps,ij);
-        fprintf(stderr," %llx ",golp[ij]);
-    }
-    fprintf(stderr,"\n"); */
+                            /*  for(ij=0;ij<n*n;ij++) {
+                                    if (ij%8 == 0) fprintf(stderr,"\n step %d ij %d",totsteps,ij);
+                                    fprintf(stderr," %llx ",golp[ij]);
+                                }
+                                fprintf(stderr,"\n"); */
     for (ij=ij1=0;ij<n*n;ij+=2,ij1++) {
         golq[ij1]=hash_patt_find(golp[(ij+n)],golp[(ij+n)+1],golp[ij],golp[ij+1]); // hash_patt_find(nw,ne,sw,se) adds quad leaf entry if pattern not found
         ij+= ((ij+2)&(n-1)) ? 0 : n;                                            // skip odd rows since these are the northern parts of quads generated on even rows
     }
-    // fprintf(stderr,"8x8 patterns found\n");
+                            // fprintf(stderr,"8x8 patterns found\n");
     for(n >>= 1; n>1; n>>= 1) {
         for (ij=ij1=0;ij<n*n;ij+=2,ij1++) {
-            // fprintf(stderr,"n %d ij1 %d\n",n,ij1);
+                            // fprintf(stderr,"n %d ij1 %d\n",n,ij1);
             golq[ij1]=hash_node_find(golq[(ij+n)],golq[(ij+n)+1],golq[ij],golq[ij+1]); // hash_node_find(nw,ne,sw,se) adds quad node entry if node not found
             ij+= ((ij+2)&(n-1)) ? 0 : n;                                        // skip odd rows since these are the northern parts of quads generated on even rows
         }
@@ -1348,6 +1382,17 @@ quadnode * quadimage(uint64_t gol[]) {                                          
     if(golq[0]!=NULL)
         if(golq[0]->hits > 1) fprintf(stderr,"image already found at t = %d\n",golq[0]->firsttime);
     return(golq[0]);
+}
+//.......................................................................................................................................................
+quadnode * extract_components(short unsigned int label[],short unsigned int nlabel) {
+    int i,ij;
+    short unsigned int ilabel=0;
+    unsigned int *ordlabel;
+    
+    ordlabel=(unsigned int *) calloc(nlabel,sizeof(unsigned int));                // stores indices of first site with component
+    for (ij=0;ij<N2;ij++) {
+        if (label[ij] && !ordlabel[label[ij]]) ordlabel[label[ij]]=ij+1;          // ij+1 to avoid confusion of ij==0 with new component
+    }
 }
 //------------------------------------------------------- pack012,3neighbors -------------------------------------------------------------------------------
 #define deltaxy(ij,x,y)  (ij - (ij&Nmask) + (((ij+(x))&Nmask) + (y)*N)) & N2mask
@@ -1408,8 +1453,9 @@ extern inline void pack16neighbors(uint64_t gol[],uint64_t golp[]) {            
         }
 }
 //.......................................................................................................................................................
-extern void pack64neighbors(uint64_t gol[],uint64_t golp[]) {                     // routine to pack 8x8 subarrays into single words
+extern void pack64neighbors(uint64_t gol[],uint64_t golp[],int N) {                     // routine to pack 8x8 subarrays into single words
     unsigned int ij,ij1,k;
+    int N2 = N*N;
     
     for (ij1=0;ij1<(N2>>6);ij1++) golp[ij1]=0ull;
     for(k=0;k<64;k++)
@@ -1467,6 +1513,123 @@ extern inline void packandcompare(uint64_t newgol[],uint64_t working[],uint64_t 
             if(offdt>0) offdt = 0;
             pack49neighbors(planesg[(newPlane-offdt)%maxPlane],golmix);
             compare_neighbors(golmix,working,offdx,offdy);                 // compare with a single direction (north) for gliders
+        }
+    }
+}
+//------------------------------------------------------- connected component labelling ---------------------------------------------------------------
+// Combine two trees containing node i and j. Union by rank with halving - see https://en.wikipedia.org/wiki/Disjoint-set_data_structure
+// Return the root of union tree in equivalence relation's disjoint union-set forest
+short unsigned int lab_union(equivrec equiv[], short unsigned int i, short unsigned int j) {
+    short unsigned int root = i;
+    while (equiv[root].parent<root) {
+        equiv[root].parent = equiv[equiv[root].parent].parent;        // halving algorithm to compress path on the fly
+        root = equiv[root].parent;
+    }
+    if (i != j) {
+        short unsigned int rooti = root;
+        short unsigned int rootj;
+        root = j;
+        while (equiv[root].parent<root) {
+            equiv[root].parent = equiv[equiv[root].parent].parent;   // halving algorithm to compress paths on the fly
+            root = equiv[root].parent;
+        }
+        if (root == rooti) return root;
+        rootj=root;
+        if (equiv[rooti].rank < equiv[rootj].rank) {                 // swap rooti, rootj so that rooti has larger rank
+            rootj=rooti;
+            rooti=root;
+        }
+        equiv[rootj].parent = rooti;                                 // merge rootj into rooti
+        if (equiv[rooti].rank == equiv[rootj].rank) {
+            equiv[rooti].rank++;
+        }
+    }
+    return root;
+}
+//.......................................................................................................................................................
+extern inline short unsigned int label_cell(int ij,short unsigned int *nlabel) {
+    short unsigned int clabel,clabel1,labelij;
+    clabel=label[deltaxy(ij,0,-1)];                  // deltaxy takes periodic BCs into account (b in Suzuki Decision Tree, see Wu et.al.)
+    if(clabel) labelij=equiv[clabel].parent;         // b
+    else {                                           // N (=b) unlabelled
+        clabel=label[deltaxy(ij,1,-1)];              // (c in Suzuki DT)
+        if(clabel) {
+            clabel1=label[deltaxy(ij,-1,-1)];        // NW (a in Suzuki DT)
+            if(clabel1) {
+                labelij=lab_union(equiv,clabel,clabel1); // c,a
+            }
+            else {
+                clabel1=label[deltaxy(ij,-1,0)];     // W (d in Suzuki DT)
+                if(clabel1) {
+                    labelij=lab_union(equiv,clabel,clabel1); // c,d
+                }
+                else {
+                    labelij=equiv[clabel].parent;    // c
+                }
+            }
+        }
+        else {
+            clabel=label[deltaxy(ij,-1,-1)];         // NW (a in Suzuki DT)
+            if(clabel) {
+                labelij=equiv[clabel].parent;        // a
+            }
+            else {
+                clabel=label[deltaxy(ij,-1,0)];      // W (d in Suzuki DT)
+                if(clabel) {
+                    labelij=equiv[clabel].parent;    // d
+                }
+                else {
+                    clabel=++*nlabel;                // new label if a,b,c,d all without labels
+                    equiv[clabel].parent=clabel;
+                    labelij=clabel;
+                    equiv[clabel].rank=0;
+                }
+            }
+        }
+    }
+    return labelij;
+}
+//.......................................................................................................................................................
+// Flatten the Union-Find tree and relabel the components.
+void flattenlabels(equivrec equiv[],unsigned short int *nlabel) {
+    short unsigned int xlabel = 0;
+    short unsigned int i;
+    for (i = 1; i < *nlabel + 1; i++)
+    if (equiv[i].parent < i) {
+        equiv[i].parent = equiv[equiv[i].parent].parent;
+    }
+    else {
+        equiv[i].parent = xlabel;
+        xlabel++;
+    }
+}
+//.......................................................................................................................................................
+// fast component labelling, updating global equivalence table equiv and placing labels in global array label
+void label_components(uint64_t gol[]) {
+    int ij;                                                 //   abc   scan mask to calculate label at position e
+    short unsigned int nlabel = 0;                          //   de
+    for(ij=0;ij<N2;ij++) label[ij]=0;
+    for(ij=0;ij<(N2>>2);ij++) equiv[ij].parent=0;
+    
+    for(ij=0;ij<N2;ij++) {                                  // do first pass main array
+        if (gol[ij]) {
+            label[ij]=label_cell(ij,&nlabel);
+        }
+    }
+    for(ij=0;ij<N;ij++) {                                   // redo first row sites to take periodic wrap around into account
+        if (gol[ij]) {
+            label[ij]=label_cell(ij,&nlabel);
+        }
+    }
+    for(ij=N;ij<N2;ij+=N) {                                 // redo first column sites to take periodic wrap around into account
+        if (gol[ij]) {
+            label[ij]=label_cell(ij,&nlabel);
+        }
+    }
+    flattenlabels(equiv,&nlabel);                           // single pass flatten of equivalence table
+    for(ij=0;ij<N2;ij++) {                                  // do second pass of main array
+        if (gol[ij]) {
+            label[ij]=equiv[label[ij]].parent;
         }
     }
 }
@@ -1790,12 +1953,13 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
     if(randomsoup) random_soup(gol,golg,newgol,newgolg);
     if(vscrolling) v_scroll(newgol,newgolg);
     if (colorfunction==8) packandcompare(newgol,working,golmix);
+    else if (colorfunction==9) label_components(newgol);
     
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    if(quadtree) qimage = quadimage(newgol);
+    if(quadtree) qimage = quadimage(newgol,N);
 
 }
 //------------------------------------------------------- update_lut_sum -----------------------------------------------------------------------------------
@@ -1960,7 +2124,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    if(quadtree) qimage = quadimage(newgol);
+    if(quadtree) qimage = quadimage(newgol,N);
 }
 //------------------------------------------------------------- update_lut_dist -----------------------------------------------------------------------------------
 void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 10,11
@@ -2130,7 +2294,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    if(quadtree) qimage = quadimage(newgol);
+    if(quadtree) qimage = quadimage(newgol,N);
 }
 //------------------------------------------------------- update_lut_canon_rot -----------------------------------------------------------------------------------
 void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 12,13
@@ -2317,7 +2481,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    if(quadtree) qimage = quadimage(newgol);
+    if(quadtree) qimage = quadimage(newgol,N);
 }
 //------------------------------------------------------- update_lut_2Dsym -----------------------------------------------------------------------------------
 void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 14,15
@@ -2528,7 +2692,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    if(quadtree) qimage = quadimage(newgol);
+    if(quadtree) qimage = quadimage(newgol,N);
 }
 //------------------------------------------------------- update_gol16 -----------------------------------------------------------------------------------
 void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]) {     // selection models 16-19
@@ -3459,12 +3623,12 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     genotypes = hashtable_keys( &genetable );
     fprintf(stderr,"population size %d with %d different genes\n",cnt,hcnt);
     
-    if(quadtree) qimage = quadimage(gol);
+    if(quadtree) qimage = quadimage(gol,N);
 #endif
 }
 //------------------------------------------------------- set ...---------------------------------------------------------------------------
 void set_colorfunction(int colorfunctionval) {
-    if(colorfunction>8) fprintf(stderr,"error colorfunction value passed %d too large\n",colorfunctionval);
+    if(colorfunction>9) fprintf(stderr,"error colorfunction value passed %d too large\n",colorfunctionval);
     else     colorfunction = colorfunctionval;
 }
 //.......................................................................................................................................................

@@ -76,6 +76,7 @@ survivalmask = runparams[4] = 0x06       # for selection=8-13 this is the GoL su
 birthmask = runparams[7] = 0x04          # for selection=8-13 this is the GoL birth mask
 colorfunction = runparams[5] = 0         # color function 0(hash), >=1(fnal), 2 nongulstate or color gol planes, 3 notgolrul yellow
                                          # 4 activities 5 genealogy steps 6 genealogy temporal 7 activity scaled colors
+                                         # 8 glider detection 9 separate component labelling
 initfield = runparams[6] = 100           # 1 init via 32x32 genepat.dat, n>1 init via nxn rand array
 nlog2pmut = simparams[0] = 8             # log2 gene mutation probability (0 or >56 means no mutation)
 initial1density = simparams[1] =  16384  # initial 1 density in GOL state
@@ -782,11 +783,11 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                 elif event.key == pg.K_SPACE:
                     pause = (pause+1)%2
                 elif event.key == pg.K_RIGHT:
-                    colorfunction = (colorfunction + 1) % 9
+                    colorfunction = (colorfunction + 1) % 10
                     genelife.set_colorfunction(colorfunction)
                     print 'step',framenr,'colorfunction changed to',colorfunction
                 elif event.key == pg.K_LEFT:
-                    colorfunction = (colorfunction - 1) % 9
+                    colorfunction = (colorfunction - 1) % 10
                     genelife.set_colorfunction(colorfunction)
                     print 'step',framenr,'colorfunction changed to',colorfunction
                 elif event.key == pg.K_PLUS or event.key == pg.K_KP_PLUS or event.key == pg.K_EQUALS:
