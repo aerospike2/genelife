@@ -862,6 +862,9 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
             caption = caption + ("q%1d " % quadrants) + paramdat
         if colorfunction == 4: caption = caption + ("ymax %d " % ymax)
         elif colorfunction == 8: caption = caption + ("offsets (%d,%d,%d) " % (offdx,offdy,offdt))
+        elif colorfunction == 9:
+            ncomponents=genelife.get_ncomponents()
+            caption = caption + ("ncomponents %d " % (ncomponents))
         if pixeldat: caption = caption + pixeldat
         pg.display.set_caption(caption)
         # pg.transform.scale2x(scr,screen)   # use this for pygame scale2x with smoother

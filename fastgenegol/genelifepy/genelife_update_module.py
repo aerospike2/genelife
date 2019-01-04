@@ -59,6 +59,8 @@ libcd.get_genealogytrace.restype = None
 libcd.get_genealogytrace.argtypes = [uint64_array,c_int]
 libcd.get_sorted_popln_act.restype = c_int
 libcd.get_sorted_popln_act.argtypes = [int_array, uint64_array, int_array, int_array]
+libcd.get_ncomponents.argtypes = None
+libcd.get_ncomponents.restype = c_int
 libcd.colorgenes1.restype = None
 libcd.colorgenes1.argtypes = [uint64_array, uint64_array, uint64_array, int_array, c_int]
 libcd.colorgenes.restype = None
@@ -148,6 +150,9 @@ def get_genealogytrace(genealogytrace):
 
 def get_sorted_popln_act( gindices, genes, popcnts, activities):
     return libcd.get_sorted_popln_act(gindices, genes, popcnts, activities)
+
+def get_ncomponents():
+    return libcd.get_ncomponents()
 
 def colorgenes1(gol, golg, golgstats, cgolg):
     return libcd.colorgenes1( gol, golg, golgstats, cgolg, len(gol))

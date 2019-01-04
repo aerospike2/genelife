@@ -1564,7 +1564,8 @@ short unsigned int lab_union(equivrec equiv[], short unsigned int i, short unsig
         }
         if (root == rooti) return root;
         rootj=root;
-        if (equiv[rooti].rank < equiv[rootj].rank) {                 // swap rooti, rootj so that rooti has larger rank
+        // if (equiv[rooti].rank < equiv[rootj].rank) {                 // swap rooti, rootj so that rooti has larger rank : disrupts ordering!
+        if (rooti > rootj) {                 // swap rooti, rootj so that rooti is lower of two
             rootj=rooti;
             rooti=root;
         }
@@ -1576,7 +1577,7 @@ short unsigned int lab_union(equivrec equiv[], short unsigned int i, short unsig
     return root;
 }
 //.......................................................................................................................................................
-extern inline short unsigned int label_cell(int ij,short unsigned int *nlabel) {
+extern inline short unsigned int label_cell_Wu(int ij,short unsigned int *nlabel) {  // first version, slightly less efficient?, not used
     short unsigned int clabel,clabel1,labelij;
     clabel=label[deltaxy(ij,0,-1)];                  // deltaxy takes periodic BCs into account (b in Suzuki Decision Tree, see Wu et.al.)
     if(clabel) labelij=equiv[clabel].parent;         // b
@@ -1619,18 +1620,74 @@ extern inline short unsigned int label_cell(int ij,short unsigned int *nlabel) {
     return labelij;
 }
 //.......................................................................................................................................................
-// Flatten the Union-Find tree and relabel the components.
-void flattenlabels(equivrec equiv[],unsigned short int *nlabel) {
+extern inline short unsigned int label_cell(int ij,short unsigned int *nlabel) {
+    short unsigned int clabel,clabel1,labelij;
+    clabel=label[deltaxy(ij,0,-1)];                  // deltaxy takes periodic BCs into account (b in Suzuki Decision Tree, 2010)
+    if(clabel) labelij=equiv[clabel].parent;         // copy b
+    else {                                           // N (=b) unlabelled
+        clabel=label[deltaxy(ij,-1,0)];              // W (d in Suzuki DT)
+        if(clabel) {
+            clabel1=label[deltaxy(ij,1,-1)];         // NE (c in Suzuki DT)
+            if(clabel1) {
+                labelij=lab_union(equiv,clabel1,clabel); // resolve c,d
+            }
+            else {
+                labelij=equiv[clabel].parent;        // copy d
+            }
+        }
+        else {
+            clabel=label[deltaxy(ij,1,-1)];              // NE (c in Suzuki DT)
+            if(clabel) {
+                clabel1=label[deltaxy(ij,-1,-1)];        // NW (a in Suzuki DT)
+                if(clabel1) {
+                    labelij=lab_union(equiv,clabel,clabel1); // resolve c,a
+                }
+                else {
+                    labelij=equiv[clabel].parent;        // copy c
+                }
+            }
+            else {
+                clabel1=label[deltaxy(ij,-1,-1)];        // NW (a in Suzuki DT)
+                if(clabel1) {
+                    labelij=equiv[clabel1].parent;       // copy a
+                }
+                else {
+                    clabel=++*nlabel;                    // new label if a,b,c,d all without labels
+                    equiv[clabel].parent=clabel;
+                    labelij=clabel;
+                    equiv[clabel].rank=0;
+                }
+            }
+        }
+    }
+    return labelij;
+}
+//.......................................................................................................................................................
+// Check labels
+void checklabels(equivrec equiv[],unsigned short int *nlabel) {
     short unsigned int xlabel = 0;
     short unsigned int i;
-    for (i = 1; i < *nlabel + 1; i++)
-    if (equiv[i].parent < i) {
-        equiv[i].parent = equiv[equiv[i].parent].parent;
+    for (i = 1; i < *nlabel + 1; i++) {
+        if (equiv[i].parent > i) {
+            fprintf(stderr,"Error in label equivalencies at t=%d for i=%d, parent %d\n",totsteps,i,equiv[i].parent);
+            xlabel++;
+        }
     }
-    else {
-        equiv[i].parent = xlabel;
-        xlabel++;
+    if (xlabel) fprintf(stderr,"Error for %d cases\n",xlabel);
+}
+// Flatten the Union-Find tree and relabel the components.
+void flattenlabels(equivrec equiv[],unsigned short int *nlabel) {
+    short unsigned int xlabel = 1;
+    short unsigned int i;
+    for (i = 1; i < *nlabel + 1; i++) {
+        if (equiv[i].parent < i) {
+            equiv[i].parent = equiv[equiv[i].parent].parent;
+        }
+        else {
+            equiv[i].parent = xlabel++;
+        }
     }
+    *nlabel = xlabel;
 }
 //.......................................................................................................................................................
 // fast component labelling, updating global equivalence table equiv and placing labels in global array label
@@ -1655,12 +1712,14 @@ void label_components(uint64_t gol[]) {
             label[ij]=label_cell(ij,&nlabel);
         }
     }
+    //checklabels(equiv,&nlabel);                           // check labels point to lower values in equivalence table
     flattenlabels(equiv,&nlabel);                           // single pass flatten of equivalence table
     for(ij=0;ij<N2;ij++) {                                  // do second pass of main array
         if (gol[ij]) {
             label[ij]=equiv[label[ij]].parent;
         }
     }
+    ncomponents=nlabel;
 }
 //------------------------------------------------------- geography -----------------------------------------------------------------------------------
 void v_scroll(uint64_t newgol[],uint64_t newgolg[]) {
@@ -2148,6 +2207,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
     if(randomsoup) random_soup(gol,golg,newgol,newgolg);
     if(vscrolling) v_scroll(newgol,newgolg);
     if (colorfunction==8) packandcompare(newgol,working,golmix);
+    else if (colorfunction==9) label_components(newgol);
 
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
@@ -2318,6 +2378,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
     if(randomsoup) random_soup(gol,golg,newgol,newgolg);
     if(vscrolling) v_scroll(newgol,newgolg);
     if (colorfunction==8) packandcompare(newgol,working,golmix);
+    else if (colorfunction==9) label_components(newgol);
 
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
@@ -2505,6 +2566,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
     if(randomsoup) random_soup(gol,golg,newgol,newgolg);
     if(vscrolling) v_scroll(newgol,newgolg);
     if (colorfunction==8) packandcompare(newgol,working,golmix);
+    else if (colorfunction==9) label_components(newgol);
 
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
@@ -2716,6 +2778,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64
     if(randomsoup) random_soup(gol,golg,newgol,newgolg);
     if(vscrolling) v_scroll(newgol,newgolg);
     if (colorfunction==8) packandcompare(newgol,working,golmix);
+    else if (colorfunction==9) label_components(newgol);
 
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
@@ -3265,7 +3328,7 @@ void genelife_update (int nsteps, int nhist, int nstat) {
 
         totsteps++;
         if(!(totsteps%10)) {
-            nquadpatterns = hashtable_count(&quadtable);
+            if (quadtree) nquadpatterns = hashtable_count(&quadtable);
             fprintf(stderr,"iteration step %d nquadpatterns %d\r",totsteps,nquadpatterns);
         }
         
@@ -3805,6 +3868,9 @@ int get_nspecies() {
     for (k=0,nspeciesnow=0; k<nspecies; k++)
         if(geneitems[k].popcount) nspeciesnow++;
     return(nspeciesnow);
+}
+int get_ncomponents() {
+    return(ncomponents);
 }
 //.......................................................................................................................................................
 void get_curgolgstats(uint64_t outgolgstats[], int NN) {
