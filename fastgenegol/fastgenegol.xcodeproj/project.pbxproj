@@ -106,8 +106,6 @@
 		521FDCF01F287E7100F08FFB /* fastgenegol.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgenegol.c; path = genelifec/fastgenegol.c; sourceTree = SOURCE_ROOT; };
 		521FDCF11F287E7100F08FFB /* fastgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgenelife.c; path = genelifec/fastgenelife.c; sourceTree = SOURCE_ROOT; };
 		521FDCF41F287ECE00F08FFB /* fastgol.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgol.c; path = genelifec/fastgol.c; sourceTree = SOURCE_ROOT; };
-		5222384B21C80E620099504F /* quadhash.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = quadhash.h; sourceTree = "<group>"; };
-		5222384C21C80E620099504F /* quadhash.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = quadhash.c; sourceTree = "<group>"; };
 		52416DA51F27425C00721D17 /* libcos_doubles.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libcos_doubles.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		52416DB61F27771500721D17 /* libgenelife.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libgenelife.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		5275A1281F292FA40062765F /* dispgenegol */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = dispgenegol; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -211,8 +209,6 @@
 				5206B81121507E2200394209 /* actgenelife.c */,
 				5206B80F21507E0B00394209 /* dispgenelife.c */,
 				52F19B3021ABE7F900D33844 /* sumtest.c */,
-				5222384B21C80E620099504F /* quadhash.h */,
-				5222384C21C80E620099504F /* quadhash.c */,
 				52DB371F21507BCF0087F098 /* subgenelife.c */,
 			);
 			path = genelifec;
