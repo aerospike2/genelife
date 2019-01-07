@@ -469,7 +469,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 // mask = (gene * 11400714819323198549ul) >> (64 - 32);  // hash with optimal prime multiplicator down to 32 bits
                 mask = gene * 11400714819323198549ull;
                 mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
-                // mask |= 0x808080ff; // ensure brighter color at risk of improbable redundancy, make alpha opaque
+                mask |= 0x080808ffull; // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
                 cgolg[ij] = (int) mask;
             }
             else cgolg[ij] = 0;
@@ -584,7 +584,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 if (gene == 0ull) gene = 11778L;                // random color for gene==0
                 mask = gene * 11400714819323198549ul;
                 mask = mask >> (64 - 32);                       // hash with optimal prime multiplicator down to 32 bits
-                mask |= 0x808080ff; // ensure brighter color at risk of improbable redundancy, make alpha opaque
+                mask |= 0x080808ffull; // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
                 if(popmax) {
                     popcount=0;
                     if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) popcount = genedataptr->popcount;
@@ -615,7 +615,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 if (gene == 0ull) gene = 11778L;                    // random color for gene==0
                 mask = gene * 11400714819323198549ul;
                 mask = mask >> (64 - 32);                           // hash with optimal prime multiplicator down to 32 bits
-                mask |= 0x808080ff;                                 // ensure brighter color at risk of improbable redundancy, make alpha opaque
+                mask |= 0x080808ffull; // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
                 if(colorfunction==7) {                              // rescale color brightness by activity/activitymax
                     colormax=0;
                     for(d=0;d<3;d++) if((color[d]=( (mask>>(8+(d<<3))) & 0xff))>colormax) colormax=color[d];
@@ -658,8 +658,8 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 gene = (uint64_t) label[ij];
                 mask = gene * 11400714819323198549ull;
                 mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
-                // mask |= 0x808080ff; // ensure brighter color at risk of improbable redundancy, make alpha opaque
-                if (label[ij] == 0xffff) mask = 0xffffffff; // recolor debug components white
+                mask |= 0x080808ffull; // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
+                if (label[ij] == 0xffff) mask = 0xffffffffull; // recolor debug components and components with max label white
                 cgolg[ij] = (int) mask;
             }
             else cgolg[ij] = 0;
@@ -3779,9 +3779,10 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         hashtable_term(&genetable);
         hashtable_term(&quadtable);
     }
-    hashtable_init(&genetable,sizeof(genedata),N2<<2,0);     // initialize dictionary for genes
+    hashtable_init(&genetable,sizeof(genedata),N2<<2,0);         // initialize dictionary for genes
     hashtable_init(&quadtable,sizeof(quadnode),N2<<2,0);         // initialize dictionary for quadtree patterns
 #endif
+    for (ij=0;ij<65536;ij++) smallpatts[ij].hits = 0;            // initialize small pattern table to no patterns hit
     notfirst = 1;
     if (initfield==1) {           // input from file genepat.dat with max size of 32*32 characters
         golgin = (char *) malloc(32* 32 * sizeof(char));
