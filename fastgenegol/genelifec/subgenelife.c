@@ -209,14 +209,15 @@ uint64_t genealogytrace[N2];        // image trace of genealogies for N most fre
 uint64_t working[N2];               // working space array for calculating genealogies and doing neighbour bit packing
 //.......................................................................................................................................................
 short unsigned int label[N2];       // labels for pixels in connected component labelling
-short unsigned int oldlabel[N2];    // previous time step labels for connected component labelling
+short unsigned int oldlabel[N2];    // previous time step labels for pixels in connected component labelling
+short unsigned int labelind[N2>>2]; // list of label indices for labels, preserving colours of previous components
 typedef struct equivrec {           // equivalence record
   short unsigned int parent;
   short unsigned int rank;
   // short unsigned int size;
 } equivrec;
 equivrec equiv[N2>>2];              // equivalences between labels
-typedef struct component {
+typedef struct component {          // data structure for identified connected components in gol array
     short unsigned int N,S,E,W;
     short unsigned int potwrap,label,corner,log2n;
     quadnode * quad;
@@ -1583,6 +1584,58 @@ short unsigned int lab_union(equivrec equiv[], short unsigned int i, short unsig
     return root;
 }
 //.......................................................................................................................................................
+// Create union of ordered cyclic list containing nodes including i with the cyclic list including j.
+// Return the lowest member of joint cyclic list
+// This algorithm is quadratic in lengths of these lists which we anticipate to be very short : check
+short unsigned int lab_union_cyclic(equivrec equiv[], short unsigned int i, short unsigned int j) {
+    short unsigned int ri = i;
+    short unsigned int rj = j;
+    short unsigned int r;
+    while (equiv[rooti].parent<rooti) rooti = equiv[rooti].parent;
+    rooti = equiv[rooti].parent;                                      // rooti is now largest in i set
+    while (equiv[rootj].parent<rootj) rootj = equiv[rootj].parent;
+    rootj=equiv[rootj].parent;
+    while (equiv[rooti].parent<rooti && equiv[rootj].parent<rootj)
+        if(rooti < rootj) {
+            if(equiv[rootj].parent<rooti)         // splice rooti into combined list fllowing rootj
+                root=equiv[rooti].parent;
+                equiv[rooti].parent=equiv[rootj].parent
+                equiv[rootj].parent=rooti;''''''''''''''''''''''''''''
+            
+            rootj=rootj.parent
+        }
+        else {
+        
+        }
+   
+    equiv[rootj].parent=rooti;
+    while (equiv[rooti].parent>root) rooti = equiv[rooti].parent;
+
+
+    rootj = equiv[rootj].parent;                                      // root is now the largest label in union containing i
+    if (i != j) {
+        short unsigned int rooti = root;
+        short unsigned int rootj;
+        root = j;
+        while (equiv[root].parent<root) {
+            equiv[root].parent = equiv[equiv[root].parent].parent;   // halving algorithm to compress paths on the fly
+            root = equiv[root].parent;
+        }
+        if (root == rooti) return root;
+        rootj=root;
+        // if (equiv[rooti].rank < equiv[rootj].rank) {                 // swap rooti, rootj so that rooti has larger rank : disrupts ordering!
+        if (rooti > rootj) {                 // swap rooti, rootj so that rooti is lower of two
+            rootj=rooti;
+            rooti=root;
+        }
+        equiv[rootj].parent = rooti;                                 // merge rootj into rooti
+        if (equiv[rooti].rank == equiv[rootj].rank) {
+            equiv[rooti].rank++;
+        }
+    }
+    return root;
+}
+//.......................................................................................................................................................
 extern inline short unsigned int label_cell_Wu(int ij,short unsigned int *nlabel) {  // first version, slightly less efficient?, not used
     short unsigned int clabel,clabel1,labelij;
     clabel=label[deltaxy(ij,0,-1)];                  // deltaxy takes periodic BCs into account (b in Suzuki Decision Tree, see Wu et.al.)
@@ -1699,15 +1752,17 @@ void flattenlabels(equivrec equiv[],unsigned short int *nlabel) {
     *nlabel = xlabel;
 }
 //.......................................................................................................................................................
+short unsigned int comp_overlap(short unsigned int label1, short unsigned int label2) {
+    return 99;     // dummy computation
+}
+//.......................................................................................................................................................
 // fast component labelling, updating global equivalence table equiv and placing labels in global array label, return number of labels
 short unsigned int label_components(uint64_t gol[]) {
     int ij;                                                 //   abc   scan mask to calculate label at position e
     short unsigned int nlabel = 0;                          //   de
-    // short unsigned int labelmap[N2>>2];
-    // short unsigned int labelmapcnt[N2>>2];
-    // short unsigned int lab;
-    // int dx[9]={0,-1,0,1,1,1,0,-1,-1};
-    // int dy[9]={0,-1,-1,-1,0,1,1,1,0};
+    short unsigned int lab;
+    int dx[9]={0,-1,0,1,1,1,0,-1,-1};
+    int dy[9]={0,-1,-1,-1,0,1,1,1,0};
     static int first = 1;
     if(!first) {
         oldncomponents = ncomponents;
@@ -1719,7 +1774,7 @@ short unsigned int label_components(uint64_t gol[]) {
         first = 0;
     }
     for(ij=0;ij<N2;ij++) label[ij]=0;
-    for(ij=0;ij<(N2>>2);ij++) equiv[ij].parent=0;
+    for(ij=0;ij<(N2>>2);ij++) equiv[ij].parent=0;           // equiv initialization should overwrite this with ij, so not strictly required
     
     for(ij=0;ij<N2;ij++) {                                  // do first pass main array
         if (gol[ij]) {
@@ -1741,23 +1796,24 @@ short unsigned int label_components(uint64_t gol[]) {
     
     for(ij=0;ij<N2;ij++) {                                  // do second pass of main array assigning final root labels
         if (gol[ij]) {
-            label[ij]=equiv[label[ij]].parent;
+            label[ij]=oldncomponents+equiv[label[ij]].parent;
         }
     }
-    return nlabel;
-/*                                                          // create continuity in labels to allow visual tracking of components NYF
+    
+    for(ij=0;ij<oldncomponents+nlabel;ij++) equiv[ij].parent=ij; // equiv reinitialization for separate lists for t-1 and t
+
+                                                            // create continuity in labels to allow visual tracking of components NYF
     for(ij=0;ij<N2;ij++) {
-        for(int k=0;k<9;k++) {
-            if((lab=oldlabel[deltaxy(ij,dx[k],dy[k])])) {
-                if(!labelmap[label[ij]]) {
-                    labelmap[label[ij]] = lab;
+        if(label[ij]) {
+            for(int k=0;k<9;k++) {
+                if((lab=oldlabel[deltaxy(ij,dx[k],dy[k])])) {
+                    label[ij] = lab_union_cyclic(equiv,lab,label[ij]);
                 }
-                else if(labelmap[label[ij]] != lab)
-                    labelmap[label[ij]]=label[ij];          // if ambiguous don't change label
             }
         }
     }
-    */
+    
+    return nlabel;
 }
 //.......................................................................................................................................................
 short unsigned int extract_components(uint64_t gol[]) {
