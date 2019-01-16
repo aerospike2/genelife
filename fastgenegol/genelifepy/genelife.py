@@ -19,6 +19,10 @@ NbP = 1
 gol = np.zeros(N2,np.uint64)
 golg = np.zeros(N2,np.uint64)
 golgstats = np.zeros(N2,np.uint64)
+
+ncomponents = 0
+connlabel = np.zeros(N2,np.uint32)
+connlen = np.zeros(N2/4,np.uint32)
                                             # graphics
 cgrid = np.zeros((N,N),np.int32)
 cgolg =np.zeros(N2,np.int32)
@@ -461,6 +465,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     global scr, screen, scalex2
     global N,NbP
     global gol,golg,golgstats
+    global connlabel,connlen,ncomponents
     global colorfunction
     global ymax
     global updatesenabled
@@ -665,6 +670,9 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             pixeldat = "(%d,%d) gene %016x" % (x,y,golg[x+y*N])
                             genelife.set_selectedgene(golg[x+y*N])
                             print ("step %d pixel data %s" % (framenr,pixeldat))
+                        elif colorfunction ==9:
+                            ncomponents=genelife.get_connected_comps(connlabel,connlen)
+                            pixeldat = "(%d,%d) label %4d nrconn %d" % (x,y,connlabel[y*N+x],connlen[connlabel[y*N+x]])
                 elif event.button == 3:          # info on button or single plane choice (selection>=20) right mouse button (-click)
                     mouse_pos = pg.mouse.get_pos()
                     if scalex2:
@@ -744,6 +752,9 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             genelife.get_genealogytrace(golg)
                             pixeldat = "(%d,%d) gene %016x" % (x,y,golg[x+y*N])
                             genelife.set_selectedgene(golg[x+y*N])
+                        elif colorfunction ==9:
+                            ncomponents=genelife.get_connected_comps(connlabel,connlen)
+                            pixeldat = "(%d,%d) label %4d nr.conn %d" % (x,y,connlabel[y*N+x],connlen[connlabel[y*N+x]])
                 elif mouseclicked2:
                     if colorfunction == 2:
                         mouse_pos = pg.mouse.get_pos()

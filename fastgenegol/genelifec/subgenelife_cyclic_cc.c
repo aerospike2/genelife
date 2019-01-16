@@ -210,20 +210,22 @@ uint64_t working[N2];               // working space array for calculating genea
 //------------------------------------------------ arrays for connected component labelling and tracking ------------------------------------------------
 const int NLM = N2>>2;              // maximum number of discrete components possible N2/4
 short unsigned int label[N2];       // labels for pixels in connected component labelling
-short unsigned int oldlabel[N2];    // previous time step labels for connected component labelling
+short unsigned int oldlabel[N2];    // previous time step labels for pixels in connected component labelling
 typedef struct equivrec {           // equivalence record
   short unsigned int pt;            // parent of record : integer index into eqv array at lower integer location
   short unsigned int rank;          // rank of equivalence class tree, may be used to accelerate union-find
-  // short unsigned int size;       // number of cells (lattice sites) with this label in current array
+  unsigned int size;                // number of cells (lattice sites) with this label in current array
 } equivrec;
 equivrec eqv[NLM];                  // equivalences between labels
+// equivrec eqvold[NLM];               // equivalences between labels previous time step
+// equivrec eqv12[NLM],eqv21[NLM];     // forward and backward in time connected component label euqivalence classes for one time step
 typedef struct component {          // data structure for identified connected components in gol array
     short unsigned int N,S,E,W;     // rectangular bounds of rectangle containing the component
-    short unsigned int lastrc;      // last occupied row/col used to trace components wrapping across the N-1 to 0 border
+    short unsigned int lastrc,corner;// for small components of size 4x4 pixels or less, the image is encoded directly in the pattern spatt, corner is TL
+                                    // patt is used in construction for last occupied row/col used to trace components wrapping across the N-1 to 0 border
     short unsigned int label,log2n; // label index of component, enclosing square size n=2^log2n
-    short unsigned int patt;        // for small components of size 4x4 pixels or less, the image is encoded directly in the pattern patt
     quadnode * quad;                // pointer to hash quadtree node of subimage for component
-    unsigned int pixels;
+    short unsigned int spatt;
 } component;
 component complist[NLM];            // current array of components
 int ncomponents = 0;                // current number of components (= current number of labels)
@@ -232,16 +234,10 @@ typedef struct connection {         // connection of connected component at time
     short unsigned int oldlab;
     short unsigned int newlab;
     unsigned int next;
-    unsigned int nextf;
-    unsigned int overlap;
 } connection;
 connection connections[N2];         // open memory reservoir of connection nodes to use in connection lists
 unsigned int connlists[NLM];        // entry points for connection list corresponding to each labelled component
-unsigned int connlistsf[NLM];       // entry points for forward connection list corresponding to each old labelled component
-unsigned int connlen[NLM];          // lengths of connection lists for connected components to previous time ie from t to t-1
-unsigned int connlenf[NLM];         // lengths of connection lists for connected components to current time i.e. from t-1 to t
-unsigned int connpref[NLM];         // preferred backward connected component at time t-1 for each component at time t
-unsigned int connpreff[NLM];        // preferred forward connected component at time t for each component at time t-1
+unsigned int connlen[NLM];          // lengths of connection lists for connected components
 int connused = 0;                   // used connection nodes
 //------------------------------------------------ planes and configuration offsets----------------------------------------------------------------------
 int offdx=0,offdy=0,offdt=0;        // display chosen offsets for glider analysis with colorfunction 8
@@ -1600,84 +1596,171 @@ short unsigned int lab_union(equivrec eqv[], short unsigned int i, short unsigne
     }
     return root;
 }
+void lab_cyclic_gen(equivrec eqv[],short unsigned int test[],int n) {
+    int i;
+    for(i=1;i<n;i++) {
+        eqv[test[i]].pt=test[i-1];
+    }
+    eqv[test[0]].pt=test[n-1];
+}
 //.......................................................................................................................................................
-extern inline short unsigned int label_cell_Wu(int ij,short unsigned int *nlabel) {  // first version, slightly less efficient?, not used
-    short unsigned int clabel,clabel1,labelij;
-    clabel=label[deltaxy(ij,0,-1)];                  // deltaxy takes periodic BCs into account (b in Suzuki Decision Tree, see Wu et.al.)
-    if(clabel) labelij=eqv[clabel].pt;         // b
-    else {                                           // N (=b) unlabelled
-        clabel=label[deltaxy(ij,1,-1)];              // (c in Suzuki DT)
-        if(clabel) {
-            clabel1=label[deltaxy(ij,-1,-1)];        // NW (a in Suzuki DT)
-            if(clabel1) {
-                labelij=lab_union(eqv,clabel,clabel1); // c,a
+// Create union of ordered cyclic list containing nodes including i with the ordered cyclic list including j.
+// Return the lowest member of joint odered cyclic list.
+// This algorithm is O(l1+l2) where the lengths l1,l2 of these lists we anticipate to be short.
+short unsigned int lab_union_cyclic(equivrec eqv[], short unsigned int i, short unsigned int j) {
+    short unsigned int ri = i;
+    short unsigned int rj = j;
+    short unsigned int r,rtop;
+    static int test = 0;
+    
+    // fprintf(stderr,"in union i %d j %d\n",i,j);
+    if (test)  {  // test
+        const int n1=1, n2=1;
+        short unsigned int test1[n1]={4};
+        short unsigned int test2[n2]={3};
+        //short unsigned int test1[n1]={4,8,9,11,13,14,19,20};
+        //short unsigned int test2[n2]={2,3,5,6,7,10,12,16,17};
+        
+        int k,kmax;
+
+        test = 0;
+        kmax=0;
+        for(k=0;k<n1;k++) if (test1[k]>kmax) kmax = test1[k];
+        for(k=0;k<n2;k++) if (test2[k]>kmax) kmax = test2[k];
+        for(k=1;k<=100;k++) eqv[k].pt = 0;
+        lab_cyclic_gen(eqv,test1,n1);
+        fprintf(stderr,"test1\n");
+        for(k=1;k<=kmax;k++) {
+               fprintf(stderr,"  %d",eqv[k].pt);
+        }
+        fprintf(stderr,"\n");
+        
+        lab_cyclic_gen(eqv,test2,n2);
+        fprintf(stderr,"test2\n");
+        for(k=1;k<=kmax;k++) {
+               fprintf(stderr,"  %d",eqv[k].pt);
+        }
+        fprintf(stderr,"\n");
+        
+        r = lab_union_cyclic(eqv,test1[0],test2[0]);
+        fprintf(stderr,"test of lab_union_cyclic\n");
+        for(k=1;k<=kmax;k++) {
+               fprintf(stderr," %d ",eqv[k].pt);
+        }
+        fprintf(stderr,"\n");
+    }
+    // fprintf(stderr,"in union i %d j %d\n",i,j);
+    while (eqv[ri].pt<ri) ri = eqv[ri].pt;                  // ri is now smallest in i set
+    while (eqv[rj].pt<rj) rj = eqv[rj].pt;                  // rj is now smallest in j set
+    if(ri==rj) return ri;                                   // sets are equal, perhaps with different entry points i,j
+    ri = eqv[ri].pt;                                        // ri is now largest in i set
+    rj=eqv[rj].pt;                                          // rj is now largest in j set
+    if(ri==rj) fprintf(stderr,"lab_union_cyclic error 1 at step %d, top values %d,%d are the same\n",totsteps,ri,rj);
+    rtop = ri>rj ? ri: rj;
+    // fprintf(stderr,"ri rj rtop %d %d %d\n",ri,rj,rtop);
+    while (eqv[ri].pt<ri && eqv[rj].pt<rj) {
+        if(ri > rj) {                                       // swap ri and rj so that ri<rj
+            r=ri;
+            ri=rj;
+            rj=r;
+        }
+        else if (ri==rj) fprintf(stderr,"lab_union_cyclic error 2 at step %d, values %d,%d are the same\n",totsteps,ri,rj);
+        if (eqv[rj].pt<ri) {                                // splice ri into combined list following rj
+            if(eqv[ri].pt<eqv[rj].pt) {
+                r=eqv[ri].pt;
+                eqv[ri].pt=eqv[rj].pt;
+                eqv[rj].pt=ri;
+                ri=r;                                       // advance ri to its parent
             }
             else {
-                clabel1=label[deltaxy(ij,-1,0)];     // W (d in Suzuki DT)
-                if(clabel1) {
-                    labelij=lab_union(eqv,clabel,clabel1); // c,d
-                }
-                else {
-                    labelij=eqv[clabel].pt;    // c
-                }
+                r=eqv[rj].pt;
+                eqv[rj].pt=ri;
+                rj=r;                                       // advance rj to its parent
             }
         }
-        else {
-            clabel=label[deltaxy(ij,-1,-1)];         // NW (a in Suzuki DT)
-            if(clabel) {
-                labelij=eqv[clabel].pt;        // a
+        else rj = eqv[rj].pt;
+    }
+    // now finish off list merger for ri or rj end overhang with other one already at bottom
+    if (ri==rj) fprintf(stderr,"lab_union_cyclic error 3 at step %d, values %d,%d are the same\n",totsteps,ri,rj);
+    // fprintf(stderr,"lab_union_cyclic intermediate 0 at step %d, values ri, rj %d,%d\n",totsteps,ri,rj);
+    if(eqv[ri].pt>=ri) {                                     // swap so that rj is the one that has reached the bottom of list
+        r = rj;
+        rj = ri;
+        ri = r;
+    }
+    // fprintf(stderr,"lab_union_cyclic intermediate 1 at step %d, values ri, rj %d,%d\n",totsteps,ri,rj);
+    if(ri>rj) {                                              // rj is at end of j list, but ri might not be at end of i list.
+        while (eqv[ri].pt>rj && eqv[ri].pt<ri) ri = eqv[ri].pt; // move down i list until either less than j or reached the end
+        // fprintf(stderr,"lab_union_cyclic intermediate 2 at step %d, values ri, rj %d,%d\n",totsteps,ri,rj);
+        if (eqv[ri].pt<=rj) {
+            if(rj==eqv[ri].pt) fprintf(stderr,"lab_union_cyclic error 4 at step %d, equal values ri.parent, rj %d\n",totsteps,rj);
+            r=eqv[ri].pt;
+            eqv[ri].pt=rj;
+            eqv[rj].pt=r;
+            ri=r;
+            while(eqv[ri].pt<ri) ri = eqv[ri].pt;
+            eqv[ri].pt=rtop;
+            return ri;
+        }
+        else {                                              // ri is now bottom elt in i list
+            if (ri>rj) {
+                eqv[ri].pt=rj;
+                eqv[rj].pt=rtop;
+                return rj;
+            }
+            else if (ri==rj) {
+                fprintf(stderr,"lab_union_cyclic error 5 at step %d, equal values ri, rj %d,%d\n",totsteps,ri,rj);
+                return 0;
             }
             else {
-                clabel=label[deltaxy(ij,-1,0)];      // W (d in Suzuki DT)
-                if(clabel) {
-                    labelij=eqv[clabel].pt;    // d
-                }
-                else {
-                    clabel=++*nlabel;                // new label if a,b,c,d all without labels
-                    eqv[clabel].pt=clabel;
-                    labelij=clabel;
-                    eqv[clabel].rank=0;
-                }
+                eqv[rj].pt=ri;
+                eqv[ri].pt=rtop;
+                return ri;
             }
         }
     }
-    return labelij;
+    else {                                                  // rj is at end of j list and greater than ri, simply append the remaining ri list to rj and close cycle
+        eqv[rj].pt=ri;
+        while(eqv[ri].pt<ri) ri = eqv[ri].pt;
+        eqv[ri].pt=rtop;
+        return ri;
+    }
 }
 //.......................................................................................................................................................
 extern inline short unsigned int label_cell(int ij,short unsigned int *nlabel) {
     short unsigned int clabel,clabel1,labelij,labelijold;
     labelijold=label[ij];
-    clabel=label[deltaxy(ij,0,-1)];                  // deltaxy takes periodic BCs into account (b in Suzuki Decision Tree, 2010)
-    if(clabel) labelij=eqv[clabel].pt;         // copy b
-    else {                                           // N (=b) unlabelled
-        clabel=label[deltaxy(ij,-1,0)];              // W (d in Suzuki DT)
+    clabel=label[deltaxy(ij,0,-1)];                    // deltaxy takes periodic BCs into account (b in Suzuki Decision Tree, 2010)
+    if(clabel) labelij=eqv[clabel].pt;                 // copy b
+    else {                                             // N (=b) unlabelled
+        clabel=label[deltaxy(ij,-1,0)];                // W (d in Suzuki DT)
         if(clabel) {
-            clabel1=label[deltaxy(ij,1,-1)];         // NE (c in Suzuki DT)
+            clabel1=label[deltaxy(ij,1,-1)];           // NE (c in Suzuki DT)
             if(clabel1) {
                 labelij=lab_union(eqv,clabel1,clabel); // resolve c,d
             }
             else {
-                labelij=eqv[clabel].pt;        // copy d
+                labelij=eqv[clabel].pt;                // copy d
             }
         }
         else {
-            clabel=label[deltaxy(ij,1,-1)];              // NE (c in Suzuki DT)
+            clabel=label[deltaxy(ij,1,-1)];            // NE (c in Suzuki DT)
             if(clabel) {
-                clabel1=label[deltaxy(ij,-1,-1)];        // NW (a in Suzuki DT)
+                clabel1=label[deltaxy(ij,-1,-1)];      // NW (a in Suzuki DT)
                 if(clabel1) {
                     labelij=lab_union(eqv,clabel,clabel1); // resolve c,a
                 }
                 else {
-                    labelij=eqv[clabel].pt;        // copy c
+                    labelij=eqv[clabel].pt;            // copy c
                 }
             }
             else {
-                clabel1=label[deltaxy(ij,-1,-1)];        // NW (a in Suzuki DT)
+                clabel1=label[deltaxy(ij,-1,-1)];      // NW (a in Suzuki DT)
                 if(clabel1) {
-                    labelij=eqv[clabel1].pt;       // copy a
+                    labelij=eqv[clabel1].pt;           // copy a
                 }
                 else {
-                    clabel=++*nlabel;                    // new label if a,b,c,d all without labels
+                    clabel=++*nlabel;                  // new label if a,b,c,d all without labels
                     eqv[clabel].pt=clabel;
                     labelij=clabel;
                     eqv[clabel].rank=0;
@@ -1717,13 +1800,36 @@ void flattenlabels(equivrec eqv[],unsigned short int *nlabel) {
     *nlabel = xlabel;
 }
 //.......................................................................................................................................................
+// Flatten the Cyclic-Union-Find tree and relabel the components: preserving old colours when mapped to new.
+void flattenlabels_cyclic(equivrec eqv[],unsigned short int *nlabelold,unsigned short int *nlabelnew) {
+    short unsigned int xlabel = 1;
+    short unsigned int i;
+    for (i = 1; i < *nlabelold + 1; i++) {
+        if (eqv[i].pt < i) {
+            eqv[i].pt = eqv[eqv[i].pt].pt;
+        }
+        else if (eqv[i].pt == i){             // non-referenced old color : free its position
+            eqv[i].pt = 0;
+        }
+        else {
+            // eqv[i].pt = xlabel++;  do not assign this but leave old color intact
+        }
+    }
+    *nlabelold = xlabel;
+}
+//.......................................................................................................................................................
+short unsigned int comp_overlap(short unsigned int label1, short unsigned int label2) {
+    return 99;     // dummy computation
+}
+//.......................................................................................................................................................
 // fast component labelling, updating global equivalence table equiv and placing labels in global array label, return number of labels
 short unsigned int label_components(uint64_t gol[]) {
-    int i,ij,sum,maxoverlap;                                //   abc   scan mask to calculate label at position e
+    int i,ij;                                               //   abc   scan mask to calculate label at position e
     short unsigned int nlabel = 0;                          //   de
-    short unsigned int lab,conn,connprev,connf,maxlabel;
+   /* short unsigned int lab;
     int dx[9]={0,-1,0,1,1,1,0,-1,-1};
     int dy[9]={0,-1,-1,-1,0,1,1,1,0};
+    unsigned int conn,sum;*/
     static int first = 1;
     if(!first) {
         oldncomponents = ncomponents;
@@ -1735,17 +1841,20 @@ short unsigned int label_components(uint64_t gol[]) {
         first = 0;
     }
     for(ij=0;ij<N2;ij++) label[ij]=0;
-    for(ij=0;ij<(N2>>2);ij++) eqv[ij].pt=0;
-    for(ij=0;ij<(N2>>2);ij++) eqv[ij].rank=0;
+    for(ij=0;ij<(N2<<2);ij++) {
+        eqv[ij].pt=0;
+        eqv[ij].rank=0;
+        eqv[ij].size=0;
+    }
     
     for(ij=0;ij<N2;ij++) {                                  // do first pass main array
         if (gol[ij]) {
             label[ij]=label_cell(ij,&nlabel);
         }
     }
-    for(ij=0;ij<N;ij++) {                                   // redo first row sites to take periodic wrap around into account
-        if (gol[ij]) {
-            label[ij]=label_cell(ij,&nlabel);
+    for(i=0;i<N;i++) {                                   // redo first row sites to take periodic wrap around into account
+        if (gol[i]) {
+            label[i]=label_cell(i,&nlabel);
         }
     }
     for(ij=N;ij<N2;ij+=N) {                                 // redo first column sites to take periodic wrap around into account
@@ -1753,138 +1862,105 @@ short unsigned int label_components(uint64_t gol[]) {
             label[ij]=label_cell(ij,&nlabel);
         }
     }
-    // checklabels(eqv,&nlabel);                            // check labels point to lower values in equivalence table
+    //checklabels(eqv,&nlabel);                             // check labels point to lower values in equivalence table
     flattenlabels(eqv,&nlabel);                             // single pass flatten of equivalence table
     
-    for(ij=0;ij<N2;ij++) {                                  // do second pass of main array assigning final root labels
+    for(ij=0;ij<N2;ij++) {                                  // do second pass of main array assigning final root labels and sizes (nr pixels)
         if (gol[ij]) {
             label[ij]=eqv[label[ij]].pt;
-       }
+            eqv[label[ij]].size++;
+        }
     }
-
-    for(i=0;i<NLM;i++) connlists[i]=0;                      // intialize all connection lists to zero
-    for(i=0;i<NLM;i++) connlen[i]=0;
-    for(i=0;i<NLM;i++) connlistsf[i]=0;
-    for(i=0;i<NLM;i++) connlenf[i]=0;
+                                                            // create continuity in labels to allow visual tracking of components NYF
+    //for(ij=0;ij<oldncomponents+nlabel;ij++) eqv[ij].pt=ij;  // equiv reinitialization with separate lists for t-1 and t
+    //for(ij=0;ij<oldncomponents+nlabel;ij++) eqv12[ij].pt=ij;// equiv (forward) initialization for separate lists for t-1 and t
+    //for(ij=0;ij<oldncomponents+nlabel;ij++) eqv21[ij].pt=ij;// equiv /backward) reinitialization for separate lists for t and t-1
+/*    for(i=0;i<NLM;i++) connlists[i]=0;
     for(ij=0;ij<N2;ij++) {
-        connections[ij].next=connections[ij].nextf=0;
+        connections[ij].next=0;
         connections[ij].oldlab=connections[ij].newlab=0;
-        connections[ij].overlap=0;
     }
-    connused=0;
-
-    for(ij=0;ij<N2;ij++) {                                  // build up backwards connections for each label[ij] via nbs in t-1 frame, insert in decreasing label nr
+    connused=0;*/
+    /*
+    for(ij=0;ij<N2;ij++) {
         if(label[ij]) {
             for(int k=0;k<9;k++) {
                 if((lab=oldlabel[deltaxy(ij,dx[k],dy[k])])) {
                     conn=connlists[label[ij]];
-                    connprev=0;
-                    while(conn && connections[conn].oldlab>lab) {
-                        connprev = conn;
-                        conn=connections[conn].next;
+                    while(conn!=0) {
+                        if(connections[conn].oldlab>lab)
+                            conn=connections[conn].next;
+                        else break;
                     }
-                    if (conn) { // connections[conn].oldlab<=lab : do nothing if oldlab==lab, otherwise insert
-                        if(connections[conn].oldlab<lab) {   // insert new node
+                    if (conn) {
+                        if(connections[conn].oldlab!=lab) {   // insert new node
                             if(connused>=N2) fprintf(stderr,"Error, out of connection memory\n");
                             connections[connused].oldlab=lab;
                             connections[connused].newlab=label[ij];
-                            connections[connused].next=conn;
-                            connections[connused].overlap++;
-                            if(connprev) connections[connprev].next = connused++;
-                            else connlists[label[ij]]=connused++;
+                            connections[connused].next=connections[conn].next;
+                            connections[conn].next = connused++;
                         }
-                        else connections[conn].overlap++;
                     }
-                    else {                                    // insert as last node in connection list added
+                    else {                                    // first node in connection list added
                         if(connused>=N2) fprintf(stderr,"Error, out of connection memory\n");
                         connections[connused].oldlab=lab;
                         connections[connused].newlab=label[ij];
-                        connections[connused].overlap++;
-                        // connections[connused].next=0;
-                        if(connprev) connections[connprev].next = connused++;
-                        else connlists[label[ij]]=connused++;
+                        connections[connused].next=0;
+                        connlists[label[ij]]=connused++;
                     }
                 }
             }
         }
     }
-
-    for(i=0;i<nlabel;i++) {                                 // count number of connections to old components for each component
-        sum = 0;
-        conn=connlists[i];
-        while(conn) {
-            sum++;
-            conn=connections[conn].next;
-        }
-        connlen[i]=sum;
-    }
-    
-    for(i=0;i<nlabel;i++) {                                 // count number of connections from each old component to new components
-        conn=connlists[i];
-        while(conn) {
-            connlenf[connections[conn].oldlab]++;
-            conn=connections[conn].next;
-        }
-    }
-    
-    for(i=0;i<nlabel;i++) {                                 // weave forward connections from each old component to new components & record preference
-        conn=connlists[i];
-        maxlabel=0; maxoverlap = 0;
-        while(conn) {
-            lab=connections[conn].oldlab;
-            connf = connlistsf[lab];
-            connprev=0;
-            while(connf && connections[connf].newlab>i) {
-                connprev = connf;
-                connf = connections[connf].nextf;
+    if(totsteps>1) {
+        for(i=0;i<nlabel;i++) {
+            sum = 0;
+            conn=connlists[i];
+            while(conn) {
+                sum++;
+                conn=connections[conn].next;
             }
-            if (connf) {                                    // connections[connf].newlab<=i : do nothing if newlab==i, otherwise insert
-                if(connections[connf].newlab<i) {           // insert node conn
-                    connections[conn].nextf=connf;
-                    if(connprev) connections[connprev].nextf = conn;
-                    else connlistsf[lab]=conn;
+            connlen[i]=sum;
+            fprintf(stderr,"At timestep %d number of connections for label %d is %d first connection %d\n",totsteps,i,sum,connlists[label[ij]]);
+        }
+    }
+    */
+    
+    /*
+    for(ij=0;ij<N2;ij++) {
+        if(label[ij]) {
+            for(int k=0;k<9;k++) {
+                if((lab=oldlabel[deltaxy(ij,dx[k],dy[k])])) {
+                    label[ij] = lab_union(eqv21,label[ij],lab);
                 }
             }
-            else {                                          // insert as last node in connection list added
-                if(connprev) connections[connprev].nextf = conn;
-                else connlistsf[lab]=conn;
-            }
-            if(connections[conn].overlap>maxoverlap) {
-                maxoverlap=connections[conn].overlap;
-                maxlabel = connections[conn].oldlab;
-            }
-            conn=connections[conn].next;
         }
-        connpref[i]=maxlabel;
     }
+    for(ij=0;ij<N2;ij++) {
+        if(oldlabel[ij]) {
+            for(int k=0;k<9;k++) {
+                if((lab=label[deltaxy(ij,dx[k],dy[k])])) {
+                    label[ij] = lab_union(eqv12,label[ij],lab);
+                }
+            }
+        }
+    }
+    for(ij=0;ij<N2;ij++) if (label[ij]) eqv[label[ij]].size++;
+    for(ij=0;ij<N2;ij++) if (oldlabel[ij]) eqv[oldlabel[ij]].size++;
+    */
     
-    for(i=0;i<oldncomponents;i++) {                                 // weave forward connections from each old component to new components & record preference
-        connf=connlistsf[i];
-        maxlabel=0; maxoverlap = 0;
-        while(connf) {
-             if(connections[connf].overlap>maxoverlap) {
-                maxoverlap=connections[connf].overlap;
-                maxlabel = connections[connf].newlab;
-            }
-            connf=connections[connf].nextf;
-        }
-        connpreff[i]=maxlabel;
-    }
-
     return nlabel;
 }
 //.......................................................................................................................................................
 short unsigned int extract_components(uint64_t gol[]) {
-    int i,j,ij,ij1,log2n,nunique;
+    int i,j,ij,ij1,log2n;
     short unsigned int k,nside,nlabel,golps;
-    short unsigned int histside[log2N+1],conn;
-    static int connectout = 1;                                                                          // whether to print lists of connected component mappings t-1 t
+    short unsigned int histside[log2N+1];
 
     nlabel = label_components(gol);                                                                     // label connected components
     for(i=1;i<nlabel+1;i++) {                                                                           // initialize component structures for horizontal scan
         complist[i].lastrc=N-1;
         complist[i].label=0;
-        complist[i].pixels=0;
     }
     for (i=0;i<N;i++) {                                                                                 // find lateral limits of each component
       for (j=0; j<N; j++) {
@@ -1894,19 +1970,18 @@ short unsigned int extract_components(uint64_t gol[]) {
             if (!complist[label[ij]].label) {                                                           // if label encountered for first time
                 complist[label[ij]].label=label[ij];
                 complist[label[ij]].E=complist[label[ij]].W=i;                                          // set both horizontal bounds to first encountered x for label
-                complist[label[ij]].lastrc=i;                                                          // row contains this label
+                complist[label[ij]].lastrc=i;                                                            // row contains this label
             }
-            else if (complist[label[ij]].lastrc != i) {                                                // label reencountered for first time in row
-                if (((complist[label[ij]].lastrc+1)&(N-1)) == i) {                                     // continuation of component from previous row
+            else if (complist[label[ij]].lastrc != i) {                                                  // label reencountered for first time in row
+                if (((complist[label[ij]].lastrc+1)&(N-1)) == i) {                                       // continuation of component from previous row
                     complist[label[ij]].E=i;
                 }
-                else if (((complist[label[ij]].lastrc+1)&(N-1)) <  i) {                                // component resumes after row gap
-                    // fprintf(stderr,"HORIZ TRACK step %d setting W %d after gap at i %d j %d label %d lastrc %d\n",totsteps,i,i,j,label[ij],complist[label[ij]].lastrc);
+                else if (((complist[label[ij]].lastrc+1)&(N-1)) <  i) {                                  // component resumes after row gap
+                    // fprintf(stderr,"HORIZ TRACK step %d setting W %d after gap at i %d j %d label %d patt %d\n",totsteps,i,i,j,label[ij],complist[label[ij]].patt);
                     complist[label[ij]].W=i;
                 }
-                complist[label[ij]].lastrc=i;                                                          // row contains this label
+                complist[label[ij]].lastrc=i;                                                            // row contains this label
             }
-            complist[label[ij]].pixels++;
         }
       }
     }
@@ -1922,42 +1997,40 @@ short unsigned int extract_components(uint64_t gol[]) {
             if (!complist[label[ij]].label) {                                                           // if label encountered for first time
                 complist[label[ij]].label=label[ij];
                 complist[label[ij]].N=complist[label[ij]].S=j;                                          // set both vertical bounds to first encountered x for label
-                complist[label[ij]].lastrc=j;                                                          // col contains this label
+                complist[label[ij]].lastrc=j;                                                            // col contains this label
             }
-            else if (complist[label[ij]].lastrc != j) {                                                // label reencountered for first time in col
-                if (((complist[label[ij]].lastrc+1)&(N-1)) == j) {                                     // continuation of component from previous col
+            else if (complist[label[ij]].lastrc != j) {                                                  // label reencountered for first time in col
+                if (((complist[label[ij]].lastrc+1)&(N-1)) == j) {                                       // continuation of component from previous col
                     complist[label[ij]].S=j;
                 }
-                else if (((complist[label[ij]].lastrc+1)&(N-1)) <  j) {                                // component resumes after col gap
-                    // fprintf(stderr,"VERT  TRACK step %d setting N %d after gap at i %d j %d label %d lastrc %d\n",totsteps,j,i,j,label[ij],complist[label[ij]].lastrc);
+                else if (((complist[label[ij]].lastrc+1)&(N-1)) <  j) {                                  // component resumes after col gap
+                    // fprintf(stderr,"VERT  TRACK step %d setting N %d after gap at i %d j %d label %d patt %d\n",totsteps,j,i,j,label[ij],complist[label[ij]].patt);
                     complist[label[ij]].N=j;
                 }
-                complist[label[ij]].lastrc=j;                                                          // col contains this label
+                complist[label[ij]].lastrc=j;                                                            // col contains this label
             }
         }
       }
     }
 
     for(i=1;i<nlabel;i++) {
+        complist[i].corner = N*complist[i].N +complist[i].W;                                            // top left corner of component square image
         nside=((complist[i].E-complist[i].W)&(N-1));                                                    // modulo calculation required if component cross periodic boundary
         k = ((complist[i].S-complist[i].N)&(N-1));
         nside = nside > k ? nside+1 : k+1;                                                              // side length of square one more than greater of vertical & horiz. difference
         for(log2n=0;(1<<log2n)<nside;log2n++);
         complist[i].log2n = log2n;
-        // log2n = log2n < 4 ? 4 : log2n;                                                               // minimum square side for quadimage is 16, so min log2n is 4
+        // log2n = log2n < 4 ? 4 : log2n;                                                                  // minimum square side for quadimage is 16, so min log2n is 4
         nside = 1<<log2n;                                                                               // convert nside to next power of 2 for quadtree analysis;
         for(ij=0;ij<nside*nside;ij++) {
-            ij1 =  (complist[i].W+(ij&(nside-1))&(N-1)) +                                               // calculate coordinate ij1 in full array of ij index in the component square
-                  N*((complist[i].N+(ij>>log2n))&(N-1));
+            ij1 =  (complist[i].corner+(ij&(nside-1))&(N-1)) +                                          // calculate coordinate ij1 in full array of ij index in the component square
+                  N*(((complist[i].corner>>log2N)+(ij>>log2n))&(N-1));
             working[ij] = (label[ij1]==i) ? 0x1ull : 0ull;                                              // use working to store binary component image
-        }
-        if (log2n<4) {
-            
         }
         if (quadtree) {
             complist[i].quad = quadimage(working,nside,&golps);                                         // quadtree hash code of component image: needs to work for all nside=2^n
-            if(complist[i].quad==NULL) complist[i].patt=golps;
-            else complist[i].patt=0;
+            if(complist[i].quad==NULL) complist[i].spatt=golps;
+            else complist[i].spatt=0;
         }
     }
     
@@ -1966,39 +2039,12 @@ short unsigned int extract_components(uint64_t gol[]) {
     }
     for(i=1;i<nlabel;i++) {
         histside[complist[i].log2n]++;
-        // fprintf(stderr,"step %d comp %d pixels %d rect (%d,%d, %d,%d)\n",totsteps,i,complist[i].pixels,complist[i].W,complist[i].N,complist[i].E,complist[i].S);
         /* if(complist[i].log2n>=8) {
             fprintf(stderr,"step %d component %d with log2n %d N,S,W,E %d %d %d %d\n",
                     totsteps,i,complist[i].log2n,complist[i].N,complist[i].S,complist[i].W,complist[i].E);
             for(ij=0;ij<N2;ij++) if(label[ij]==i) label[ij]=0xffff;                                    // recolour component white for debugging
         } */
     }
-    
-    if (connectout) {
-        for(i=1;i<nlabel;i++) {                                                                        // print backward connections
-            fprintf(stderr,"step %5d nr bwd conn's for newlabel %4d is %3d pref %4d:",totsteps,i,connlen[i],connpref[i]);
-            conn = connlists[i];
-            while(conn) {
-                fprintf(stderr," %4d(%3d)",connections[conn].oldlab,connections[conn].overlap);
-                conn=connections[conn].next;
-            }
-            fprintf(stderr,"\n");
-        }
-        for(i=1;i<oldncomponents;i++) {                                                                // print forward connections
-            fprintf(stderr,"step %5d nr fwd conn's for oldlabel %4d is %3d pref %4d:",totsteps,i,connlenf[i],connpreff[i]);
-            conn = connlistsf[i];
-            while(conn) {
-                fprintf(stderr," %4d(%3d)",connections[conn].newlab,connections[conn].overlap);
-                conn=connections[conn].nextf;
-            }
-            fprintf(stderr,"\n");
-        }
-    }
-    
-    // for(nunique=0,i=1;i<oldncomponents;i++) if (connlenf[i]==1 && connlen[connections[connlistsf[i]].newlab]==1) nunique++;
-    for(nunique=0,i=1;i<oldncomponents;i++) if (connpref[connpreff[i]] == i) nunique++;
-    fprintf(stderr,"step %d nr unique connections %d out of %d old components\n",totsteps,nunique,oldncomponents);
-    
     fprintf(stderr,"step %d histogram of component log2n\n",totsteps);
     fprintf(stderr,"_____________________________________________\n");
     for(i=0;i<=log2N;i++) {
@@ -4002,7 +4048,6 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     fprintf(stderr,"population size %d with %d different genes\n",cnt,hcnt);
     
     // if(quadtree) qimage = quadimage(gol,N);
-    if (colorfunction==9) ncomponents=extract_components(gol);
 #endif
 }
 //------------------------------------------------------- set ...---------------------------------------------------------------------------
@@ -4055,13 +4100,13 @@ void set_rbackground(int rbackgroundin, int randomsoupin) {
     if(!rbackground) randomsoup=0;   // do not leave patch randomsoup variable active when turning off random background
 }
 //.......................................................................................................................................................
-unsigned int set_repscheme_bits(int quadrant, int x, int y, unsigned int surviveover[]) {
+unsigned int set_repscheme_bits(int quadrant, int x, int y, int surviveover[]) {
     unsigned int quadrantval;
     
     quadrantval=(x<(Nmask>>1)? 0 : 1) + (y<(Nmask>>1)? 0 : 2);              // determine selected quadrant
     if(quadrants >= 0 && quadrants < 5) {                                   // assumes repscheme bits in pairs starting from bit 0 matching quadrants
         repscheme &=  ~(0x3llu<<(quadrants<<1));
-        repscheme |=  quadrantval<<(quadrant<<1);
+        repscheme |=  ((uint64_t) quadrantval)<<(quadrant<<1);
     }
     else if (quadrant < 6) {
         survivalmask &= ~0x3u;
@@ -4156,18 +4201,6 @@ int get_nspecies() {
         if(geneitems[k].popcount) nspeciesnow++;
     return(nspeciesnow);
 }
-
-int get_connected_comps(unsigned int outlabel[], unsigned int outconnlen[]) {
-    int i,ij;
-    for (ij=0; ij<N2; ij++) {
-        outlabel[ij] = (unsigned int) label[ij];
-    }
-    for (i=1;i<ncomponents+1;i++) {
-        outconnlen[i] = (unsigned int) connlen[i];
-    }
-    return ncomponents;
-}
-
 int get_ncomponents() {
     return(ncomponents);
 }

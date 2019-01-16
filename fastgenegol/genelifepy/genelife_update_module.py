@@ -10,12 +10,14 @@ import numpy.ctypeslib as npct
 from ctypes import c_int
 from ctypes import c_uint64
 from ctypes import c_uint32
+from ctypes import c_uint16
 
 # input type for genelife c to python array functions
-# must be a long unsigned int array, with single dimension that is contiguous
+# must be a short/long/_ unsigned int array, with single dimension that is contiguous
+uint16_array = npct.ndpointer(dtype=np.uint16, ndim=1, flags='CONTIGUOUS')
 uint64_array = npct.ndpointer(dtype=np.uint64, ndim=1, flags='CONTIGUOUS')
-int_array = npct.ndpointer(dtype=np.int32, ndim=1, flags='CONTIGUOUS')
 uint_array = npct.ndpointer(dtype=np.uint32, ndim=1, flags='CONTIGUOUS')
+int_array = npct.ndpointer(dtype=np.int32, ndim=1, flags='CONTIGUOUS')
 
 # load the library, using numpy mechanisms
 libcd = npct.load_library("libgenelife", ".")
@@ -59,6 +61,8 @@ libcd.get_genealogytrace.restype = None
 libcd.get_genealogytrace.argtypes = [uint64_array,c_int]
 libcd.get_sorted_popln_act.restype = c_int
 libcd.get_sorted_popln_act.argtypes = [int_array, uint64_array, int_array, int_array]
+libcd.get_connected_comps.restype = c_int
+libcd.get_connected_comps.argtypes = [uint_array, uint_array]
 libcd.get_ncomponents.argtypes = None
 libcd.get_ncomponents.restype = c_int
 libcd.colorgenes1.restype = None
@@ -150,6 +154,9 @@ def get_genealogytrace(genealogytrace):
 
 def get_sorted_popln_act( gindices, genes, popcnts, activities):
     return libcd.get_sorted_popln_act(gindices, genes, popcnts, activities)
+
+def get_connected_comps(connlabel,connlen):
+    return libcd.get_connected_comps(connlabel,connlen)
 
 def get_ncomponents():
     return libcd.get_ncomponents()
