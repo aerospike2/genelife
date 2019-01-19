@@ -243,6 +243,15 @@ unsigned int connlenf[NLM];         // lengths of connection lists for connected
 unsigned int connpref[NLM];         // preferred backward connected component at time t-1 for each component at time t
 unsigned int connpreff[NLM];        // preferred forward connected component at time t for each component at time t-1
 int connused = 0;                   // used connection nodes
+//............................................... optimal linear assignment t-1 to t ....................................................................
+#include "lapjv.h"                  // modified from Tomas Kazmar python interfaced implementation of Jonker-Volgenant LAPMOD algorithm, using lapmod.c
+cost_t cclap[N2];                   // sparse cost matrix for mapping connected components at t-1 to t (overlaps) containing nclap entries
+uint_t iilap[NLM];                  // indices of start of each variable length row in sparse cost matrix : first entry 0, last entry nclap
+uint_t kklap[N2];                   // column indices for successive entries in cost matrix
+int_t  xlap[NLM];                   // returned list of assignments: columns assigned to rows
+int_t  ylap[NLM];                   // returned list of assignments: rows assigned to columns
+int_t  nlap;                        // number of connected components at t-1 entering into the assignment, i.e. n for LAPMOD
+int_t  nclap;                       // number of edges between connected comp's t-1 to t entering into the assignment, == no. of cost matrix entries
 //------------------------------------------------ planes and configuration offsets----------------------------------------------------------------------
 int offdx=0,offdy=0,offdt=0;        // display chosen offsets for glider analysis with colorfunction 8
 int Noff = 9;                       // number of offsets
@@ -1719,7 +1728,7 @@ void flattenlabels(equivrec eqv[],unsigned short int *nlabel) {
 //.......................................................................................................................................................
 // fast component labelling, updating global equivalence table equiv and placing labels in global array label, return number of labels
 short unsigned int label_components(uint64_t gol[]) {
-    int i,ij,sum,maxoverlap;                                //   abc   scan mask to calculate label at position e
+    int i,ij,sum,maxoverlap,overallmaxoverlap,ret;          //   abc   scan mask to calculate label at position e
     short unsigned int nlabel = 0;                          //   de
     short unsigned int lab,conn,connprev,connf,maxlabel;
     int dx[9]={0,-1,0,1,1,1,0,-1,-1};
@@ -1834,12 +1843,12 @@ short unsigned int label_components(uint64_t gol[]) {
             lab=connections[conn].oldlab;
             connf = connlistsf[lab];
             connprev=0;
-            while(connf && connections[connf].newlab>i) {
+            while(connf && connections[connf].newlab<i) {   // change to < for compatibility with lapmod sparse array order
                 connprev = connf;
                 connf = connections[connf].nextf;
             }
             if (connf) {                                    // connections[connf].newlab<=i : do nothing if newlab==i, otherwise insert
-                if(connections[connf].newlab<i) {           // insert node conn
+                if(connections[connf].newlab>i) {           // insert node conn
                     connections[conn].nextf=connf;
                     if(connprev) connections[connprev].nextf = conn;
                     else connlistsf[lab]=conn;
@@ -1858,6 +1867,7 @@ short unsigned int label_components(uint64_t gol[]) {
         connpref[i]=maxlabel;
     }
     
+    overallmaxoverlap = 0;
     for(i=0;i<oldncomponents;i++) {                                 // weave forward connections from each old component to new components & record preference
         connf=connlistsf[i];
         maxlabel=0; maxoverlap = 0;
@@ -1868,8 +1878,46 @@ short unsigned int label_components(uint64_t gol[]) {
             }
             connf=connections[connf].nextf;
         }
+        if(maxoverlap>overallmaxoverlap) overallmaxoverlap = maxoverlap;
         connpreff[i]=maxlabel;
     }
+    if (totsteps<1) return nlabel;
+    
+    for(i=0;i<N2;i++) {                                             // reset arrays used in LAP
+        cclap[i]=0;
+        kklap[i]=0;
+    }
+    for(i=0;i<NLM;i++) iilap[i]=0;
+    nlap = 0;                                                       // initialize counters
+    nclap = 0;
+    iilap[0] = 0;
+    for(i=0;i<oldncomponents;i++) {                                 // setup cost matrix as sparse array for lapmod
+        connf=connlistsf[i];
+        if(connf) {                                                 // fix so that there is always a (poor) solution for mapped components
+            cclap[nclap]=(cost_t) 4* overallmaxoverlap;
+            kklap[nclap++]=nlap;
+            nlap++;
+        }
+        while(connf) {
+            // cclap[nclap]=(cost_t) connections[connf].overlap;    // maximize cost
+            cclap[nclap]=connections[connf].overlap ? (cost_t) (1+overallmaxoverlap-connections[connf].overlap) : LARGE;   // use if lapmod minimizes cost
+            if (cclap[nclap]<0) fprintf(stderr,"error in cost matrix from genelife, negative value at %d\n",nclap);
+            kklap[nclap]=connections[connf].newlab;
+            nclap++;
+            connf=connections[connf].nextf;
+        }
+        iilap[nlap]=nclap;
+    }
+    for(i=nlap;i<=nlabel;i++) {
+        cclap[nclap]=(cost_t) 4* overallmaxoverlap;
+        kklap[nclap++]=nlap;
+        nlap++;
+        iilap[nlap]=nclap;
+    }
+
+    fprintf(stderr,"step %d lapmod called with nlap %d (out of %d) and nclap %d and ncomponents %d and maxvalue %d\n",totsteps,nlap,oldncomponents,nclap,nlabel,overallmaxoverlap);
+    ret=lapmod_internal(nlap,cclap,iilap,kklap,xlap,ylap,FP_DYNAMIC);
+    fprintf(stderr,"step %d lapmod returns %d with first three entries %d %d %d\n",totsteps,ret,xlap[0],xlap[1],xlap[2]);
 
     return nlabel;
 }
@@ -1878,9 +1926,11 @@ short unsigned int extract_components(uint64_t gol[]) {
     int i,j,ij,ij1,log2n,nunique;
     short unsigned int k,nside,nlabel,golps;
     short unsigned int histside[log2N+1],conn;
-    static int connectout = 1;                                                                          // whether to print lists of connected component mappings t-1 t
+    static int connectout = 0;                                                                          // whether to print lists of connected component mappings t-1 t
 
-    nlabel = label_components(gol);                                                                     // label connected components
+    ncomponents = label_components(gol);                                                                // label connected components
+    nlabel = ncomponents;
+    
     for(i=1;i<nlabel+1;i++) {                                                                           // initialize component structures for horizontal scan
         complist[i].lastrc=N-1;
         complist[i].label=0;
