@@ -14,7 +14,7 @@
 #include <time.h>
 #include <math.h>
 //-----------------------------------------------------------size of array -------------------------------------------------------------------------
-const int log2N = 9;                // toroidal array of side length N = 2 to the power of log2N
+const int log2N = 9;                // toroidal array of side length N = 2 to the power of log2N (minimum log2N is 6 i.e. 64x64)
 const int N = 0x1 << log2N;         // only side lengths powers of 2 allowed to enable efficient implementation of periodic boundaries
 const int N2 = N*N;                 // number of sites in square-toroidal array
 const int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
@@ -250,6 +250,8 @@ uint_t iilap[NLM];                  // indices of start of each variable length 
 uint_t kklap[N2];                   // column indices for successive entries in cost matrix
 int_t  xlap[NLM];                   // returned list of assignments: columns assigned to rows
 int_t  ylap[NLM];                   // returned list of assignments: rows assigned to columns
+int_t  dist[NLM];                   // distance along augmented paths for Hopcroft Karp matching algorithm: maxmatch
+int queue_array[NLM];               // array for queue used in Hopcroft Karp matching algorithm: maxmatch
 int_t  nlap;                        // number of connected components at t-1 entering into the assignment, i.e. n for LAPMOD
 int_t  nclap;                       // number of edges between connected comp's t-1 to t entering into the assignment, == no. of cost matrix entries
 //------------------------------------------------ planes and configuration offsets----------------------------------------------------------------------
@@ -1730,17 +1732,20 @@ void flattenlabels(equivrec eqv[],unsigned short int *nlabel) {
 short unsigned int label_components(uint64_t gol[]) {
     int i,ij,sum,maxoverlap,overallmaxoverlap,ret;          //   abc   scan mask to calculate label at position e
     short unsigned int nlabel = 0;                          //   de
+    short unsigned int oldnlabel,secured;
     short unsigned int lab,conn,connprev,connf,maxlabel;
     int dx[9]={0,-1,0,1,1,1,0,-1,-1};
     int dy[9]={0,-1,-1,-1,0,1,1,1,0};
+    void testflow(void);
+    extern int maxmatch(int m, unsigned int kk[], unsigned int ii[], int xlap[], int ylap[], int dist[]);
     static int first = 1;
     if(!first) {
-        oldncomponents = ncomponents;
+        oldnlabel = oldncomponents = ncomponents;
         for(ij=0;ij<N2;ij++) oldlabel[ij]=label[ij];
     }
     else {
         for(ij=0;ij<N2;ij++) oldlabel[ij]=0;
-        oldncomponents = 0;
+        oldnlabel = oldncomponents = 0;
         first = 0;
     }
     for(ij=0;ij<N2;ij++) label[ij]=0;
@@ -1788,12 +1793,12 @@ short unsigned int label_components(uint64_t gol[]) {
                 if((lab=oldlabel[deltaxy(ij,dx[k],dy[k])])) {
                     conn=connlists[label[ij]];
                     connprev=0;
-                    while(conn && connections[conn].oldlab>lab) {
+                    while(conn && connections[conn].oldlab<lab) {
                         connprev = conn;
                         conn=connections[conn].next;
                     }
-                    if (conn) { // connections[conn].oldlab<=lab : do nothing if oldlab==lab, otherwise insert
-                        if(connections[conn].oldlab<lab) {   // insert new node
+                    if (conn) { // connections[conn].oldlab>=lab : if oldlab>lab insert & increment overlap, else just increment overlap
+                        if(connections[conn].oldlab>lab) {   // insert new node
                             if(connused>=N2) fprintf(stderr,"Error, out of connection memory\n");
                             connections[connused].oldlab=lab;
                             connections[connused].newlab=label[ij];
@@ -1818,7 +1823,7 @@ short unsigned int label_components(uint64_t gol[]) {
         }
     }
 
-    for(i=0;i<nlabel;i++) {                                 // count number of connections to old components for each component
+    for(i=1;i<=nlabel;i++) {                                 // count number of connections to old components for each component
         sum = 0;
         conn=connlists[i];
         while(conn) {
@@ -1828,7 +1833,7 @@ short unsigned int label_components(uint64_t gol[]) {
         connlen[i]=sum;
     }
     
-    for(i=0;i<nlabel;i++) {                                 // count number of connections from each old component to new components
+    for(i=1;i<=nlabel;i++) {                                 // count number of connections from each old component to new components
         conn=connlists[i];
         while(conn) {
             connlenf[connections[conn].oldlab]++;
@@ -1836,7 +1841,7 @@ short unsigned int label_components(uint64_t gol[]) {
         }
     }
     
-    for(i=0;i<nlabel;i++) {                                 // weave forward connections from each old component to new components & record preference
+    for(i=1;i<=nlabel;i++) {                                 // weave forward connections from each old component to new components & record preference
         conn=connlists[i];
         maxlabel=0; maxoverlap = 0;
         while(conn) {
@@ -1868,7 +1873,7 @@ short unsigned int label_components(uint64_t gol[]) {
     }
     
     overallmaxoverlap = 0;
-    for(i=0;i<oldncomponents;i++) {                                 // weave forward connections from each old component to new components & record preference
+    for(i=1;i<=oldnlabel;i++) {                             // calclulate max overlap connection and overall max overlap
         connf=connlistsf[i];
         maxlabel=0; maxoverlap = 0;
         while(connf) {
@@ -1883,41 +1888,63 @@ short unsigned int label_components(uint64_t gol[]) {
     }
     if (totsteps<1) return nlabel;
     
-    for(i=0;i<N2;i++) {                                             // reset arrays used in LAP
+    for(i=0;i<N2;i++) {                                    // reset arrays used in LAP
         cclap[i]=0;
         kklap[i]=0;
     }
     for(i=0;i<NLM;i++) iilap[i]=0;
-    nlap = 0;                                                       // initialize counters
+    nlap = 0;                                              // initialize counters
     nclap = 0;
     iilap[0] = 0;
-    for(i=0;i<oldncomponents;i++) {                                 // setup cost matrix as sparse array for lapmod
+    for(i=1;i<=oldnlabel;i++) {                            // setup cost matrix as sparse array for lapmod
         connf=connlistsf[i];
-        if(connf) {                                                 // fix so that there is always a (poor) solution for mapped components
-            cclap[nclap]=(cost_t) 4* overallmaxoverlap;
-            kklap[nclap++]=nlap;
-            nlap++;
-        }
+        secured = 1;                                       // do not add secured labels for maxmatch, set to 0 for lapmod
         while(connf) {
-            // cclap[nclap]=(cost_t) connections[connf].overlap;    // maximize cost
-            cclap[nclap]=connections[connf].overlap ? (cost_t) (1+overallmaxoverlap-connections[connf].overlap) : LARGE;   // use if lapmod minimizes cost
+            if(connections[connf].newlab-1==nlap) secured = 1;          // this connection will provide the necessary secure backup for a perfect match
+            else if(connections[connf].newlab-1>nlap && !secured) {     // this is the right place to insert the j==i backup match
+                secured = 1;
+                cclap[nclap]=(cost_t) 100 * overallmaxoverlap; // alternatively use LARGE (results in error);
+                kklap[nclap++]=nlap;
+            }
+            kklap[nclap]=connections[connf].newlab;           // for maxmatch labels for sparse cost matrix column index kk are newlab : and run from 1 to nlabel
+            cclap[nclap]=connections[connf].overlap ? (cost_t) (1+overallmaxoverlap-connections[connf].overlap) : (cost_t) 100 * overallmaxoverlap;   // use if lapmod minimizes cost
             if (cclap[nclap]<0) fprintf(stderr,"error in cost matrix from genelife, negative value at %d\n",nclap);
-            kklap[nclap]=connections[connf].newlab;
             nclap++;
             connf=connections[connf].nextf;
         }
+        if(!secured) {                                     // if still not secured because matches never reached j>=i, insert the j==i backup match
+            secured = 1;
+            cclap[nclap]=(cost_t) 100 * overallmaxoverlap; // alternatively use LARGE (results in error);
+            kklap[nclap++]=nlap;
+        }
+        nlap++; // end of row
         iilap[nlap]=nclap;
     }
-    for(i=nlap;i<=nlabel;i++) {
-        cclap[nclap]=(cost_t) 4* overallmaxoverlap;
-        kklap[nclap++]=nlap;
+    ret=maxmatch(nlap,kklap,iilap,xlap,ylap,dist);
+    
+    /* do this for lapmod not maxmatch
+    for(i=nlap;i<=nlabel;i++) {                            // if nlabel > oldnlabel, then fill out cost matrix further with dummy nodes
+        cclap[nclap]=(cost_t) 100 * overallmaxoverlap;     // alternatively use LARGE (results in error);
+        kklap[nclap++]=i;
         nlap++;
         iilap[nlap]=nclap;
+    } */
+    // testflow();  // maximum flow test case
+    /*
+    fprintf(stderr,"Linear Assignment Problem cc,kk output\n");
+    for(i=0,ij=0;ij<nclap;ij++) {
+        while(iilap[i]<=ij) {
+            i++;
+            fprintf(stderr,"\n");
+        }
+        fprintf(stderr,"ij %d i %d j=kk[ij] %d cc[ij] %f ii[i] %d connlenf[i] %d\n",ij,i,kklap[ij],cclap[ij],iilap[i],connlenf[i]);
     }
+    */
 
-    fprintf(stderr,"step %d lapmod called with nlap %d (out of %d) and nclap %d and ncomponents %d and maxvalue %d\n",totsteps,nlap,oldncomponents,nclap,nlabel,overallmaxoverlap);
-    ret=lapmod_internal(nlap,cclap,iilap,kklap,xlap,ylap,FP_DYNAMIC);
-    fprintf(stderr,"step %d lapmod returns %d with first three entries %d %d %d\n",totsteps,ret,xlap[0],xlap[1],xlap[2]);
+
+//    fprintf(stderr,"step %d lapmod called with nlap %d (out of %d) and nclap %d and ncomponents %d and maxvalue %d\n",totsteps,nlap,oldnlabel,nclap,nlabel,overallmaxoverlap);
+//    ret=lapmod_internal(nlap,cclap,iilap,kklap,xlap,ylap,FP_DYNAMIC);
+//    fprintf(stderr,"step %d lapmod returns %d with first three entries %d %d %d\n",totsteps,ret,xlap[0],xlap[1],xlap[2]);
 
     return nlabel;
 }
@@ -1926,12 +1953,12 @@ short unsigned int extract_components(uint64_t gol[]) {
     int i,j,ij,ij1,log2n,nunique;
     short unsigned int k,nside,nlabel,golps;
     short unsigned int histside[log2N+1],conn;
-    static int connectout = 0;                                                                          // whether to print lists of connected component mappings t-1 t
+    static int connectout = 1;                                                                          // whether to print lists of connected component mappings t-1 t
 
     ncomponents = label_components(gol);                                                                // label connected components
     nlabel = ncomponents;
     
-    for(i=1;i<nlabel+1;i++) {                                                                           // initialize component structures for horizontal scan
+    for(i=1;i<=nlabel;i++) {                                                                           // initialize component structures for horizontal scan
         complist[i].lastrc=N-1;
         complist[i].label=0;
         complist[i].pixels=0;
@@ -1960,7 +1987,7 @@ short unsigned int extract_components(uint64_t gol[]) {
         }
       }
     }
-    for(i=1;i<nlabel+1;i++) {                                                                           // initialize component structures for vertical scan
+    for(i=1;i<=nlabel;i++) {                                                                           // initialize component structures for vertical scan
         complist[i].lastrc=N-1;
         complist[i].label=0;
     }
@@ -1988,7 +2015,7 @@ short unsigned int extract_components(uint64_t gol[]) {
       }
     }
 
-    for(i=1;i<nlabel;i++) {
+    for(i=1;i<=nlabel;i++) {
         nside=((complist[i].E-complist[i].W)&(N-1));                                                    // modulo calculation required if component cross periodic boundary
         k = ((complist[i].S-complist[i].N)&(N-1));
         nside = nside > k ? nside+1 : k+1;                                                              // side length of square one more than greater of vertical & horiz. difference
@@ -2014,7 +2041,7 @@ short unsigned int extract_components(uint64_t gol[]) {
     for(i=0;i<=log2N;i++) {
         histside[i]=0;
     }
-    for(i=1;i<nlabel;i++) {
+    for(i=1;i<=nlabel;i++) {
         histside[complist[i].log2n]++;
         // fprintf(stderr,"step %d comp %d pixels %d rect (%d,%d, %d,%d)\n",totsteps,i,complist[i].pixels,complist[i].W,complist[i].N,complist[i].E,complist[i].S);
         /* if(complist[i].log2n>=8) {
@@ -2025,8 +2052,9 @@ short unsigned int extract_components(uint64_t gol[]) {
     }
     
     if (connectout) {
-        for(i=1;i<nlabel;i++) {                                                                        // print backward connections
-            fprintf(stderr,"step %5d nr bwd conn's for newlabel %4d is %3d pref %4d:",totsteps,i,connlen[i],connpref[i]);
+        fprintf(stderr,"BACKWARD\n");
+        for(i=1;i<=nlabel;i++) {                                                                        // print backward connections
+            fprintf(stderr,"step %5d: %3d bwd conn's for newlabel %4d prefers %4d assigned y%4d:",totsteps,connlen[i],i,connpref[i],ylap[i]);
             conn = connlists[i];
             while(conn) {
                 fprintf(stderr," %4d(%3d)",connections[conn].oldlab,connections[conn].overlap);
@@ -2034,8 +2062,9 @@ short unsigned int extract_components(uint64_t gol[]) {
             }
             fprintf(stderr,"\n");
         }
-        for(i=1;i<oldncomponents;i++) {                                                                // print forward connections
-            fprintf(stderr,"step %5d nr fwd conn's for oldlabel %4d is %3d pref %4d:",totsteps,i,connlenf[i],connpreff[i]);
+        fprintf(stderr,"FORWARD\n");
+        for(i=1;i<=oldncomponents;i++) {                                                                // print forward connections
+            fprintf(stderr,"step %5d: %3d fwd conn's for oldlabel %4d prefers %4d assigned x%4d:",totsteps,connlenf[i],i,connpreff[i],xlap[i]);
             conn = connlistsf[i];
             while(conn) {
                 fprintf(stderr," %4d(%3d)",connections[conn].newlab,connections[conn].overlap);
@@ -2045,8 +2074,26 @@ short unsigned int extract_components(uint64_t gol[]) {
         }
     }
     
-    // for(nunique=0,i=1;i<oldncomponents;i++) if (connlenf[i]==1 && connlen[connections[connlistsf[i]].newlab]==1) nunique++;
-    for(nunique=0,i=1;i<oldncomponents;i++) if (connpref[connpreff[i]] == i) nunique++;
+    for(i=0;i<=oldncomponents+ncomponents;i++) dist[i]=i;                                              // use dist array to map labels new to old and down fill
+    for(i=1;i<=oldncomponents;i++) if(!xlap[i]) dist[i]=0;
+    
+    for(i=oldncomponents+1;i<=oldncomponents+ncomponents;i++) {
+        if(ylap[i-oldncomponents]) {
+            dist[i] = ylap[i-oldncomponents];
+        }
+    }
+                                                                                                   // down filling is not working - needs correction - tricky
+    /* for(ij=1,i=oldncomponents+1;i<=oldncomponents+ncomponents;i++) {
+            while ((((dist[ij]!=0) && (ij<=oldncomponents)) || ((dist[ij]==ij) && (ij>oldncomponents))) && ij<i) ij++;
+            dist[i] = ij;                                                                            // position of next empty site
+    }
+    fprintf(stderr,"fill top position ij %d and last label %d\n",ij,dist[oldncomponents+ncomponents]);*/
+    for(ij=0;ij<N2;ij++)
+        if(label[ij])
+            label[ij]=dist[label[ij]+oldncomponents];                                                // remap array of labels
+    
+    // for(nunique=0,i=1;i<=oldncomponents;i++) if (connlenf[i]==1 && connlen[connections[connlistsf[i]].newlab]==1) nunique++;
+    for(nunique=0,i=1;i<=oldncomponents;i++) if (connpref[connpreff[i]] == i) nunique++;
     fprintf(stderr,"step %d nr unique connections %d out of %d old components\n",totsteps,nunique,oldncomponents);
     
     fprintf(stderr,"step %d histogram of component log2n\n",totsteps);

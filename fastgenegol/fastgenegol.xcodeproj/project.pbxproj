@@ -17,6 +17,9 @@
 		529A8B7221F1BA5900A316DB /* lapmod.c in Sources */ = {isa = PBXBuildFile; fileRef = 529A8B7121F1BA5900A316DB /* lapmod.c */; };
 		529A8B7521F1CD6300A316DB /* lapmod.c in Sources */ = {isa = PBXBuildFile; fileRef = 529A8B7121F1BA5900A316DB /* lapmod.c */; };
 		529A8B7621F1CD6400A316DB /* lapmod.c in Sources */ = {isa = PBXBuildFile; fileRef = 529A8B7121F1BA5900A316DB /* lapmod.c */; };
+		529A8B8321F7200800A316DB /* maxmatch.c in Sources */ = {isa = PBXBuildFile; fileRef = 529A8B7E21F64D2A00A316DB /* maxmatch.c */; };
+		529A8B8421F7200A00A316DB /* maxmatch.c in Sources */ = {isa = PBXBuildFile; fileRef = 529A8B7E21F64D2A00A316DB /* maxmatch.c */; };
+		529A8B8521F7200C00A316DB /* maxmatch.c in Sources */ = {isa = PBXBuildFile; fileRef = 529A8B7E21F64D2A00A316DB /* maxmatch.c */; };
 		52A14B3F2177387E000E2ED4 /* hashtable.h in Headers */ = {isa = PBXBuildFile; fileRef = 52A14B3E2177387E000E2ED4 /* hashtable.h */; };
 		52F19B3D21ADF41200D33844 /* lsb64.c in Sources */ = {isa = PBXBuildFile; fileRef = 52F19B3121ADF18500D33844 /* lsb64.c */; };
 /* End PBXBuildFile section */
@@ -126,6 +129,8 @@
 		529A8B6D21EE297800A316DB /* subgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = subgenelife.c; sourceTree = "<group>"; };
 		529A8B7121F1BA5900A316DB /* lapmod.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = lapmod.c; sourceTree = "<group>"; };
 		529A8B7321F1BA9C00A316DB /* lapjv.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = lapjv.h; sourceTree = "<group>"; };
+		529A8B7921F62CF400A316DB /* maxflow.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = maxflow.c; sourceTree = "<group>"; };
+		529A8B7E21F64D2A00A316DB /* maxmatch.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = maxmatch.c; sourceTree = "<group>"; };
 		52A14B3E2177387E000E2ED4 /* hashtable.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hashtable.h; sourceTree = "<group>"; };
 		52DB371F21507BCF0087F098 /* subgenelife_cyclic_cc.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = subgenelife_cyclic_cc.c; path = genelifec/subgenelife_cyclic_cc.c; sourceTree = SOURCE_ROOT; };
 		52F19B3021ABE7F900D33844 /* sumtest.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = sumtest.c; sourceTree = "<group>"; };
@@ -208,6 +213,8 @@
 			isa = PBXGroup;
 			children = (
 				529A8B7321F1BA9C00A316DB /* lapjv.h */,
+				529A8B7921F62CF400A316DB /* maxflow.c */,
+				529A8B7E21F64D2A00A316DB /* maxmatch.c */,
 				529A8B7121F1BA5900A316DB /* lapmod.c */,
 				52A14B3E2177387E000E2ED4 /* hashtable.h */,
 				521FDCF41F287ECE00F08FFB /* fastgol.c */,
@@ -524,6 +531,7 @@
 			files = (
 				529A8B7621F1CD6400A316DB /* lapmod.c in Sources */,
 				0DD73C052150EF8700F3FF92 /* dispgenelife.c in Sources */,
+				529A8B8421F7200A00A316DB /* maxmatch.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -533,6 +541,7 @@
 			files = (
 				529A8B7521F1CD6300A316DB /* lapmod.c in Sources */,
 				5206B822215088E300394209 /* actgenelife.c in Sources */,
+				529A8B8521F7200C00A316DB /* maxmatch.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -558,6 +567,7 @@
 			files = (
 				529A8B7221F1BA5900A316DB /* lapmod.c in Sources */,
 				529A8B6E21EE297800A316DB /* subgenelife.c in Sources */,
+				529A8B8321F7200800A316DB /* maxmatch.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
