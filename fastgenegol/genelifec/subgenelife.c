@@ -1737,7 +1737,7 @@ short unsigned int label_components(uint64_t gol[]) {
     short unsigned int nlabel = 0;                          //   de
     short unsigned int oldnlabel;                           //   with lapmod need also: ret
     short unsigned int lab,conn,connprev,connf,maxlabel;
-    int nunique,nzconnect;
+    int nunique,nzconnect,nremconnect;
     int dx[9]={0,-1,0,1,1,1,0,-1,-1};
     int dy[9]={0,-1,-1,-1,0,1,1,1,0};
     static int connectout = 0;                              // whether to print lists of connected component mappings t-1 t
@@ -1984,7 +1984,8 @@ short unsigned int label_components(uint64_t gol[]) {
 
     for(nunique=0,i=1;i<=oldnlabel;i++) if (connpref[connpreff[i]] == i) nunique++;
     for(nzconnect=0,i=1;i<=oldnlabel;i++) if (!connlistsf[i]) nzconnect++;
-    fprintf(stderr,"step %d:  %d matched connections  %d unique connections  %d no connections  out of %d old components and %d new\n",totsteps,nmatched,nunique,nzconnect,oldnlabel,nlabel);
+    for(nremconnect=0,i=1;i<=oldnlabel;i++) if (iilap[i]==iilap[i-1]) nremconnect++;       // this includes those components with all connections removed by nunique pairs
+    fprintf(stderr,"step %d:  %d(%d) matched(unique) & %d(%d) no-residual(no) connections i.e. %d out of %d(%d) old(new) components\n",totsteps,nmatched,nunique,nremconnect,nzconnect,nmatched+nremconnect,oldnlabel,nlabel);
     
     /* do this for lapmod not maxmatch
     for(i=nlap;i<=nlabel;i++) {                            // if nlabel > oldnlabel, then fill out cost matrix further with dummy nodes
@@ -2115,11 +2116,11 @@ short unsigned int extract_components(uint64_t gol[]) {
         } */
     }
 
-    fprintf(stderr,"step %d histogram of component log2n\n",totsteps);
-    fprintf(stderr,"_____________________________________________\n");
-    for(i=0;i<=log2N;i++) {
-        fprintf(stderr,"%d counts %d\n",i,histside[i]);
-    }
+    // fprintf(stderr,"step %d histogram of component log2n\n",totsteps);
+    fprintf(stderr,"histogram log2n ");for(i=0;i<=log2N;i++) fprintf(stderr," %5d",i);fprintf(stderr,"\n");
+    fprintf(stderr,"conn cmpt counts");for(i=0;i<=log2N;i++) fprintf(stderr," %5d",histside[i]);fprintf(stderr,"\n");
+    fprintf(stderr,"------------------------------------\n");
+
     return nlabel;
 }
 //------------------------------------------------------- geography -----------------------------------------------------------------------------------
