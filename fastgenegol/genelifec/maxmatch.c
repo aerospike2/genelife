@@ -174,15 +174,15 @@ int hopcroftKarp(int m, int n, unsigned int kk[], unsigned int ii[], int pairU[]
   
     for (int u=0; u<=m; u++)                     // Initialize NIL as pair of all vertices
         pairU[u] = NIL;
-    for (int v=0; v<=n; v++)
+    for (int v=0; v<=n; v++)                     // Note that not all of right vertices n have edges to them
         pairV[v] = NIL;
   
-    int result = 0;                             // Initialize result
+    int result = 0;                              // Initialize result
   
-    while (bfs(m,kk,ii,pairU,pairV,dist))       // Keep updating the result while there is an augmenting path.
+    while (bfs(m,kk,ii,pairU,pairV,dist))        // Keep updating the result while there is an augmenting path.
     {
-        for (int u=1; u<=m; u++)                // Find a free vertex
-                                                // If current vertex is free and there is an augmenting path from current vertex
+        for (int u=1; u<=m; u++)                 // Find a free vertex
+                                                 // If current vertex is free and there is an augmenting path from current vertex
             if (pairU[u]==NIL && dfs(u,kk,ii,pairU,pairV,dist))
                 result++;
     }
@@ -192,7 +192,8 @@ int hopcroftKarp(int m, int n, unsigned int kk[], unsigned int ii[], int pairU[]
 int maxmatch(int m, unsigned int kk[], unsigned int ii[], int pairU[], int pairV[], int dist[])
 {
     int i,n;
-    for (n=i=0;i<ii[m];i++) n = kk[i] > n ? kk[i] : n;                           // calculate n as maximum vertex on right
-    fprintf(stderr,"Size of maximum matching is %d\n",n=hopcroftKarp(m,n,kk,ii,pairU,pairV,dist));
-    return n;
+    for (n=i=0;i<ii[m];i++) n = kk[i] > n ? kk[i] : n;    // calculate n as maximum vertex on right
+    i=hopcroftKarp(m,n,kk,ii,pairU,pairV,dist);
+    // fprintf(stderr,"Size of maximum matching is %d\n",i);
+    return i;
 }
