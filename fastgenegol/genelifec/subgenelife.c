@@ -126,10 +126,12 @@ typedef struct genedata {           // value of keys stored for each gene encoun
             int lastextinctionframe;// this is initialized to -1, meaning no extinctions yet
             int activity;           // initialized to 0
             int nextinctions;       // initialized to 0
+            int reserve;            // reserved for future use
+            uint64_t gene;          // stored gene : note that two difft 64-bit genes may be stored at same location, so need check
             uint64_t firstancestor; // this is initialized to a special gene seq not likely ever to occur for starting genes
             } genedata;
 const uint64_t rootgene = 0xfedcba9876543210; // initial special gene as root for genealogies
-genedata ginitdata = {1,0,-1,0,0,rootgene};  // initialization data structure for gene data
+genedata ginitdata = {1,0,-1,0,0,0,0ull,rootgene};  // initialization data structure for gene data
 genedata *genedataptr;              // pointer to a genedata instance
 HASHTABLE_SIZE_T const* genotypes;  // pointer to stored hash table keys (which are the genotypes)
 genedata* geneitems;                // list of genedata structured items stored in hash table
@@ -1227,6 +1229,7 @@ extern inline void hashaddgene(uint64_t gene,uint64_t ancestor) {
     if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) genedataptr->popcount++;
     else {
         gdata=ginitdata;
+        gdata.gene = gene;
         gdata.firstbirthframe = totsteps;
         gdata.firstancestor = ancestor;
         hashtable_insert(&genetable, gene,(genedata *) &gdata);
@@ -1252,6 +1255,7 @@ extern inline void hashreplacegene(uint64_t gene1,uint64_t gene2,uint64_t ancest
     if((genedataptr = (genedata *) hashtable_find(&genetable, gene2)) != NULL) genedataptr->popcount++;
     else {
         gdata=ginitdata;
+        gdata.gene = gene2;
         gdata.firstbirthframe = totsteps;
         gdata.firstancestor = ancestor;
         hashtable_insert(&genetable, gene2,(genedata *) &gdata);
@@ -1328,7 +1332,7 @@ extern inline uint64_t node_hash(const void *a, const void *b, const void *c, co
 extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, const uint64_t sw, const uint64_t se) {
 #ifdef HASH
         quadnode *q;
-        uint64_t h;
+        uint64_t h,nnw,nne,nsw,nse;
         int nr1,nr1s;
         h = patt_hash(nw,ne,sw,se);
         if((q = (quadnode *) hashtable_find(&quadtable, h)) != NULL) {
@@ -1337,11 +1341,40 @@ extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, co
                 q->hits++;q->active=1;
             }
             else {                                      // collision in hash table at leaf level
-                quadcollisions++;
-                fprintf(stderr,"at %d quadhash pattern collision %llx %llx %llx %llx hash %llx collides %llx %llx %llx %llx\n",
-                        totsteps,nw,ne,sw,se,h,q->nw.patt,q->ne.patt,q->sw.patt,q->se.patt);
-                while(q->next != NULL && (q = (quadnode *) hashtable_find(&quadtable, q->next->key)) != NULL) {
-                // STILL NEED TO RESOLVE ANY COLLISIONS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                // quadcollisions++;
+                // fprintf(stderr,"at %d quadhash pattern collision %llx %llx %llx %llx hash %llx collides %llx %llx %llx %llx\n",
+                //    totsteps,nw,ne,sw,se,h,q->nw.patt,q->ne.patt,q->sw.patt,q->se.patt);
+                nnw=nw*11400714819323198549ull;
+                nne=ne*11400714819323198549ull;
+                nsw=sw*11400714819323198549ull;
+                nse=se*11400714819323198549ull;
+                h = patt_hash(nnw,nne,nsw,nse);
+                if((q = (quadnode *) hashtable_find(&quadtable, h)) != NULL) {
+                                                        // check if pattern found in hash table is correct
+                    if( nw == q->nw.patt &&  ne == q->ne.patt && sw == q->sw.patt && se ==q->se.patt && !q->isnode) {
+                        q->hits++;q->active=1;
+                    }
+                    else {                                      // collision in hash table at leaf level
+                        quadcollisions++;
+                        fprintf(stderr,"at %d quadhash 2ndary pattern collision %llx %llx %llx %llx hash %llx collides %llx %llx %llx %llx\n",
+                                totsteps,nw,ne,sw,se,h,q->nw.patt,q->ne.patt,q->sw.patt,q->se.patt);
+                    }
+                }
+                else {                                           // new node or pattern, save in hash table
+                    quadinit.isnode=0;
+                    quadinit.nw.patt=nw;
+                    quadinit.ne.patt=ne;
+                    quadinit.sw.patt=sw;
+                    quadinit.se.patt=se;
+                    quadinit.size=16;
+                    quadinit.firsttime=totsteps;
+                    POPCOUNT64C(nw,nr1);nr1s=nr1;
+                    POPCOUNT64C(ne,nr1);nr1s+=nr1;
+                    POPCOUNT64C(sw,nr1);nr1s+=nr1;
+                    POPCOUNT64C(se,nr1);nr1s+=nr1;
+                    quadinit.pop1s =nr1s;
+                    hashtable_insert(&quadtable, h,(quadnode *) &quadinit);
+                    q = (quadnode *) hashtable_find(&quadtable, h);
                 }
             }
         }
@@ -1370,7 +1403,7 @@ extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, co
 extern inline quadnode * hash_node_find(const quadnode * nw, const quadnode* ne, const quadnode* sw, const quadnode* se) {
 #ifdef HASH
         quadnode *q;
-        uint64_t h;
+        uint64_t h,nnw,nne,nsw,nse;
         h = node_hash(nw,ne,sw,se);
         if((q = (quadnode *) hashtable_find(&quadtable, h)) != NULL) {
             if(nw == q->nw.node && ne == q->ne.node && sw == q->sw.node && se == q->se.node && q->isnode) { // node found in hash table
@@ -1378,11 +1411,42 @@ extern inline quadnode * hash_node_find(const quadnode * nw, const quadnode* ne,
                 /* fprintf(stderr,"at %d quadhash node repeat %llx %llx %llx %llx hash %llx\n", totsteps,
                     (uint64_t) nw,(uint64_t) ne,(uint64_t) sw,(uint64_t) se,(uint64_t) h);  // simple recording for now, later do chaining or whatever */
             }
-            else {                                       // collision in hash table at node level
-                quadcollisions++;
-                fprintf(stderr,"at %d quadhash node collision %llx %llx %llx %llx hash %llx collides %llx %llx %llx %llx\n", totsteps,
-                    (uint64_t) nw,(uint64_t) ne,(uint64_t) sw,(uint64_t) se,(uint64_t) h,
-                    (uint64_t) q->nw.node, (uint64_t) q->ne.node, (uint64_t) q->sw.node, (uint64_t) q->se.node);  // simple recording for now, later do chaining or whatever
+            else {                                      // collision in hash table at node level
+                // quadcollisions++;
+                // fprintf(stderr,"at %d quadhash node collision %llx %llx %llx %llx hash %llx collides %llx %llx %llx %llx\n", totsteps,
+                //     (uint64_t) nw,(uint64_t) ne,(uint64_t) sw,(uint64_t) se,(uint64_t) h,
+                //     (uint64_t) q->nw.node, (uint64_t) q->ne.node, (uint64_t) q->sw.node, (uint64_t) q->se.node);  // simple recording for now, later do chaining or whatever
+                nnw=(uint64_t) nw * 11400714819323198549ull;
+                nne=(uint64_t) ne * 11400714819323198549ull;
+                nsw=(uint64_t) sw * 11400714819323198549ull;
+                nse=(uint64_t) se * 11400714819323198549ull;
+                h = patt_hash(nnw,nne,nsw,nse);
+                if((q = (quadnode *) hashtable_find(&quadtable, h)) != NULL) {
+                                                        // check if pattern found in hash table is correct
+                    if(nw == q->nw.node && ne == q->ne.node && sw == q->sw.node && se == q->se.node && q->isnode) { // node found in hash table
+                        q->hits++;q->active=1;
+                    }
+                    else {                                      // collision in hash table at leaf level
+                        quadcollisions++;
+                        fprintf(stderr,"at %d quadhash node 2ndary collision %llx %llx %llx %llx hash %llx collides %llx %llx %llx %llx\n", totsteps,
+                                (uint64_t) nw,(uint64_t) ne,(uint64_t) sw,(uint64_t) se,(uint64_t) h,
+                                (uint64_t) q->nw.node, (uint64_t) q->ne.node, (uint64_t) q->sw.node, (uint64_t) q->se.node);  // simple recording for now, later do chaining or whatever
+                    }
+                }
+                else {                                           // new node or pattern, save in hash table
+                    quadinit.isnode=1;
+                    quadinit.nw.node=(quadnode *)nw;
+                    quadinit.ne.node=(quadnode *)ne;
+                    quadinit.sw.node=(quadnode *)sw;
+                    quadinit.se.node=(quadnode *)se;
+                    quadinit.firsttime=totsteps;
+                    quadinit.pop1s=nw->pop1s+ne->pop1s+sw->pop1s+se->pop1s;
+                    quadinit.size=nw->size<<2;
+                    hashtable_insert(&quadtable, h,(quadnode *) &quadinit);
+                    q = (quadnode *) hashtable_find(&quadtable, h);
+                    /* fprintf(stderr,"at %d quadhash node stored %llx %llx %llx %llx hash %llx\n", totsteps,
+                        (uint64_t) nw,(uint64_t) ne,(uint64_t) sw,(uint64_t) se,(uint64_t) h);  // simple recording for now, later do chaining or whatever */
+                }
             }
         }
         else {                                           // new node or pattern, save in hash table
