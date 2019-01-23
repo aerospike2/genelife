@@ -128,7 +128,7 @@ typedef struct genedata {           // value of keys stored for each gene encoun
             int nextinctions;       // initialized to 0
             int reserve;            // reserved for future use
             uint64_t gene;          // stored gene : note that two difft 64-bit genes may be stored at same location, so need check
-            uint64_t firstancestor; // this is initialized to a special gene seq not likely ever to occur for starting genes
+            uint64_t firstancestor; // this is initialized to a special gene seq (rootgene) not likely ever to occur for starting genes
             } genedata;
 const uint64_t rootgene = 0xfedcba9876543210; // initial special gene as root for genealogies
 genedata ginitdata = {1,0,-1,0,0,0,0ull,rootgene};  // initialization data structure for gene data
@@ -152,22 +152,27 @@ typedef struct quadnode {           // stored quadtree binary pattern nodes for 
    struct quadkey *next;            // hash-linked list of elements starting with same key : follow hash key chain
    quad nw, ne, sw, se;             // constant pointers to quadnodes or 64-bit patterns : we terminate one level higher than Gosper & golly
    struct quadnode *res;            // store cached value associated with the node (optional here)
-   unsigned char isnode,active;     // 1 if this is a node not a pattern and an active part of the current time step CA resp.
+   unsigned short isnode;           // 1 if this is a node not a pattern
    unsigned short size;             // side length of square image corresponding to quadtree pattern
    unsigned int hits;               // number of references to finding this node
    unsigned int pop1s;              // 32 bit number of 1s in quadnode
-   unsigned int firsttime;          // first time node is identified
+   unsigned int firsttime;          // first time node was identified
+   unsigned int lasttime;           // last time node was identified : used to determine if part of current timestep
+   unsigned int reserve;            // reserve field : giving size of record an even number of 64bit words
 } quadnode;
-quadnode quadinit = {NULL,0ull,0ull,0ull,0ull,NULL,0,1,0,1,0,0};
+quadnode quadinit = {NULL,0ull,0ull,0ull,0ull,NULL,0,0,1,0,0,0,0};
 quadnode * qimage;
 quadkey *freenodes;
 int quadchainmem = 0;
 int quadcollisions = 0;
 int nquadpatterns = 0;
+HASHTABLE_SIZE_T const* quadtypes;  // pointer to stored hash table keys (which are the quadtypes)
+quadnode* quaditems;                // list of quadnode structured items stored in hash table
 typedef struct smallpatt {          // stored binary patterns for 4*4 subarrays or smaller (16bit)
    unsigned short size;             // side length of square image corresponding to pattern
    unsigned int hits;               // number of references to finding this pattern
-   unsigned int firsttime;          // first time pattern is identified
+   unsigned int firsttime;          // first time pattern was identified
+   unsigned int lasttime;           // last time pattern was identified
 } smallpatt;
 smallpatt smallpatts[65536];
 #endif                              // HASH
@@ -1338,7 +1343,7 @@ extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, co
         if((q = (quadnode *) hashtable_find(&quadtable, h)) != NULL) {
                                                         // check if pattern found in hash table is correct
             if( nw == q->nw.patt &&  ne == q->ne.patt && sw == q->sw.patt && se ==q->se.patt && !q->isnode) {
-                q->hits++;q->active=1;
+                q->hits++;q->lasttime=totsteps;
             }
             else {                                      // collision in hash table at leaf level
                 // quadcollisions++;
@@ -1352,7 +1357,7 @@ extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, co
                 if((q = (quadnode *) hashtable_find(&quadtable, h)) != NULL) {
                                                         // check if pattern found in hash table is correct
                     if( nw == q->nw.patt &&  ne == q->ne.patt && sw == q->sw.patt && se ==q->se.patt && !q->isnode) {
-                        q->hits++;q->active=1;
+                        q->hits++;q->lasttime=totsteps;
                     }
                     else {                                      // collision in hash table at leaf level
                         quadcollisions++;
@@ -1368,6 +1373,7 @@ extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, co
                     quadinit.se.patt=se;
                     quadinit.size=16;
                     quadinit.firsttime=totsteps;
+                    quadinit.lasttime=totsteps;
                     POPCOUNT64C(nw,nr1);nr1s=nr1;
                     POPCOUNT64C(ne,nr1);nr1s+=nr1;
                     POPCOUNT64C(sw,nr1);nr1s+=nr1;
@@ -1386,6 +1392,7 @@ extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, co
             quadinit.se.patt=se;
             quadinit.size=16;
             quadinit.firsttime=totsteps;
+            quadinit.lasttime=totsteps;
             POPCOUNT64C(nw,nr1);nr1s=nr1;
             POPCOUNT64C(ne,nr1);nr1s+=nr1;
             POPCOUNT64C(sw,nr1);nr1s+=nr1;
@@ -1407,7 +1414,7 @@ extern inline quadnode * hash_node_find(const quadnode * nw, const quadnode* ne,
         h = node_hash(nw,ne,sw,se);
         if((q = (quadnode *) hashtable_find(&quadtable, h)) != NULL) {
             if(nw == q->nw.node && ne == q->ne.node && sw == q->sw.node && se == q->se.node && q->isnode) { // node found in hash table
-                q->hits++;q->active=1;
+                q->hits++;q->lasttime=totsteps;
                 /* fprintf(stderr,"at %d quadhash node repeat %llx %llx %llx %llx hash %llx\n", totsteps,
                     (uint64_t) nw,(uint64_t) ne,(uint64_t) sw,(uint64_t) se,(uint64_t) h);  // simple recording for now, later do chaining or whatever */
             }
@@ -1424,7 +1431,7 @@ extern inline quadnode * hash_node_find(const quadnode * nw, const quadnode* ne,
                 if((q = (quadnode *) hashtable_find(&quadtable, h)) != NULL) {
                                                         // check if pattern found in hash table is correct
                     if(nw == q->nw.node && ne == q->ne.node && sw == q->sw.node && se == q->se.node && q->isnode) { // node found in hash table
-                        q->hits++;q->active=1;
+                        q->hits++;q->lasttime=totsteps;
                     }
                     else {                                      // collision in hash table at leaf level
                         quadcollisions++;
@@ -1440,6 +1447,7 @@ extern inline quadnode * hash_node_find(const quadnode * nw, const quadnode* ne,
                     quadinit.sw.node=(quadnode *)sw;
                     quadinit.se.node=(quadnode *)se;
                     quadinit.firsttime=totsteps;
+                    quadinit.lasttime=totsteps;
                     quadinit.pop1s=nw->pop1s+ne->pop1s+sw->pop1s+se->pop1s;
                     quadinit.size=nw->size<<2;
                     hashtable_insert(&quadtable, h,(quadnode *) &quadinit);
@@ -1456,6 +1464,7 @@ extern inline quadnode * hash_node_find(const quadnode * nw, const quadnode* ne,
             quadinit.sw.node=(quadnode *)sw;
             quadinit.se.node=(quadnode *)se;
             quadinit.firsttime=totsteps;
+            quadinit.lasttime=totsteps;
             quadinit.pop1s=nw->pop1s+ne->pop1s+sw->pop1s+se->pop1s;
             quadinit.size=nw->size<<2;
             hashtable_insert(&quadtable, h,(quadnode *) &quadinit);
@@ -1488,11 +1497,13 @@ quadnode * quadimage(uint64_t gol[],int n,short unsigned int *golps) {          
             pack16neighbors(gol,golps,n);
             if(smallpatts[*golps].hits) {
                 smallpatts[*golps].hits++;
+                smallpatts[*golps].lasttime=totsteps;
             }
             else {
                 smallpatts[*golps].size=n;
                 smallpatts[*golps].hits++;
                 smallpatts[*golps].firsttime=totsteps;
+                smallpatts[*golps].lasttime=totsteps;
             }
             return NULL;
         }
@@ -4449,6 +4460,10 @@ int cmpfunc3 (const void * pa, const void * pb) {
    return ( geneitems[*(const int*)pa].popcount < geneitems[*(const int*)pb].popcount ? 1 : -1);
 }
 
+int cmpfunc3q (const void * pa, const void * pb) {
+   return ( quaditems[*(const int*)pa].pop1s < quaditems[*(const int*)pb].pop1s ? 1 : -1);
+}
+
 void countspecieshash() {  /* counts numbers of all different species using qsort first */
     int k, *golgs, nspecies, nspeciesnow, nones;
     uint64_t last;
@@ -4494,15 +4509,15 @@ void countspecieshash() {}  /* dummy routine, no effect */
 
 //------------------------------------------------------- activitieshash ---------------------------------------------------------------------------
 #ifdef HASH
-int activitieshash() {  /* count activities of all currently active species */
+int activitieshash() {  /* count activities of all currently active gene species */
     int i, j, ij, ij1, x, nspecies, nspeciesnow, popcnt0, popcnt1;
     int *gindices,*popln,*activities;
     double act;
     uint64_t *genes;
+    uint64_t gene;
     const int maxact = 10000;
     // int ymax1;
-    uint64_t gene;
-    
+
     nspecies = hashtable_count(&genetable);
     genotypes = hashtable_keys(&genetable);
     geneitems = (genedata*) hashtable_items( &genetable );
@@ -4515,14 +4530,14 @@ int activitieshash() {  /* count activities of all currently active species */
 
     for (i=j=0; i<nspecies; i++) {
         if(geneitems[i].popcount) {
-            gindices[j]=i;                                         // if col is 0 then the array gindices must be passed with sufficient length
+            gindices[j]=i;                                           // if col is 0 then the array gindices must be passed with sufficient length
             j++;
         }
         //gindices[j]=(geneitems[i].popcount) ? i : gindices[j--];   // if col is 0 then the array gindices must be passed with sufficient length
         //j++;
     }
-    if (nspeciesnow > maxact) {                             //sort with in order of decreasing population
-        qsort(gindices, nspeciesnow, sizeof(int), cmpfunc3);        // sort in decreasing count order
+    if (nspeciesnow > maxact) {                                      //sort with in order of decreasing population
+        qsort(gindices, nspeciesnow, sizeof(int), cmpfunc3);         // sort in decreasing count order
     }
     if (nspeciesnow > maxact) nspeciesnow = maxact;
 
@@ -4546,22 +4561,22 @@ int activitieshash() {  /* count activities of all currently active species */
     }
     else x=totdisp;
 
-    for(i=0;i<N;i++) acttrace[x+i*N]=rootgene;                  // set column gray
+    for(i=0;i<N;i++) acttrace[x+i*N]=rootgene;                      // set column gray
     //for(i=ymax1=0;i<nspeciesnow;i++)
     //    ymax1 = activities[i]>ymax1 ? activities[i] : ymax1;
     // if (ymax1>ymax) ymax = ymax*2;     // autoscale of activities
     // if (ymax1<ymax/2) ymax = ymax/2;   // autoscale of activities
     for(j=0;j<nspeciesnow;j++) {
-        // activities[j] = N-1 - (activities[j] * (N-1)) / ymax;        // linear scale, needs truncation if ymax superceded
+        // activities[j] = N-1 - (activities[j] * (N-1)) / ymax;    // linear scale, needs truncation if ymax superceded
         act = (double) activities[j];
-        // activities[j] = (N-1) - (int) ((N-1)*log2(act)/log2ymax);      // logarithmic scale, suffers from discrete steps at bottom
+        // activities[j] = (N-1) - (int) ((N-1)*log2(act)/log2ymax);// logarithmic scale, suffers from discrete steps at bottom
         activities[j] = (N-1) - (int) ((N-1)*act/(act+(double)ymax));
         gene = genes[j];
         ij = (x&Nmask)+activities[j]*N;
         // if(ij >= 0 && ij<N2)
-        if(acttrace[ij]==rootgene)                                      // only one genotype to plot
+        if(acttrace[ij]==rootgene)                                  // only one genotype to plot
             acttrace[ij] = gene;
-        else {                                                          // plot species color with largest current population size if chpoice of multiple
+        else {                                                      // plot species color with largest current population size if choice of multiple
             if((genedataptr = (genedata *) hashtable_find(&genetable, acttrace[ij])) != NULL)
                popcnt0 = genedataptr->popcount;
             else popcnt0 = 0;
@@ -4582,7 +4597,7 @@ int activitieshash() {return(0)}  /* dummy routine, no effect */
 #endif
 
 #ifdef HASH
-int activitieshashx(int gindices[], uint64_t genes[], int popln[], int activities[]) {  /* count activities of all currently active species */
+int activitieshashx(int gindices[], uint64_t genes[], int popln[], int activities[]) {  /* python interface to count activities of all currently active species, no display */
     int i, j, nspecies, nspeciesnow;
     const int maxact = 10000;
     
@@ -4592,16 +4607,11 @@ int activitieshashx(int gindices[], uint64_t genes[], int popln[], int activitie
 
     // if(gindices != NULL && col) free(gindices);
     for (i=0,nspeciesnow=0; i<nspecies; i++)
-        //if(geneitems[i].popcount) nspeciesnow++;                  // time critical loop, replace if by conditional
         nspeciesnow+= geneitems[i].popcount ? 1 : 0;
 
     if (nspeciesnow>10000) return(-1);                              // exit with error need to allocate more space in python
     for (i=j=0; i<nspecies; i++) {
-        //if(geneitems[i].popcount) {
-        //    gindices[j]=i;                                        // if col is 0 then the array gindices must be passed with sufficient length
-        //    j++;
-        //}
-        gindices[j]=geneitems[i].popcount ? i : gindices[j--];      // time critical loop, replace if by conditional
+        gindices[j]=geneitems[i].popcount ? i : gindices[j--];      // if col is 0 then the array gindices must be passed with sufficient length
         j++;
     }
     qsort(gindices, nspeciesnow, sizeof(int), cmpfunc3);            // sort in decreasing count order
@@ -4614,7 +4624,7 @@ int activitieshashx(int gindices[], uint64_t genes[], int popln[], int activitie
         activities[i]=geneitems[gindices[i]].activity;
     }
     
-    return(nspeciesnow);                                            // exit here unless doing display
+    return(nspeciesnow);                                            // exit here without doing display
 
 }
 #else
@@ -4626,7 +4636,88 @@ int get_sorted_popln_act( int gindices[], uint64_t genes[], int popln[], int act
     nspecies=activitieshashx(gindices, genes, popln, activities);        // sets acttrace and returns current population arrays
     return(nspecies);
 }
+//...............................................................................................................................................
+#ifdef HASH
+int activitieshashquad() {  /* count activities of all currently active quad images of connected components */
+    int i, j, ij, ij1, x, nspecies, nspeciesnow, popcnt0, popcnt1;
+    int *qindices,*popln,*activities;
+    quadnode *q;
+    double act;
+    uint64_t *qids;                                                   // 64 bit ids for components used for colouring and ID
+    uint64_t qid;
+    const int maxact = 10000;
+    
+    nspecies = hashtable_count(&quadtable);
+    quadtypes = hashtable_keys(&quadtable);
+    quaditems = (quadnode*) hashtable_items( &quadtable );
 
+    for (i=0,nspeciesnow=0; i<nspecies; i++)
+        nspeciesnow+=quaditems[i].lasttime==totsteps ? 1 : 0;
+    
+    qindices = (int *) malloc(nspeciesnow*sizeof(int));
+
+    for (i=j=0; i<nspecies; i++) {
+        if(quaditems[i].lasttime==totsteps) qindices[j++]=i;         // if col is 0 then the array gindices must be passed with sufficient length
+    }
+    if (nspeciesnow > maxact) {                                      //sort with in order of decreasing population
+        qsort(qindices, nspeciesnow, sizeof(int), cmpfunc3q);        // sort in decreasing pixel count order
+    }
+    if (nspeciesnow > maxact) nspeciesnow = maxact;
+
+    qids = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
+    popln = (int *) malloc(nspeciesnow*sizeof(int));
+    activities = (int *) malloc(nspeciesnow*sizeof(int));
+
+    for (i=0; i<nspeciesnow; i++) {
+        qids[i]=quadtypes[qindices[i]];
+        popln[i]=quaditems[qindices[i]].pop1s;
+        activities[i]=quaditems[qindices[i]].hits;
+    }
+    
+    if (totdisp>=N) {                                               // 1 pixel to left scroll when full
+        for(ij=0;ij<N2;ij++) {
+            ij1 = ((ij+1)&Nmask)+((ij>>log2N)<<log2N);              // (i+1)%N+j*N;
+            // if(ij1>=N2) fprintf(stderr,"error in scroll of acttrace\n");
+            acttrace[ij]=acttrace[ij1];
+        }
+        x=N-1;
+    }
+    else x=totdisp;
+
+    for(i=0;i<N;i++) acttrace[x+i*N]=0;                             // set column gray
+    //for(i=ymax1=0;i<nspeciesnow;i++)
+    //    ymax1 = activities[i]>ymax1 ? activities[i] : ymax1;
+    // if (ymax1>ymax) ymax = ymax*2;     // autoscale of activities
+    // if (ymax1<ymax/2) ymax = ymax/2;   // autoscale of activities
+    for(j=0;j<nspeciesnow;j++) {
+        // activities[j] = N-1 - (activities[j] * (N-1)) / ymax;    // linear scale, needs truncation if ymax superceded
+        act = (double) activities[j];
+        // activities[j] = (N-1) - (int) ((N-1)*log2(act)/log2ymax);// logarithmic scale, suffers from discrete steps at bottom
+        activities[j] = (N-1) - (int) ((N-1)*act/(act+(double)ymax));
+        qid = qids[j];
+        ij = (x&Nmask)+activities[j]*N;
+        // if(ij >= 0 && ij<N2)
+        if(acttrace[ij]==0)                                         // only one quadtype to plot
+            acttrace[ij] = qid;
+        else {                                                      // plot species color with largest current population size if choice of multiple
+            if((q = (quadnode *) hashtable_find(&quadtable, acttrace[ij])) != NULL)
+               popcnt0 = q->pop1s;
+            else popcnt0 = 0;
+            if((q = (quadnode *) hashtable_find(&quadtable, qid)) != NULL)
+               popcnt1 = q->pop1s;
+            else popcnt1 = 0;
+            if(popcnt1 >= popcnt0) acttrace[ij]=qid;
+        }
+        //else
+        //    fprintf(stderr,"error activity ij out of range activities[j] %d\n",activities[j]);
+    }
+
+    free(qindices);free(activities);free(qids);free(popln);
+    return(nspeciesnow);
+}
+#else
+int activitieshashquad() {return(0)}  /* dummy routine, no effect */
+#endif
 //------------------------------------------------------- genealogies ---------------------------------------------------------------------------
 #ifdef HASH
 int cmpfunc4 (const void * pa, const void * pb) {
