@@ -193,6 +193,6 @@ int maxmatch(int m, unsigned int kk[], unsigned int ii[], int pairU[], int pairV
 {
     int i,n;
     for (n=i=0;i<ii[m];i++) n = kk[i] > n ? kk[i] : n;                           // calculate n as maximum vertex on right
-    fprintf(stderr,"Size of maximum matching is %d\n",hopcroftKarp(m,n,kk,ii,pairU,pairV,dist));
-    return 0;
+    fprintf(stderr,"Size of maximum matching is %d\n",n=hopcroftKarp(m,n,kk,ii,pairU,pairV,dist));
+    return n;
 }

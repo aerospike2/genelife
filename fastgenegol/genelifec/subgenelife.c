@@ -251,9 +251,11 @@ uint_t kklap[N2];                   // column indices for successive entries in 
 int_t  xlap[NLM];                   // returned list of assignments: columns assigned to rows
 int_t  ylap[NLM];                   // returned list of assignments: rows assigned to columns
 int_t  dist[NLM];                   // distance along augmented paths for Hopcroft Karp matching algorithm: maxmatch
-int queue_array[NLM];               // array for queue used in Hopcroft Karp matching algorithm: maxmatch
+int_t  relabel[NLM],oldrelabel[NLM];// array to relabel connected components matching to be compatible with previous step
+int_t  queue_array[NLM];            // array for queue used in Hopcroft Karp matching algorithm: maxmatch
 int_t  nlap;                        // number of connected components at t-1 entering into the assignment, i.e. n for LAPMOD
 int_t  nclap;                       // number of edges between connected comp's t-1 to t entering into the assignment, == no. of cost matrix entries
+int_t  nmatched;                    // number of matched old labels in current label set
 //------------------------------------------------ planes and configuration offsets----------------------------------------------------------------------
 int offdx=0,offdy=0,offdt=0;        // display chosen offsets for glider analysis with colorfunction 8
 int Noff = 9;                       // number of offsets
@@ -684,7 +686,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
     else if(colorfunction==9) {         // colorfunction based on unique labelling of separate components in image
         for (ij=0; ij<NN2; ij++) {
             if (gol[ij]) {
-                gene = (uint64_t) label[ij];
+                gene = (uint64_t) relabel[label[ij]];
                 mask = gene * 11400714819323198549ull;
                 mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
                 mask |= 0x080808ffull; // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
@@ -1730,9 +1732,9 @@ void flattenlabels(equivrec eqv[],unsigned short int *nlabel) {
 //.......................................................................................................................................................
 // fast component labelling, updating global equivalence table equiv and placing labels in global array label, return number of labels
 short unsigned int label_components(uint64_t gol[]) {
-    int i,ij,sum,maxoverlap,overallmaxoverlap,ret;          //   abc   scan mask to calculate label at position e
+    int i,ij,sum,maxoverlap,overallmaxoverlap;              //   abc   scan mask to calculate label at position e
     short unsigned int nlabel = 0;                          //   de
-    short unsigned int oldnlabel,secured;
+    short unsigned int oldnlabel,secured;                   //   with lapmod need also: ret
     short unsigned int lab,conn,connprev,connf,maxlabel;
     int dx[9]={0,-1,0,1,1,1,0,-1,-1};
     int dy[9]={0,-1,-1,-1,0,1,1,1,0};
@@ -1742,15 +1744,18 @@ short unsigned int label_components(uint64_t gol[]) {
     if(!first) {
         oldnlabel = oldncomponents = ncomponents;
         for(ij=0;ij<N2;ij++) oldlabel[ij]=label[ij];
+        for(i=0;i<NLM;i++) oldrelabel[i]=0;
+        for(i=0;i<ncomponents;i++) oldrelabel[i]=relabel[i];
     }
     else {
         for(ij=0;ij<N2;ij++) oldlabel[ij]=0;
         oldnlabel = oldncomponents = 0;
+        for(i=0;i<NLM;i++) oldrelabel[i]=0;
         first = 0;
     }
     for(ij=0;ij<N2;ij++) label[ij]=0;
-    for(ij=0;ij<(N2>>2);ij++) eqv[ij].pt=0;
-    for(ij=0;ij<(N2>>2);ij++) eqv[ij].rank=0;
+    for(ij=0;ij<(NLM);ij++) eqv[ij].pt=0;
+    for(ij=0;ij<(NLM);ij++) eqv[ij].rank=0;
     
     for(ij=0;ij<N2;ij++) {                                  // do first pass main array
         if (gol[ij]) {
@@ -1780,7 +1785,7 @@ short unsigned int label_components(uint64_t gol[]) {
     for(i=0;i<NLM;i++) connlen[i]=0;
     for(i=0;i<NLM;i++) connlistsf[i]=0;
     for(i=0;i<NLM;i++) connlenf[i]=0;
-    for(ij=0;ij<N2;ij++) {
+    for(ij=0;ij<N2;ij++) {                                  // these are the open memory reserve of connection elements to be linked, better to use memset perhaps
         connections[ij].next=connections[ij].nextf=0;
         connections[ij].oldlab=connections[ij].newlab=0;
         connections[ij].overlap=0;
@@ -1920,7 +1925,7 @@ short unsigned int label_components(uint64_t gol[]) {
         nlap++; // end of row
         iilap[nlap]=nclap;
     }
-    ret=maxmatch(nlap,kklap,iilap,xlap,ylap,dist);
+    nmatched=maxmatch(nlap,kklap,iilap,xlap,ylap,dist);
     
     /* do this for lapmod not maxmatch
     for(i=nlap;i<=nlabel;i++) {                            // if nlabel > oldnlabel, then fill out cost matrix further with dummy nodes
@@ -2074,24 +2079,15 @@ short unsigned int extract_components(uint64_t gol[]) {
         }
     }
     
-    for(i=0;i<=oldncomponents+ncomponents;i++) dist[i]=i;                                              // use dist array to map labels new to old and down fill
-    for(i=1;i<=oldncomponents;i++) if(!xlap[i]) dist[i]=0;
-    
-    for(i=oldncomponents+1;i<=oldncomponents+ncomponents;i++) {
-        if(ylap[i-oldncomponents]) {
-            dist[i] = ylap[i-oldncomponents];
+    for(i=0;i<NLM;i++) relabel[i]=0;
+    for(i=1;i<=ncomponents;i++) if(ylap[i]) relabel[i]=oldrelabel[ylap[i]];
+    for(ij=i=1;i<=ncomponents;i++)  {
+        if(!ylap[i]) {
+            while(relabel[ij]) ij++;
+            relabel[i]=ij;
         }
     }
-                                                                                                   // down filling is not working - needs correction - tricky
-    /* for(ij=1,i=oldncomponents+1;i<=oldncomponents+ncomponents;i++) {
-            while ((((dist[ij]!=0) && (ij<=oldncomponents)) || ((dist[ij]==ij) && (ij>oldncomponents))) && ij<i) ij++;
-            dist[i] = ij;                                                                            // position of next empty site
-    }
-    fprintf(stderr,"fill top position ij %d and last label %d\n",ij,dist[oldncomponents+ncomponents]);*/
-    for(ij=0;ij<N2;ij++)
-        if(label[ij])
-            label[ij]=dist[label[ij]+oldncomponents];                                                // remap array of labels
-    
+
     // for(nunique=0,i=1;i<=oldncomponents;i++) if (connlenf[i]==1 && connlen[connections[connlistsf[i]].newlab]==1) nunique++;
     for(nunique=0,i=1;i<=oldncomponents;i++) if (connpref[connpreff[i]] == i) nunique++;
     fprintf(stderr,"step %d nr unique connections %d out of %d old components\n",totsteps,nunique,oldncomponents);
