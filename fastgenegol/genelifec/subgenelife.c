@@ -137,21 +137,9 @@ HASHTABLE_SIZE_T const* genotypes;  // pointer to stored hash table keys (which 
 genedata* geneitems;                // list of genedata structured items stored in hash table
 //.......................................................................................................................................................
 hashtable_t quadtable;              // hash table for quad tree
-int quadtree = 1;                   // whether to do quadtree calculation
-struct quadkey;
-typedef struct quadkey {
-    struct quadkey *next;
-    uint64_t key;
-} quadkey;
-struct quadnode;                    // prototype for quadtree node defined below with recursive elements
-typedef union quad {                // node pointer and 64-bit patterns occupy the same memory : access Union elts as quad.node or quad.patt
-    struct quadnode *node;
-    uint64_t patt;
-} quad;
 typedef struct quadnode {           // stored quadtree binary pattern nodes for population over time (currently only for analysis not computation)
-   struct quadkey *next;            // hash-linked list of elements starting with same key : follow hash key chain
-   quad nw, ne, sw, se;             // constant pointers to quadnodes or 64-bit patterns : we terminate one level higher than Gosper & golly
-   struct quadnode *res;            // store cached value associated with the node (optional here)
+   uint64_t hashkey;                // hash table look up key for node : enables tree exploration more directly than construction from nw,ne,sw,se including collision avoidance
+   uint64_t nw, ne, sw, se;         // constant keys to hashed quadnodes or 64-bit patterns : we terminate one level higher than Gosper & golly
    unsigned short isnode;           // 1 if this is a node not a pattern
    unsigned short size;             // side length of square image corresponding to quadtree pattern
    unsigned int hits;               // number of references to finding this node
@@ -160,10 +148,8 @@ typedef struct quadnode {           // stored quadtree binary pattern nodes for 
    unsigned int lasttime;           // last time node was identified : used to determine if part of current timestep
    unsigned int reserve;            // reserve field : giving size of record an even number of 64bit words
 } quadnode;
-quadnode quadinit = {NULL,0ull,0ull,0ull,0ull,NULL,0,0,1,0,0,0,0};
+quadnode quadinit = {0ull,0ull,0ull,0ull,0ull,0,0,1,0,0,0,0};
 quadnode * qimage;
-quadkey *freenodes;
-int quadchainmem = 0;
 int quadcollisions = 0;
 HASHTABLE_SIZE_T const* quadtypes;  // pointer to stored hash table keys (which are the quadtypes)
 quadnode* quaditems;                // list of quadnode structured items stored in hash table
@@ -231,7 +217,7 @@ typedef struct component {          // data structure for identified connected c
     short unsigned int lastrc;      // last occupied row/col used to trace components wrapping across the N-1 to 0 border
     short unsigned int label,log2n; // label index of component, enclosing square size n=2^log2n
     short unsigned int patt;        // for small components of size 4x4 pixels or less, the image is encoded directly in the pattern patt
-    quadnode * quad;                // pointer to hash quadtree node of subimage for component
+    uint64_t quad;                  // hashkey for quadtree node of subimage for component
     unsigned int pixels;
 } component;
 component complist[NLM];            // current array of components
@@ -497,7 +483,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 //--------------------------------------------------------------------------------------------------------------------------------------------------------
 //------------------------------------------------------- colorgenes -------------------------------------------------------------------------------------
 void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2) {
-    uint64_t gene, gdiff, g2c, mask;
+    uint64_t gene, gdiff, g2c, mask, quad;
     int ij,k,activity,popcount;
     unsigned int d,d0,d1,d2;
     unsigned int color[3],colormax;
@@ -701,13 +687,15 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
     else if(colorfunction==9) {                                     // colorfunction based on unique labelling of separate components in image
         for (ij=0; ij<NN2; ij++) {
             if (gol[ij]) {
-                gene = (uint64_t) relabel[label[ij]];               // use gene variable simply as label for connected component (no connection with gene)
-                mask = gene * 11400714819323198549ull;              // map label (quasi-uniformly) into larger unsigned colour space
+                quad = (uint64_t) relabel[label[ij]];               // use gene variable simply as label for connected component (no connection with gene)
+                mask = quad * 11400714819323198549ull;              // map label (quasi-uniformly) into larger unsigned colour space
                 mask = mask >> (64 - 32);                           // hash with optimal prime multiplicator down to 32 bits
                 mask |= 0x080808ffull;                              // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
                 if (noveltyfilter) {
+                    quad = complist[label[ij]].quad;
                     if((d=complist[label[ij]].patt)) popcount=smallpatts[d].hits; // number of times small (<= 4x4) pattern encountered previously
-                    else if((q=complist[label[ij]].quad)) popcount=q->hits; // number of times large pattern encountered previously (poss. also as part of larger patt)
+                    else if((q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL) // if we reach here, quad should have been stored in hash table
+                        popcount=q->hits;                           // number of times large pattern encountered previously (poss. also as part of larger patt)
                     else popcount=1;                                // should never occur, but just in case assume novel
                     if (popcount>1) mask &= 0x3f3f3fff;
                 }
@@ -1342,32 +1330,9 @@ extern inline uint64_t patt_hash(const uint64_t a, const uint64_t b, const uint6
     return r ;
 }
 //.......................................................................................................................................................
-quadkey * newkey() {                                   // free keys kept in a linked list, allocated 1024 at a time
-    quadkey *q;
-    int i;
-    uint64_t randnr;
-    const int blocksize = 1024;
-   
-    if (freenodes == 0) {
-        freenodes = (quadkey *) calloc(blocksize, sizeof(quadkey)) ;
-        if (freenodes == 0) {
-            fprintf(stderr,"No more memory can be allocated for quadkey chains.\n") ;
-            exit(1);
-        }
-        quadchainmem += blocksize * sizeof(quadkey) ;
-        for(i=0;i<(blocksize-1);i++) {
-            freenodes[i].next = freenodes+i+1;
-            RAND128P(randnr);
-            freenodes[i].key = randnr;
-        }
-    }
-    q = freenodes;
-    freenodes = freenodes->next;
-    return q ;
-}
-//.......................................................................................................................................................
-extern inline uint64_t node_hash(const void *a, const void *b, const void *c, const void *d) {
-   uint64_t r = (65537*(uint64_t)(d)+257*(uint64_t)(c)+17*(uint64_t)(b)+5*(uint64_t)(a));
+// now not used : could use instead of patt_hash for hash_node_find
+extern inline uint64_t node_hash(const uint64_t a, const uint64_t b, const uint64_t c, const uint64_t d) {
+   uint64_t r = (65537*(d)+257*(c)+17*(b)+5*(a));
    r += (r >> 11);
    return r ;
 }
@@ -1380,7 +1345,7 @@ extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, co
         h = patt_hash(nw,ne,sw,se);
         if((q = (quadnode *) hashtable_find(&quadtable, h)) != NULL) {
                                                         // check if pattern found in hash table is correct
-            if( nw == q->nw.patt &&  ne == q->ne.patt && sw == q->sw.patt && se ==q->se.patt && !q->isnode) {
+            if( nw == q->nw &&  ne == q->ne && sw == q->sw && se ==q->se && !q->isnode) {
                 q->hits++;q->lasttime=totsteps;
             }
             else {                                      // collision in hash table at leaf level
@@ -1394,21 +1359,22 @@ extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, co
                 h = patt_hash(nnw,nne,nsw,nse);
                 if((q = (quadnode *) hashtable_find(&quadtable, h)) != NULL) {
                                                         // check if pattern found in hash table is correct
-                    if( nw == q->nw.patt &&  ne == q->ne.patt && sw == q->sw.patt && se ==q->se.patt && !q->isnode) {
+                    if( nw == q->nw &&  ne == q->ne && sw == q->sw && se ==q->se && !q->isnode) {
                         q->hits++;q->lasttime=totsteps;
                     }
                     else {                                      // collision in hash table at leaf level
                         quadcollisions++;
                         fprintf(stderr,"at %d quadhash 2ndary pattern collision %llx %llx %llx %llx hash %llx collides %llx %llx %llx %llx\n",
-                                totsteps,nw,ne,sw,se,h,q->nw.patt,q->ne.patt,q->sw.patt,q->se.patt);
+                                totsteps,nw,ne,sw,se,h,q->nw,q->ne,q->sw,q->se);
                     }
                 }
                 else {                                           // new node or pattern, save in hash table
+                    quadinit.hashkey = h;
                     quadinit.isnode=0;
-                    quadinit.nw.patt=nw;
-                    quadinit.ne.patt=ne;
-                    quadinit.sw.patt=sw;
-                    quadinit.se.patt=se;
+                    quadinit.nw=nw;
+                    quadinit.ne=ne;
+                    quadinit.sw=sw;
+                    quadinit.se=se;
                     quadinit.size=16;
                     quadinit.firsttime=totsteps;
                     quadinit.lasttime=totsteps;
@@ -1423,11 +1389,12 @@ extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, co
             }
         }
         else {                                           // new node or pattern, save in hash table
+            quadinit.hashkey = h;
             quadinit.isnode=0;
-            quadinit.nw.patt=nw;
-            quadinit.ne.patt=ne;
-            quadinit.sw.patt=sw;
-            quadinit.se.patt=se;
+            quadinit.nw=nw;
+            quadinit.ne=ne;
+            quadinit.sw=sw;
+            quadinit.se=se;
             quadinit.size=16;
             quadinit.firsttime=totsteps;
             quadinit.lasttime=totsteps;
@@ -1445,70 +1412,78 @@ extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, co
 #endif
 }
 //.......................................................................................................................................................
-extern inline quadnode * hash_node_find(const quadnode * nw, const quadnode* ne, const quadnode* sw, const quadnode* se) {
+extern inline quadnode * hash_node_find(const uint64_t nw, const uint64_t ne, const uint64_t sw, const uint64_t se) {
+                                                                // should only be called if arguments are hashtable keys, not bit patterns
 #ifdef HASH
-        quadnode *q;
+        quadnode *q,*qnw,*qne,*qsw,*qse;
         uint64_t h,nnw,nne,nsw,nse;
-        h = node_hash(nw,ne,sw,se);
+        h = node_hash(nw,ne,sw,se);                             // alternatively use patt_hash : but this is optimized for 64 bit keys (unlikely to have 0 or low values)
         if((q = (quadnode *) hashtable_find(&quadtable, h)) != NULL) {
-            if(nw == q->nw.node && ne == q->ne.node && sw == q->sw.node && se == q->se.node && q->isnode) { // node found in hash table
+            if(nw == q->nw && ne == q->ne && sw == q->sw && se == q->se && q->isnode) { // node found in hash table
                 q->hits++;q->lasttime=totsteps;
                 /* fprintf(stderr,"at %d quadhash node repeat %llx %llx %llx %llx hash %llx\n", totsteps,
                     (uint64_t) nw,(uint64_t) ne,(uint64_t) sw,(uint64_t) se,(uint64_t) h);  // simple recording for now, later do chaining or whatever */
             }
-            else {                                      // collision in hash table at node level
+            else {                                              // collision in hash table at node level
                 // quadcollisions++;
                 // fprintf(stderr,"at %d quadhash node collision %llx %llx %llx %llx hash %llx collides %llx %llx %llx %llx\n", totsteps,
                 //     (uint64_t) nw,(uint64_t) ne,(uint64_t) sw,(uint64_t) se,(uint64_t) h,
                 //     (uint64_t) q->nw.node, (uint64_t) q->ne.node, (uint64_t) q->sw.node, (uint64_t) q->se.node);  // simple recording for now, later do chaining or whatever
-                nnw=(uint64_t) nw * 11400714819323198549ull;
-                nne=(uint64_t) ne * 11400714819323198549ull;
+                nnw=nw * 11400714819323198549ull;
+                nne= ne * 11400714819323198549ull;
                 nsw=(uint64_t) sw * 11400714819323198549ull;
                 nse=(uint64_t) se * 11400714819323198549ull;
-                h = patt_hash(nnw,nne,nsw,nse);
+                h = node_hash(nnw,nne,nsw,nse);                 // alternatively use patt_hash
                 if((q = (quadnode *) hashtable_find(&quadtable, h)) != NULL) {
-                                                        // check if pattern found in hash table is correct
-                    if(nw == q->nw.node && ne == q->ne.node && sw == q->sw.node && se == q->se.node && q->isnode) { // node found in hash table
+                                                                // check if pattern found in hash table is correct
+                    if(nw == q->nw && ne == q->ne && sw == q->sw && se == q->se && q->isnode) { // node found in hash table
                         q->hits++;q->lasttime=totsteps;
                     }
                     else {                                      // collision in hash table at leaf level
                         quadcollisions++;
                         fprintf(stderr,"at %d quadhash node 2ndary collision %llx %llx %llx %llx hash %llx collides %llx %llx %llx %llx\n", totsteps,
-                                (uint64_t) nw,(uint64_t) ne,(uint64_t) sw,(uint64_t) se,(uint64_t) h,
-                                (uint64_t) q->nw.node, (uint64_t) q->ne.node, (uint64_t) q->sw.node, (uint64_t) q->se.node);  // simple recording for now, later do chaining or whatever
+                                 nw, ne, sw, se, h, q->nw, q->ne,  q->sw, q->se);  // simple recording for now, later do further chaining or whatever
                     }
                 }
-                else {                                           // new node or pattern, save in hash table
+                else {                                           // new node, save in hash table
+                    quadinit.hashkey = h;
                     quadinit.isnode=1;
-                    quadinit.nw.node=(quadnode *)nw;
-                    quadinit.ne.node=(quadnode *)ne;
-                    quadinit.sw.node=(quadnode *)sw;
-                    quadinit.se.node=(quadnode *)se;
+                    quadinit.nw=nw;
+                    quadinit.ne=ne;
+                    quadinit.sw=sw;
+                    quadinit.se=se;
                     quadinit.firsttime=totsteps;
                     quadinit.lasttime=totsteps;
-                    quadinit.pop1s=nw->pop1s+ne->pop1s+sw->pop1s+se->pop1s;
-                    quadinit.size=nw->size<<2;
+                    if((qnw = (quadnode *) hashtable_find(&quadtable, nw)) == NULL) fprintf(stderr,"Error nw node not found in hashtable.\n");
+                    if((qne = (quadnode *) hashtable_find(&quadtable, ne)) == NULL) fprintf(stderr,"Error ne node not found in hashtable.\n");
+                    if((qsw = (quadnode *) hashtable_find(&quadtable, sw)) == NULL) fprintf(stderr,"Error sw node not found in hashtable.\n");
+                    if((qse = (quadnode *) hashtable_find(&quadtable, se)) == NULL) fprintf(stderr,"Error se node not found in hashtable.\n");
+                    quadinit.pop1s=qnw->pop1s+qne->pop1s+qsw->pop1s+qse->pop1s;
+                    quadinit.size=qnw->size<<2;
                     hashtable_insert(&quadtable, h,(quadnode *) &quadinit);
                     q = (quadnode *) hashtable_find(&quadtable, h);
-                    /* fprintf(stderr,"at %d quadhash node stored %llx %llx %llx %llx hash %llx\n", totsteps,
-                        (uint64_t) nw,(uint64_t) ne,(uint64_t) sw,(uint64_t) se,(uint64_t) h);  // simple recording for now, later do chaining or whatever */
+                    // fprintf(stderr,"step %d quadhash node stored %llx %llx %llx %llx hash %llx\n", totsteps, nw, ne, sw, se, h);
                 }
             }
         }
-        else {                                           // new node or pattern, save in hash table
+        else {                                                  // new node, save in hash table
+            quadinit.hashkey = h;
             quadinit.isnode=1;
-            quadinit.nw.node=(quadnode *)nw;
-            quadinit.ne.node=(quadnode *)ne;
-            quadinit.sw.node=(quadnode *)sw;
-            quadinit.se.node=(quadnode *)se;
+            quadinit.nw=nw;
+            quadinit.ne=ne;
+            quadinit.sw=sw;
+            quadinit.se=se;
             quadinit.firsttime=totsteps;
             quadinit.lasttime=totsteps;
-            quadinit.pop1s=nw->pop1s+ne->pop1s+sw->pop1s+se->pop1s;
-            quadinit.size=nw->size<<2;
+            if((qnw = (quadnode *) hashtable_find(&quadtable, nw)) == NULL) fprintf(stderr,"Error nw node not found in hashtable.\n");
+            if((qne = (quadnode *) hashtable_find(&quadtable, ne)) == NULL) fprintf(stderr,"Error ne node not found in hashtable.\n");
+            if((qsw = (quadnode *) hashtable_find(&quadtable, sw)) == NULL) fprintf(stderr,"Error sw node not found in hashtable.\n");
+            if((qse = (quadnode *) hashtable_find(&quadtable, se)) == NULL) fprintf(stderr,"Error se node not found in hashtable.\n");
+            quadinit.pop1s=qnw->pop1s+qne->pop1s+qsw->pop1s+qse->pop1s;
+            quadinit.size=qnw->size<<2;
             hashtable_insert(&quadtable, h,(quadnode *) &quadinit);
             q = (quadnode *) hashtable_find(&quadtable, h);
-            /* fprintf(stderr,"at %d quadhash node stored %llx %llx %llx %llx hash %llx\n", totsteps,
-                    (uint64_t) nw,(uint64_t) ne,(uint64_t) sw,(uint64_t) se,(uint64_t) h);  // simple recording for now, later do chaining or whatever */
+            // fprintf(stderr,"step %d quadhash node stored %llx %llx %llx %llx hash %llx\n", totsteps, nw, ne, sw, se, h);
         }
         return(q);
 #else
@@ -1556,8 +1531,8 @@ quadnode * quadimage(uint64_t gol[],int n,short unsigned int *golps) {          
         }
 
         for(n3 >>= 1; n3>1; n3>>= 1) {                                              // proceed up the hierarchy amalgamating 2x2 blocks to next level until reach top
-            for (ij=ij1=0;ij<n3*n3;ij+=2,ij1++) {
-                golq[ij1]=hash_node_find(golq[(ij+n3)],golq[(ij+n3)+1],golq[ij],golq[ij+1]); // hash_node_find(nw,ne,sw,se) adds quad node entry if node not found
+            for (ij=ij1=0;ij<n3*n3;ij+=2,ij1++) {                                   // hash_node_find(nw,ne,sw,se) adds quad node entry if node not found
+                golq[ij1]=hash_node_find(golq[(ij+n3)]->hashkey,golq[(ij+n3)+1]->hashkey,golq[ij]->hashkey,golq[ij+1]->hashkey);
                 ij+= ((ij+2)&(n3-1)) ? 0 : n3;                                      // skip odd rows since these are the northern parts of quads generated on even rows
             }
         }
@@ -2128,12 +2103,12 @@ short unsigned int extract_components(uint64_t gol[]) {
     int i,j,ij,ij1,log2n;
     short unsigned int k,nside,nlabel,golps;
     short unsigned int histside[log2N+1];
-
+    quadnode * q;
 
     ncomponents = label_components(gol);                                                                // label connected components
     nlabel = ncomponents;
     
-    for(i=1;i<=nlabel;i++) {                                                                           // initialize component structures for horizontal scan
+    for(i=1;i<=nlabel;i++) {                                                                            // initialize component structures for horizontal scan
         complist[i].lastrc=N-1;
         complist[i].label=0;
         complist[i].pixels=0;
@@ -2146,23 +2121,23 @@ short unsigned int extract_components(uint64_t gol[]) {
             if (!complist[label[ij]].label) {                                                           // if label encountered for first time
                 complist[label[ij]].label=label[ij];
                 complist[label[ij]].E=complist[label[ij]].W=i;                                          // set both horizontal bounds to first encountered x for label
-                complist[label[ij]].lastrc=i;                                                          // row contains this label
+                complist[label[ij]].lastrc=i;                                                           // row contains this label
             }
-            else if (complist[label[ij]].lastrc != i) {                                                // label reencountered for first time in row
-                if (((complist[label[ij]].lastrc+1)&(N-1)) == i) {                                     // continuation of component from previous row
+            else if (complist[label[ij]].lastrc != i) {                                                 // label reencountered for first time in row
+                if (((complist[label[ij]].lastrc+1)&(N-1)) == i) {                                      // continuation of component from previous row
                     complist[label[ij]].E=i;
                 }
-                else if (((complist[label[ij]].lastrc+1)&(N-1)) <  i) {                                // component resumes after row gap
+                else if (((complist[label[ij]].lastrc+1)&(N-1)) <  i) {                                 // component resumes after row gap
                     // fprintf(stderr,"HORIZ TRACK step %d setting W %d after gap at i %d j %d label %d lastrc %d\n",totsteps,i,i,j,label[ij],complist[label[ij]].lastrc);
                     complist[label[ij]].W=i;
                 }
-                complist[label[ij]].lastrc=i;                                                          // row contains this label
+                complist[label[ij]].lastrc=i;                                                           // row contains this label
             }
             complist[label[ij]].pixels++;
         }
       }
     }
-    for(i=1;i<=nlabel;i++) {                                                                           // initialize component structures for vertical scan
+    for(i=1;i<=nlabel;i++) {                                                                            // initialize component structures for vertical scan
         complist[i].lastrc=N-1;
         complist[i].label=0;
     }
@@ -2174,17 +2149,17 @@ short unsigned int extract_components(uint64_t gol[]) {
             if (!complist[label[ij]].label) {                                                           // if label encountered for first time
                 complist[label[ij]].label=label[ij];
                 complist[label[ij]].N=complist[label[ij]].S=j;                                          // set both vertical bounds to first encountered x for label
-                complist[label[ij]].lastrc=j;                                                          // col contains this label
+                complist[label[ij]].lastrc=j;                                                           // col contains this label
             }
-            else if (complist[label[ij]].lastrc != j) {                                                // label reencountered for first time in col
-                if (((complist[label[ij]].lastrc+1)&(N-1)) == j) {                                     // continuation of component from previous col
+            else if (complist[label[ij]].lastrc != j) {                                                 // label reencountered for first time in col
+                if (((complist[label[ij]].lastrc+1)&(N-1)) == j) {                                      // continuation of component from previous col
                     complist[label[ij]].S=j;
                 }
-                else if (((complist[label[ij]].lastrc+1)&(N-1)) <  j) {                                // component resumes after col gap
+                else if (((complist[label[ij]].lastrc+1)&(N-1)) <  j) {                                 // component resumes after col gap
                     // fprintf(stderr,"VERT  TRACK step %d setting N %d after gap at i %d j %d label %d lastrc %d\n",totsteps,j,i,j,label[ij],complist[label[ij]].lastrc);
                     complist[label[ij]].N=j;
                 }
-                complist[label[ij]].lastrc=j;                                                          // col contains this label
+                complist[label[ij]].lastrc=j;                                                           // col contains this label
             }
         }
       }
@@ -2202,10 +2177,14 @@ short unsigned int extract_components(uint64_t gol[]) {
                   N*((complist[i].N+(ij>>log2n))&(N-1));
             working[ij] = (label[ij1]==i) ? 0x1ull : 0ull;                                              // use working to store binary component image
         }
-        if (quadtree) {
-            complist[i].quad = quadimage(working,nside,&golps);                                         // quadtree hash code of component image: needs to work for all nside=2^n
-            if(complist[i].quad==NULL) complist[i].patt=golps;                                          // components either have (quad!=NULL and patt==0) or (quad==NULL and patt!=0)
-            else complist[i].patt=0;
+        q = quadimage(working,nside,&golps);                                                            // quadtree hash code of component image: needs to work for all nside=2^n
+        if(q==NULL) {
+            complist[i].patt=golps;                                                                     // components either have (quad!=NULL and patt==0) or (quad==NULL and patt!=0)
+            complist[i].quad=0ull;
+        }
+        else {
+            complist[i].patt=0;
+            complist[i].quad=q->hashkey;
         }
     }
     
@@ -2555,7 +2534,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    // if(quadtree) qimage = quadimage(newgol,N);
+    // qimage = quadimage(newgol,N); // quadtree hash of entire image
 
 }
 //------------------------------------------------------- update_lut_sum -----------------------------------------------------------------------------------
@@ -2721,7 +2700,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    // if(quadtree) qimage = quadimage(newgol,N);
+    // qimage = quadimage(newgol,N); // quadtree hash of entire image
 }
 //------------------------------------------------------------- update_lut_dist -----------------------------------------------------------------------------------
 void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 10,11
@@ -2892,7 +2871,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    // if(quadtree) qimage = quadimage(newgol,N);
+    // qimage = quadimage(newgol,N); // quadtree hash of entire image
 }
 //------------------------------------------------------- update_lut_canon_rot -----------------------------------------------------------------------------------
 void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 12,13
@@ -3080,7 +3059,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    // if(quadtree) qimage = quadimage(newgol,N);
+    // qimage = quadimage(newgol,N); // quadtree hash of entire image
 }
 //------------------------------------------------------- update_lut_2Dsym -----------------------------------------------------------------------------------
 void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 14,15
@@ -3292,7 +3271,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    // if(quadtree) qimage = quadimage(newgol,N);
+    // qimage = quadimage(newgol,N); // quadtree hash of entire image
 }
 //------------------------------------------------------- update_gol16 -----------------------------------------------------------------------------------
 void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]) {     // selection models 16-19
@@ -3837,8 +3816,9 @@ void genelife_update (int nsteps, int nhist, int nstat) {
 
         totsteps++;
         if(!(totsteps%10)) {
-            if (quadtree) nspeciesquad = hashtable_count(&quadtable);else nspeciesquad=-1;
-            fprintf(stderr,"iteration step %d nspeciesquad %d\r",totsteps,nspeciesquad);
+            nspecies = hashtable_count(&genetable);
+            nspeciesquad = hashtable_count(&quadtable);
+            fprintf(stderr,"iteration step %d: cumulative nspecies %d nspeciesquad %d\r",totsteps,nspecies,nspeciesquad);
         }
         
         if (selection<8)        update(gol,golg,newgol,newgolg);              // calculate next iteration with selection
@@ -4227,7 +4207,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     genotypes = hashtable_keys( &genetable );
     fprintf(stderr,"population size %d with %d different genes\n",cnt,hcnt);
     
-    // if(quadtree) qimage = quadimage(gol,N);
+    // qimage = quadimage(gol,N); // quadtree hash of entire image
     if (colorfunction>=9) ncomponents=extract_components(gol);
 #endif
 }
