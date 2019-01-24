@@ -97,6 +97,8 @@ libcd.set_surviveover64.restype = None
 libcd.set_surviveover64.argtypes = [uint_array, c_int]
 libcd.set_vscrolling.restype = None
 libcd.set_vscrolling.argtypes = []
+libcd.set_noveltyfilter.restype = None
+libcd.set_noveltyfilter.argtypes = []
 
 def get_log2N():
     return libcd.get_log2N()
@@ -208,3 +210,6 @@ def set_surviveover64(surviveover):
 
 def set_vscrolling():
     return libcd.set_vscrolling()
+    
+def set_noveltyfilter():
+    return libcd.set_noveltyfilter()

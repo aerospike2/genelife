@@ -59,6 +59,7 @@ framenr = 0
 savecnt = 0                              # counter for saved images
 randomsoup = 0
 vscrolling = 0
+noveltyfilter = 0
                                          # parameter initialization
 runparams = np.zeros(8,np.int32)         # 8 parameters passed to C
 simparams = np.zeros(5,np.int32)         # 5 parameters passed to C
@@ -474,7 +475,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     global cancol
     global Height,Width
     global dispinit
-    global randomsoup,vscrolling
+    global randomsoup,vscrolling,noveltyfilter
     global gogo,pause,mouseclicked,mouseclicked2,pixeldat,paramdat
     global ymax,maxPlane,offdx,offdy,offdt,quadrants,oldymax,displayoneplane
     global parhelp
@@ -855,6 +856,10 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     vscrolling=1-vscrolling
                     print 'step',framenr,"vscrolling changed to ",vscrolling
                     genelife.set_vscrolling()
+                elif event.key == pg.K_n:
+                    noveltyfilter=1-noveltyfilter
+                    print 'step',framenr,"noveltyfilter changed to ",noveltyfilter
+                    genelife.set_noveltyfilter()
         if (not mouseclicked and not pause):
             if updatesenabled:
                 update_sim(nrun, ndisp, nskip, niter, nhist, nstat, count)
@@ -892,11 +897,11 @@ def parhelp():
         print "Green    ","0. selective birth for 3-live-nbs  ","1. selective birth for 2-live-nbs"
         print "Mid Blue ","2. canonical 0 position vs difft   ","3. bypass selection for 2-live-nbs"
         print "Teal blue","4. enforce birth for 3-live-nbs    ","5. enforce birth for 2-live-nbs"
-        print "Green      ","6. 2nd neighbour genetic modulation","7. 1st neighbour genetic masking"
+        print "Green    ","6. 2nd neighbour genetic modulation","7. 1st neighbour genetic masking"
         print "Yellow   ","8. enforce GoL rule if non GoL rule","9. enforce GoL rule last change by non GoL rule */"
         print "Green    ","10-13. allow 2-nb birth only for active subset of 4 canonical configs"
         print "Blue     ","14. Survival for 3-live-nbs        ","15. Survival for 2-live-nbs"
-        print "Red    ","16. Gene overwrite for 3-live-nbs  ","17. Gene overwrite for 2-live-nbs"
+        print "Red      ","16. Gene overwrite for 3-live-nbs  ","17. Gene overwrite for 2-live-nbs"
     elif selection < 16:
         print ""
         if selection < 10:
@@ -956,10 +961,11 @@ def parhelp():
     print "middle mouse","stop simulation [data is retained for possible run() for run/analysis with updatesenabled=True/False]"
     print "left mouse  ","extract information about local state inside the array, or control buttons below"
     print "right mouse ","choose single plane for GoL display in colorfunction 2 for selection 16-19"
-    print "<- , ->     ","decrement or increment the colorfunction analysis type mod 9"
+    print "<- , ->     ","decrement or increment the colorfunction analysis type mod 11"
     print "h           ","print this help"
     print "H           ","toggle horizon mode on or off: upper half of array obeys unmodified GoL rule"
-    print "<space>     ","pasue simulation"
+    print "<space>     ","pause simulation"
+    print "n           ","toggle novelty filter on/off for connected component color function 9"
     print "q,Q         ","incr or decr quadrant parameter choice : -1 = no quadrants, 0-4 are first 5 bit pairs of repscheme, 5,6 surv and overwrite"
     print "r           ","toggle random soup domain on or off"
     print "R           ","toggle intermittent feathered random soup domain on or off"

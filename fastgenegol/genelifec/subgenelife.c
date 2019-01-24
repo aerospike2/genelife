@@ -204,6 +204,7 @@ int last_scrolled = 0;              // whether vscrolling applied on last time s
 int ymax = 2000;                    // activity scale max for plotting : will be adjusted dynamically or by keys
 double log2ymax = 25.0;             // activity scale max 2^25 = 33.5 * 10^6
 int activitymax;                    // max of activity in genealogical record of current population
+int noveltyfilter = 0;              // novelty filter for colorfunction 9 : if on, darkens non-novel components (hits>1) in display
 //------------------------------------------------ arrays for time tracing, activity and genealogies ----------------------------------------------------
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
@@ -466,6 +467,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // set_rulemod          set rulemod from python
 // set_surviveover      set the two masks for survival and overwrite from python (survivalmask, overwritemask)
 // set_vscrolling       set vertical scrolling to track fronts of growth in vertical upwards direction
+// set_noveltyfilter    set novelty filter for darkening already encountered components in connected component display (colorfunction 9)
 //.......................................................................................................................................................
 // get_log2N            get the current log2N value from C to python
 // get_curgol           get current gol array from C to python
@@ -496,6 +498,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
     unsigned int d,d0,d1,d2;
     unsigned int color[3],colormax;
     double rescalecolor;
+    quadnode *q;
     static int numones[16]={0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4};
 
     if(colorfunction==0) { // colorfunction based on multiplicative hash
@@ -683,7 +686,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                     mask = (mask<<8)+0xff;
                 }
                 else {
-                   POPCOUNT64C(gene,d);                    // assigns number of ones in gene to d. These 3 lines version for one offset comparison
+                   POPCOUNT64C(gene,d);                             // assigns number of ones in gene to d. These 3 lines version for one offset comparison
                     d=(d==64)?0:63-d;
                     mask = (d==63) ? 0xffffffff : ((((d&3)<<22)+(((d>>2)&3)<<14)+(((d>>4)&3)<<6))<<8) + 0xff;
                 }
@@ -691,14 +694,20 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 cgolg[ij] = (int) mask;
         }
     }
-    else if(colorfunction==9) {         // colorfunction based on unique labelling of separate components in image
+    else if(colorfunction==9) {                                     // colorfunction based on unique labelling of separate components in image
         for (ij=0; ij<NN2; ij++) {
             if (gol[ij]) {
-                gene = (uint64_t) relabel[label[ij]];
-                mask = gene * 11400714819323198549ull;
-                mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
-                mask |= 0x080808ffull; // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
-                if (label[ij] == 0xffff) mask = 0xffffffffull; // recolor debug components and components with max label white
+                gene = (uint64_t) relabel[label[ij]];               // use gene variable simply as label for connected component (no connection with gene)
+                mask = gene * 11400714819323198549ull;              // map label (quasi-uniformly) into larger unsigned colour space
+                mask = mask >> (64 - 32);                           // hash with optimal prime multiplicator down to 32 bits
+                mask |= 0x080808ffull;                              // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
+                if (noveltyfilter) {
+                    if((d=complist[label[ij]].patt)) popcount=smallpatts[d].hits; // number of times small (<= 4x4) pattern encountered previously
+                    else if((q=complist[label[ij]].quad)) popcount=q->hits; // number of times large pattern encountered previously (poss. also as part of larger patt)
+                    else popcount=1;                                // should never occur, but just in case assume novel
+                    if (popcount>1) mask &= 0x3f3f3fff;
+                }
+                if (label[ij] == 0xffff) mask = 0xffffffffull;      // recolor debug components and components with max label white
                 cgolg[ij] = (int) mask;
             }
             else cgolg[ij] = 0;
@@ -1478,55 +1487,52 @@ extern inline quadnode * hash_node_find(const quadnode * nw, const quadnode* ne,
 #endif
 }
 //.......................................................................................................................................................
-quadnode * quadimage(uint64_t gol[],int n,short unsigned int *golps) {                                    // routine to generate a quadtree for an entire binary image of long words
-                                                                                // makes use of global linear and quadratic size variable N2 for sizing internal arrays golp,golq
-                                                                                // assumes that N is power of 2 and >=16
+quadnode * quadimage(uint64_t gol[],int n,short unsigned int *golps) {              // routine to generate a quadtree for an entire binary image of long words
+                                                                                    // makes use of global linear and quadratic size variable N2 for sizing internal arrays golp,golq
+                                                                                    // assumes that N is power of 2
     unsigned int ij,ij1,n3;
     uint64_t golp[N2>>6];
     quadnode * golq[N2>>8];
     extern void pack16neighbors(uint64_t gol[],short unsigned int golps[],int n);
     extern void pack64neighbors(uint64_t gol[],uint64_t golp[],int n);
     
-    if(n<16) {
-        if (n==8) {
+    if(n<16) {                                                                      // n < 16
+        if (n==8) {                                                                 // n == 8
             pack64neighbors(gol,golp,n);
             golq[0]=hash_patt_find(golp[0],0ull,0ull,0ull);
             return(golq[0]);
         }
-        else {
+        else {                                                                      // n == 4,2,1   use smallpatts array to store patterns (more efficient than continued quadtree)
             pack16neighbors(gol,golps,n);
-            if(smallpatts[*golps].hits) {
+            if(smallpatts[*golps].hits) {                                           // pattern found
                 smallpatts[*golps].hits++;
                 smallpatts[*golps].lasttime=totsteps;
             }
-            else {
+            else {                                                                  // store new pattern
                 smallpatts[*golps].size=n;
                 smallpatts[*golps].hits++;
                 smallpatts[*golps].firsttime=totsteps;
                 smallpatts[*golps].lasttime=totsteps;
             }
-            return NULL;
+            return NULL;                                                            // in this case image key is returned in *golps rather than quad key
         }
     }
-    else  {
-        pack64neighbors(gol,golp,n);
-        n3=n>>3;
-        /*  for(ij=0;ij<n3*n3;ij++) { if (ij%8 == 0) fprintf(stderr,"\n step %d ij %d",totsteps,ij);
-                                  fprintf(stderr," %llx ",golp[ij]);} fprintf(stderr,"\n"); */
-        for (ij=ij1=0;ij<n3*n3;ij+=2,ij1++) {
+    else  {                                                                         // n >= 16
+        pack64neighbors(gol,golp,n);                                                // 8x8 blocks of gol pixels packed into single 64bit words in golp
+        n3=n>>3;                                                                    // n3=n/8 is number of such 8x8 blocks along each side of square
+        // for(ij=0;ij<n3*n3;ij++) { if (ij%8 == 0) fprintf(stderr,"\n step %d ij %d",totsteps,ij);fprintf(stderr," %llx ",golp[ij]);} fprintf(stderr,"\n");
+        for (ij=ij1=0;ij<n3*n3;ij+=2,ij1++) {                                       //  hash all 16x16 patterns (2x2 of golp words) found as leaves of the quadtree
             golq[ij1]=hash_patt_find(golp[(ij+n3)],golp[(ij+n3)+1],golp[ij],golp[ij+1]); // hash_patt_find(nw,ne,sw,se) adds quad leaf entry if pattern not found
-            ij+= ((ij+2)&(n3-1)) ? 0 : n3;                                            // skip odd rows since these are the northern parts of quads generated on even rows
+            ij+= ((ij+2)&(n3-1)) ? 0 : n3;                                          // skip odd rows since these are the northern parts of quads generated on even rows
         }
-                            // fprintf(stderr,"8x8 patterns found\n");
-        for(n3 >>= 1; n3>1; n3>>= 1) {
+
+        for(n3 >>= 1; n3>1; n3>>= 1) {                                              // proceed up the hierarchy amalgamating 2x2 blocks to next level until reach top
             for (ij=ij1=0;ij<n3*n3;ij+=2,ij1++) {
-                            // fprintf(stderr,"n %d ij1 %d\n",n,ij1);
                 golq[ij1]=hash_node_find(golq[(ij+n3)],golq[(ij+n3)+1],golq[ij],golq[ij+1]); // hash_node_find(nw,ne,sw,se) adds quad node entry if node not found
-                ij+= ((ij+2)&(n3-1)) ? 0 : n3;                                        // skip odd rows since these are the northern parts of quads generated on even rows
+                ij+= ((ij+2)&(n3-1)) ? 0 : n3;                                      // skip odd rows since these are the northern parts of quads generated on even rows
             }
         }
-        /* if(golq[0]!=NULL)
-            if(golq[0]->hits > 1) fprintf(stderr,"step %d image already found at t = %d activity %d\n",totsteps,golq[0]->firsttime,golq[0]->hits); */
+        // if(golq[0]!=NULL) if(golq[0]->hits > 1) fprintf(stderr,"step %d image already found at t = %d activity %d\n",totsteps,golq[0]->firsttime,golq[0]->hits);
         return(golq[0]);
     }
 
@@ -2161,19 +2167,15 @@ short unsigned int extract_components(uint64_t gol[]) {
         nside = nside > k ? nside+1 : k+1;                                                              // side length of square one more than greater of vertical & horiz. difference
         for(log2n=0;(1<<log2n)<nside;log2n++);
         complist[i].log2n = log2n;
-        // log2n = log2n < 4 ? 4 : log2n;                                                               // minimum square side for quadimage is 16, so min log2n is 4
         nside = 1<<log2n;                                                                               // convert nside to next power of 2 for quadtree analysis;
         for(ij=0;ij<nside*nside;ij++) {
             ij1 =  (complist[i].W+(ij&(nside-1))&(N-1)) +                                               // calculate coordinate ij1 in full array of ij index in the component square
                   N*((complist[i].N+(ij>>log2n))&(N-1));
             working[ij] = (label[ij1]==i) ? 0x1ull : 0ull;                                              // use working to store binary component image
         }
-        if (log2n<4) {
-            
-        }
         if (quadtree) {
             complist[i].quad = quadimage(working,nside,&golps);                                         // quadtree hash code of component image: needs to work for all nside=2^n
-            if(complist[i].quad==NULL) complist[i].patt=golps;
+            if(complist[i].quad==NULL) complist[i].patt=golps;                                          // components either have (quad!=NULL and patt==0) or (quad==NULL and patt!=0)
             else complist[i].patt=0;
         }
     }
@@ -2183,8 +2185,8 @@ short unsigned int extract_components(uint64_t gol[]) {
     }
     for(i=1;i<=nlabel;i++) {
         histside[complist[i].log2n]++;
-        // fprintf(stderr,"step %d comp %d pixels %d rect (%d,%d, %d,%d)\n",totsteps,i,complist[i].pixels,complist[i].W,complist[i].N,complist[i].E,complist[i].S);
-        /* if(complist[i].log2n>=8) {
+        /* fprintf(stderr,"step %d comp %d pixels %d rect (%d,%d, %d,%d)\n",totsteps,i,complist[i].pixels,complist[i].W,complist[i].N,complist[i].E,complist[i].S);
+           if(complist[i].log2n>=8) {
             fprintf(stderr,"step %d component %d with log2n %d N,S,W,E %d %d %d %d\n",
                     totsteps,i,complist[i].log2n,complist[i].N,complist[i].S,complist[i].W,complist[i].E);
             for(ij=0;ij<N2;ij++) if(label[ij]==i) label[ij]=0xffff;                                    // recolour component white for debugging
@@ -4304,6 +4306,10 @@ void set_surviveover64(unsigned int surviveover[], int len ) {
 void set_vscrolling() {
     vscrolling=1-vscrolling;
     if(!vscrolling) last_scrolled = 0;
+}
+//.......................................................................................................................................................
+void set_noveltyfilter() {
+    noveltyfilter=1-noveltyfilter;
 }
 //------------------------------------------------------- get ... ---------------------------------------------------------------------------
 //.......................................................................................................................................................
