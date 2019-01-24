@@ -81,7 +81,7 @@ survivalmask = runparams[4] = 0x06       # for selection=8-13 this is the GoL su
 birthmask = runparams[7] = 0x04          # for selection=8-13 this is the GoL birth mask
 colorfunction = runparams[5] = 0         # color function 0(hash), >=1(fnal), 2 nongulstate or color gol planes, 3 notgolrul yellow
                                          # 4 activities 5 genealogy steps 6 genealogy temporal 7 activity scaled colors
-                                         # 8 glider detection 9 separate component labelling
+                                         # 8 glider detection 9 connected component labelling 10 connected component activities
 initfield = runparams[6] = 100           # 1 init via 32x32 genepat.dat, n>1 init via nxn rand array
 nlog2pmut = simparams[0] = 8             # log2 gene mutation probability (0 or >56 means no mutation)
 initial1density = simparams[1] =  16384  # initial 1 density in GOL state
@@ -420,6 +420,7 @@ def set_params():
     runparams[7] = birthmask                 # 8 bit birth mask for allowing genes to modify LUTs
     runparams[5] = colorfunction             # color function; 0(hash), 1-3 (functional), 2 nongulstate or color gol planes, 3 notgolrul yellow
                                              # 4 activities 5 genealogy steps 6 genealogy temporal 7 genealogy with activity scaled colors 8 glider detection
+                                             # 9 connected component labels and novelty (n) 10 connected component activities
     runparams[6] = initfield                 # 0 full field random or start depending on initialrdensity, 1 init via 32x32 genepat.dat, n>1 init via nxn rand array
     simparams[0] = nlog2pmut                 # log2 gene mutation probability (0 or >56 means no mutation)
     simparams[1] = initial1density           # initial 1 density in GOL state
@@ -651,7 +652,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             else:
                                 pixeldat = "(%d,%d) gol %016x gene %016x status %016x" % (x,y,gol[x+y*N],golg[x+y*N],golgstats[x+y*N])
                                 print ("step %d pixel data %s" % (framenr,pixeldat))
-                                if selection == 8:
+                                if selection == 8:                              # color rule table rectangles at base by rule derived from gene at current pixel
                                     for k in xrange(16):
                                         pg.draw.rect(scr,cancol[1][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 elif selection == 10:
@@ -671,9 +672,12 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             pixeldat = "(%d,%d) gene %016x" % (x,y,golg[x+y*N])
                             genelife.set_selectedgene(golg[x+y*N])
                             print ("step %d pixel data %s" % (framenr,pixeldat))
-                        elif colorfunction ==9:
+                        elif colorfunction == 9:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen)
                             pixeldat = "(%d,%d) label %4d nrconn %d" % (x,y,connlabel[y*N+x],connlen[connlabel[y*N+x]])
+                        elif colorfunction == 10:
+                            ncomponents=genelife.get_connected_comps(connlabel,connlen)
+                            pixeldat = "(%d,%d) label %4d nrconn %d" % (x,y,connlabel[y*N+x],connlen[connlabel[y*N+x]])  # MODIFY
                 elif event.button == 3:          # info on button or single plane choice (selection>=20) right mouse button (-click)
                     mouse_pos = pg.mouse.get_pos()
                     if scalex2:
@@ -753,9 +757,12 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             genelife.get_genealogytrace(golg)
                             pixeldat = "(%d,%d) gene %016x" % (x,y,golg[x+y*N])
                             genelife.set_selectedgene(golg[x+y*N])
-                        elif colorfunction ==9:
+                        elif colorfunction == 9:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen)
                             pixeldat = "(%d,%d) label %4d nr.conn %d" % (x,y,connlabel[y*N+x],connlen[connlabel[y*N+x]])
+                        elif colorfunction == 10:
+                            ncomponents=genelife.get_connected_comps(connlabel,connlen)
+                            pixeldat = "(%d,%d) label %4d nr.conn %d" % (x,y,connlabel[y*N+x],connlen[connlabel[y*N+x]])  # MODIFY
                 elif mouseclicked2:
                     if colorfunction == 2:
                         mouse_pos = pg.mouse.get_pos()
@@ -795,11 +802,11 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                 elif event.key == pg.K_SPACE:
                     pause = (pause+1)%2
                 elif event.key == pg.K_RIGHT:
-                    colorfunction = (colorfunction + 1) % 10
+                    colorfunction = (colorfunction + 1) % 11
                     genelife.set_colorfunction(colorfunction)
                     print 'step',framenr,'colorfunction changed to',colorfunction
                 elif event.key == pg.K_LEFT:
-                    colorfunction = (colorfunction - 1) % 10
+                    colorfunction = (colorfunction - 1) % 11
                     genelife.set_colorfunction(colorfunction)
                     print 'step',framenr,'colorfunction changed to',colorfunction
                 elif event.key == pg.K_PLUS or event.key == pg.K_KP_PLUS or event.key == pg.K_EQUALS:
@@ -881,6 +888,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
         elif colorfunction == 9:
             ncomponents=genelife.get_ncomponents()
             caption = caption + ("ncomponents %d " % (ncomponents))
+        elif colorfunction == 10: caption = caption + ("ymax %d " % ymax)
         if pixeldat: caption = caption + pixeldat
         pg.display.set_caption(caption)
         # pg.transform.scale2x(scr,screen)   # use this for pygame scale2x with smoother
