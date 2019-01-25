@@ -53,8 +53,12 @@ libcd.get_nspecies.argtypes = None
 libcd.get_nspecies.restype = c_int
 libcd.get_stats.restype = None
 libcd.get_stats.argtypes = [int_array, int_array, int_array, int_array, c_int]
-libcd.get_activities.restype = None
-libcd.get_activities.argtypes = [uint64_array, int_array, int_array]
+libcd.get_activities.restype = c_int
+libcd.get_activities.argtypes = [uint64_array, int_array, c_int]
+libcd.get_all_activities.restype = c_int
+libcd.get_all_activities.argtypes = [uint64_array, int_array, c_int]
+libcd.get_quad_activities.restype = c_int
+libcd.get_quad_activities.argtypes = [uint64_array, int_array, c_int]
 libcd.get_acttrace.restype = None
 libcd.get_acttrace.argtypes = [uint64_array,c_int]
 libcd.get_genealogytrace.restype = None
@@ -145,8 +149,14 @@ def get_histo(gol):
 def get_stats(livesites,genotypes,stepstats,configstats,nstats):
     return libcd.get_stats(livesites,genotypes,stepstats,configstats,nstats)
 
-def get_activities(actgenes,activities,ngenesp):
-    return libcd.get_activities(actgenes,activities,ngenesp)
+def get_activities(actgenes,activities,narraysize):
+    return libcd.get_activities(actgenes,activities,narraysize)
+
+def get_all_activities(actgenes,activities,narraysize):
+    return libcd.get_all_activities(actgenes,activities,narraysize)
+
+def get_quad_activities(actgenes,activities,narraysize):
+    return libcd.get_quad_activities(actgenes,activities,narraysize)
 
 def get_acttrace(acttrace):
     return libcd.get_acttrace(acttrace, int(len(acttrace)))
