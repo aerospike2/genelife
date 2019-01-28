@@ -27,6 +27,11 @@ int_array = npct.ndpointer(dtype=np.int32, ndim=1, flags='CONTIGUOUS')
 #    _fields_ = [('N',c_uint16),('S',c_uint16),('W',c_uint16),('E',c_uint16),('lastrc',c_uint16),
 #                ('label',c_uint16),('log2n',c_uint16),('patt',c_uint16),('quad',c_uint64),('pixels',c_uint32),('reserve',c_uint32)]
 
+# genedata type to retrieve hashed genes from C using numpy and ctypes
+genedtype=[('popcount',c_uint32),('firsttime',c_uint32),('lasttime',c_uint32),('lastextinctiontime',c_int),     #    3 unsigned 1 signed int 32 bits
+           ('activity',c_uint32),('nextinctions',c_uint32),('gene',c_uint64),('firstancestor',c_uint64)]        #    2 unsigned 32 bit and 2 unsigned 64 bit int
+gene_array = npct.ndpointer(dtype=genedtype, ndim=1, flags=['CONTIGUOUS','ALIGNED'])
+
 # component type to retrieve connected components from C using numpy and ctypes
 compdtype=[('N',c_uint16),('S',c_uint16),('W',c_uint16),('E',c_uint16),('lastrc',c_uint16),
            ('label',c_uint16),('log2n',c_uint16),('patt',c_uint16),('quad',c_uint64),('pixels',c_uint32),('reserve',c_uint32)]
@@ -98,6 +103,8 @@ libcd.get_smallpatts.restype = c_int
 libcd.get_smallpatts.argtypes = [smallpatt_array, c_int]
 libcd.get_quadnodes.restype = c_int
 libcd.get_quadnodes.argtypes = [quad_array, c_int]
+libcd.get_genes.restype = c_int
+libcd.get_genes.argtypes = [gene_array, c_int]
 libcd.colorgenes1.restype = None
 libcd.colorgenes1.argtypes = [uint64_array, uint64_array, uint64_array, int_array, c_int]
 libcd.colorgenes.restype = None
@@ -210,6 +217,9 @@ def get_smallpatts(smallpatts):
 
 def get_quadnodes(quadnodes):
     return libcd.get_quadnodes(quadnodes, int(len(quadnodes)))
+
+def get_genes(genelist):
+    return libcd.get_genes(genelist, int(len(genelist)))
 
 def colorgenes1(gol, golg, golgstats, cgolg):
     return libcd.colorgenes1( gol, golg, golgstats, cgolg, len(gol))

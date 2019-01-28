@@ -117,15 +117,15 @@ int colorfunction = 0;              // color function choice of 0: hash or 1: fu
 #include "hashtable.h"              // Gustavsson's file was modified because the 64bit to 32bit key compression code produces 0 for some values
 hashtable_t genetable;
 typedef struct genedata {           // value of keys stored for each gene encountered in simulation
-            int popcount;           // initialized to 1
-            int firsttime;          // initialized to 0
-            int lasttime;           // last time this gene was seen : enables genes to be mapped to their last epoch (including present)
-            int lastextinctiontime; // this is initialized to -1, meaning no extinctions yet
-            int activity;           // initialized to 0
-            int nextinctions;       // initialized to 0
-            uint64_t gene;          // stored gene : note that two difft 64-bit genes may be stored at same location, so need check
-            uint64_t firstancestor; // this is initialized to a special gene seq (rootgene) not likely ever to occur for starting genes
-            } genedata;
+    unsigned int popcount;          // initialized to 1
+    unsigned int firsttime;         // initialized to 0
+    unsigned int lasttime;          // last time this gene was seen : enables genes to be mapped to their last epoch (including present)
+    int lastextinctiontime;         // this is initialized to -1, meaning no extinctions yet
+    unsigned int activity;          // initialized to 0
+    unsigned int nextinctions;      // initialized to 0
+    uint64_t gene;                  // stored gene : note that two difft 64-bit genes may be stored at same location, so need check
+    uint64_t firstancestor;         // this is initialized to a special gene seq (rootgene) not likely ever to occur for starting genes
+} genedata;
 const uint64_t rootgene = 0xfedcba9876543210; // initial special gene as root for genealogies
 genedata ginitdata = {1,0,0,-1,0,0,0ull,rootgene};  // initialization data structure for gene data
 genedata *genedataptr;              // pointer to a genedata instance
@@ -134,15 +134,15 @@ genedata* geneitems;                // list of genedata structured items stored 
 //.......................................................................................................................................................
 hashtable_t quadtable;              // hash table for quad tree
 typedef struct quadnode {           // stored quadtree binary pattern nodes for population over time (currently only for analysis not computation)
-   uint64_t hashkey;                // hash table look up key for node : enables tree exploration more directly than construction from nw,ne,sw,se including collision avoidance
-   uint64_t nw, ne, sw, se;         // constant keys to hashed quadnodes or 64-bit patterns : we terminate one level higher than Gosper & golly
-   unsigned short int isnode;       // 1 if this is a node not a pattern
-   unsigned short int size;         // side length of square image corresponding to quadtree pattern
-   unsigned int activity;           // number of references to finding this node
-   unsigned int pop1s;              // 32 bit number of 1s in quadnode
-   unsigned int firsttime;          // first time node was identified
-   unsigned int lasttime;           // last time node was identified : used to determine if part of current timestep
-   unsigned int reserve;            // reserve field : giving size of record an even number of 64bit words
+    uint64_t hashkey;               // hash table look up key for node : enables tree exploration more directly than construction from nw,ne,sw,se including collision avoidance
+    uint64_t nw, ne, sw, se;        // constant keys to hashed quadnodes or 64-bit patterns : we terminate one level higher than Gosper & golly
+    unsigned short int isnode;      // 1 if this is a node not a pattern
+    unsigned short int size;        // side length of square image corresponding to quadtree pattern
+    unsigned int activity;          // number of references to finding this node
+    unsigned int pop1s;             // 32 bit number of 1s in quadnode
+    unsigned int firsttime;         // first time node was identified
+    unsigned int lasttime;          // last time node was identified : used to determine if part of current timestep
+    unsigned int reserve;           // reserve field : giving size of record an even number of 64bit words
 } quadnode;
 quadnode quadinit = {0ull,0ull,0ull,0ull,0ull,0,0,1,0,0,0,0};
 quadnode * qimage;
@@ -150,11 +150,11 @@ int quadcollisions = 0;
 HASHTABLE_SIZE_T const* quadtypes;  // pointer to stored hash table keys (which are the quadtypes)
 quadnode* quaditems;                // list of quadnode structured items stored in hash table
 typedef struct smallpatt {          // stored binary patterns for 4*4 subarrays or smaller (16bit)
-   unsigned short int size;         // side length of square image corresponding to pattern
-   unsigned short int reserve;      // reserved for future use, padding to even number of 64-bit words for record
-   unsigned int activity;           // number of references to finding this pattern
-   unsigned int firsttime;          // first time pattern was identified
-   unsigned int lasttime;           // last time pattern was identified
+    unsigned short int size;         // side length of square image corresponding to pattern
+    unsigned short int reserve;      // reserved for future use, padding to even number of 64-bit words for record
+    unsigned int activity;           // number of references to finding this pattern
+    unsigned int firsttime;          // first time pattern was identified
+    unsigned int lasttime;           // last time pattern was identified
 } smallpatt;
 smallpatt smallpatts[65536];
 //-------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -462,6 +462,11 @@ const uint64_t r1 = 0x1111111111111111ull;
 // get_curgol           get current gol array from C to python
 // get_curgolg          get current golg array from C to python
 // get_acttrace         get current acttrace array C to python
+// get genealogy_trace  get current trace of genealogies to python
+// get_components       get all current connected component data structures
+// get_smallpatts       get array of small pattern data structures including sizes and activities
+// get_quadnodes        get all hashed quadnodes including hashkey, sizes and activities
+// get_genes            get all hashed genes with data structures including activity counts, extinctions etc
 // get_curgolgstats     get current golgstats array C to python
 //.......................................................................................................................................................
 // cmpfunc              compare gene values as numerical unsigned numbers
@@ -1311,7 +1316,7 @@ extern inline void hashgeneextinction(uint64_t gene,const char errorformat[]) {
 }
 //.......................................................................................................................................................
 extern inline void hashgeneactivity(uint64_t gene, const char errorformat[]) {
-        if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) genedataptr->activity ++;
+        if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) genedataptr->activity++;
         else fprintf(stderr,errorformat,4,totsteps,gene);
 }
 //------------------------------------------------------- hash quadtree inline fns ----------------------------------------------------------------------
@@ -4497,13 +4502,14 @@ int get_smallpatts(smallpatt smallpattsout[],int narraysize) {
 //.......................................................................................................................................................
 int get_quadnodes(quadnode quadnodes[],int narraysize) {
     int i;
-    
+
+    // these three calls executed through hashactivityquad if colorfunction 9 or 10
     // nallspeciesquad = hashtable_count(&quadtable);
     // quadtypes = hashtable_keys(&quadtable);
     // quaditems = (quadnode*) hashtable_items( &quadtable );
     
     if (narraysize<nallspeciesquad) {
-        fprintf(stderr,"Error in get_quadnodes : called with insufficent component holding array size %d < %d\n",narraysize,nallspeciesquad);
+        fprintf(stderr,"Error in get_quadnodes : called with insufficent quadnode holding array size %d < %d\n",narraysize,nallspeciesquad);
         return -1;
     }
 
@@ -4523,6 +4529,33 @@ int get_quadnodes(quadnode quadnodes[],int narraysize) {
     }
     
     return nallspeciesquad;
+}
+//.......................................................................................................................................................
+int get_genes(genedata genelist[],int narraysize) {
+    int i;
+
+    // these three calls executed already through hashactivity
+    // nallspecies = hashtable_count(&genetable);
+    // genotypes = hashtable_keys(&genetable);
+    // geneitems = (genedata*) hashtable_items( &genetable );
+    
+    if (narraysize<nallspecies) {
+        fprintf(stderr,"Error in get_genes : called with insufficent genedata holding array size %d < %d\n",narraysize,nallspecies);
+        return -1;
+    }
+
+    for (i=0;i<nallspeciesquad;i++) {
+        genelist[i].popcount=geneitems[i].popcount;
+        genelist[i].firsttime=geneitems[i].firsttime;
+        genelist[i].lasttime=geneitems[i].lasttime;
+        genelist[i].lastextinctiontime=geneitems[i].lastextinctiontime;
+        genelist[i].activity=geneitems[i].activity;
+        genelist[i].nextinctions=geneitems[i].nextinctions;
+        genelist[i].gene=geneitems[i].gene;
+        genelist[i].firstancestor=geneitems[i].firstancestor;
+    }
+    
+    return nallspecies;
 }
 //.......................................................................................................................................................
 void get_curgolgstats(uint64_t outgolgstats[], int NN) {
