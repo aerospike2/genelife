@@ -136,8 +136,8 @@ hashtable_t quadtable;              // hash table for quad tree
 typedef struct quadnode {           // stored quadtree binary pattern nodes for population over time (currently only for analysis not computation)
    uint64_t hashkey;                // hash table look up key for node : enables tree exploration more directly than construction from nw,ne,sw,se including collision avoidance
    uint64_t nw, ne, sw, se;         // constant keys to hashed quadnodes or 64-bit patterns : we terminate one level higher than Gosper & golly
-   unsigned short isnode;           // 1 if this is a node not a pattern
-   unsigned short size;             // side length of square image corresponding to quadtree pattern
+   unsigned short int isnode;       // 1 if this is a node not a pattern
+   unsigned short int size;         // side length of square image corresponding to quadtree pattern
    unsigned int activity;           // number of references to finding this node
    unsigned int pop1s;              // 32 bit number of 1s in quadnode
    unsigned int firsttime;          // first time node was identified
@@ -150,7 +150,8 @@ int quadcollisions = 0;
 HASHTABLE_SIZE_T const* quadtypes;  // pointer to stored hash table keys (which are the quadtypes)
 quadnode* quaditems;                // list of quadnode structured items stored in hash table
 typedef struct smallpatt {          // stored binary patterns for 4*4 subarrays or smaller (16bit)
-   unsigned short size;             // side length of square image corresponding to pattern
+   unsigned short int size;         // side length of square image corresponding to pattern
+   unsigned short int reserve;      // reserved for future use, padding to even number of 64-bit words for record
    unsigned int activity;           // number of references to finding this pattern
    unsigned int firsttime;          // first time pattern was identified
    unsigned int lasttime;           // last time pattern was identified
@@ -196,7 +197,10 @@ uint64_t acttrace[N2];              // scrolled trace of last N time points of a
 uint64_t acttraceq[N2];             // scrolled trace of last N time points of activity of quad patterns
 uint64_t genealogytrace[N2];        // image trace of genealogies for N most frequently populated genes
 uint64_t working[N2];               // working space array for calculating genealogies and doing neighbour bit packing
-int nlivespecies;                   // number of gene species in current population
+// int nlivespecies;                   // number of gene species in current population
+int nspeciesgene,nspeciesquad;      // number of gene species in current population, and that have ever existed
+int nallspecies,nallspeciesquad;    // number of quad species in current population, and that have ever existed
+int ngenealogydeep;                 // depth of genealogy
 //------------------------------------------------ arrays for connected component labelling and tracking ------------------------------------------------
 const int NLM = N2>>2;              // maximum number of discrete components possible N2/4
 short unsigned int label[N2];       // labels for pixels in connected component labelling
@@ -1369,7 +1373,7 @@ extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, co
                     quadinit.ne=ne;
                     quadinit.sw=sw;
                     quadinit.se=se;
-                    quadinit.size=16;
+                    quadinit.size=(ne || sw || se) ? 16 : 8;
                     quadinit.firsttime=totsteps;
                     quadinit.lasttime=totsteps;
                     POPCOUNT64C(nw,nr1);nr1s=nr1;
@@ -1389,7 +1393,7 @@ extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, co
             quadinit.ne=ne;
             quadinit.sw=sw;
             quadinit.se=se;
-            quadinit.size=16;
+            quadinit.size=(ne || sw || se) ? 16 : 8;
             quadinit.firsttime=totsteps;
             quadinit.lasttime=totsteps;
             POPCOUNT64C(nw,nr1);nr1s=nr1;
@@ -1449,7 +1453,7 @@ extern inline quadnode * hash_node_find(const uint64_t nw, const uint64_t ne, co
                     if((qsw = (quadnode *) hashtable_find(&quadtable, sw)) == NULL) fprintf(stderr,"Error sw node not found in hashtable.\n");
                     if((qse = (quadnode *) hashtable_find(&quadtable, se)) == NULL) fprintf(stderr,"Error se node not found in hashtable.\n");
                     quadinit.pop1s=qnw->pop1s+qne->pop1s+qsw->pop1s+qse->pop1s;
-                    quadinit.size=qnw->size<<2;
+                    quadinit.size=qnw->size<<1;
                     hashtable_insert(&quadtable, h,(quadnode *) &quadinit);
                     q = (quadnode *) hashtable_find(&quadtable, h);
                     // fprintf(stderr,"step %d quadhash node stored %llx %llx %llx %llx hash %llx\n", totsteps, nw, ne, sw, se, h);
@@ -1470,7 +1474,7 @@ extern inline quadnode * hash_node_find(const uint64_t nw, const uint64_t ne, co
             if((qsw = (quadnode *) hashtable_find(&quadtable, sw)) == NULL) fprintf(stderr,"Error sw node not found in hashtable.\n");
             if((qse = (quadnode *) hashtable_find(&quadtable, se)) == NULL) fprintf(stderr,"Error se node not found in hashtable.\n");
             quadinit.pop1s=qnw->pop1s+qne->pop1s+qsw->pop1s+qse->pop1s;
-            quadinit.size=qnw->size<<2;
+            quadinit.size=qnw->size<<1;
             hashtable_insert(&quadtable, h,(quadnode *) &quadinit);
             q = (quadnode *) hashtable_find(&quadtable, h);
             // fprintf(stderr,"step %d quadhash node stored %llx %llx %llx %llx hash %llx\n", totsteps, nw, ne, sw, se, h);
@@ -3861,7 +3865,6 @@ void genelife_update (int nsteps, int nhist, int nstat) {
     /* encode without if structures for optimal vector treatment */
     int t;
     uint64_t *newgol, *newgolg;
-    int nspecies,nspeciesquad,nallspecies,nallspeciesquad,ngenealogydeep;
     int activitieshash(void);                                                 // count activities of all currently active gene species
     int activitieshashquad(void);                                             // count activities of all currently active quad pattern species
     int genealogies(void);                                                    // genealogies of all currently active species
@@ -3899,8 +3902,8 @@ void genelife_update (int nsteps, int nhist, int nstat) {
         golg = planesg[curPlane];
         golgstats = planesgs[curPlane];
 
-        nspecies=activitieshash();                                           // colors acttrace and sets current population arrays, need to run always for continuity
-        if(nspecies<0) fprintf(stderr,"error returned from activitieshash\n");
+        nspeciesgene=activitieshash();                                       // colors acttrace and sets current population arrays, need to run always for continuity
+        if(nspeciesgene<0) fprintf(stderr,"error returned from activitieshash\n");
         nspeciesquad=activitieshashquad();                                   // colors acttraceq and sets current population arrays, need to run always for continuity
         if(nspeciesquad<0) fprintf(stderr,"error returned from activitieshashquad\n");
         if(colorfunction>4 && colorfunction<8) {                             // genealogies
@@ -3910,7 +3913,7 @@ void genelife_update (int nsteps, int nhist, int nstat) {
         if(!(totsteps%10)) {
             nallspecies = hashtable_count(&genetable);
             nallspeciesquad = hashtable_count(&quadtable);
-            fprintf(stderr,"step %6d: genes %d/%d (extant/all), patterns %d/%d (extant/all)\n",totsteps,nspecies,nallspecies,nspeciesquad,nallspeciesquad);
+            fprintf(stderr,"step %6d: genes %d/%d (extant/all), patterns %d/%d (extant/all)\n",totsteps,nspeciesgene,nallspecies,nspeciesquad,nallspeciesquad);
         }
 
         totdisp++;                                                            // currently every step is counted for display in activities
@@ -4452,7 +4455,7 @@ int get_components(component components[],int narraysize) {
     int i;
     if (narraysize<ncomponents) {
         fprintf(stderr,"Error in get_components : called with insufficent component holding array size %d < %d\n",narraysize,ncomponents);
-        return ncomponents;
+        return -1;
     }
     for (i=1;i<=ncomponents;i++) {
         components[i-1].N=complist[i].N;
@@ -4472,6 +4475,54 @@ int get_components(component components[],int narraysize) {
     }
     
     return ncomponents;
+}
+//.......................................................................................................................................................
+int get_smallpatts(smallpatt smallpattsout[],int narraysize) {
+    int i,count;
+    if (narraysize<65536) {
+        fprintf(stderr,"Error in get_smallpatts : called with insufficent smallpatt holding array size %d < %d\n",narraysize,65536);
+        return -1;
+    }
+    for (count=i=0;i<65536;i++) {
+        smallpattsout[i].size= smallpatts[i].size;
+        smallpattsout[i].reserve= smallpatts[i].reserve;
+        smallpattsout[i].activity= smallpatts[i].activity;
+        count += smallpatts[i].activity ? 1 : 0;
+        smallpattsout[i].firsttime= smallpatts[i].firsttime;
+        smallpattsout[i].lasttime= smallpatts[i].lasttime;
+    }
+    
+    return count;
+}
+//.......................................................................................................................................................
+int get_quadnodes(quadnode quadnodes[],int narraysize) {
+    int i;
+    
+    // nallspeciesquad = hashtable_count(&quadtable);
+    // quadtypes = hashtable_keys(&quadtable);
+    // quaditems = (quadnode*) hashtable_items( &quadtable );
+    
+    if (narraysize<nallspeciesquad) {
+        fprintf(stderr,"Error in get_quadnodes : called with insufficent component holding array size %d < %d\n",narraysize,nallspeciesquad);
+        return -1;
+    }
+
+    for (i=0;i<nallspeciesquad;i++) {
+        quadnodes[i].hashkey=quaditems[i].hashkey;
+        quadnodes[i].nw=quaditems[i].nw;
+        quadnodes[i].ne=quaditems[i].ne;
+        quadnodes[i].sw=quaditems[i].sw;
+        quadnodes[i].se=quaditems[i].se;
+        quadnodes[i].isnode=quaditems[i].isnode;
+        quadnodes[i].size=quaditems[i].size;
+        quadnodes[i].activity=quaditems[i].activity;
+        quadnodes[i].pop1s=quaditems[i].pop1s;
+        quadnodes[i].firsttime=quaditems[i].firsttime;
+        quadnodes[i].lasttime=quaditems[i].lasttime;
+        quadnodes[i].reserve=quaditems[i].reserve;
+    }
+    
+    return nallspeciesquad;
 }
 //.......................................................................................................................................................
 void get_curgolgstats(uint64_t outgolgstats[], int NN) {

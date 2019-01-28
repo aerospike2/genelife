@@ -27,12 +27,23 @@ int_array = npct.ndpointer(dtype=np.int32, ndim=1, flags='CONTIGUOUS')
 #    _fields_ = [('N',c_uint16),('S',c_uint16),('W',c_uint16),('E',c_uint16),('lastrc',c_uint16),
 #                ('label',c_uint16),('log2n',c_uint16),('patt',c_uint16),('quad',c_uint64),('pixels',c_uint32),('reserve',c_uint32)]
 
-# comp_array = npct.ndpointer(dtype=COMPONENT, ndim=1, flags='CONTIGUOUS')  using numpy and ctypes
+# component type to retrieve connected components from C using numpy and ctypes
 compdtype=[('N',c_uint16),('S',c_uint16),('W',c_uint16),('E',c_uint16),('lastrc',c_uint16),
-                ('label',c_uint16),('log2n',c_uint16),('patt',c_uint16),('quad',c_uint64),('pixels',c_uint32),('reserve',c_uint32)]
+           ('label',c_uint16),('log2n',c_uint16),('patt',c_uint16),('quad',c_uint64),('pixels',c_uint32),('reserve',c_uint32)]
 comp_array = npct.ndpointer(dtype=compdtype, ndim=1, flags=['CONTIGUOUS','ALIGNED'])
+
+# quadnode type to retrieve quadnodes from C using numpy and ctypes
+quaddtype=[('hashkey',c_uint64),('nw',c_uint64),('ne',c_uint64),('sw',c_uint64),('se',c_uint64),('isnode',c_uint16),('size',c_uint16),
+           ('activity',c_uint32),('pop1s',c_uint32),('firsttime',c_uint32),('lasttime',c_uint32),('reserve',c_uint32)]
+quad_array = npct.ndpointer(dtype=quaddtype, ndim=1, flags=['CONTIGUOUS','ALIGNED'])
+
+# smallpatt type to retrieve smallpatts from C using numpy and ctypes
+smallpattdtype=[('size',c_uint16),('reserve',c_uint16),('activity',c_uint32),('firsttime',c_uint32),('lasttime',c_uint32)]
+smallpatt_array = npct.ndpointer(dtype=smallpattdtype, ndim=1, flags=['CONTIGUOUS','ALIGNED'])
+
 # load the library, using numpy mechanisms
 libcd = npct.load_library("libgenelife", ".")
+
 
 # setup the return types and argument types
 libcd.get_log2N.restype = c_int
@@ -83,6 +94,10 @@ libcd.get_ncomponents.restype = c_int
 libcd.get_ncomponents.argtypes = None
 libcd.get_components.restype = c_int
 libcd.get_components.argtypes = [comp_array, c_int]
+libcd.get_smallpatts.restype = c_int
+libcd.get_smallpatts.argtypes = [smallpatt_array, c_int]
+libcd.get_quadnodes.restype = c_int
+libcd.get_quadnodes.argtypes = [quad_array, c_int]
 libcd.colorgenes1.restype = None
 libcd.colorgenes1.argtypes = [uint64_array, uint64_array, uint64_array, int_array, c_int]
 libcd.colorgenes.restype = None
@@ -189,6 +204,12 @@ def get_ncomponents():
 
 def get_components(components):
     return libcd.get_components(components, int(len(components)))
+
+def get_smallpatts(smallpatts):
+    return libcd.get_smallpatts(smallpatts, int(len(smallpatts)))
+
+def get_quadnodes(quadnodes):
+    return libcd.get_quadnodes(quadnodes, int(len(quadnodes)))
 
 def colorgenes1(gol, golg, golgstats, cgolg):
     return libcd.colorgenes1( gol, golg, golgstats, cgolg, len(gol))
