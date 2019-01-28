@@ -490,14 +490,29 @@ const uint64_t r1 = 0x1111111111111111ull;
 // printxy              terminal screen print of array on xterm
 //--------------------------------------------------------------------------------------------------------------------------------------------------------
 //------------------------------------------------------- colorgenes -------------------------------------------------------------------------------------
+extern inline void setcolor(unsigned int *color,int n) // for coloring by quad size...
+{
+    unsigned int Ncolor=16;
+    unsigned int cmax = 0xffffff;
+    unsigned int step,nn,mycol;
+
+    nn = n % Ncolor;
+    step = cmax / Ncolor;
+    mycol = nn*step;
+    color[0] = mycol & 0xff;
+    color[1] = (mycol & 0xff00) >> 2;
+    color[2] = (mycol & 0xff0000) >> 4;
+}
+
 void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2) {
     uint64_t gene, gdiff, g2c, mask, quad;
-    int ij,k,activity,popcount;
+    int i,ij,k,activity,popcount;
     unsigned int d,d0,d1,d2;
     unsigned int color[3],colormax;
     double rescalecolor;
     quadnode *q;
     static int numones[16]={0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4};
+    unsigned int histsize[17];     // for keeping track of quad size distribution
 
     if(colorfunction==0) { // colorfunction based on multiplicative hash
         // see https://stackoverflow.com/questions/6943493/hash-table-with-64-bit-values-as-key/33871291
@@ -714,6 +729,39 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
         }
     }
     else if(colorfunction==10){                                     //activities for patterns
+        for(i=0;i<17;i++) histsize[i]=0;
+        for (ij=0; ij<NN2; ij++) {
+            quad=acttraceq[ij];
+            mask = 0x3f00ff;                           // default color (green)
+            if (quad == rootgene) mask = 0x3f3f3fff;                // grey color for background, all root genes
+            else {
+                unsigned short sz,i;
+                if((q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL){
+                    popcount = q->pop1s;
+                    sz = q->size;
+                    if(sz<17) histsize[sz]++;
+                    for(i=1; i<32; i++){
+                        if(sz>>i == 0){
+                            setcolor(color,i);
+                            break;
+                        }
+                    }
+                    for(d=0,mask=0xff;d<3;d++) mask |= color[d]<<((d<<3)+8);
+                }
+                else if (quad<65536 && smallpatts[quad].activity) {
+                    color[0]=0; color[1]=0; color[2]=0; // black for all small pats.
+                }
+                else{
+                    fprintf(stderr,"quad pattern not found in colorfunction for activities\n");
+                    color[0]=0xff; color[1]=0xff; color[2]=0xff;
+                }
+                mask = (color[0]<<8) | (color[1]<<4) |  (color[2]<<2) | 0xff;
+            }
+            cgolg[ij]= (int) mask;
+        }
+        fprintf(stderr,"size counts\t");for(i=0;i<17;i++) fprintf(stderr," %5u",histsize[i]);fprintf(stderr,"\n");
+    }
+    else if(colorfunction==11){                                     //activities for patterns
         int popmax = 0;                                             // need to bring this parameter up to python, if 0 do not scale brightness by pop1s
         for (ij=0; ij<NN2; ij++) {
             quad=acttraceq[ij];
