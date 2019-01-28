@@ -196,6 +196,7 @@ uint64_t acttrace[N2];              // scrolled trace of last N time points of a
 uint64_t acttraceq[N2];             // scrolled trace of last N time points of activity of quad patterns
 uint64_t genealogytrace[N2];        // image trace of genealogies for N most frequently populated genes
 uint64_t working[N2];               // working space array for calculating genealogies and doing neighbour bit packing
+int nlivespecies;                   // number of gene species in current population
 //------------------------------------------------ arrays for connected component labelling and tracking ------------------------------------------------
 const int NLM = N2>>2;              // maximum number of discrete components possible N2/4
 short unsigned int label[N2];       // labels for pixels in connected component labelling
@@ -208,12 +209,13 @@ typedef struct equivrec {           // equivalence record
 } equivrec;
 equivrec eqv[NLM];                  // equivalences between labels
 typedef struct component {          // data structure for identified connected components in gol array
-    short unsigned int N,S,E,W;     // rectangular bounds of rectangle containing the component
+    short unsigned int N,S,W,E;     // rectangular bounds of rectangle containing the component
     short unsigned int lastrc;      // last occupied row/col used to trace components wrapping across the N-1 to 0 border
     short unsigned int label,log2n; // label index of component, enclosing square size n=2^log2n
     short unsigned int patt;        // for small components of size 4x4 pixels or less, the image is encoded directly in the pattern patt
     uint64_t quad;                  // hashkey for quadtree node of subimage for component
-    unsigned int pixels;
+    unsigned int pixels;            // number of pixels on
+    unsigned int reserve;           // reserve to ensure structure is  a whole numebr of 64 bit words (for efficiency and ndarray python communication)
 } component;
 component complist[NLM];            // current array of components
 int ncomponents = 0;                // current number of components (= current number of labels)
@@ -1476,38 +1478,39 @@ extern inline quadnode * hash_node_find(const uint64_t nw, const uint64_t ne, co
         return(q);
 }
 //.......................................................................................................................................................
-quadnode * quadimage(uint64_t gol[],int n,short unsigned int *golps) {              // routine to generate a quadtree for an entire binary image of long words
+quadnode * quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {         // routine to generate a quadtree for an entire binary image of long words
                                                                                     // makes use of global linear and quadratic size variable N2 for sizing internal arrays golp,golq
-                                                                                    // assumes that N is power of 2
+                                                                                    // assumes that n is power of 2
     unsigned int ij,ij1,n3;
     uint64_t golp[N2>>6];
     quadnode * golq[N2>>8];
-    extern void pack16neighbors(uint64_t gol[],short unsigned int golps[],int n);
-    extern void pack64neighbors(uint64_t gol[],uint64_t golp[],int n);
+    int n = 1 << log2n;
+    extern void pack16neighbors(uint64_t gol[],short unsigned int *patt,int log2n);
+    extern void pack64neighbors(uint64_t gol[],uint64_t golp[],int log2n);
     
     if(n<16) {                                                                      // n < 16
         if (n==8) {                                                                 // n == 8
-            pack64neighbors(gol,golp,n);
+            pack64neighbors(gol,golp,log2n);
             golq[0]=hash_patt_find(golp[0],0ull,0ull,0ull);
             return(golq[0]);
         }
         else {                                                                      // n == 4,2,1   use smallpatts array to store patterns (more efficient than continued quadtree)
-            pack16neighbors(gol,golps,n);
-            if(smallpatts[*golps].activity) {                                       // pattern found
-                smallpatts[*golps].activity++;
-                smallpatts[*golps].lasttime=totsteps;
+            pack16neighbors(gol,patt,log2n);
+            if(smallpatts[*patt].activity) {                                       // pattern found
+                smallpatts[*patt].activity++;
+                smallpatts[*patt].lasttime=totsteps;
             }
             else {                                                                  // store new pattern
-                smallpatts[*golps].size=n;
-                smallpatts[*golps].activity++;
-                smallpatts[*golps].firsttime=totsteps;
-                smallpatts[*golps].lasttime=totsteps;
+                smallpatts[*patt].size=n;
+                smallpatts[*patt].activity++;
+                smallpatts[*patt].firsttime=totsteps;
+                smallpatts[*patt].lasttime=totsteps;
             }
-            return NULL;                                                            // in this case image key is returned in *golps rather than quad key
+            return NULL;                                                            // in this case image key is returned in *patt rather than quad key
         }
     }
     else  {                                                                         // n >= 16
-        pack64neighbors(gol,golp,n);                                                // 8x8 blocks of gol pixels packed into single 64bit words in golp
+        pack64neighbors(gol,golp,log2n);                                                // 8x8 blocks of gol pixels packed into single 64bit words in golp
         n3=n>>3;                                                                    // n3=n/8 is number of such 8x8 blocks along each side of square
         // for(ij=0;ij<n3*n3;ij++) { if (ij%8 == 0) fprintf(stderr,"\n step %d ij %d",totsteps,ij);fprintf(stderr," %llx ",golp[ij]);} fprintf(stderr,"\n");
         for (ij=ij1=0;ij<n3*n3;ij+=2,ij1++) {                                       //  hash all 16x16 patterns (2x2 of golp words) found as leaves of the quadtree
@@ -1527,7 +1530,8 @@ quadnode * quadimage(uint64_t gol[],int n,short unsigned int *golps) {          
 
 }
 //------------------------------------------------------- pack012,3neighbors -------------------------------------------------------------------------------
-#define deltaxy(ij,x,y)  (ij - (ij&Nmask) + (((ij+(x))&Nmask) + (y)*N)) & N2mask
+#define deltaxy(ij,x,y)  ((ij - (ij&Nmask) + (((ij+(x))&Nmask) + (y)*N)) & N2mask)
+#define deltaxyn(ij,x,y,log2n)  ((ij - (ij&((1<<log2n)-1)) + (((ij+(x))&Nmask) + (y)*N)) & N2mask)
 //.......................................................................................................................................................
 extern inline void pack012neighbors(uint64_t gol[],uint64_t golp[]) {              // routine to pack all up to 2nd neighbours in single word
     unsigned int ij,k;
@@ -1574,30 +1578,35 @@ extern inline void pack49neighbors(uint64_t gol[],uint64_t golp[]) {            
                                                                                   // mask removes bit numbers 16,18,24,26,32,33,36,37,48,49,50,52,53,56,58
 }
 //.......................................................................................................................................................
-extern inline void pack16neighbors(uint64_t gol[],short unsigned int golp[],int n) { // routine to pack 4x4 subarrays of binary array gol into single words
-    unsigned int ij,ij1,k;                                                        // assuming golp length >= (n*n)>>4
-    unsigned int n2 = n*n;
+extern inline void pack16neighbors(uint64_t wgol[],short unsigned int golp[],int log2n) { // routine to pack 4x4 subarrays of binary square array wgol (nxn) into single words
+    unsigned int ij,ij1,k;                                                           // assuming golp length >= (n*n)>>4, side length of square is n (power of 2)
+    int n = 1 << log2n;
+    int n2 = n*n;
     for (ij1=0;ij1<(n2>>4);ij1++) golp[ij1]=0;
-    if (n2>=16) {
-        for(k=0;k<16;k++) {
-            for (ij=ij1=0;ij<n2;ij+=4,ij1++) {
-                golp[ij1] |= (short unsigned int) gol[deltaxy(ij,k&0x3,k>>2)]<<k;    // 4x4 packed arrays
-                ij+= ((ij+4)&(n-1)) ? 0 : (4-1)*n;
-            }
+    if (n==1) golp[0]=(short unsigned int) (wgol[0]);
+    else if (n==2) golp[0]=(short unsigned int) (wgol[0]+(wgol[1]<<1)+(wgol[2]<<2)+(wgol[3]<<3));
+    else if (n>=4) {
+        for (ij=ij1=0;ij<n2;ij+=4,ij1++) {
+            for(k=0;k<4;k++) golp[ij1] |= (short unsigned int) ((wgol[k*n]+(wgol[k*n+1]<<1)+(wgol[k*n+2]<<2)+(wgol[k*n+3]<<3))<<(k<<2));
+            ij+= ((ij+4)&(n-1)) ? 0 : (4-1)*n;
         }
     }
-    else if (n2==4) golp[0]=(short unsigned) (gol[0]+(gol[deltaxy(0,1,0)]<<1)+(gol[deltaxy(0,0,1)]<<2)+(gol[deltaxy(0,1,1)]<<3));
-    else if (n2==1) golp[0]=1;
     else fprintf(stderr,"pack16neighbours called with not permitted value of n %d\n",n);
 }
 //.......................................................................................................................................................
-extern void pack64neighbors(uint64_t gol[],uint64_t golp[],int n) {               // routine to pack 8x8 subarrays of binary array gol into single words
-    unsigned int ij,ij1,k;                                                        // assuming golp length >= (n*n)>>6
-    unsigned int n2 = n*n;
+extern void pack64neighbors(uint64_t gol[],uint64_t golp[],int log2n) {           // routine to pack 8x8 subarrays of full binary array gol into single words
+    int n = 1 << log2n;
+    int ij,ij1,k;                                                                 // assuming golp length >= (n*n)>>2^6
+    int n2 = n*n;
+    
+    if (log2n<3) {
+        fprintf(stderr,"Error trying to pack too small an array into 64 bit words: need >= 8x8 have %d x %d\n",n,n);
+        return;
+    }
     for (ij1=0;ij1<(n2>>6);ij1++) golp[ij1]=0ull;
     for(k=0;k<64;k++)
-        for (ij=ij1=0;ij<n2;ij+=8,ij1++) {
-             golp[ij1] |= gol[deltaxy(ij,k&0x7,k>>3)]<<k;                        // 8x8 packed arrays
+        for (ij=ij1=0;ij<n2;ij+=8) {
+             golp[ij1++] |= gol[(ij &(n-1))+(k&0x7)+n*((ij>>log2n)+(k>>3))]<<k;
              ij+= ((ij+8)&(n-1)) ? 0 : (8-1)*n;
         }
 }
@@ -1790,7 +1799,7 @@ void checklabels(equivrec eqv[],unsigned short int *nlabel) {
 void flattenlabels(equivrec eqv[],unsigned short int *nlabel) {
     short unsigned int xlabel = 1;
     short unsigned int i;
-    for (i = 1; i < *nlabel + 1; i++) {
+    for (i = 1; i <= *nlabel; i++) {
         if (eqv[i].pt < i) {
             eqv[i].pt = eqv[eqv[i].pt].pt;
         }
@@ -1798,7 +1807,7 @@ void flattenlabels(equivrec eqv[],unsigned short int *nlabel) {
             eqv[i].pt = xlabel++;
         }
     }
-    *nlabel = xlabel;
+    *nlabel = xlabel-1;
 }
 //.......................................................................................................................................................
 // fast component labelling, updating global equivalence table equiv and placing labels in global array label, return number of labels
@@ -2055,7 +2064,10 @@ short unsigned int label_components(uint64_t gol[]) {
     for(nunique=0,i=1;i<=oldnlabel;i++) if (connpref[connpreff[i]] == i) nunique++;
     for(nzconnect=0,i=1;i<=oldnlabel;i++) if (!connlistsf[i]) nzconnect++;
     for(nremconnect=0,i=1;i<=oldnlabel;i++) if (iilap[i]==iilap[i-1]) nremconnect++;       // this includes those components with all connections removed by nunique pairs
-    fprintf(stderr,"step %d:  %d(%d) matched(unique) & %d(%d) no-residual(no) connections i.e. %d out of %d(%d) old(new) components\n",totsteps,nmatched,nunique,nremconnect,nzconnect,nmatched+nremconnect,oldnlabel,nlabel);
+    if(!(totsteps % 10)) {
+        fprintf(stderr,"connected cpts:  %d(%d) matched(unique) & %d(%d) with no-residual(no) connections i.e. %d out of %d(%d) old(new) components\n",
+                        nmatched,nunique,nremconnect,nzconnect,nmatched+nremconnect,oldnlabel,nlabel);
+    }
     
     /* do this for lapmod not maxmatch
     for(i=nlap;i<=nlabel;i++) {                            // if nlabel > oldnlabel, then fill out cost matrix further with dummy nodes
@@ -2086,19 +2098,21 @@ short unsigned int label_components(uint64_t gol[]) {
 //.......................................................................................................................................................
 short unsigned int extract_components(uint64_t gol[]) {
     int i,j,ij,ij1,log2n;
-    short unsigned int k,nside,nlabel,golps;
+    short unsigned int k,nside,nlabel,patt;
     short unsigned int histside[log2N+1];
+    uint64_t fullpatt;
+    int wpixels;
     quadnode * q;
 
     ncomponents = label_components(gol);                                                                // label connected components
     nlabel = ncomponents;
     
     for(i=1;i<=nlabel;i++) {                                                                            // initialize component structures for horizontal scan
-        complist[i].lastrc=N-1;
+        complist[i].lastrc=0;
         complist[i].label=0;
         complist[i].pixels=0;
     }
-    for (i=0;i<N;i++) {                                                                                 // find lateral limits of each component
+    for (i=0;i<N;i++) {                                                                                 // find lateral limits of each component in horizontal scan
       for (j=0; j<N; j++) {
         ij = j*N+i;
         if(label[ij]>nlabel) fprintf(stderr,"in extract_components step %d label %d out of bounds\n",totsteps,label[ij]);
@@ -2110,7 +2124,7 @@ short unsigned int extract_components(uint64_t gol[]) {
             }
             else if (complist[label[ij]].lastrc != i) {                                                 // label reencountered for first time in row
                 if (((complist[label[ij]].lastrc+1)&(N-1)) == i) {                                      // continuation of component from previous row
-                    complist[label[ij]].E=i;
+                    if(complist[label[ij]].E>=complist[label[ij]].W) complist[label[ij]].E=i;
                 }
                 else if (((complist[label[ij]].lastrc+1)&(N-1)) <  i) {                                 // component resumes after row gap
                     // fprintf(stderr,"HORIZ TRACK step %d setting W %d after gap at i %d j %d label %d lastrc %d\n",totsteps,i,i,j,label[ij],complist[label[ij]].lastrc);
@@ -2123,7 +2137,7 @@ short unsigned int extract_components(uint64_t gol[]) {
       }
     }
     for(i=1;i<=nlabel;i++) {                                                                            // initialize component structures for vertical scan
-        complist[i].lastrc=N-1;
+        complist[i].lastrc=0;
         complist[i].label=0;
     }
     for (j=0;j<N;j++) {                                                                                 // find vertical limits of each component
@@ -2138,7 +2152,7 @@ short unsigned int extract_components(uint64_t gol[]) {
             }
             else if (complist[label[ij]].lastrc != j) {                                                 // label reencountered for first time in col
                 if (((complist[label[ij]].lastrc+1)&(N-1)) == j) {                                      // continuation of component from previous col
-                    complist[label[ij]].S=j;
+                    if(complist[label[ij]].S>=complist[label[ij]].N) complist[label[ij]].S=j;
                 }
                 else if (((complist[label[ij]].lastrc+1)&(N-1)) <  j) {                                 // component resumes after col gap
                     // fprintf(stderr,"VERT  TRACK step %d setting N %d after gap at i %d j %d label %d lastrc %d\n",totsteps,j,i,j,label[ij],complist[label[ij]].lastrc);
@@ -2151,21 +2165,31 @@ short unsigned int extract_components(uint64_t gol[]) {
     }
 
     for(i=1;i<=nlabel;i++) {
-        nside=((complist[i].E-complist[i].W)&(N-1));                                                    // modulo calculation required if component cross periodic boundary
+        nside=((complist[i].E-complist[i].W)&(N-1));                                                    // modulo calculation required if component crosses periodic boundary
         k = ((complist[i].S-complist[i].N)&(N-1));
         nside = nside > k ? nside+1 : k+1;                                                              // side length of square one more than greater of vertical & horiz. difference
         for(log2n=0;(1<<log2n)<nside;log2n++);
-        complist[i].log2n = log2n;
+        complist[i].log2n = log2n;                                                                      // log2n is smallest power of 2 for side of square enclosing component
         nside = 1<<log2n;                                                                               // convert nside to next power of 2 for quadtree analysis;
+        wpixels = 0;
         for(ij=0;ij<nside*nside;ij++) {
-            ij1 =  (complist[i].W+(ij&(nside-1))&(N-1)) +                                               // calculate coordinate ij1 in full array of ij index in the component square
-                  N*((complist[i].N+(ij>>log2n))&(N-1));
-            working[ij] = (label[ij1]==i) ? 0x1ull : 0ull;                                              // use working to store binary component image
+            ij1 =   ((complist[i].W+(ij&(nside-1)))&(N-1)) +                                              // calculate coordinate ij1 in full array of ij index in the component square
+                 N*((complist[i].N+(ij>>log2n))&(N-1));
+            working[ij] = (label[ij1]==i) ? 0x1ull : 0ull;                                              // use working array to store binary component image
+            if (working[ij]) wpixels++;
         }
-        q = quadimage(working,nside,&golps);                                                            // quadtree hash code of component image: needs to work for all nside=2^n
-        if(q==NULL) {
-            complist[i].patt=golps;                                                                     // components either have (quad!=NULL and patt==0) or (quad==NULL and patt!=0)
+        q = quadimage(working,&patt,log2n);                                                             // quadtree hash code of component image: needs to work for all nside=2^n
+        if(q==NULL) {                                                                                   // components either have (quad!=NULL and patt==0) or (quad==NULL and patt!=0)
+            complist[i].patt=patt;
             complist[i].quad=0ull;
+            // DEBUGGING
+            fullpatt = (uint64_t) patt;
+            POPCOUNT64C(fullpatt, ij1);
+            if (ij1 != complist[i].pixels) {
+                fprintf(stderr,"step %d label %d ERROR in small pattern construction patt pixels : patt %x pixels %d fullpatt %llx n1s %d wpixels = %d nside %d\n",
+                                                    totsteps, i, patt, complist[i].pixels, fullpatt, ij1, wpixels, nside);
+                fprintf(stderr,"                 N S W E = (%4d %4d %4d %4d) lastrc %d\n",complist[i].N,complist[i].S,complist[i].W,complist[i].E,complist[i].lastrc);
+            }
         }
         else {
             complist[i].patt=0;
@@ -2187,9 +2211,11 @@ short unsigned int extract_components(uint64_t gol[]) {
     }
 
     // fprintf(stderr,"step %d histogram of component log2n\n",totsteps);
-    fprintf(stderr,"histogram log2n ");for(i=0;i<=log2N;i++) fprintf(stderr," %5d",i);fprintf(stderr,"\n");
-    fprintf(stderr,"conn cmpt counts");for(i=0;i<=log2N;i++) fprintf(stderr," %5d",histside[i]);fprintf(stderr,"\n");
-    fprintf(stderr,"------------------------------------\n");
+    if(!(totsteps % 10)) {
+        fprintf(stderr,"histogram log2n ");for(i=0;i<=log2N;i++) fprintf(stderr," %5d",i);fprintf(stderr,"\n");
+        fprintf(stderr,"conn cmpt counts");for(i=0;i<=log2N;i++) fprintf(stderr," %5d",histside[i]);fprintf(stderr,"\n");
+        fprintf(stderr,"------------------------------------\n");
+    }
 
     return nlabel;
 }
@@ -2519,7 +2545,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    // qimage = quadimage(newgol,N); // quadtree hash of entire image
+    // qimage = quadimage(newgol,&patt,log2N); // quadtree hash of entire image
 
 }
 //------------------------------------------------------- update_lut_sum -----------------------------------------------------------------------------------
@@ -2685,7 +2711,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    // qimage = quadimage(newgol,N); // quadtree hash of entire image
+    // qimage = quadimage(newgol,&patt,log2N); // quadtree hash of entire image
 }
 //------------------------------------------------------------- update_lut_dist -----------------------------------------------------------------------------------
 void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 10,11
@@ -2856,7 +2882,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    // qimage = quadimage(newgol,N); // quadtree hash of entire image
+    // qimage = quadimage(newgol,&patt,log2N); // quadtree hash of entire image
 }
 //------------------------------------------------------- update_lut_canon_rot -----------------------------------------------------------------------------------
 void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 12,13
@@ -3044,7 +3070,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    // qimage = quadimage(newgol,N); // quadtree hash of entire image
+    // qimage = quadimage(newgol,&patt,log2N); // quadtree hash of entire image
 }
 //------------------------------------------------------- update_lut_2Dsym -----------------------------------------------------------------------------------
 void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 14,15
@@ -3256,7 +3282,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
-    // qimage = quadimage(newgol,N); // quadtree hash of entire image
+    // qimage = quadimage(newgol,&patt,log2N); // quadtree hash of entire image
 }
 //------------------------------------------------------- update_gol16 -----------------------------------------------------------------------------------
 void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]) {     // selection models 16-19
@@ -3835,7 +3861,7 @@ void genelife_update (int nsteps, int nhist, int nstat) {
     /* encode without if structures for optimal vector treatment */
     int t;
     uint64_t *newgol, *newgolg;
-    int nspecies,nspeciesquad,ngenealogydeep;
+    int nspecies,nspeciesquad,nallspecies,nallspeciesquad,ngenealogydeep;
     int activitieshash(void);                                                 // count activities of all currently active gene species
     int activitieshashquad(void);                                             // count activities of all currently active quad pattern species
     int genealogies(void);                                                    // genealogies of all currently active species
@@ -3849,9 +3875,9 @@ void genelife_update (int nsteps, int nhist, int nstat) {
 
         totsteps++;
         if(!(totsteps%10)) {
-            nspecies = hashtable_count(&genetable);
-            nspeciesquad = hashtable_count(&quadtable);
-            fprintf(stderr,"iteration step %d: cumulative nspecies %d nspeciesquad %d\r",totsteps,nspecies,nspeciesquad);
+            nallspecies = hashtable_count(&genetable);
+            nallspeciesquad = hashtable_count(&quadtable);
+            fprintf(stderr,"step %6d\r",totsteps);
         }
         
         if (selection<8)        update(gol,golg,newgol,newgolg);              // calculate next iteration with selection
@@ -3881,7 +3907,12 @@ void genelife_update (int nsteps, int nhist, int nstat) {
             ngenealogydeep=genealogies();                                    // colors genealogytrace
             if(ngenealogydeep<0) fprintf(stderr,"error returned from genealogies\n");
         }
-        
+        if(!(totsteps%10)) {
+            nallspecies = hashtable_count(&genetable);
+            nallspeciesquad = hashtable_count(&quadtable);
+            fprintf(stderr,"step %6d: genes %d/%d (extant/all), patterns %d/%d (extant/all)\n",totsteps,nspecies,nallspecies,nspeciesquad,nallspeciesquad);
+        }
+
         totdisp++;                                                            // currently every step is counted for display in activities
     }
 }
@@ -4236,7 +4267,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     genotypes = hashtable_keys( &genetable );
     fprintf(stderr,"population size %d with %d different genes\n",cnt,hcnt);
     
-    // qimage = quadimage(gol,N); // quadtree hash of entire image
+    // qimage = quadimage(gol,&patt,log2N); // quadtree hash of entire image
     if (colorfunction>=9) ncomponents=extract_components(gol);
 }
 //------------------------------------------------------- set ...---------------------------------------------------------------------------
@@ -4415,6 +4446,32 @@ int get_connected_comps(unsigned int outlabel[], unsigned int outconnlen[]) {
 
 int get_ncomponents() {
     return(ncomponents);
+}
+
+int get_components(component components[],int narraysize) {
+    int i;
+    if (narraysize<ncomponents) {
+        fprintf(stderr,"Error in get_components : called with insufficent component holding array size %d < %d\n",narraysize,ncomponents);
+        return ncomponents;
+    }
+    for (i=1;i<=ncomponents;i++) {
+        components[i-1].N=complist[i].N;
+        components[i-1].S=complist[i].S;
+        components[i-1].W=complist[i].W;
+        components[i-1].E=complist[i].E;
+        components[i-1].lastrc=complist[i].lastrc;
+        components[i-1].label=complist[i].label;
+        components[i-1].log2n=complist[i].log2n;
+        components[i-1].patt=complist[i].patt;
+        components[i-1].quad=complist[i].quad;
+        components[i-1].pixels=complist[i].pixels;
+        // components[i-1].reserve=complist[i].reserve;
+        /* if (i<100) fprintf(stderr,"Component %d: (N,W,S,E)=(%d,%d,%d,%d), lastrc=%d, label=%d, log2n=%d, patt=%d, quad=%llx, pixels=%d\n",i,
+            complist[i].N,complist[i].W,complist[i].S,complist[i].E,complist[i].lastrc,complist[i].label,
+            complist[i].log2n,complist[i].patt,complist[i].quad,complist[i].pixels); */
+    }
+    
+    return ncomponents;
 }
 //.......................................................................................................................................................
 void get_curgolgstats(uint64_t outgolgstats[], int NN) {

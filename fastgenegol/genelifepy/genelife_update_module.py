@@ -1,6 +1,8 @@
 """ 
 Wrapping a C library function that does update of long unsigned int arrays gol, golg
     input using the numpy.ctypeslib.
+    See https://docs.python.org/2/library/ctypes.html
+    See https://docs.scipy.org/doc/numpy-1.15.0/reference/generated/numpy.dtype.html#numpy.dtype  for numpy.dtype specs
     Method gleaned from 
     http://www.scipy-lectures.org/advanced/interfacing_with_c/interfacing_with_c.html
 """
@@ -19,6 +21,16 @@ uint64_array = npct.ndpointer(dtype=np.uint64, ndim=1, flags='CONTIGUOUS')
 uint_array = npct.ndpointer(dtype=np.uint32, ndim=1, flags='CONTIGUOUS')
 int_array = npct.ndpointer(dtype=np.int32, ndim=1, flags='CONTIGUOUS')
 
+# communicate component type for connected components if not using numpy
+# from ctypes import *
+# class COMPONENT(Structure):
+#    _fields_ = [('N',c_uint16),('S',c_uint16),('W',c_uint16),('E',c_uint16),('lastrc',c_uint16),
+#                ('label',c_uint16),('log2n',c_uint16),('patt',c_uint16),('quad',c_uint64),('pixels',c_uint32),('reserve',c_uint32)]
+
+# comp_array = npct.ndpointer(dtype=COMPONENT, ndim=1, flags='CONTIGUOUS')  using numpy and ctypes
+compdtype=[('N',c_uint16),('S',c_uint16),('W',c_uint16),('E',c_uint16),('lastrc',c_uint16),
+                ('label',c_uint16),('log2n',c_uint16),('patt',c_uint16),('quad',c_uint64),('pixels',c_uint32),('reserve',c_uint32)]
+comp_array = npct.ndpointer(dtype=compdtype, ndim=1, flags=['CONTIGUOUS','ALIGNED'])
 # load the library, using numpy mechanisms
 libcd = npct.load_library("libgenelife", ".")
 
@@ -67,8 +79,10 @@ libcd.get_sorted_popln_act.restype = c_int
 libcd.get_sorted_popln_act.argtypes = [int_array, uint64_array, int_array, int_array]
 libcd.get_connected_comps.restype = c_int
 libcd.get_connected_comps.argtypes = [uint_array, uint_array]
-libcd.get_ncomponents.argtypes = None
 libcd.get_ncomponents.restype = c_int
+libcd.get_ncomponents.argtypes = None
+libcd.get_components.restype = c_int
+libcd.get_components.argtypes = [comp_array, c_int]
 libcd.colorgenes1.restype = None
 libcd.colorgenes1.argtypes = [uint64_array, uint64_array, uint64_array, int_array, c_int]
 libcd.colorgenes.restype = None
@@ -149,14 +163,14 @@ def get_histo(gol):
 def get_stats(livesites,genotypes,stepstats,configstats,nstats):
     return libcd.get_stats(livesites,genotypes,stepstats,configstats,nstats)
 
-def get_activities(actgenes,activities,narraysize):
-    return libcd.get_activities(actgenes,activities,narraysize)
+def get_activities(genes,activities):
+    return libcd.get_activities(genes,activities,int(len(genes)))
 
-def get_all_activities(actgenes,activities,narraysize):
-    return libcd.get_all_activities(actgenes,activities,narraysize)
+def get_all_activities(genes,activities):
+    return libcd.get_all_activities(genes,activities,int(len(genes)))
 
-def get_quad_activities(actgenes,activities,narraysize):
-    return libcd.get_quad_activities(actgenes,activities,narraysize)
+def get_quad_activities(quads,activities):
+    return libcd.get_quad_activities(quads,activities,int(len(quads)))
 
 def get_acttrace(acttrace):
     return libcd.get_acttrace(acttrace, int(len(acttrace)))
@@ -172,6 +186,9 @@ def get_connected_comps(connlabel,connlen):
 
 def get_ncomponents():
     return libcd.get_ncomponents()
+
+def get_components(components):
+    return libcd.get_components(components, int(len(components)))
 
 def colorgenes1(gol, golg, golgstats, cgolg):
     return libcd.colorgenes1( gol, golg, golgstats, cgolg, len(gol))
