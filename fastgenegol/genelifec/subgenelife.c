@@ -705,7 +705,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                     else if((q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL) // if we reach here, quad should have been stored in hash table
                         popcount=q->activity;                       // number of times large pattern encountered previously (poss. also as part of larger patt)
                     else popcount=1;                                // should never occur, but just in case, assume novel
-                    if (popcount>1) mask &= 0x3f3f3fff;             // darken
+                    if (popcount>1) mask &= (mask&0x3f3f3fff);      // darken non novel components (currently a little too much)
                 }
                 if (label[ij] == 0xffff) mask = 0xffffffffull;      // recolor debug components and components with max label white
                 cgolg[ij] = (int) mask;
@@ -2059,11 +2059,16 @@ short unsigned int label_components(uint64_t gol[]) {
         for(i=1;i<=nlabel;i++) relabel[i]=i;
     }
     else {
-        for(i=1;i<=nlabel;i++) if(ylap[i]) relabel[i]=oldrelabel[ylap[i]];
+        for(i=1;i<=NLM;i++) working[i] = 0;
+        for(i=1;i<=nlabel;i++) if(ylap[i]) {
+            relabel[i]=oldrelabel[ylap[i]];   // keep old label for these matched components
+            working[relabel[i]]=1;            // mark this label as taken
+        }
         for(ij=i=1;i<=nlabel;i++)  {
-            if(!ylap[i]) {
-                while(relabel[ij]) ij++;
+            if(!ylap[i]) {                                                   // if unmatched component
+                while(working[ij]) ij++;                                     // find next free label ij with relabel[ij]==0, i.e. not yet assigned
                 relabel[i]=ij;
+                ij++;
             }
         }
     }
