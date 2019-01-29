@@ -492,16 +492,25 @@ const uint64_t r1 = 0x1111111111111111ull;
 //------------------------------------------------------- colorgenes -------------------------------------------------------------------------------------
 extern inline void setcolor(unsigned int *color,int n) // for coloring by quad size...
 {
-    unsigned int Ncolor=16;
-    unsigned int cmax = 0xffffff;
-    unsigned int step,nn,mycol;
-
-    nn = n % Ncolor;
-    step = cmax / Ncolor;
-    mycol = nn*step;
-    color[0] = mycol & 0xff;
-    color[1] = (mycol & 0xff00) >> 2;
-    color[2] = (mycol & 0xff0000) >> 4;
+    // rainbow colors from running rainbow(6) in R
+    static const unsigned int rainbow[]={0xFF0000FF, 0xFFFF00FF, 0x00FF00FF, 0x00FFFFFF, 0x0000FFFF, 0xFF00FFFF};
+    unsigned int mycol;
+    mycol = rainbow[n];
+    color[0] = (mycol & 0xff000000) >> 6; // R
+    color[1] = (mycol & 0xff0000) >> 4;   // G
+    color[2] = (mycol & 0xff00) >> 2;     // B
+}
+extern inline unsigned int mylog2(unsigned int v)// find the log2 of v = power of 2
+{
+    // From:  https://graphics.stanford.edu/~seander/bithacks.html#IntegerLog
+    static const unsigned int b[] = {0xAAAAAAAA, 0xCCCCCCCC, 0xF0F0F0F0, 
+                                     0xFF00FF00, 0xFFFF0000};
+    register unsigned int r = (v & b[0]) != 0;
+    r |= ((v & b[4]) != 0) << 4;
+    r |= ((v & b[3]) != 0) << 3;
+    r |= ((v & b[2]) != 0) << 2;
+    r |= ((v & b[1]) != 0) << 1;
+    return(r);
 }
 
 void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2) {
@@ -728,7 +737,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
             else cgolg[ij] = 0;
         }
     }
-    else if(colorfunction==10){                                     //activities for patterns
+    else if(colorfunction==11){                                     //activities for patterns
         int popmax = 0;                                             // need to bring this parameter up to python, if 0 do not scale brightness by pop1s
         for (ij=0; ij<NN2; ij++) {
             quad=acttraceq[ij];
@@ -753,24 +762,24 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
             cgolg[ij]= (int) mask;
         }
     }
-    else if(colorfunction==11){                                     //activities for patterns
+    else if(colorfunction==10){                                     //activities for patterns
         for(i=0;i<17;i++) histsize[i]=0;
         for (ij=0; ij<NN2; ij++) {
             quad=acttraceq[ij];
             mask = 0x3f00ff;                           // default color (green)
             if (quad == rootgene) mask = 0x3f3f3fff;                // grey color for background, all root genes
             else {
-                unsigned short sz,i;
+                unsigned short sz;
                 if((q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL){
                     popcount = q->pop1s;
                     sz = q->size;
-                    if(sz<17) histsize[sz]++;
-                    for(i=1; i<32; i++){
-                        if(sz>>i == 0){
-                            setcolor(color,i);
-                            break;
-                        }
+                    sz = mylog2(sz) - 3 ;
+                    if(sz>6){
+                        fprintf(stderr,"size error %d\n",sz);
+                        sz=0;
                     }
+                    histsize[sz]++;
+                    setcolor(color,sz);
                     for(d=0,mask=0xff;d<3;d++) mask |= color[d]<<((d<<3)+8);
                 }
                 else if (quad<65536 && smallpatts[quad].activity) {
