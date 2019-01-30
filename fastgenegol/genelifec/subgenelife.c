@@ -240,18 +240,19 @@ unsigned int connpref[NLM];         // preferred backward connected component at
 unsigned int connpreff[NLM];        // preferred forward connected component at time t for each component at time t-1
 int connused = 0;                   // used connection nodes
 //............................................... optimal linear assignment t-1 to t ....................................................................
-#include "lapjv.h"                  // modified from Tomas Kazmar python interfaced implementation of Jonker-Volgenant LAPMOD algorithm, using lapmod.c
-cost_t cclap[N2];                   // sparse cost matrix for mapping connected components at t-1 to t (overlaps) containing nclap entries
-uint_t iilap[NLM];                  // indices of start of each variable length row in sparse cost matrix : first entry 0, last entry nclap
-uint_t kklap[N2];                   // column indices for successive entries in cost matrix
-int_t  xlap[NLM];                   // returned list of assignments: columns assigned to rows
-int_t  ylap[NLM];                   // returned list of assignments: rows assigned to columns
-int_t  dist[NLM];                   // distance along augmented paths for Hopcroft Karp matching algorithm: maxmatch
-int_t  relabel[NLM],oldrelabel[NLM];// array to relabel connected components matching to be compatible with previous step
-int_t  queue_array[NLM];            // array for queue used in Hopcroft Karp matching algorithm: maxmatch
-int_t  nlap;                        // number of connected components at t-1 entering into the assignment, i.e. n for LAPMOD
-int_t  nclap;                       // number of edges between connected comp's t-1 to t entering into the assignment, == no. of cost matrix entries
-int_t  nmatched;                    // number of matched old labels in current label set
+// #include "lapjv.h"               // modified from Tomas Kazmar python interfaced implementation of Jonker-Volgenant LAPMOD algorithm, if using lapmod.c
+unsigned int iilap[NLM];            // indices of start of each variable length row in sparse cost matrix : first entry 0, last entry nclap
+unsigned int cclap[N2];             // sparse cost matrix for mapping connected components at t-1 to t (overlaps) containing nclap entries
+short unsigned int kklap[N2];       // column indices for successive entries in cost matrix
+short unsigned int xlap[NLM];       // returned list of assignments: columns assigned to rows
+short unsigned int ylap[NLM];       // returned list of assignments: rows assigned to columns
+short unsigned int dist[NLM];       // distance along augmented paths for Hopcroft Karp matching algorithm: maxmatch
+short unsigned int relabel[NLM];    // array to relabel connected components matching to be compatible with previous step
+short unsigned int oldrelabel[NLM]; // old relabel array at previous time step
+short unsigned int queue_array[NLM];// array for queue used in Hopcroft Karp matching algorithm: maxmatch
+int  nlap;                          // number of connected components at t-1 entering into the assignment, i.e. n for LAPMOD
+int  nclap;                         // number of edges between connected comp's t-1 to t entering into the assignment, == no. of cost matrix entries
+int  nmatched;                      // number of matched old labels in current label set
 //------------------------------------------------ planes and configuration offsets----------------------------------------------------------------------
 int offdx=0,offdy=0,offdt=0;        // display chosen offsets for glider analysis with colorfunction 8
 int Noff = 9;                       // number of offsets
@@ -729,6 +730,31 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
         }
     }
     else if(colorfunction==10){                                     //activities for patterns
+        int popmax = 0;                                            // need to bring this parameter up to python, if 0 do not scale brightness by pop1s
+        for (ij=0; ij<NN2; ij++) {
+            quad=acttraceq[ij];
+            if (quad == rootgene) mask = 0x3f3f3fff;                // grey color for background, all root genes
+            else {
+                mask = quad * 11400714819323198549ul;
+                mask = mask >> (64 - 32);                           // hash with optimal prime multiplicator down to 32 bits
+                mask |= 0x080808ffull;                              // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
+                if(popmax) {                                        // not yet implemented properly : UPDATE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    popcount=0;
+                    if((q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL) popcount = q->pop1s;
+                    else if (quad<65536 && smallpatts[quad].activity) { POPCOUNT64C(quad,popcount); }
+                    else fprintf(stderr,"quad pattern not found in colorfunction for activities\n");
+                    if(popcount>popmax) popcount=popmax;
+                    colormax=0;
+                    for(d=0;d<3;d++) if((color[d]=( (mask>>(8+(d<<3))) & 0xff))>colormax) colormax=color[d];
+                    rescalecolor=(log((double)popcount)/log((double)popmax))*((double)0xff/(double)colormax);
+                    for(d=0;d<3;d++) color[d]=(unsigned int) (((double) color[d])*rescalecolor);
+                    for(d=0,mask=0xff;d<3;d++) mask |= color[d]<<((d<<3)+8);
+                }
+            }
+            cgolg[ij]= (int) mask;
+        }
+    }
+    else if(colorfunction==11){                                     //activities for patterns with size weighted colours - currently not used
         for(i=0;i<17;i++) histsize[i]=0;
         for (ij=0; ij<NN2; ij++) {
             quad=acttraceq[ij];
@@ -760,31 +786,6 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
             cgolg[ij]= (int) mask;
         }
         fprintf(stderr,"size counts\t");for(i=0;i<17;i++) fprintf(stderr," %5u",histsize[i]);fprintf(stderr,"\n");
-    }
-    else if(colorfunction==11){                                     //activities for patterns
-        int popmax = 0;                                             // need to bring this parameter up to python, if 0 do not scale brightness by pop1s
-        for (ij=0; ij<NN2; ij++) {
-            quad=acttraceq[ij];
-            if (quad == rootgene) mask = 0x3f3f3fff;                // grey color for background, all root genes
-            else {
-                mask = quad * 11400714819323198549ul;
-                mask = mask >> (64 - 32);                           // hash with optimal prime multiplicator down to 32 bits
-                mask |= 0x080808ffull;                              // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
-                if(popmax) {                                        // not yet implemented properly : UPDATE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                    popcount=0;
-                    if((q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL) popcount = q->pop1s;
-                    else if (quad<65536 && smallpatts[quad].activity) { POPCOUNT64C(quad,popcount); }
-                    else fprintf(stderr,"quad pattern not found in colorfunction for activities\n");
-                    if(popcount>popmax) popcount=popmax;
-                    colormax=0;
-                    for(d=0;d<3;d++) if((color[d]=( (mask>>(8+(d<<3))) & 0xff))>colormax) colormax=color[d];
-                    rescalecolor=(log((double)popcount)/log((double)popmax))*((double)0xff/(double)colormax);
-                    for(d=0;d<3;d++) color[d]=(unsigned int) (((double) color[d])*rescalecolor);
-                    for(d=0,mask=0xff;d<3;d++) mask |= color[d]<<((d<<3)+8);
-                }
-            }
-            cgolg[ij]= (int) mask;
-        }
     }
 }
 //.......................................................................................................................................................
@@ -1651,7 +1652,7 @@ extern inline void pack16neighbors(uint64_t wgol[],short unsigned int golp[],int
     else fprintf(stderr,"pack16neighbours called with not permitted value of n %d\n",n);
 }
 //.......................................................................................................................................................
-extern void pack64neighbors(uint64_t gol[],uint64_t golp[],int log2n) {           // routine to pack 8x8 subarrays of full binary array gol into single words
+extern inline void pack64neighbors(uint64_t gol[],uint64_t golp[],int log2n) {    // routine to pack 8x8 subarrays of full binary array gol into single words
     int n = 1 << log2n;
     int ij,ij1,k;                                                                 // assuming golp length >= (n*n)>>2^6
     int n2 = n*n;
@@ -1722,7 +1723,7 @@ extern inline void packandcompare(uint64_t newgol[],uint64_t working[],uint64_t 
 //------------------------------------------------------- connected component labelling ---------------------------------------------------------------
 // Combine two trees containing node i and j. Union by rank with halving - see https://en.wikipedia.org/wiki/Disjoint-set_data_structure
 // Return the root of union tree in equivalence relation's disjoint union-set forest
-short unsigned int lab_union(equivrec eqv[], short unsigned int i, short unsigned int j) {
+extern inline short unsigned int lab_union(equivrec eqv[], short unsigned int i, short unsigned int j) {
     short unsigned int root = i;
     while (eqv[root].pt<root) {
         eqv[root].pt = eqv[eqv[root].pt].pt;        // halving algorithm to compress path on the fly
@@ -1878,7 +1879,7 @@ short unsigned int label_components(uint64_t gol[]) {
     int dy[9]={0,-1,-1,-1,0,1,1,1,0};
     static int connectout = 0;                              // whether to print lists of connected component mappings t-1 t
     void testflow(void);
-    extern int maxmatch(int m, unsigned int kk[], unsigned int ii[], int xlap[], int ylap[], int dist[]);
+    extern int maxmatch(int m, short unsigned int kk[], unsigned int ii[], short unsigned int xlap[], short unsigned int ylap[], short unsigned int dist[]);
     static int first = 1;
     if(!first) {
         oldnlabel = oldncomponents = ncomponents;
@@ -2065,22 +2066,22 @@ short unsigned int label_components(uint64_t gol[]) {
                 lab = connections[connf].newlab;
                 if(connpreff[connpref[lab]]!=lab) {        // only connect to labels that are not preassigned by mutuality to another label
                     kklap[nclap]=connections[connf].newlab;   // for maxmatch labels for sparse cost matrix column index kk are newlab : and run from 1 to nlabel
-                    cclap[nclap]=connections[connf].overlap ? (cost_t) (1+overallmaxoverlap-connections[connf].overlap) : (cost_t) 100 * overallmaxoverlap;   // use if minimizing cost
+                    cclap[nclap]=connections[connf].overlap ?  (1+overallmaxoverlap-connections[connf].overlap) :  100 * overallmaxoverlap;   // use if minimizing cost
                     // if (cclap[nclap]<0) fprintf(stderr,"error in cost matrix from genelife, negative value at %d\n",nclap);
                     nclap++;
                 }
                 connf=connections[connf].nextf;
             }
         }
-        nlap++; // end of row, possibility of zero entries in row
+        nlap++;                                           // end of row, possibility of zero entries in row
         iilap[nlap]=nclap;
     }
     
     nmatched=maxmatch(nlap,kklap,iilap,xlap,ylap,dist);
-    
+                                                          // optionally, print connections, preferred, matched, and list of possible
     if (connectout) {
         fprintf(stderr,"BACKWARD\n");
-        for(i=1;i<=nlabel;i++) {                                                                        // print backward connections
+        for(i=1;i<=nlabel;i++) {                          // print backward connections
             fprintf(stderr,"step %5d: %3d bwd conn's for newlabel %4d prefers %4d assigned y%4d:",totsteps,connlen[i],i,connpref[i],ylap[i]);
             conn = connlists[i];
             while(conn) {
@@ -2090,7 +2091,7 @@ short unsigned int label_components(uint64_t gol[]) {
             fprintf(stderr,"\n");
         }
         fprintf(stderr,"FORWARD\n");
-        for(i=1;i<=oldnlabel;i++) {                                                                // print forward connections
+        for(i=1;i<=oldnlabel;i++) {                       // print forward connections
             fprintf(stderr,"step %5d: %3d fwd conn's for oldlabel %4d prefers %4d assigned x%4d:",totsteps,connlenf[i],i,connpreff[i],xlap[i]);
             conn = connlistsf[i];
             while(conn) {
@@ -2101,20 +2102,20 @@ short unsigned int label_components(uint64_t gol[]) {
         }
     }
     
-    for(i=0;i<NLM;i++) relabel[i]=0;
+    for(i=0;i<NLM;i++) relabel[i]=0;                    // now using matching to implement relabelling of new components
     if(totsteps==0) {
         fprintf(stderr,"totsteps 0 nlabel %d\n",nlabel);
         for(i=1;i<=nlabel;i++) relabel[i]=i;
     }
     else {
-        for(i=1;i<=NLM;i++) working[i] = 0;
+        for(i=1;i<=NLM;i++) queue_array[i] = 0;
         for(i=1;i<=nlabel;i++) if(ylap[i]) {
-            relabel[i]=oldrelabel[ylap[i]];   // keep old label for these matched components
-            working[relabel[i]]=1;            // mark this label as taken
+            relabel[i]=oldrelabel[ylap[i]];             // keep old label for these matched components
+            queue_array[relabel[i]]=1;                  // mark this label as taken
         }
         for(ij=i=1;i<=nlabel;i++)  {
-            if(!ylap[i]) {                                                   // if unmatched component
-                while(working[ij]) ij++;                                     // find next free label ij with relabel[ij]==0, i.e. not yet assigned
+            if(!ylap[i]) {                              // if unmatched component
+                while(queue_array[ij]) ij++;            // find next free label ij with relabel[ij]==0, i.e. not yet assigned
                 relabel[i]=ij;
                 ij++;
             }
@@ -2131,9 +2132,9 @@ short unsigned int label_components(uint64_t gol[]) {
                         nmatched,nunique,nremconnect,nzconnect,nmatched+nremconnect,oldnlabel,nlabel);
     }
     
-    /* do this for lapmod not maxmatch
-    for(i=nlap;i<=nlabel;i++) {                            // if nlabel > oldnlabel, then fill out cost matrix further with dummy nodes
-        cclap[nclap]=(cost_t) 100 * overallmaxoverlap;     // alternatively use LARGE (results in error);
+    /* do this for lapmod not maxmatch : cclap needs to be of type cost_t not short unsigned int
+    for(i=nlap;i<=nlabel;i++) {                         // if nlabel > oldnlabel, then fill out cost matrix further with dummy nodes
+        cclap[nclap]=(cost_t) 100 * overallmaxoverlap;  // alternatively use LARGE (results in error);
         kklap[nclap++]=i;
         nlap++;
         iilap[nlap]=nclap;

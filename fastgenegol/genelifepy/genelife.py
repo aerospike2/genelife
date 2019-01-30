@@ -894,7 +894,8 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
         # pg.transform.scale2x(scr,screen)   # use this for pygame scale2x with smoother
         if scalex2:
             pg.transform.scale2xact(scr,screen)  # use this for custom pygame no smoother
-        pg.display.update()                    # copies the screen to the display (or use .flip())
+        pg.display.update()                    # copies the screen to the display (or use .flip() but this is slower)
+        # pg.display.flip()
 #-----------------------------------------------------------------------------------------------------------
 
 def parhelp():
