@@ -113,6 +113,8 @@ libcd.set_colorfunction.restype = None
 libcd.set_colorfunction.argtypes = [c_int]
 libcd.setget_act_ymax.restype = c_int
 libcd.setget_act_ymax.argtypes = [c_int]
+libcd.setget_act_ymaxq.restype = c_int
+libcd.setget_act_ymaxq.argtypes = [c_int]
 libcd.set_selectedgene.restype = None
 libcd.set_selectedgene.argtypes = [c_uint64]
 libcd.set_offsets.restype = None
@@ -232,7 +234,10 @@ def set_colorfunction(colorfunctionval):
 
 def setget_act_ymax(ymax):
     return libcd.setget_act_ymax(ymax)
-    
+
+def setget_act_ymaxq(ymaxq):
+    return libcd.setget_act_ymaxq(ymaxq)
+
 def set_selectedgene(gene):
     return libcd.set_selectedgene(gene)
 

@@ -123,7 +123,7 @@ boolean bfs(int m, short unsigned int kk[], unsigned int ii[], short unsigned in
                 {
                     // Consider the pair and add it to queue
                     dist[pairV[v]] = dist[u] + 1;
-                    queue_push(pairV[v]);
+                    queue_push((int) pairV[v]);
                 }
             }
         }

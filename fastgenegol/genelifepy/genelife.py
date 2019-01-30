@@ -48,6 +48,8 @@ mouseclicked2 = False
 pause = 0
 ymax = 10000
 oldymax = ymax
+ymaxq = 10000
+oldymaxq = ymaxq
 maxPlane = 4
 offdx = offdy = offdt = 0
 quadrants = -1
@@ -469,7 +471,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     global gol,golg,golgstats
     global connlabel,connlen,ncomponents
     global colorfunction
-    global ymax
+    global ymax,ymaxq,oldymax,oldymaxq
     global updatesenabled
     global rulemod,repscheme,survivalmask,birthmask,overwritemask,selection,ncoding,displayplanes
     global savecnt
@@ -478,7 +480,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     global dispinit
     global randomsoup,vscrolling,noveltyfilter
     global gogo,pause,mouseclicked,mouseclicked2,pixeldat,paramdat
-    global ymax,maxPlane,offdx,offdy,offdt,quadrants,oldymax,displayoneplane
+    global maxPlane,offdx,offdy,offdt,quadrants,displayoneplane
     global parhelp
 
     selectiontext0007 = ["largest value","most ones","scissors-well-stone-paper","not well ordered","two target","predator prey","cooperative","neutral"];
@@ -511,11 +513,12 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     mouseclicked = False
     mouseclicked2 = False
     pause = 0
-    ymax = 10000
+    ymax = ymaxq = 10000
     maxPlane = 4
     offdx = offdy=offdt=0
     quadrants = -1
     oldymax = genelife.setget_act_ymax(ymax)
+    oldymaxq = genelife.setget_act_ymaxq(ymaxq)
     displayoneplane=64
 
     if selection>=16 & selection<19:
@@ -810,13 +813,23 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     genelife.set_colorfunction(colorfunction)
                     print 'step',framenr,'colorfunction changed to',colorfunction
                 elif event.key == pg.K_PLUS or event.key == pg.K_KP_PLUS or event.key == pg.K_EQUALS:
-                    ymax = ymax * 2
-                    oldymax = genelife.setget_act_ymax(ymax)
-                    print 'step',framenr,'new ymax =',ymax
+                    if colorfunction == 4:
+                        ymax = ymax * 2
+                        oldymax = genelife.setget_act_ymax(ymax)
+                        print 'step',framenr,'new ymax =',ymax
+                    elif colorfunction == 10:
+                        ymaxq = ymaxq * 2
+                        oldymaxq = genelife.setget_act_ymaxq(ymaxq)
+                        print 'step',framenr,'new ymaxq =',ymaxq
                 elif event.key == pg.K_MINUS:
-                    ymax = ymax / 2
-                    oldymax = genelife.setget_act_ymax(ymax)
-                    print 'step',framenr,'new ymax =',ymax
+                    if colorfunction == 4:
+                        ymax = ymax / 2
+                        oldymax = genelife.setget_act_ymax(ymax)
+                        print 'step',framenr,'new ymax =',ymax
+                    elif colorfunction == 10:
+                        ymaxq = ymaxq / 2
+                        oldymaxq = genelife.setget_act_ymaxq(ymaxq)
+                        print 'step',framenr,'new ymaxq =',ymaxq
                 elif event.key == pg.K_x:
                     if pg.key.get_mods() & pg.KMOD_SHIFT: offdx = offdx+1
                     else: offdx = offdx-1
@@ -888,7 +901,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
         elif colorfunction == 9:
             ncomponents=genelife.get_ncomponents()
             caption = caption + ("ncomponents %d " % (ncomponents))
-        elif colorfunction == 10: caption = caption + ("ymax %d " % ymax)
+        elif colorfunction == 10: caption = caption + ("ymaxq %d " % ymaxq)
         if pixeldat: caption = caption + pixeldat
         pg.display.set_caption(caption)
         # pg.transform.scale2x(scr,screen)   # use this for pygame scale2x with smoother
@@ -981,7 +994,7 @@ def parhelp():
     print "s           ","save current image to file in image subdriectory"
     print "x,X y,Y t,T ","lower (lc) or raise (uc) the (dx,dy,dt) offsets for glider tracking (colorfn 8) (0,0,0)=(all 8 nnb dt=-1)"
     print "v           ","toggle vertical scroll tracking mode : following top most objects and losing lowest objects in contact with 0 row"
-    print "+,-         ","increase or decrease ymax for activity display scaled as act/(ymax+act) by a factor of 2"
+    print "+,-         ","increase or decrease ymax or ymaxq for activity display scaled as act/(ymax+act) by a factor of 2"
 #-----------------------------------------------------------------------------------------------------------
 
 if __name__ == '__main__':

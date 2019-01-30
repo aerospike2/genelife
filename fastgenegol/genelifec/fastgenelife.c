@@ -53,7 +53,7 @@ long unsigned int state[2];                  // State for xorshift pseudorandom 
 	state[0] = y;	x ^= x << 23;  state[1] = x ^ y ^ (x >> 17) ^ (y >> 26);  \
 	val = state[1] + y;}
 
-const long unsigned int m1  = 0x5555555555555555; //binary: 0101...           Constants for Hamming distance macro POPCOUNT24C
+const long unsigned int m1  = 0x5555555555555555; //binary: 0101...           Constants for Hamming distance macro POPCOUNT64C
 const long unsigned int m2  = 0x3333333333333333; //binary: 00110011..
 const long unsigned int m4  = 0x0f0f0f0f0f0f0f0f; //binary:  4 zeros,  4 ones ...
 const long unsigned int h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,3...

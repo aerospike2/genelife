@@ -14,9 +14,6 @@
 		5275A1351F2930E90062765F /* cos_doubles.h in Headers */ = {isa = PBXBuildFile; fileRef = 5275A1311F2930E90062765F /* cos_doubles.h */; };
 		528F919D1F31E30E008DD596 /* probtestdispatch.c in Sources */ = {isa = PBXBuildFile; fileRef = 528F91941F2F9895008DD596 /* probtestdispatch.c */; };
 		529A8B6E21EE297800A316DB /* subgenelife.c in Sources */ = {isa = PBXBuildFile; fileRef = 529A8B6D21EE297800A316DB /* subgenelife.c */; };
-		529A8B7221F1BA5900A316DB /* lapmod.c in Sources */ = {isa = PBXBuildFile; fileRef = 529A8B7121F1BA5900A316DB /* lapmod.c */; };
-		529A8B7521F1CD6300A316DB /* lapmod.c in Sources */ = {isa = PBXBuildFile; fileRef = 529A8B7121F1BA5900A316DB /* lapmod.c */; };
-		529A8B7621F1CD6400A316DB /* lapmod.c in Sources */ = {isa = PBXBuildFile; fileRef = 529A8B7121F1BA5900A316DB /* lapmod.c */; };
 		529A8B8321F7200800A316DB /* maxmatch.c in Sources */ = {isa = PBXBuildFile; fileRef = 529A8B7E21F64D2A00A316DB /* maxmatch.c */; };
 		529A8B8421F7200A00A316DB /* maxmatch.c in Sources */ = {isa = PBXBuildFile; fileRef = 529A8B7E21F64D2A00A316DB /* maxmatch.c */; };
 		529A8B8521F7200C00A316DB /* maxmatch.c in Sources */ = {isa = PBXBuildFile; fileRef = 529A8B7E21F64D2A00A316DB /* maxmatch.c */; };
@@ -527,7 +524,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				529A8B7621F1CD6400A316DB /* lapmod.c in Sources */,
 				0DD73C052150EF8700F3FF92 /* dispgenelife.c in Sources */,
 				529A8B8421F7200A00A316DB /* maxmatch.c in Sources */,
 			);
@@ -537,7 +533,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				529A8B7521F1CD6300A316DB /* lapmod.c in Sources */,
 				5206B822215088E300394209 /* actgenelife.c in Sources */,
 				529A8B8521F7200C00A316DB /* maxmatch.c in Sources */,
 			);
@@ -563,7 +558,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				529A8B7221F1BA5900A316DB /* lapmod.c in Sources */,
 				529A8B6E21EE297800A316DB /* subgenelife.c in Sources */,
 				529A8B8321F7200800A316DB /* maxmatch.c in Sources */,
 			);
