@@ -10,6 +10,7 @@
 		0DD73C052150EF8700F3FF92 /* dispgenelife.c in Sources */ = {isa = PBXBuildFile; fileRef = 5206B80F21507E0B00394209 /* dispgenelife.c */; };
 		5206B81B2150835D00394209 /* fastgolstat.c in Sources */ = {isa = PBXBuildFile; fileRef = 5206B81A2150835C00394209 /* fastgolstat.c */; };
 		5206B822215088E300394209 /* actgenelife.c in Sources */ = {isa = PBXBuildFile; fileRef = 5206B81121507E2200394209 /* actgenelife.c */; };
+		523F0A792201FE520002FBC5 /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = 523F0A782201FE520002FBC5 /* main.c */; };
 		5275A1341F2930E90062765F /* cos_doubles.c in Sources */ = {isa = PBXBuildFile; fileRef = 5275A1301F2930E90062765F /* cos_doubles.c */; };
 		5275A1351F2930E90062765F /* cos_doubles.h in Headers */ = {isa = PBXBuildFile; fileRef = 5275A1311F2930E90062765F /* cos_doubles.h */; };
 		528F919D1F31E30E008DD596 /* probtestdispatch.c in Sources */ = {isa = PBXBuildFile; fileRef = 528F91941F2F9895008DD596 /* probtestdispatch.c */; };
@@ -66,6 +67,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 1;
 		};
+		523F0A742201FE520002FBC5 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
 		5275A1261F292FA40062765F /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -109,6 +119,8 @@
 		521FDCF01F287E7100F08FFB /* fastgenegol.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgenegol.c; path = genelifec/fastgenegol.c; sourceTree = SOURCE_ROOT; };
 		521FDCF11F287E7100F08FFB /* fastgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgenelife.c; path = genelifec/fastgenelife.c; sourceTree = SOURCE_ROOT; };
 		521FDCF41F287ECE00F08FFB /* fastgol.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgol.c; path = genelifec/fastgol.c; sourceTree = SOURCE_ROOT; };
+		523F0A762201FE520002FBC5 /* ilog2test */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = ilog2test; sourceTree = BUILT_PRODUCTS_DIR; };
+		523F0A782201FE520002FBC5 /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
 		52416DA51F27425C00721D17 /* libcos_doubles.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libcos_doubles.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		52416DB61F27771500721D17 /* libgenelife.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libgenelife.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		5275A1281F292FA40062765F /* dispgenegol */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = dispgenegol; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -150,6 +162,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		521FDCDF1F287A6100F08FFB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		523F0A732201FE520002FBC5 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -236,6 +255,14 @@
 			path = cos;
 			sourceTree = "<group>";
 		};
+		523F0A772201FE520002FBC5 /* ilog2test */ = {
+			isa = PBXGroup;
+			children = (
+				523F0A782201FE520002FBC5 /* main.c */,
+			);
+			path = ilog2test;
+			sourceTree = "<group>";
+		};
 		525EB7A01F18DCE4004078F1 = {
 			isa = PBXGroup;
 			children = (
@@ -244,6 +271,7 @@
 				5206B8192150823000394209 /* cos */,
 				528F91931F2F9895008DD596 /* probtest */,
 				52F19B3721ADF3C900D33844 /* lsb64 */,
+				523F0A772201FE520002FBC5 /* ilog2test */,
 				525EB7AA1F18DCE4004078F1 /* Products */,
 				528F919E1F33303D008DD596 /* Frameworks */,
 			);
@@ -260,6 +288,7 @@
 				521C1456214DDE9400E17A8F /* dispgenelife */,
 				521C1464214DDF0400E17A8F /* actgenelife */,
 				52F19B3621ADF3C900D33844 /* lsb64 */,
+				523F0A762201FE520002FBC5 /* ilog2test */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -363,6 +392,23 @@
 			name = fastgenegol;
 			productName = fastgenegol;
 			productReference = 521FDCE21F287A6100F08FFB /* fastgenegol */;
+			productType = "com.apple.product-type.tool";
+		};
+		523F0A752201FE520002FBC5 /* ilog2test */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 523F0A7A2201FE520002FBC5 /* Build configuration list for PBXNativeTarget "ilog2test" */;
+			buildPhases = (
+				523F0A722201FE520002FBC5 /* Sources */,
+				523F0A732201FE520002FBC5 /* Frameworks */,
+				523F0A742201FE520002FBC5 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ilog2test;
+			productName = ilog2test;
+			productReference = 523F0A762201FE520002FBC5 /* ilog2test */;
 			productType = "com.apple.product-type.tool";
 		};
 		52416DA41F27425C00721D17 /* cos_doubles */ = {
@@ -473,6 +519,10 @@
 						CreatedOnToolsVersion = 8.3.3;
 						ProvisioningStyle = Automatic;
 					};
+					523F0A752201FE520002FBC5 = {
+						CreatedOnToolsVersion = 10.1;
+						ProvisioningStyle = Automatic;
+					};
 					52416DA41F27425C00721D17 = {
 						CreatedOnToolsVersion = 8.3.3;
 						ProvisioningStyle = Automatic;
@@ -515,6 +565,7 @@
 				521C1455214DDE9400E17A8F /* dispgenelife */,
 				521C1463214DDF0400E17A8F /* actgenelife */,
 				52F19B3521ADF3C900D33844 /* lsb64 */,
+				523F0A752201FE520002FBC5 /* ilog2test */,
 			);
 		};
 /* End PBXProject section */
@@ -542,6 +593,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		523F0A722201FE520002FBC5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				523F0A792201FE520002FBC5 /* main.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -683,6 +742,46 @@
 			};
 			name = Release;
 		};
+		523F0A7B2201FE520002FBC5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ANALYZER_SECURITY_FLOATLOOPCOUNTER = NO;
+				CLANG_CXX_LANGUAGE_STANDARD = "compiler-default";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_USE_OPTIMIZATION_PROFILE = NO;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_IDENTITY = "Mac Developer";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEVELOPMENT_TEAM = 6FG96XX388;
+				GCC_C_LANGUAGE_STANDARD = "compiler-default";
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		523F0A7C2201FE520002FBC5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ANALYZER_SECURITY_FLOATLOOPCOUNTER = NO;
+				CLANG_CXX_LANGUAGE_STANDARD = "compiler-default";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_USE_OPTIMIZATION_PROFILE = NO;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_IDENTITY = "Mac Developer";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEVELOPMENT_TEAM = 6FG96XX388;
+				GCC_C_LANGUAGE_STANDARD = "compiler-default";
+				GCC_UNROLL_LOOPS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
 		52416DA71F27425C00721D17 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -706,12 +805,14 @@
 		52416DB81F27771500721D17 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_UNDEFINED_BEHAVIOR_SANITIZER_INTEGER = NO;
+				CLANG_USE_OPTIMIZATION_PROFILE = NO;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				EXECUTABLE_PREFIX = lib;
 				GCC_GENERATE_TEST_COVERAGE_FILES = NO;
 				GENERATE_PROFILING_CODE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.12;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -719,14 +820,17 @@
 		52416DB91F27771500721D17 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_UNDEFINED_BEHAVIOR_SANITIZER_INTEGER = NO;
+				CLANG_USE_OPTIMIZATION_PROFILE = NO;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				EXECUTABLE_PREFIX = lib;
 				GCC_GENERATE_TEST_COVERAGE_FILES = NO;
 				GCC_OPTIMIZATION_LEVEL = fast;
 				GCC_UNROLL_LOOPS = YES;
+				GENERATE_PROFILING_CODE = YES;
 				"INSTALL_PATH[sdk=*]" = /usr/local/lib;
-				MACOSX_DEPLOYMENT_TARGET = 10.12;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -961,6 +1065,15 @@
 			buildConfigurations = (
 				521FDCE71F287A6100F08FFB /* Debug */,
 				521FDCE81F287A6100F08FFB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		523F0A7A2201FE520002FBC5 /* Build configuration list for PBXNativeTarget "ilog2test" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				523F0A7B2201FE520002FBC5 /* Debug */,
+				523F0A7C2201FE520002FBC5 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

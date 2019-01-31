@@ -204,6 +204,8 @@ int nspeciesgene,nallspecies;       // number of gene species in current populat
 int nspeciesquad,nallspeciesquad;   // number of quad species in current population, and that have ever existed
 int nspeciessmall,nallspeciessmall; // number of small pattern species now, and that have ever existed
 int ngenealogydeep;                 // depth of genealogy
+int histcumlogpattsize[log2N+1];    // histogram of patterns binned on log scale according to power of two side enclosing square
+int histcumpixelssqrt[N+1];         // histogram of patterns binned on an integer sqrt scale according to number of pixels
 //------------------------------------------------ arrays for connected component labelling and tracking ------------------------------------------------
 const int NLM = N2>>2;              // maximum number of discrete components possible N2/4
 short unsigned int label[N2];       // labels for pixels in connected component labelling
@@ -368,19 +370,19 @@ const uint64_t r1 = 0x1111111111111111ull;
     found = ((xxxx&h01) * h01) >> 56;}         /* found is returned as the number of patterns found at any of the 8 positions */
 //.......................................................................................................................................................
 #define FIRST1INDEX(v, c) {                    /* starting point 64bit from Sean Eron Anderson https://graphics.stanford.edu/~seander/bithacks.html#ZerosOnRightParallel */  \
-    uint64_t mmmm,mmmq;                        /* note also arguments must be of types uint64_t and int respectivley */ \
+    uint64_t mmmm,mmmq;                        /* calculates position of rightmost (lsb) 1 : arguments must be of types uint64_t and int respectivley */ \
     int cccc;                                  /* takes on successive integer values 32,16,84,2,1 */ \
     int tttt;                                  /* logical to integer variable true=one false=zero : if a 1 in v under mask mmmm */ \
     c=v?0:1;                                   /* c will contain count of number of zeros on right of last one, here if v is all zeros then start from 1 */ \
-    mmmm=~0ull;                                /* all ones, mask from previous stage */ \
-    for (cccc=1<<5;cccc>0;cccc>>=1) {          /* loop over cccc goes 32,16,8,4,2,1 */ \
-        mmmq = mmmm;                           /* mmmq is to be the mask used to query if a one is under it at this stage, start with old mask */ \
-        mmmq &= mmmm^(mmmm<<cccc);             /* divided high part of mask into two equal parts, taking lower part */ \
-        tttt = v&mmmq?0:1;                     /* zero if a one under the query mask, one otherwise */ \
+    mmmm=~0ull;                                /* initially all ones, this is the mask from previous stage in loop below */ \
+    for (cccc=1<<5;cccc>0;cccc>>=1) {          /* loop over cccc goes 32,16,8,4,2,1 : the amount of shift used in mask construction */ \
+        mmmq = mmmm;                           /* query mask mmmq is to be the mask used to query if a one is under it at this stage, start with old mask */ \
+        mmmq &= mmmm^(mmmm<<cccc);             /* mmmq: 0xffffffff00000000, 0xffff0000ffff0000, 0xff00ff00ff00ff00, 0xf0f0f0f0f0f0f0f0, 0xccc..., 0xaaa...*/ \
+        tttt = v&mmmq?0:1;                     /* tttt is zero if a one under the query mask, one otherwise */ \
         mmmm=mmmq^(tttt*mmmm);                 /* the new mask for next stage is the query mask if a one is under it, otherwise the other half of mmmm */ \
         c+=tttt*cccc;                          /* the right zero counter is incremented by the length of the current interval cccc if a one was not under mask */ \
     }                                          /* note that Anderson's algorithm was incorrect, see also profile comparison in standalone lsb64.c */ \
-}
+}                                              /* this macro calculates the LSB 1 (ie from the bottom) not the MSB 1 (ie from the top) that the integer log function finds. */
 //----------------------------------------------------- list of subroutines -----------------------------------------------------------------------------
 // colorgenes1          colour genes specified as input parameters
 // colorgenes           colour genes specified at current time point
@@ -496,20 +498,35 @@ const uint64_t r1 = 0x1111111111111111ull;
 // printxy              terminal screen print of array on xterm
 //--------------------------------------------------------------------------------------------------------------------------------------------------------
 //------------------------------------------------------- colorgenes -------------------------------------------------------------------------------------
-extern inline void setcolor(unsigned int *color,int n) // for coloring by quad size...
-{
-    // rainbow colors from running rainbow(8) in R : last two are repeats to avoid crash for log2N > 9
-    static const unsigned int rainbow[]={0xFF0000FF, 0xFFFF00FF, 0x00FF00FF, 0x00FFFFFF, 0x0000FFFF, 0xFF00FFFF, 0xFF00FFFF, 0xFF00FFFF};
-    unsigned int mycol;
-    mycol = rainbow[n];
-    color[0] = (mycol & 0xff000000) >> 6; // R
-    color[1] = (mycol & 0xff0000) >> 4;   // G
-    color[2] = (mycol & 0xff00) >> 2;     // B
+extern inline int integerSqrt(int n) {                  // the largest integer smaller than the square root of n (n>=0)
+    int shift,nShifted,result,candidateResult;
+    // only works for n >= 0;
+    // Find greatest shift.
+    shift = 2;
+    nShifted = n >> shift;
+
+    while (nShifted != 0) {
+        shift += 2;
+        nShifted >>= 2;
+    }
+    shift -= 2;
+
+    // Find digits of result.
+    result = 0;
+    while (shift >= 0) {
+        result <<=  1;
+        candidateResult = result + 1;
+        if (candidateResult*candidateResult <= (n >> shift))
+            result = candidateResult;
+        shift -= 2;
+    }
+    return result;
 }
-extern inline unsigned int mylog2(unsigned int v)// find the log2 of v = power of 2
+
+extern inline unsigned int mylog2r(unsigned int v)// find the log2 of v = power of 2, warning wrong answers for v not power of 2
 {
     // From:  https://graphics.stanford.edu/~seander/bithacks.html#IntegerLog
-    static const unsigned int b[] = {0xAAAAAAAA, 0xCCCCCCCC, 0xF0F0F0F0, 
+    static const unsigned int b[] = {0xAAAAAAAA, 0xCCCCCCCC, 0xF0F0F0F0,
                                      0xFF00FF00, 0xFFFF0000};
     register unsigned int r = (v & b[0]) != 0;
     r |= ((v & b[4]) != 0) << 4;
@@ -517,6 +534,32 @@ extern inline unsigned int mylog2(unsigned int v)// find the log2 of v = power o
     r |= ((v & b[2]) != 0) << 2;
     r |= ((v & b[1]) != 0) << 1;
     return(r);
+}
+
+extern inline unsigned int mylog2a(unsigned int v)// find the integer log2 of v : works for all 32 bit integer v > 0
+{// Adapted by John McCaskill starting from the power of two version at https://graphics.stanford.edu/~seander/bithacks.html#IntegerLog
+    static const unsigned int b[] = {0xAAAAAAAA, 0xCCCCCCCC, 0xF0F0F0F0,
+                                     0xFF00FF00, 0xFFFF0000};
+    register int k = 4;
+    register unsigned int r,s;
+    s = ((v & b[k])   != 0); r  = s; v &= s ? b[k] : ~b[k]; r<<=1;
+    s = ((v & b[--k]) != 0); r |= s; v &= s ? b[k] : ~b[k]; r<<=1;
+    s = ((v & b[--k]) != 0); r |= s; v &= s ? b[k] : ~b[k]; r<<=1;
+    s = ((v & b[--k]) != 0); r |= s; v &= s ? b[k] : ~b[k]; r<<=1;
+    s = ((v & b[--k]) != 0); r |= s;
+
+    return(r);
+}
+
+extern inline void setcolor(unsigned int *color,int n) // for coloring by quad size...
+{
+    // rainbow colors from running rainbow(8) in R : last two are repeats to avoid crash for log2N > 9
+    static const unsigned int rainbow[]={0, 0, 0, 0xFF0000FF, 0xFFFF00FF, 0x00FF00FF, 0x00FFFFFF, 0x0000FFFF, 0xFF00FFFF, 0xFF00FFFF, 0xFF00FFFF};
+    unsigned int mycol;
+    mycol = rainbow[n];
+    color[0] = (mycol & 0xff000000) >> 6; // R
+    color[1] = (mycol & 0xff0000) >> 4;   // G
+    color[2] = (mycol & 0xff00) >> 2;     // B
 }
 
 void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2) {
@@ -776,34 +819,21 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
             else {
                 unsigned short sz;
                 if(acttraceqt[ij] && (q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL){
-                    // popcount = q->pop1s;
-                    sz = q->size;
-                    sz = mylog2(sz) ;
-                    if(sz>log2N){
-                        fprintf(stderr,"Error in colorfunction 10, size error %d\n",sz);
-                        sz=0;
-                    }
-                    k = totsteps<N ? totsteps : N-1;                // current column of activty plot
-                    if ((ij&(N-1))==k) histsize[sz]++;             // only include current column in histogram
-                    setcolor(color,sz-3);
-                    for(d=0,mask=0xff;d<3;d++) mask |= color[d]<<((d<<3)+8);
+                    sz = q->size; sz = mylog2a(sz);
                 }
                 else if (!acttraceqt[ij] && quad<65536ull && smallpatts[quad].activity) {
-                    // POPCOUNT64C(quad,popcount);
-                    sz = smallpatts[quad].size;
-                    sz = mylog2(sz);
-                    if(sz>log2N){
-                        fprintf(stderr,"Error in colorfunction 10, size error %d\n",sz);
-                        sz=0;
-                    }
-                    k = totsteps<N ? totsteps : N-1;               // current column of activty plot
-                    if ((ij&(N-1))==k) histsize[sz]++;            // only include current column in histogram
-                    color[0]=0; color[1]=0; color[2]=0; // black for all small pats.
+                    sz = smallpatts[quad].size;sz = mylog2a(sz);
                 }
                 else{
-                    fprintf(stderr,"quad pattern not found in colorfunction for activities\n");
-                    color[0]=0xff; color[1]=0xff; color[2]=0xff;
+                    sz=0;fprintf(stderr,"quad pattern not found in colorfunction for activities\n");
                 }
+                if(sz>log2N){
+                    fprintf(stderr,"Error in colorfunction 10, size error %d\n",sz);
+                    sz=0;
+                }
+                k = totsteps<N ? totsteps : N-1;               // current column of activity plot
+                if ((ij&(N-1))==k) histsize[sz]++;             // only include current column in histogram
+                setcolor(color,sz);
                 mask = (color[0]<<8) | (color[1]<<4) |  (color[2]<<2) | 0xff;
             }
             cgolg[ij]= (int) mask;
@@ -4937,9 +4967,16 @@ int activitieshashquad() {  /* count activities of all currently active quad ima
     quadtypes = hashtable_keys(&quadtable);
     quaditems = (quadnode*) hashtable_items( &quadtable );
 
-    if (totdisp>=N) {                                               // 1 pixel to left scroll when full
+    for(i=0;i<=log2N;i++) histcumlogpattsize[i]=0;                    // collect cumulative pattern size histograms of entire hash table
+    for(i=0;i<=N;i++) histcumpixelssqrt[i]=0;
+    for (i=0; i<nspecies; i++) {
+            histcumlogpattsize[mylog2a(quaditems[i].size)]++;
+            histcumpixelssqrt[(int) sqrt(quaditems[i].pop1s)]++;
+    }
+    
+    if (totdisp>=N) {                                                 // 1 pixel to left scroll when full
         for(ij=0;ij<N2;ij++) {
-            ij1 = ((ij+1)&Nmask)+((ij>>log2N)<<log2N);              // (i+1)%N+j*N;
+            ij1 = ((ij+1)&Nmask)+((ij>>log2N)<<log2N);                // (i+1)%N+j*N;
             // if(ij1>=N2) fprintf(stderr,"error in scroll of acttraceq\n");
             acttraceq[ij]=acttraceq[ij1];
             acttraceqt[ij]=acttraceqt[ij1];
@@ -4947,8 +4984,7 @@ int activitieshashquad() {  /* count activities of all currently active quad ima
         x=N-1;
     }
     else x=totdisp;
-
-    for(i=0;i<N;i++) acttraceq[x+i*N]=rootgene;                      // set column gray, rootgene is used as unique pattern mapped to gray as for gene activities
+    for(i=0;i<N;i++) acttraceq[x+i*N]=rootgene;                       // set column gray, rootgene is used as unique pattern mapped to gray as for gene activities
     
     for (i=0,nspeciesnow=0; i<nspecies; i++)
         nspeciesnow+=quaditems[i].lasttime==totsteps ? 1 : 0;
@@ -4957,33 +4993,33 @@ int activitieshashquad() {  /* count activities of all currently active quad ima
         qindices = (int *) malloc(nspeciesnow*sizeof(int));
 
         for (i=j=0; i<nspecies; i++) {
-            if(quaditems[i].lasttime==totsteps) qindices[j++]=i;         // if col is 0 then the array gindices must be passed with sufficient length
+            if(quaditems[i].lasttime==totsteps) qindices[j++]=i;      // if col is 0 then the array qindices must be passed with sufficient length
         }
-        if (nspeciesnow > maxact) {                                      //sort in order of decreasing pixel count
+        if (nspeciesnow > maxact) {                                   // sort in order of decreasing pixel count
             qsort(qindices, nspeciesnow, sizeof(int), cmpfunc3q);
         }
         if (nspeciesnow > maxact) nspeciesnow = maxact;
 
-        qids = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
+        qids = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));     // allocate arrays
         popln = (int *) malloc(nspeciesnow*sizeof(int));
         activities = (int *) malloc(nspeciesnow*sizeof(int));
 
-        for (i=0; i<nspeciesnow; i++) {
+        for (i=0; i<nspeciesnow; i++) {                               // set arrays of ids, popln (nr 1 pixels), and activities from hash table
             qids[i]=quadtypes[qindices[i]];
             popln[i]=quaditems[qindices[i]].pop1s;
             activities[i]=quaditems[qindices[i]].activity;
         }
 
-        for(j=0;j<nspeciesnow;j++) {
+        for(j=0;j<nspeciesnow;j++) {                                 // main loop to construct new display column for activities
             act = (double) activities[j];
             activities[j] = (N-1) - (int) ((N-1)*act/(act+(double)ymaxq));
             qid = qids[j];
             ij = (x&Nmask)+activities[j]*N;
-            if(acttraceq[ij]==rootgene) {                               // first quadtype to plot at this position
+            if(acttraceq[ij]==rootgene) {                            // first quadtype to plot at this position
                 acttraceq[ij] = qid;
-                acttraceqt[ij] = 1;
+                acttraceqt[ij] = 1;                                  // tye of entry is quadtree (not small pattern)
             }
-            else {                                                      // plot species color with largest current pop1s size if choice of multiple
+            else {                                                   // plot species color with largest current pop1s size if choice of multiple
                 if((q = (quadnode *) hashtable_find(&quadtable, acttraceq[ij])) != NULL)
                    popcnt0 = q->pop1s;
                 else popcnt0 = 0;
@@ -4999,14 +5035,14 @@ int activitieshashquad() {  /* count activities of all currently active quad ima
         free(qindices);free(activities);free(qids);free(popln);
     }
     
-    if (nspeciesnow<maxact) {                                       // overlay activities of smallpatts up to maxact
+    if (nspeciesnow<maxact) {                                        // overlay activities of smallpatts up to maxact
         for (nallspeciessmall=nspeciessmall=i=0;i<65536; i++) {
             if (smallpatts[i].activity) {
                 qsallindices[nallspeciessmall++]=i;
                 if (smallpatts[i].lasttime == totsteps) qsindices[nspeciessmall++]=i;   // indices of current patterns
             }
         }
-        if (nspeciesnow+nspeciessmall > maxact) {                  //sort in order of decreasing pixel count
+        if (nspeciesnow+nspeciessmall > maxact) {                    //sort in order of decreasing pixel count
             qsort(qsindices, nspeciessmall, sizeof(int), cmpfunc3qs);
             nspeciessmall = maxact-nspeciesnow;
         }
