@@ -605,10 +605,8 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                         case 7 : g2c = (gene>>8)&((1ull<<ncoding)-1ull);
                                  gdiff = gene&0xff;POPCOUNT64C(gdiff,d2);d = d2>7? 7 : d2;
                                  mask = g2c ? 0xf0f0f0ff : ((0x1f+(d<<5))<<8)+(((gdiff>>4)&0xf)<<27)+(((gdiff&0xf)<<4)<<16)+0xff; break;
-                        case 8 :                                            // colors according to nr of non zero LUT entries d from blue to red in increasing d
-                                 if (((repscheme>>4) & 0x7) == 7) {         // repselect is case 7 : scissors-stone-well-paper
-                                    d = d & 0x3; mask = d==3 ? 0xf0f0f0ff : ((0xff<<(d<<3))<<8)+0xff; // scissors-stone-well-paper: red-green-blue-white
-                                 }
+                        case 8 :                                            // colors according to nr of non zero LUT entries d from blue to red in increasing d, except for repselect 7
+                                 if (((repscheme>>4) & 0x7) == 7) {d = d & 0x3; mask = d==3 ? 0xf0f0f0ff : ((0xff<<(d<<3))<<8)+0xff;} // repselect 7 : sc-st-we-pa: red-green-blue-white
                                  else if (ncoding==1) {gdiff=gene&0xffff;POPCOUNT64C(gdiff,d);mask = d==16 ? 0x0000ffff : ((((15-d)<<20)+(abs((int)d-8)<<12)+(d<<4))<<8) + 0xff;}
                                  else if (ncoding==2) {PATTERN2_32(gene,0x3,d);mask = d==16 ? 0x00ffffff : ((((15-d)<<20)+(abs((int)d-8)<<12)+(d<<4))<<8) + 0xff;}
                                  else {PATTERN4(gene,0xf,d);mask = d==16 ? 0x00ffffff : ((((15-d)<<20)+(abs((int)d-8)<<12)+(d<<4))<<8) + 0xff;}
@@ -1087,9 +1085,14 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
             }
             for(extremval= 0ull,k=0;k<s;k++) extremval = (scores[k]>= extremval ? scores[k] : extremval); // find value of fittest gene, best score in tournament
             for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= (scores[k]==extremval ? 1ull<<(k+0*nbest++) : 0ull); // find set of genes with equal best value
-            *birth = ((nbest>0) ? 1ull: 0ull);         // birth condition may include later that genes are not all same
+            if (s==3) for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= 1ull<<nbest++; // for s==3 all genes of equal best value
+            *birth = ((nbest>0) ? 1ull: 0ull);         // birth condition
+            if (s==3 || s==2) {                                   // included compatibility with update() for enforcebirth off
+                for(d0=k=0;k<s;k++) for (int k1=0;k1<k;k1++) d0 |= livegenes[k]^livegenes[k1] ? 1 : 0; //  d0 = 1 if  genes are not all the same
+                *birth = *birth && d0 ? 1ull: 0ull;    // birth condition modified to only be true if genes difft
+            }
             for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
-            *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
+            *newgene = livegenes[k&0x7];               // choose first of selected set to replicate (can make positional dependent choice instead externally)
             break;
         default:
             fprintf(stderr,"Error: s = %d live gene repselect %d is not implemented\n",s,repselect);
@@ -1471,6 +1474,7 @@ extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, co
                                                         // check if pattern found in hash table is correct
             if( nw == q->nw &&  ne == q->ne && sw == q->sw && se ==q->se && !q->isnode) {
                 q->activity++;q->lasttime=totsteps;
+                // Still need to update activities of 4 subpatterns if non-zero !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             }
             else {                                      // collision in hash table at leaf level
                 // quadcollisions++;
@@ -1541,6 +1545,7 @@ extern inline quadnode * hash_node_find(const uint64_t nw, const uint64_t ne, co
         if((q = (quadnode *) hashtable_find(&quadtable, h)) != NULL) {
             if(nw == q->nw && ne == q->ne && sw == q->sw && se == q->se && q->isnode) { // node found in hash table
                 q->activity++;q->lasttime=totsteps;
+                // Still need to update activities of 4 subnodes if non-zero !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 /* fprintf(stderr,"at %d quadhash node repeat %llx %llx %llx %llx hash %llx\n", totsteps,
                     (uint64_t) nw,(uint64_t) ne,(uint64_t) sw,(uint64_t) se,(uint64_t) h);  // simple recording for now, later do chaining or whatever */
             }
@@ -1652,16 +1657,16 @@ quadnode * quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {     
         }
     }
     else  {                                                                         // n >= 16
-        pack64neighbors(gol,golp,log2n);                                                // 8x8 blocks of gol pixels packed into single 64bit words in golp
-        n3=n>>3;                                                                    // n3=n/8 is number of such 8x8 blocks along each side of square
+        pack64neighbors(gol,golp,log2n);                                            // 8x8 blocks of gol pixels packed into single 64bit words in golp
+        n3=n>>3;                                                                    // n3=n/8 is number of such 8x8 blocks along each side of square : n3 is at least 2 here (n>=16)
         // for(ij=0;ij<n3*n3;ij++) { if (ij%8 == 0) fprintf(stderr,"\n step %d ij %d",totsteps,ij);fprintf(stderr," %llx ",golp[ij]);} fprintf(stderr,"\n");
         for (ij=ij1=0;ij<n3*n3;ij+=2,ij1++) {                                       //  hash all 16x16 patterns (2x2 of golp words) found as leaves of the quadtree
             golq[ij1]=hash_patt_find(golp[(ij+n3)],golp[(ij+n3)+1],golp[ij],golp[ij+1]); // hash_patt_find(nw,ne,sw,se) adds quad leaf entry if pattern not found
             ij+= ((ij+2)&(n3-1)) ? 0 : n3;                                          // skip odd rows since these are the northern parts of quads generated on even rows
         }
 
-        for(n3 >>= 1; n3>1; n3>>= 1) {                                              // proceed up the hierarchy amalgamating 2x2 blocks to next level until reach top
-            for (ij=ij1=0;ij<n3*n3;ij+=2,ij1++) {                                   // hash_node_find(nw,ne,sw,se) adds quad node entry if node not found
+        for(n3 >>= 1; n3>1; n3 >>= 1) {                                             // proceed up the hierarchy amalgamating 2x2 blocks to next level until reach top
+            for (ij=ij1=0;ij<n3*n3;ij+=2,ij1++) {                                   // hash_node_find(nw,ne,sw,se) adds quad node entry if node not found & updates activities
                 golq[ij1]=hash_node_find(golq[(ij+n3)]->hashkey,golq[(ij+n3)+1]->hashkey,golq[ij]->hashkey,golq[ij+1]->hashkey);
                 ij+= ((ij+2)&(n3-1)) ? 0 : n3;                                      // skip odd rows since these are the northern parts of quads generated on even rows
             }
@@ -2475,8 +2480,9 @@ void random_soup(uint64_t gol[],uint64_t golg[],uint64_t newgol[],uint64_t newgo
 }
 //------------------------------------------------------- update -----------------------------------------------------------------------------------
 void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){
-    /* update GoL for toroidal field which has side length which is a binary power of 2 */
-    /* encode without if structures for optimal vector treatment */
+    // update for dissection of genetic rule variants within nearest neighbor sum s=2 or 3 only for survival and birth
+    // update GoL for toroidal field which has side length which is a binary power of 2
+    // encode without if structures for optimal vector treatment
     int s, s0, k, k1, kodd, nmut, crot;
     unsigned int kch,rulemodij,add2nd,mask1st;
     unsigned int select23live,pos_canon_neutral,survival,overwrite,enforcebirth,add2ndmask1st,nongolnottwice;
@@ -2597,13 +2603,13 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
             }  // end if s==3
             else {  // s==2                                                 // possible birth as exception to GoL rule
                 statflag |= F_2_live;
-                if (((select23live>>1)&0x1)&&(rulemodij||gol[ij])) {       // rule departure from GOL allowed or possible overwrite
+                if (((select23live>>1)&0x1)&&(rulemodij||gol[ij])) {        // rule departure from GOL allowed or possible overwrite
                     if ((0x1ull&(overwrite>>1))||!gol[ij]) {                // either overwrite on for s==2 or central site is empty
                         if (add2nd) selectone_nbs(s,nb1i,nb,gol,golg,&birth,&newgene); //2nd nb modulation
                         else {
                             nbmask = (0x1ull<<(nb1i&0x7)) + (0x1ull<<((nb1i>>4)&0x7));
                             kch=selectdifft2(nbmask, &crot, &kodd);
-                            if (repscheme & ((pos_canon_neutral>>1)&0x1)) { // enforce gene independent birth
+                            if ((pos_canon_neutral>>1)&0x1) {               // enforce gene independent birth for s = 2 (corrected 31.1.2019, remove repscheme&)
                                 newgene = golg[nb[kch]];
                                 birth = 1ull;
                             }
