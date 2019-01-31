@@ -564,13 +564,13 @@ extern inline void setcolor(unsigned int *color,int n) // for coloring by quad s
 
 void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2) {
     uint64_t gene, gdiff, g2c, mask, quad;
-    int i,ij,k,activity,popcount;
+    int ij,k,activity,popcount;
     unsigned int d,d0,d1,d2;
     unsigned int color[3],colormax;
     double rescalecolor;
     quadnode *q;
     static int numones[16]={0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4};
-    unsigned int histsize[log2N+1];     // for keeping track of quad size distribution
+    // unsigned int histsize[log2N+1];     // for keeping track of quad size distribution, histograms are now collected in activitieshashquad() not here
 
     if(colorfunction==0) { // colorfunction based on multiplicative hash
         // see https://stackoverflow.com/questions/6943493/hash-table-with-64-bit-values-as-key/33871291
@@ -812,7 +812,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
         }
     }
     else if(colorfunction==10){                                     //activities for patterns with size weighted colours
-        for(i=0;i<=log2N;i++) histsize[i]=0;
+        // for(ij=0;ij<=log2N;ij++) histsize[ij]=0;
         for (ij=0; ij<N2; ij++) {
             quad=acttraceq[ij];
             if (quad == rootgene) mask = 0x3f3f3fff;                // grey color for background, all root genes
@@ -832,13 +832,13 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                     sz=0;
                 }
                 k = totsteps<N ? totsteps : N-1;               // current column of activity plot
-                if ((ij&(N-1))==k) histsize[sz]++;             // only include current column in histogram
+                // if ((ij&(N-1))==k) histsize[sz]++;             // only include current column in histogram
                 setcolor(color,sz);
                 mask = (color[0]<<8) | (color[1]<<4) |  (color[2]<<2) | 0xff;
             }
             cgolg[ij]= (int) mask;
         }
-        fprintf(stderr,"size counts\t");for(i=0;i<=log2N;i++) fprintf(stderr," %5u",histsize[i]);fprintf(stderr,"\n");
+        // fprintf(stderr,"size counts\t");for(ij=0;ij<=log2N;ij++) fprintf(stderr," %5u",histsize[ij]);fprintf(stderr,"\n");
     }
 }
 //.......................................................................................................................................................
@@ -3986,17 +3986,18 @@ int get_quad_activities(uint64_t quads[], int activities[], int narraysize) {
 }
 //------------------------------------------------------- genelife_update -----------------------------------------------------------------------------------
 void genelife_update (int nsteps, int nhist, int nstat) {
-    /* update GoL for toroidal field which has side length which is a binary power of 2 */
-    /* encode without if structures for optimal vector treatment */
+    /* update GoL and gene arrays for toroidal field which has side length which is a binary power of 2 */
+    /* encode as much as possible without if structures (use ? : instead) in update routines for optimal vector treatment */
     int t;
     uint64_t *newgol, *newgolg;
     int activitieshash(void);                                                 // count activities of all currently active gene species
     int activitieshashquad(void);                                             // count activities of all currently active quad pattern species
     int genealogies(void);                                                    // genealogies of all currently active species
 
-    nhistG = nhist;
+    nhistG = nhist;                                                           // intervals for collecting histograms
     nstatG = nstat;
-    for (t=0; t<nsteps; t++) {
+    
+    for (t=0; t<nsteps; t++) {                                                // main iteration loop for nsteps
         newgol = planes[newPlane];
         newgolg = planesg[newPlane];
         newgolgstats = planesgs[newPlane];
@@ -4967,11 +4968,14 @@ int activitieshashquad() {  /* count activities of all currently active quad ima
     quadtypes = hashtable_keys(&quadtable);
     quaditems = (quadnode*) hashtable_items( &quadtable );
 
-    for(i=0;i<=log2N;i++) histcumlogpattsize[i]=0;                    // collect cumulative pattern size histograms of entire hash table
-    for(i=0;i<=N;i++) histcumpixelssqrt[i]=0;
-    for (i=0; i<nspecies; i++) {
+
+    if(nhistG && (totsteps%nhistG == 0)) {                            // collect cumulative pattern size histograms of entire hash table
+        for(i=0;i<=log2N;i++) histcumlogpattsize[i]=0;
+        for(i=0;i<=N;i++) histcumpixelssqrt[i]=0;
+        for (i=0; i<nspecies; i++) {
             histcumlogpattsize[mylog2a(quaditems[i].size)]++;
             histcumpixelssqrt[(int) sqrt(quaditems[i].pop1s)]++;
+        }
     }
     
     if (totdisp>=N) {                                                 // 1 pixel to left scroll when full

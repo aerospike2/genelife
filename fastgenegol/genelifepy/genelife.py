@@ -379,7 +379,7 @@ def update_sim(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     global cnt,framenr
 
     cnt = cnt+nrun
-    if cnt % ndisp == 0:  # insert the non-displayed iterations & count species : NB nrun must divide ndisp
+    if cnt % ndisp == 0 and nrun:  # insert the non-displayed iterations & count species : NB nrun must divide ndisp
         genelife.genelife_update(nskip, nhist, nstat)
         framenr = framenr + nskip
         if(count): genelife.countspecieshash()
@@ -803,7 +803,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     else:
                         parhelp()
                 elif event.key == pg.K_SPACE:
-                    pause = (pause+1)%2
+                    pause = 1-pause
                 elif event.key == pg.K_RIGHT:
                     colorfunction = (colorfunction + 1) % 11
                     genelife.set_colorfunction(colorfunction)
@@ -830,22 +830,10 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                         ymaxq = ymaxq / 2
                         oldymaxq = genelife.setget_act_ymaxq(ymaxq)
                         print 'step',framenr,'new ymaxq =',ymaxq
-                elif event.key == pg.K_x:
-                    if pg.key.get_mods() & pg.KMOD_SHIFT: offdx = offdx+1
-                    else: offdx = offdx-1
-                    print 'step',framenr,"offset dx changed to ",offdx
-                    genelife.set_offsets(offdx,offdx,offdt)
-                elif event.key == pg.K_y:
-                    if pg.key.get_mods() & pg.KMOD_SHIFT: offdy = offdy+1
-                    else: offdy = offdy-1
-                    print 'step',framenr,"offset dy changed to ",offdy
-                    genelife.set_offsets(offdx,offdy,offdt)
-                elif event.key == pg.K_t:
-                    if pg.key.get_mods() & pg.KMOD_SHIFT:
-                        if(offdt<0): offdt = offdt+1
-                    elif offdt>-maxPlane+1: offdt = offdt-1
-                    print 'step',framenr,"offset dt changed to ",offdt
-                    genelife.set_offsets(offdx,offdy,offdt)
+                elif event.key == pg.K_n:
+                    noveltyfilter=1-noveltyfilter
+                    print 'step',framenr,"noveltyfilter changed to ",noveltyfilter
+                    genelife.set_noveltyfilter()
                 elif event.key == pg.K_q:
                     if pg.key.get_mods() & pg.KMOD_ALT:
                         quadrants = input("Enter an integer between -1 and 6: ")
@@ -872,16 +860,28 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     pg.image.save(screen, "images/genelife_sel%02d_t%03d_r%08x_s%03d.jpeg" % (selection,framenr,repscheme,savecnt))
                     print ("image saved "+"images/genelife_sel%02d_t%03d_r%08x_s%03d.jpeg" % (selection,framenr,repscheme,savecnt))
                     savecnt = savecnt + 1
+                elif event.key == pg.K_t:
+                    if pg.key.get_mods() & pg.KMOD_SHIFT:
+                        if(offdt<0): offdt = offdt+1
+                    elif offdt>-maxPlane+1: offdt = offdt-1
+                    print 'step',framenr,"offset dt changed to ",offdt
+                    genelife.set_offsets(offdx,offdy,offdt)
                 elif event.key == pg.K_v:
                     vscrolling=1-vscrolling
                     print 'step',framenr,"vscrolling changed to ",vscrolling
                     genelife.set_vscrolling()
-                elif event.key == pg.K_n:
-                    noveltyfilter=1-noveltyfilter
-                    print 'step',framenr,"noveltyfilter changed to ",noveltyfilter
-                    genelife.set_noveltyfilter()
-        if (not mouseclicked and not pause):
-            if updatesenabled:
+                elif event.key == pg.K_x:
+                    if pg.key.get_mods() & pg.KMOD_SHIFT: offdx = offdx+1
+                    else: offdx = offdx-1
+                    print 'step',framenr,"offset dx changed to ",offdx
+                    genelife.set_offsets(offdx,offdx,offdt)
+                elif event.key == pg.K_y:
+                    if pg.key.get_mods() & pg.KMOD_SHIFT: offdy = offdy+1
+                    else: offdy = offdy-1
+                    print 'step',framenr,"offset dy changed to ",offdy
+                    genelife.set_offsets(offdx,offdy,offdt)
+        if (not mouseclicked):
+            if updatesenabled and not pause:
                 update_sim(nrun, ndisp, nskip, niter, nhist, nstat, count)
             else:
                 colorgrid()
@@ -986,7 +986,7 @@ def parhelp():
     print "<- , ->     ","decrement or increment the colorfunction analysis type mod 11"
     print "h           ","print this help"
     print "H           ","toggle horizon mode on or off: upper half of array obeys unmodified GoL rule"
-    print "<space>     ","pause simulation"
+    print "<space>     ","pause simulation, allowing ongoing display control"
     print "n           ","toggle novelty filter on/off for connected component color function 9"
     print "q,Q         ","incr or decr quadrant parameter choice : -1 = no quadrants, 0-4 are first 5 bit pairs of repscheme, 5,6 surv and overwrite"
     print "r           ","toggle random soup domain on or off"
