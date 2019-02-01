@@ -1076,20 +1076,25 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
           break;
         case 7:                                         // scissors-stone-well-paper game on number ones mod 4, scissors 0 stone 1 well 2 paper 3
             for (k=0;k<s;k++) {                         // exception to numerical order: sc>pa. Do tournament with all others for each livegene and score
-                gene0=livegenes[k];scores[k]=0;
-                for (int k1=0;k1<s-1;k1++) {
-                    k1 = (k==k1) ? k1+1 :k1; k1 = (k==s) ? 0 : k1;
-                    d0 = d[k]&0x3; d1 = d[k1]&0x3;
-                    scores[k] += (d0 > d1 && d1 != 0) || (d1 == 3 && d0 == 0) ? 1 : 0;
+                scores[k]=0;
+                for (int k1=0;k1<s;k1++) {
+                    d0 = d[k]&0x3; d1 = d[k1]&0x3;      // if k==k1 there is zero score in next line so allow it
+                    scores[k] += ( (d0 > d1 && !(d0 == 3 && d1 == 0)) || (d0 == 0 && d1 == 3) ) ? 1 : 0;
                 }
             }
             for(extremval= 0ull,k=0;k<s;k++) extremval = (scores[k]>= extremval ? scores[k] : extremval); // find value of fittest gene, best score in tournament
-            for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= (scores[k]==extremval ? 1ull<<(k+0*nbest++) : 0ull); // find set of genes with equal best value
-            if (s==3) for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= 1ull<<nbest++; // for s==3 all genes of equal best value
-            *birth = ((nbest>0) ? 1ull: 0ull);         // birth condition
-            if (s==3 || s==2) {                                   // included compatibility with update() for enforcebirth off
+            if (extremval) {
+                for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= (scores[k]==extremval ? 1ull<<(k+0*nbest++) : 0ull); // find set of genes with equal best value
+            }
+            else {   // no positive scores, no birth
+                bestnbmask=0ull;nbest=0;
+            }
+            *birth = nbest ? 1ull: 0ull;               // birth condition
+            if (s==3) {                                // included for compatibility with update() for enforcebirth off
                 for(d0=k=0;k<s;k++) for (int k1=0;k1<k;k1++) d0 |= livegenes[k]^livegenes[k1] ? 1 : 0; //  d0 = 1 if  genes are not all the same
-                *birth = *birth && d0 ? 1ull: 0ull;    // birth condition modified to only be true if genes difft
+                *birth = d0 ? 1ull: 0ull;    // birth condition modified to only be true if some genes difft
+                nbest = d0 ? 3 : 0;
+                bestnbmask = d0 ? 0x7ull : 0;
             }
             for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
             *newgene = livegenes[k&0x7];               // choose first of selected set to replicate (can make positional dependent choice instead externally)
@@ -1362,7 +1367,7 @@ extern inline uint64_t disambiguate(unsigned int kch, uint64_t nb1i, int nb[], u
         case 0:  kch += ((nsame-1)&(randnr>>32))<< (nsame ==4 ? 1 : 2);                  // random choice
                  kch &=0x7; return( golg[nb[(nb1i>>(kch<<2))&0x7]]);
         case 1:  return( golg[nb[(nb1i>>(kch<<2))&0x7]]);                                // ignore asymmetry issue, continue regardless;
-        case 2:  birth = 0; return(0ull);                                                // abandom birth attempt
+        case 2:  *birth = 0; return(0ull);                                               // abandom birth attempt
         case 3:  for (newgene=~0ull,k=0;k<nsame;k++) {                                   // choose minimum value gene
                      kch+=k*(nsame==4 ? 2 : 4);
                      gene=golg[nb[(nb1i>>(kch<<2))&0x7]];
@@ -2492,6 +2497,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
     uint64_t newgene, ancestor, livegenes[3];
     uint64_t s2or3, birth, statflag, nextgolstate;
 
+    canonical = repscheme & R_2_canonical_nb;
     survival = survivalmask;
     overwrite = overwritemask;
     select23live = ((repscheme & R_0_2sel_3live)?1:0)+((repscheme & R_1_2sel_2live)?2:0);
@@ -2568,7 +2574,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
 
             if (s&0x1ull) {  // s==3                                        // allow birth (with possible overwrite)
               statflag |= F_3_live;                                         // record instance of 3 live nbs
-              if ((0x1ull&overwrite)|(0x1ull&~gol[ij]) ) {                  // central site empty or overwrite mode
+              if ((0x1ull&overwrite)||!gol[ij] ) {                          // central site empty or overwrite mode
                 birth = 1ull;                                               // birth flag
                 for(k=0;k<s;k++) livegenes[k] = golg[nb[(nb1i>>(k<<2))&0x7]]; // live neighbour genes
                 statflag |= F_3_livenbs & (nbmask<<16);                     // record live neighbour pattern
@@ -2589,15 +2595,21 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                         }
                       }
                       else statflag |= F_2select;                           // ancestor has been chosen in selectone_of_2
+                      fprintf(stderr,"DEBUG ERROR entered selection with threesome\n");
                   }
                   else {
                       newgene = golg[nbch];
+                      if(birth) {
+                        fprintf(stderr,"DEBUG selectdifft3 with threesome: newgene %16llx nbmask %2llx kch %d: genes ",newgene,nbmask,kch);
+                        for(k=0;k<8;k++) if ((nbmask>>k)&0x1ull) fprintf(stderr," %llx",golg[nb[k]]); fprintf(stderr,"\n");
+                      }
                   }
                 } // end if not all live neighbors the same
                 else {
                     statflag |= F_3g_same;
                     newgene = livegenes[0];                                 // genes all the same : copy first one
                     if((~enforcebirth&0x1) && rulemodij) birth = 0ull;      // no birth for 3 identical genes if not enforcebirth3 and rulemod
+                    if (birth) fprintf(stderr,"DEBUG ERROR birth with identical threesome\n");
                 }
               } // end central site empty or overwrite mode
             }  // end if s==3
@@ -2605,17 +2617,28 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                 statflag |= F_2_live;
                 if (((select23live>>1)&0x1)&&(rulemodij||gol[ij])) {        // rule departure from GOL allowed or possible overwrite
                     if ((0x1ull&(overwrite>>1))||!gol[ij]) {                // either overwrite on for s==2 or central site is empty
-                        if (add2nd) selectone_nbs(s,nb1i,nb,gol,golg,&birth,&newgene); //2nd nb modulation
+                        if (add2nd) {
+                            selectone_nbs(s,nb1i,nb,gol,golg,&birth,&newgene); //2nd nb modulation
+                            fprintf(stderr,"DEBUG ERROR entered 2nd nb with twosome\n");
+                        }
                         else {
                             nbmask = (0x1ull<<(nb1i&0x7)) + (0x1ull<<((nb1i>>4)&0x7));
                             kch=selectdifft2(nbmask, &crot, &kodd);
                             if ((pos_canon_neutral>>1)&0x1) {               // enforce gene independent birth for s = 2 (corrected 31.1.2019, remove repscheme&)
                                 newgene = golg[nb[kch]];
                                 birth = 1ull;
+                                fprintf(stderr,"DEBUG ERROR entered gene indept birth with twosome\n");
                             }
-                            else selectone_of_2(s,nb1i,nb,golg,&birth,&newgene,kch);
+                            else {
+                                selectone_of_2(s,nb1i,nb,golg,&birth,&newgene,kch);
+                                if(birth) {
+                                    fprintf(stderr,"DEBUG selectone_of_2 with twosome: newgene %16llx nbmask %2llx kch %d: genes ",newgene,nbmask,kch);
+                                    for(k=0;k<8;k++) if ((nbmask>>k)&0x1ull) fprintf(stderr," %llx",golg[nb[k]]); fprintf(stderr,"\n");
+                                }
+                            }
                             if(repscheme & R_10_13_2birth_k4) {             // birth only on the active subset of 4 canonical 2-live nb configs if any are active
                                 if(~repscheme & (R_10_2birth_k0<<(kch-1))) birth = 0ull;   // cancel birth if chosen configuration not active
+                                fprintf(stderr,"DEBUG ERROR entered subset canon with twosome\n");
                             }
                         }
 
@@ -2628,6 +2651,7 @@ void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[
                                 else birth = 0ull;
                             }
                             else birth = 1ull;
+                            fprintf(stderr,"DEBUG ERROR entered enforced birth with twosome\n");
                         }
                         if (birth) statflag |= F_2select;
                     }
@@ -2709,7 +2733,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
 /*
         0 <= s <= 8
         genome =
-        8 bits for each possible s value for birth (center site 0) : exclude s=0 no birth of isolated
+        8 bits for each possible s value for birth (center site 0) : exclude s=0 no birth of isolated live cells
         8 bits for each possible s value for survival/death (center site 1) : exclude s=0 no survival of isolated
         (assume s = 0 => 0 always)
         using b0 for s=0, b1 for s=1, etc
@@ -2798,14 +2822,17 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
             if (repscheme & R_7_random_resln) {
                 kch = ((randnr>>32)&0xffff) % s;                            // choose random in this option only
                 newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
+                fprintf(stderr,"DEBUG ERROR choose random with s %d\n",s);
             }
             else {
                 nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&nbmask);// selection scheme depends on repscheme parameter
+                if (nbest<=1 && birth) fprintf(stderr,"DEBUG selectone_of_s with s %d: newgene %16llx nbmask %2llx nbest %d\n",s,newgene,nbmask,nbest);
                 if(nbest>1) {
                     kch=selectdifft(nbest,nbmask,&crot,&kodd,&nsame);        // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
                     if(nsame) newgene = disambiguate(kch, nb1i, nb, golg, nsame, &birth, randnr); // restore symmetry via one of 8 repscheme options
                     else newgene = golg[nb[kch]];
                     // fprintf(stderr,"lut step %d ij %d s %d nbest %d nbmask %llx nsame %d crot %d newgene %llx nb1i %llx kch %d gol[nb[kch]] %llx\n",totsteps, ij, s, nbest, nbmask, nsame, crot, newgene, nb1i, kch, gol[nb[kch]]);
+                    if (birth) fprintf(stderr,"DEBUG selectone_of_s with s %d: newgene %16llx nbmask %2llx nbest %d kch %d nsame %d\n",s,newgene,nbmask,nbest,kch,nsame);
                 }
             }
             if (birth) {                                                    // ask again because disambiguate may turn off birth
@@ -2830,7 +2857,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
                 if(gol[ij] && survive) statflag |= F_survival;              // could be failed overwrite birth attempt and survival
             }
         }
-        else if(gol[ij]) {                                                       // death/survival
+        else if(gol[ij]) {                                                  // death/survival
             if(survive) {                                                   // survival coded
                 statflag |= F_survival;
                 newgol[ij]  = gol[ij];                                      // new game of life cell value same as old
@@ -4286,8 +4313,9 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         case 6:
         case 7:  for (k=0;k<8;k++) startgenes[k]=(0x1ull<<(4+k*8))-1ull; break;
 
-        case 8:  genegol[selection-8] = (codingmask<<((8+3-1)*ncoding))|(codingmask<<((2-1)*ncoding))|(codingmask<<((3-1)*ncoding));
-                 for (k=0;k<8;k++)   startgenes[k] = ((k&0x7ull)<<61) | genegol[selection-8];break;    // put up to 3 extra bits at top to ensure all nr 1s values occupied
+        case 8:  if (((repscheme>>4)&0x7)==7) genegol[selection-8] = (codingmask<<((8+3-1)*ncoding))|(codingmask<<((8+2-1)*ncoding))|(codingmask<<((2-1)*ncoding))|(codingmask<<((3-1)*ncoding));
+                 else genegol[selection-8] = (codingmask<<((8+3-1)*ncoding))|(codingmask<<((2-1)*ncoding))|(codingmask<<((3-1)*ncoding));
+                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;    // put up to 3 extra bits at top to ensure all nr 1s values occupied
         case 9:  genegol[selection-8] = 0xb32ull;                                 //GoL rule for survival in totalistic LUT case, variable length encoding
                  for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];  break;
         case 10: genegol[selection-8] = (0x7ull<<2)|(0xfull<<5)|(0xfull<<37);     //GoL rule for survival in corner/edge dist LUT case, fixed length encoding
