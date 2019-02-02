@@ -191,7 +191,8 @@ int ymax = 2000;                    // gene activity scale max for plotting : wi
 int ymaxq = 2000;                   // quad pattern activity scale max for plotting : will be adjusted dynamically or by keys
 // double log2ymax = 25.0;          // activity scale max 2^25 = 33.5 * 10^6 : suffers from discrete steps at bottom, not used
 int activitymax;                    // max of activity in genealogical record of current population
-int noveltyfilter = 0;              // novelty filter for colorfunction 9 : if on, darkens non-novel components (activity>1) in display
+int noveltyfilter = 0;              // novelty filter for colorfunction 9 : if on (key "n"), darkens non-novel components (activity>1) in display
+int activity_size_colormode = 0;    // color by size for colorfunction 10 : if on (key "p")  1 log2 enclosing square size 2 use sqrt(#pixels)
 //------------------------------------------------ arrays for time tracing, activity and genealogies ----------------------------------------------------
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
@@ -431,7 +432,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // label_components     do two-pass fast component labelling with 8-neighbour using Suzuki decision tree, rank union and periodic BCs, connect t-1 labels with t
 // extract_components   extract labelled components to list of subimages embedded in square of side 2^n, each stored in a quadtree hash table
 //.......................................................................................................................................................
-// update               update gol, golg, golgstats for a single synchronous time step : for selection 0-7 with fixed GoL rule departures in repscheme
+// update_23            update gol, golg, golgstats for a single synchronous time step : for selection 0-7 with fixed GoL rule departures in repscheme
 // update_lut_sum       update version for gene encoding look up table for totalistic survival and birth (disallowing 0 live neighbour entries) sel 8,9
 // update_lut_dist      update version for gene encoding look up table for survival and birth based on corner & edge sums (2*19 states disallowing s=0,1,7,8): sel 10,11
 // update_lut_canon_rot update version for gene encoding look up table for canonical rotation survival and birth (2*32 states, disallowing 0,1,7,8 entries) : sel 12,13
@@ -469,6 +470,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // set_surviveover      set the two masks for survival and overwrite from python (survivalmask, overwritemask)
 // set_vscrolling       set vertical scrolling to track fronts of growth in vertical upwards direction
 // set_noveltyfilter    set novelty filter for darkening already encountered components in connected component display (colorfunction 9)
+// set_activity_size_colormode set colormode by size for colorfunction 10 : 0 by ID  1 log2 enclosing square size 2 use sqrt(#pixels)
 //.......................................................................................................................................................
 // get_log2N            get the current log2N value from C to python
 // get_curgol           get current gol array from C to python
@@ -559,7 +561,7 @@ extern inline unsigned int mylog2a(unsigned int v)// find the integer log2 of v 
 extern inline void setcolor(unsigned int *color,int n) // for coloring by quad size...
 {
     // rainbow colors from running rainbow(8) in R : last two are repeats to avoid crash for log2N > 9
-    static const unsigned int rainbow[]={0, 0, 0, 0xFF0000FF, 0xFFFF00FF, 0x00FF00FF, 0x00FFFFFF, 0x0000FFFF, 0xFF00FFFF, 0xFF00FFFF, 0xFF00FFFF};
+    static const unsigned int rainbow[]={0x7F0000FF, 0x7F7F00FF, 0x007F00FF, 0xFF0000FF, 0xFFFF00FF, 0x00FF00FF, 0x00FFFFFF, 0x0000FFFF, 0xFF00FFFF, 0xFF00FFFF, 0xFF00FFFF};
     unsigned int mycol;
     mycol = rainbow[n];
     color[0] = (mycol & 0xff000000) >> 6; // R
@@ -793,59 +795,39 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
             else cgolg[ij] = 0;
         }
     }
-    else if(colorfunction==11){                                     //activities for patterns
-        int popmax = 0;                                             // need to bring this parameter up to python, if 0 do not scale brightness by pop1s
+    else if(colorfunction==10){                                     //activities for patterns with size weighted colours
         for (ij=0; ij<N2; ij++) {
             quad=acttraceq[ij];
             if (quad == rootgene) mask = 0x3f3f3fff;                // grey color for background, all root genes
             else {
-                mask = quad * 11400714819323198549ul;
-                mask = mask >> (64 - 32);                           // hash with optimal prime multiplicator down to 32 bits
-                mask |= 0x080808ffull;                              // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
-                if(popmax) {                                        // not yet implemented properly : UPDATE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                    popcount=0;
-                    if((q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL) popcount = q->pop1s;
-                    else if (quad<65536 && smallpatts[quad].activity) { POPCOUNT64C(quad,popcount); }
-                    else fprintf(stderr,"quad pattern not found in colorfunction for activities\n");
+                if (activity_size_colormode == 0) {
+                    mask = quad * 11400714819323198549ul;
+                    mask = mask >> (64 - 32);                           // hash with optimal prime multiplicator down to 32 bits
+                    mask |= 0x080808ffull;                              // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
+                }
+                else if (activity_size_colormode == 1) {                // color by log2n, enclosing square size
+                    if(acttraceqt[ij] && (q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL) d = mylog2a((unsigned int) q->size);
+                    else if (!acttraceqt[ij] && quad<65536ull && smallpatts[quad].activity) d = mylog2a((unsigned int) smallpatts[quad].size);
+                    else {fprintf(stderr,"quad pattern not found in colorfunction for activities\n");d=0;}
+                    if(d>log2N){fprintf(stderr,"Error in colorfunction 10, size error %d\n",d);d=0;}
+                    setcolor(color,d);
+                    mask = (color[0]<<8) | (color[1]<<4) |  (color[2]<<2) | 0xff;
+                }
+                else {                                                  // color by sqrt of nr of live pixels (up to max value of 255)
+                    int popmax = 255;
+                    if(acttraceqt[ij] && (q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL) popcount = (int) sqrt((int) q->pop1s);
+                    else if (!acttraceqt[ij] && quad<65536ull && smallpatts[quad].activity) { POPCOUNT64C((uint64_t) quad,popcount); popcount = (int) sqrt((double) popcount);}
+                    else {fprintf(stderr,"quad pattern not found in colorfunction for activities\n");popcount=0;}
+                    // fprintf(stderr,"step %d ij %d popcount %d\n",totsteps,ij,popcount);
                     if(popcount>popmax) popcount=popmax;
-                    colormax=0;
-                    for(d=0;d<3;d++) if((color[d]=( (mask>>(8+(d<<3))) & 0xff))>colormax) colormax=color[d];
-                    rescalecolor=(log((double)popcount)/log((double)popmax))*((double)0xff/(double)colormax);
-                    for(d=0;d<3;d++) color[d]=(unsigned int) (((double) color[d])*rescalecolor);
+                    color[0]=popcount;
+                    color[1]=popcount<<3;color[1]=color[1]>255 ? 255: color[1];
+                    color[2]=popcount<<6;color[2]=color[2]>255 ? 255: color[2];
                     for(d=0,mask=0xff;d<3;d++) mask |= color[d]<<((d<<3)+8);
                 }
             }
             cgolg[ij]= (int) mask;
         }
-    }
-    else if(colorfunction==10){                                     //activities for patterns with size weighted colours
-        // for(ij=0;ij<=log2N;ij++) histsize[ij]=0;
-        for (ij=0; ij<N2; ij++) {
-            quad=acttraceq[ij];
-            if (quad == rootgene) mask = 0x3f3f3fff;                // grey color for background, all root genes
-            else {
-                unsigned short sz;
-                if(acttraceqt[ij] && (q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL){
-                    sz = q->size; sz = mylog2a(sz);
-                }
-                else if (!acttraceqt[ij] && quad<65536ull && smallpatts[quad].activity) {
-                    sz = smallpatts[quad].size;sz = mylog2a(sz);
-                }
-                else{
-                    sz=0;fprintf(stderr,"quad pattern not found in colorfunction for activities\n");
-                }
-                if(sz>log2N){
-                    fprintf(stderr,"Error in colorfunction 10, size error %d\n",sz);
-                    sz=0;
-                }
-                k = totsteps<N ? totsteps : N-1;               // current column of activity plot
-                // if ((ij&(N-1))==k) histsize[sz]++;             // only include current column in histogram
-                setcolor(color,sz);
-                mask = (color[0]<<8) | (color[1]<<4) |  (color[2]<<2) | 0xff;
-            }
-            cgolg[ij]= (int) mask;
-        }
-        // fprintf(stderr,"size counts\t");for(ij=0;ij<=log2N;ij++) fprintf(stderr," %5u",histsize[ij]);fprintf(stderr,"\n");
     }
 }
 //.......................................................................................................................................................
@@ -1095,7 +1077,7 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
                 bestnbmask=0ull;nbest=0;
             }
             *birth = nbest ? 1ull: 0ull;               // birth condition
-            if (s==3) {                                // included for compatibility with update() for enforcebirth off
+            if (s==3) {                                // included for compatibility with update_23() for enforcebirth off
                 for(d0=k=0;k<s;k++) for (int k1=0;k1<k;k1++) d0 |= livegenes[k]^livegenes[k1] ? 1 : 0; //  d0 = 1 if  genes are not all the same
                 *birth = d0 ? 1ull: 0ull;    // birth condition modified to only be true if some genes difft
                 nbest = d0 ? 3 : 0;
@@ -2488,8 +2470,8 @@ void random_soup(uint64_t gol[],uint64_t golg[],uint64_t newgol[],uint64_t newgo
         }
     }
 }
-//------------------------------------------------------- update -----------------------------------------------------------------------------------
-void update(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){
+//------------------------------------------------------- update_23 ---------------------------------------------------------------------------------
+void update_23(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){
     // update for dissection of genetic rule variants within nearest neighbor sum s=2 or 3 only for survival and birth
     // update GoL for toroidal field which has side length which is a binary power of 2
     // encode without if structures for optimal vector treatment
@@ -4073,8 +4055,8 @@ void genelife_update (int nsteps, int nhist, int nstat) {
             fprintf(stderr,"step %6d\r",totsteps);
         }
 
-        if (selection<8)        update(gol,golg,newgol,newgolg);              // calculate next iteration with selection
-        else if (selection<10)  update_lut_sum(gol,golg,newgol,newgolg);      // calculate next iteration for lut sum version s= 1-8
+        if (selection<8)        update_23(gol,golg,newgol,newgolg);           // calculate next iteration with detailed varyiants of version s=2-3
+        else if (selection<10)  update_lut_sum(gol,golg,newgol,newgolg);      // calculate next iteration for lut sum (gene coded)   version s=1-8
         else if (selection<12)  update_lut_dist(gol,golg,newgol,newgolg);     // calculate next iteration for lut dist (corner/edge) version s=1-7
         else if (selection<14)  update_lut_canon_rot(gol,golg,newgol,newgolg);// calculate next iteration for lut canonical rotation version s=2-6
         else if (selection<16)  update_lut_2D_sym(gol,golg,newgol,newgolg);   // calculate next iteration for lut fully 2D symmetric version s=0-4
@@ -4581,6 +4563,9 @@ void set_vscrolling() {
 //.......................................................................................................................................................
 void set_noveltyfilter() {
     noveltyfilter=1-noveltyfilter;
+}
+void set_activity_size_colormode() {
+    activity_size_colormode = (activity_size_colormode+1) %3;
 }
 //------------------------------------------------------- get ... ---------------------------------------------------------------------------
 //.......................................................................................................................................................

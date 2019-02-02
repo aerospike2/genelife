@@ -62,6 +62,7 @@ savecnt = 0                              # counter for saved images
 randomsoup = 0
 vscrolling = 0
 noveltyfilter = 0
+activity_size_colormode = 0
                                          # parameter initialization
 runparams = np.zeros(8,np.int32)         # 8 parameters passed to C
 simparams = np.zeros(5,np.int32)         # 5 parameters passed to C
@@ -478,7 +479,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     global cancol
     global Height,Width
     global dispinit
-    global randomsoup,vscrolling,noveltyfilter
+    global randomsoup,vscrolling,noveltyfilter,activity_size_colormode
     global gogo,pause,mouseclicked,mouseclicked2,pixeldat,paramdat
     global maxPlane,offdx,offdy,offdt,quadrants,displayoneplane
     global parhelp
@@ -834,6 +835,10 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     noveltyfilter=1-noveltyfilter
                     print 'step',framenr,"noveltyfilter changed to ",noveltyfilter
                     genelife.set_noveltyfilter()
+                elif event.key == pg.K_p:
+                    activity_size_colormode=(activity_size_colormode+1)%3
+                    print 'step',framenr,"activity_size_colormode changed to ",activity_size_colormode
+                    genelife.set_activity_size_colormode()
                 elif event.key == pg.K_q:
                     if pg.key.get_mods() & pg.KMOD_ALT:
                         quadrants = input("Enter an integer between -1 and 6: ")
@@ -988,6 +993,7 @@ def parhelp():
     print "H           ","toggle horizon mode on or off: upper half of array obeys unmodified GoL rule"
     print "<space>     ","pause simulation, allowing ongoing display control"
     print "n           ","toggle novelty filter on/off for connected component color function 9"
+    print "p           ","toggle activity_size_colormode on/off 0,1,2 for (no,log2n,sqrt(pixels)) size display of activities in color function 10"
     print "q,Q         ","incr or decr quadrant parameter choice : -1 = no quadrants, 0-4 are first 5 bit pairs of repscheme, 5,6 surv and overwrite"
     print "r           ","toggle random soup domain on or off"
     print "R           ","toggle intermittent feathered random soup domain on or off"
