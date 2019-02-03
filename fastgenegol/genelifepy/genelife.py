@@ -64,7 +64,7 @@ vscrolling = 0
 noveltyfilter = 0
 activity_size_colormode = 0
                                          # parameter initialization
-runparams = np.zeros(8,np.int32)         # 8 parameters passed to C
+runparams = np.zeros(9,np.int32)         # 9 parameters passed to C
 simparams = np.zeros(5,np.int32)         # 5 parameters passed to C
 nrun=1; ndisp=1000; nskip=0; niter=1;    # simulation time stepping parameters: nrun CA updates per step, ndisp nr steps to display before skip,
                                          # nskip nr of CA updates to skip over display, niter nr of repeats of disp-skip cycle
@@ -82,6 +82,7 @@ selection = runparams[2] = 10            # fitness for 2 live neighbor rule : 0-
 overwritemask = runparams[3]= 0x3        # whether to overwrite existing genes and allow birth
 survivalmask = runparams[4] = 0x06       # for selection=8-13 this is the GoL survival mask
 birthmask = runparams[7] = 0x04          # for selection=8-13 this is the GoL birth mask
+ancselectmask = runparams[8] = 0xff      # bit mask for enabling gene-selective choice of ancestor for different birth rules
 colorfunction = runparams[5] = 0         # color function 0(hash), >=1(fnal), 2 nongulstate or color gol planes, 3 notgolrul yellow
                                          # 4 activities 5 genealogy steps 6 genealogy temporal 7 activity scaled colors
                                          # 8 glider detection 9 connected component labelling 10 connected component activities
@@ -236,7 +237,7 @@ def init_button_arrays():
 #-----------------------------------------------------------------------------------------------------------
 
 def init_buttons():    # initialize parameter buttons
-    global repscheme,survivalmask,birthmask,overwritemask,selection,ncoding,displayplanes
+    global repscheme,survivalmask,birthmask,overwritemask,ancselectmask,selection,ncoding,displayplanes
     global scr,scalex2
     global Height,Width
     global log2N,NbP
@@ -352,7 +353,7 @@ def show0(count=True):
 # display initial population and count species
     global framenr
     global scr, screen, scalex2,caption
-    # global repscheme,survivalmask,overwritemask,selection
+    # global repscheme,survivalmask,overwritemask,ancselectmask,selection
     global cancol
     global dispinit
     
@@ -397,7 +398,8 @@ def pr_params():
     print "runparams[2] = selection = ",selection              
     print "runparams[3] = overwritemask = %x"%overwritemask
     print "runparams[4] = survivalmask = %x"%survivalmask      
-    print "runparams[7] = birthmask = %x"%birthmask                
+    print "runparams[7] = birthmask = %x"%birthmask
+    print "runparams[8] = ancselectmask = %x"%ancselectmask
     print "runparams[5] = colorfunction = ",colorfunction            
     print "runparams[6] = initfield = ",initfield                
     print "simparams[0] = nlog2pmut = ",nlog2pmut                
@@ -409,7 +411,7 @@ def pr_params():
 #-----------------------------------------------------------------------------------------------------------
 
 def set_params():
-    global rulemod,repscheme,survivalmask,birthmask,overwritemask,selection,ncoding
+    global rulemod,repscheme,survivalmask,birthmask,overwritemask,ancselectmask,selection,ncoding
     global startgenechoice,initialrdensity,initial1density,nlog2pmut,initfield
     global colorfunction
     global runparams, simparams
@@ -419,8 +421,9 @@ def set_params():
     runparams[1] = repscheme                 # 0-7 20 control bits for repscheme 8-15 <12 different control bits for repscheme 16-19 nplanes
     runparams[2] = selection                 # 0-7 fitness for 2 live neighbor rule, 8-15 LUT symmetry model and gene coding modes 16-19 16 planes 20-23 64 planes 24 matching
     runparams[3] = overwritemask             # mask of bits to overwrite sum or lut entry with birth instead of survival
-    runparams[4] = survivalmask              # 8 bit survival mask for allowing genes to modify LUTs
-    runparams[7] = birthmask                 # 8 bit birth mask for allowing genes to modify LUTs
+    runparams[4] = survivalmask              # 8-32 bit survival mask for allowing genes to modify LUTs
+    runparams[7] = birthmask                 # 8-32 bit birth mask for allowing genes to modify LUTs
+    runparams[8] = ancselectmask             # 8-32 bit ancesor selection mask to allow genetic selection to determine ancesotr for LUT rule
     runparams[5] = colorfunction             # color function; 0(hash), 1-3 (functional), 2 nongulstate or color gol planes, 3 notgolrul yellow
                                              # 4 activities 5 genealogy steps 6 genealogy temporal 7 genealogy with activity scaled colors 8 glider detection
                                              # 9 connected component labels and novelty (n) 10 connected component activities
@@ -474,7 +477,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     global colorfunction
     global ymax,ymaxq,oldymax,oldymaxq
     global updatesenabled
-    global rulemod,repscheme,survivalmask,birthmask,overwritemask,selection,ncoding,displayplanes
+    global rulemod,repscheme,survivalmask,birthmask,overwritemask,ancselectmask,selection,ncoding,displayplanes
     global savecnt
     global cancol
     global Height,Width
@@ -938,6 +941,7 @@ def parhelp():
             print "blue         ","survival  for sum=1-8 separate buttons for the 8 non-zero sums"
             print "green        ","birth     for sum=1-8 separate buttons for the 8 non-zero sums"
             print "red          ","overwrite for sum=1-8 separate buttons for the 8 non-zero sums"
+            print "none         ","ancselectmask for sum=1-8 whether to do gene selection on ancestor"
         elif selection < 12:
             print "Control bits for masks to enable gene encoded LUTs (left to right):"
             print "___________________________________________________________________"
@@ -945,6 +949,7 @@ def parhelp():
             print "blue-purple ","survival sum=1-7 separate buttons for s = 1-7 se = 0-1 0-2 0-3 0-4 1-4 2-4 3-4"
             print "green-yellow","birth    sum=1-7 separate buttons for s = 1-7 se = 0-1 0-2 0-3 0-4 1-4 2-4 3-4"
             print "red          ","overwrite for sum=1-8 separate buttons for the 8 non-zero sums"
+            print "none         ","ancselectmask for s=1-8 whether to do gene selection on ancestor"
         elif selection < 14:
             print "Control bits for masks to enable gene encoded LUTs (left to right):"
             print "___________________________________________________________________"
@@ -952,13 +957,15 @@ def parhelp():
             print "blue-purple ","survival sum=2-6 separate buttons for s = 2-6 canonical rotns = 4 7 10 7 4"
             print "green-yellow","birth    sum=2-6 separate buttons for s = 2-6 canonical rotns = 4 7 10 7 4"
             print "red          ","overwrite for sum=1-8 separate buttons for the 8 non-zero sums"
+            print "none         ","ancselectmask for s=1-8 whether to do gene selection on ancestor"
         elif selection < 16:
             print "Control bits for masks to enable gene encoded LUTs (left to right):"
             print "___________________________________________________________________"
             print "Full 2D symmetry LUT rules for sums 0-4 for survival /left half) and birth (right half)"
             print "blue-purple ","survival sum=0-4 separate buttons for s = 0-4 pattern offset = 1 2 6 10 13"
-            print "green-yellow","birth    sum=0-4 separate buttons for s = 2-6 pattern offset = 1 2 6 10 13"
+            print "green-yellow","birth    sum=0-4 separate buttons for s = 0-4 pattern offset = 1 2 6 10 13"
             print "red          ","overwrite for sum=1-8 separate buttons for the 8 non-zero sums"
+            print "none         ","ancselectmask for s=1-8 whether to do gene selection on ancestor"
         print ""
         print "Additional control bits for selection are in repscheme"
         print "______________________________________________________"

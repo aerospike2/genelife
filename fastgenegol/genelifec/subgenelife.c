@@ -50,6 +50,7 @@ unsigned int birthmask = 0x0;       // for selection 0-7 unused, birth control i
                                     // for selection=8,9 it is 16-bit and for 10-11 it is 19-bit and 12-13 32-bit birthmask to restrict luts
 unsigned int overwritemask = 0x3;   // for selection 0-7 bit mask for 4 cases of overwrite: bit 0. s==3  bit 1. special birth s==2
                                     // for selection=8,9 it is 16-bit and for 10-11 it is 19-bit and 12-13 32-bit birthmask to restrict luts
+unsigned int ancselectmask = 0xff;  // whether to use selection between genes to determine ancestor: for each birth rule (0 use positional choice via selectdifft)
 
 int ncoding = 1;                    // byte 0 of python ncoding : number of coding bits per gene function
 int ncoding2 = 0;                   // byte 1 of python ncoding: number of coding bits per gene function for masks in connection with repscheme add2ndmask1st R_6,7
@@ -1372,7 +1373,7 @@ extern inline uint64_t disambiguate(unsigned int kch, uint64_t nb1i, int nb[], u
                      newgene&=golg[nb[(nb1i>>(kch<<2))&0x7]];
                  }; return(newgene);
         case 6:  if ( selection<16) return(genegol[selection-8]);                        // choose gene with GoL encoding : needs fixing for selection 11,13
-        case 7:  return(randnr);                                                         // choose random gene : should really update randnr outside to ensure indept
+        case 7:  return(randnr);                                                         // choose random gene : should update randnr outside to ensure indept
         default: fprintf(stderr,"Error in switch of ambiguous rotation resolution, should never reach here\n");
                  return(0ull);
     }
@@ -2808,29 +2809,26 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         else survive = birth = s2or3 = gols = 0ull;
 
         if(birth) { // birth
-            RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
             if (repscheme & R_7_random_resln) {
+                RAND128P(randnr);                                           // inline exp so compiler recognizes auto-vec,
                 kch = ((randnr>>32)&0xffff) % s;                            // choose random in this option only
                 newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
-                // fprintf(stderr,"DEBUG ERROR choose random with s %d\n",s);
             }
             else {
-                nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&nbmask);// selection scheme depends on repscheme parameter
-                /* if (nbest<=1 && birth) {
-                    fprintf(stderr,"DEBUG selectone_of_s with s %d: newgene %16llx nbmask %2llx nbest %d : genes ",s,newgene,nbmask,nbest);
-                    for(k=0;k<8;k++) if ((nbmask>>k)&0x1ull) fprintf(stderr," %llx",golg[nb[k]]); fprintf(stderr,"\n");
-                    DEBUGCNT2++;
-                }*/
-                if(nbest>1) {
-                    kch=selectdifft(nbest,nbmask,&crot,&kodd,&nsame);        // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
+            
+                if ((ancselectmask>>(s-1)) &0x1) {                          // use genes to select ancestor
+                    nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&nbmask);// selection scheme depends on repscheme parameter, selection depends on genes
+                }
+                else {                                                      // use positional information to select ancestor (leave birth on)
+                    nbest = s; newgene = 0ull;                              // newgene initialized here to avoid warning below (not needed though)
+                    for (nbmask=0ull,k=0;k<s;k++) nbmask |= 0x1ull<<((nb1i>>(k<<2))&0x7);
+                    if (nbest<=1) newgene = golg[nb[nb1i&0x7]];             // for s==1 we define newgene ancestor immediately (s==0 does not reach here)
+                }
+                if(nbest>1 ) {
+                    kch=selectdifft(nbest,nbmask,&crot,&kodd,&nsame);       // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
+                    RAND128P(randnr);                                       // used in special cases of disambiguate (0 random choice & 7 random gene) only
                     if(nsame) newgene = disambiguate(kch, nb1i, nb, golg, nsame, &birth, randnr); // restore symmetry via one of 8 repscheme options
                     else newgene = golg[nb[kch]];
-                    // fprintf(stderr,"lut step %d ij %d s %d nbest %d nbmask %llx nsame %d crot %d newgene %llx nb1i %llx kch %d gol[nb[kch]] %llx\n",totsteps, ij, s, nbest, nbmask, nsame, crot, newgene, nb1i, kch, gol[nb[kch]]);
-                    /* if (birth) {
-                        fprintf(stderr,"DEBUG selectone_of_s with s %d: newgene %16llx nbmask %2llx nbest %d kch %d nsame %d: genes ",s,newgene,nbmask,nbest,kch,nsame);
-                        for(k=0;k<8;k++) if ((nbmask>>k)&0x1ull) fprintf(stderr," %llx",golg[nb[k]]); fprintf(stderr,"\n");
-                        DEBUGCNT1++;
-                    }*/
                 }
             }
             if (birth) {                                                    // ask again because disambiguate may turn off birth
@@ -2989,15 +2987,23 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
         else survive = birth = s2or3 = gols = 0ull;
 
         if(birth) {
-            RAND128P(randnr);                                                   // inline exp so compiler recognizes auto-vec,
             if (repscheme & R_7_random_resln) {
+                RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
                 kch = ((randnr>>32)&0xffff) % s;                                // choose random in this option only
                 newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
             }
             else {
-                nbest=selectone_of_s(s, nb1i, nb, golg, &birth, &newgene, &nbmask); // selection scheme depends on repscheme parameter
-                if(nbest>1) {
-                    kch=selectdifft(nbest, nbmask, &crot, &kodd, &nsame);
+                if ((ancselectmask>>(s-1)) &0x1) {                              // use genes to select ancestor
+                    nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&nbmask);// selection scheme depends on repscheme parameter, selection depends on genes
+                }
+                else {                                                          // use positional information to select ancestor (leave birth on)
+                    nbest = s; newgene = 0ull;                                  // newgene initialized here to avoid warning below (not needed though)
+                    for (nbmask=0ull,k=0;k<s;k++) nbmask |= 0x1ull<<((nb1i>>(k<<2))&0x7);
+                    if (nbest<=1) newgene = golg[nb[nb1i&0x7]];                 // for s==1 we define newgene ancestor immediately (s==0 does not reach here)
+                }
+                if(nbest>1 ) {
+                    kch=selectdifft(nbest,nbmask,&crot,&kodd,&nsame);           // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
+                    RAND128P(randnr);                                           // used in special cases of disambiguate (0 random choice & 7 random gene) only
                     if(nsame) newgene = disambiguate(kch, nb1i, nb, golg, nsame, &birth, randnr); // restore symmetry via one of 8 repscheme options
                     else newgene = golg[nb[kch]];
                 }
@@ -3180,10 +3186,17 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
                 newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
             }
             else {
-                nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&nbmask);   // selection scheme depends on repscheme parameter
-                if(nbest>1) {
-                    kch=selectdifft(nbest,nbmask, &crot, &kodd, &nsame);
-                    RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
+                if ((ancselectmask>>(s-1)) &0x1) {                              // use genes to select ancestor
+                    nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&nbmask);// selection scheme depends on repscheme parameter, selection depends on genes
+                }
+                else {                                                          // use positional information to select ancestor (leave birth on)
+                    nbest = s; newgene = 0ull;                                  // newgene initialized here to avoid warning below (not needed though)
+                    for (nbmask=0ull,k=0;k<s;k++) nbmask |= 0x1ull<<((nb1i>>(k<<2))&0x7);
+                    if (nbest<=1) newgene = golg[nb[nb1i&0x7]];                 // for s==1 we define newgene ancestor immediately (s==0 does not reach here)
+                }
+                if(nbest>1 ) {
+                    kch=selectdifft(nbest,nbmask,&crot,&kodd,&nsame);           // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
+                    RAND128P(randnr);                                           // used in special cases of disambiguate (0 random choice & 7 random gene) only
                     if(nsame) newgene = disambiguate(kch, nb1i, nb, golg, nsame, &birth, randnr); // restore symmetry via one of 8 repscheme options
                     else newgene = golg[nb[kch]];
                 }
@@ -3385,15 +3398,22 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64
 
         if(birth) {
             if (repscheme & R_7_random_resln) {
-                RAND128P(randnr);                                              // inline exp so compiler recognizes auto-vec,
-                kch = ((randnr>>32)&0xffff) % s;                               // choose random in this option only
+                RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
+                kch = ((randnr>>32)&0xffff) % s;                                // choose random in this option only
                 newgene = golg[nb[(nb1i>>(kch<<2))&0x7]];
             }
             else {
-                nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&nbmask);  // selection scheme depends on repscheme parameter
-                if(nbest>1) {
-                    kch=selectdifft(nbest,nbmask, &crot, &kodd, &nsame);
-                    RAND128P(randnr);                                          // inline exp so compiler recognizes auto-vec,
+                if (s>0 && ((ancselectmask>>(s-1))&0x1)) {                      // use genes to select ancestor
+                    nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&nbmask);// selection scheme depends on repscheme parameter, selection depends on genes
+                }
+                else {                                                          // use positional information to select ancestor (leave birth on)
+                    nbest = s; newgene = 0ull;                                  // newgene initialized here to avoid warning below (not needed though)
+                    for (nbmask=0ull,k=0;k<s;k++) nbmask |= 0x1ull<<((nb1i>>(k<<2))&0x7);
+                    if (nbest<=1) newgene = golg[nb[nb1i&0x7]];                 // for s==1 we define newgene ancestor immediately (s==0 does not reach here)
+                }
+                if(nbest>1 ) {
+                    kch=selectdifft(nbest,nbmask,&crot,&kodd,&nsame);           // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
+                    RAND128P(randnr);                                           // used in special cases of disambiguate (0 random choice & 7 random gene) only
                     if(nsame) newgene = disambiguate(kch, nb1i, nb, golg, nsame, &birth, randnr); // restore symmetry via one of 8 repscheme options
                     else newgene = golg[nb[kch]];
                 }
@@ -4242,6 +4262,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     colorfunction = runparams[5];
     initfield = runparams[6];
     birthmask=runparams[7];
+    ancselectmask=runparams[8];
 
     randomsoup = 0;
     vscrolling = last_scrolled = 0;
@@ -4281,8 +4302,9 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
 
     fprintf(stderr,"___________________________________________________________________________________________\n");
     fprintf(stderr,"_________________________________ genelife simulation _____________________________________\n");
-    fprintf(stderr,"runparams %d %d %d %d %d %d %d\n",runparams[0],runparams[1],runparams[2],
-                                         runparams[3],runparams[4],runparams[5],runparams[6]);
+    fprintf(stderr,"runparams %d %d %d %d %d %d %d %d %d\n",runparams[0],runparams[1],runparams[2],
+                                         runparams[3],runparams[4],runparams[5],runparams[6],
+                                         runparams[7],runparams[8]);
     fprintf(stderr,"simparams %d %d %d %d %d\n",simparams[0],simparams[1],simparams[2],simparams[3],simparams[4]);
     fprintf(stderr,"pmutmask %x (NB 0 means no mutation) No of bit planes %d\n",pmutmask, NbP);
 
