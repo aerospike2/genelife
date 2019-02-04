@@ -155,8 +155,6 @@ quadnode * qimage;
 int quadcollisions = 0;
 HASHTABLE_SIZE_T const* quadtypes;  // pointer to stored hash table keys (which are the quadtypes)
 quadnode* quaditems;                // list of quadnode structured items stored in hash table
-int quadhashfreeze = 0;             // prevent quad hash table expansion temporarily (used in the middle of quadimage()) 
-int quadhashxpending = 0;           // a quadhash table expansion request is pending
 typedef struct smallpatt {          // stored binary patterns for 4*4 subarrays or smaller (16bit)
     unsigned short int size;        // side length of square image corresponding to pattern
     unsigned short int reserve;     // reserved for future use, padding to even number of 64-bit words for record
@@ -417,12 +415,15 @@ const uint64_t r1 = 0x1111111111111111ull;
 // hash_patt_find       find quadtree hash for pattern (leaf of quadtree consists of 4 64bit integers defining a 16x16 pixel array)
 // hash_node_find       find quadtree hash for node (node is specified by its four quadrant pointers (64 bit))
 // quadimage            construct quadtree for an entire image, reporting if the image has been found previously
+
 //.......................................................................................................................................................
 // pack012neighbors     pack all up to 2nd neighbours in single word
 // pack0123neighbors    pack all up to 3rd neighbours in single word
 // pack49neighbors      fast routine to pack all up to 3rd neighbours in single word : oder of bits dictated by hiearchical assembly
 // pack16neighbors      pack 4x4 blocks in single uint64_t word using 16 bits
+// unpack16neighbors    unpack 16 bit word to 4x4 block at offset in full array of labels, marking with chosen label
 // pack64neighbors      pack 8x8 blocks in single uint64_t (long) word with 64 bits
+// unpack64neighbors    unpack 64 bit word to 8x8 block at offset in full array of labels, marking with chosen label
 // compare_neighbors    compare packed pack neighbours with one given x,y shift of arbitrary size
 // compare_all_neighbors compare packed pack neighbours with all nearest neighbour x,y shifts
 // packandcompare       pack and compare either all 1-shifted 3-neighbourhoods with t=-1 or chosen (dx,dy,dt) 3-neighbourhoods
@@ -1620,13 +1621,14 @@ extern inline quadnode * hash_node_find(const uint64_t nw, const uint64_t ne, co
         return(q);
 }
 //.......................................................................................................................................................
-quadnode * quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {         // routine to generate a quadtree for an entire binary image of long words
+uint64_t quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {           // routine to generate a quadtree for an entire binary image of long words
                                                                                     // makes use of global linear and quadratic size variable N2 for sizing internal arrays golp,golq
                                                                                     // assumes that n is power of 2
     unsigned int ij,ij1,n3;
     uint64_t golp[N2>>6];
     quadnode * golq[N2>>8];
     int n = 1 << log2n;
+    uint64_t hashkey;
     extern void pack16neighbors(uint64_t gol[],short unsigned int *patt,int log2n);
     extern void pack64neighbors(uint64_t gol[],uint64_t golp[],int log2n);
     
@@ -1634,7 +1636,11 @@ quadnode * quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {     
         if (n==8) {                                                                 // n == 8
             pack64neighbors(gol,golp,log2n);
             golq[0]=hash_patt_find(golp[0],0ull,0ull,0ull);
-            return(golq[0]);
+            if(golq[0]!=NULL) return(golq[0]->hashkey);
+            else {
+                fprintf(stderr,"Error in quadimage with n==8 null hash_patt_find\n");
+                return(0ull);
+            }
         }
         else {                                                                      // n == 4,2,1   use smallpatts array to store patterns (more efficient than continued quadtree)
             pack16neighbors(gol,patt,log2n);
@@ -1648,11 +1654,11 @@ quadnode * quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {     
                 smallpatts[*patt].firsttime=totsteps;
                 smallpatts[*patt].lasttime=totsteps;
             }
-            return NULL;                                                            // in this case image key is returned in *patt rather than quad key
+            return 0ull;                                                               // in this case image key is returned in *patt rather than quad key
         }
     }
     else  {                                                                         // n >= 16
-        quadhashfreeze = 1;                                                         // freeze quad hash table against expansion ( to ensure valid pointers during array ops)
+        quadtable.expansion_frozen = 1;                                                         // freeze quad hash table against expansion ( to ensure valid pointers during array ops)
         pack64neighbors(gol,golp,log2n);                                            // 8x8 blocks of gol pixels packed into single 64bit words in golp
         n3=n>>3;                                                                    // n3=n/8 is number of such 8x8 blocks along each side of square : n3 is at least 2 here (n>=16)
         // for(ij=0;ij<n3*n3;ij++) { if (ij%8 == 0) fprintf(stderr,"\n step %d ij %d",totsteps,ij);fprintf(stderr," %llx ",golp[ij]);} fprintf(stderr,"\n");
@@ -1668,10 +1674,21 @@ quadnode * quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {     
             }
         }
         // if(golq[0]!=NULL) if(golq[0]->activity > 1) fprintf(stderr,"step %d image already found at t = %d activity %d\n",totsteps,golq[0]->firsttime,golq[0]->activity);
-        quadhashfreeze = 0;                                                         // unfreeze quad hash table
-        return(golq[0]);
+        if(golq[0]!=NULL) hashkey = golq[0]->hashkey;
+        else {
+            fprintf(stderr,"Error in quadimage with n>=16 null hash_node_find\n");
+            hashkey = 0ull;
+        }
+        quadtable.expansion_frozen = 0;                                                         // unfreeze quad hash table
+        return(hashkey);
     }
 
+}
+
+
+int labelimage(quadnode * quadimage, short unsigned int labelimg[], int xyoffset, short unsigned int label) { // rebuild image from quadimage at with label
+    
+    return label;
 }
 //------------------------------------------------------- pack012,3neighbors -------------------------------------------------------------------------------
 #define deltaxy(ij,x,y)  ((ij - (ij&Nmask) + (((ij+(x))&Nmask) + (y)*N)) & N2mask)
@@ -1738,6 +1755,14 @@ extern inline void pack16neighbors(uint64_t wgol[],short unsigned int golp[],int
     else fprintf(stderr,"pack16neighbours called with not permitted value of n %d\n",n);
 }
 //.......................................................................................................................................................
+extern inline void unpack16neighbors(const short unsigned golpw, short unsigned int labelimg[],const unsigned int label,const int offset){
+    int k,ij;
+    for(k=0;k<16;k++) {
+        ij = deltaxy(offset,k&0x3,k>>2);
+        labelimg[ij] = (golpw>>k)&0x1 ? label : 0;
+    }
+}
+//.......................................................................................................................................................
 extern inline void pack64neighbors(uint64_t gol[],uint64_t golp[],int log2n) {    // routine to pack 8x8 subarrays of full binary array gol into single words
     int n = 1 << log2n;
     int ij,ij1,k;                                                                 // assuming golp length >= (n*n)>>2^6
@@ -1754,6 +1779,14 @@ extern inline void pack64neighbors(uint64_t gol[],uint64_t golp[],int log2n) {  
              golp[ij1++] |= gol[(ij &(n-1))+(k&0x7)+n*((ij>>log2n)+(k>>3))]<<k;
              ij+= ((ij+8)&(n-1)) ? 0 : (8-1)*n;
         }
+}
+//.......................................................................................................................................................
+extern inline void unpack64neighbors(const uint64_t golpw, short unsigned int labelimg[],const unsigned int label,const int offset){
+    int k,ij;
+    for(k=0;k<64;k++) {
+        ij = deltaxy(offset,k&0x7,k>>3);
+        labelimg[ij] = (golpw>>k)&0x1 ? label : 0;
+    }
 }
 //.......................................................................................................................................................
 extern inline void compare_neighbors(uint64_t a[],uint64_t b[], int dx, int dy) {  // routine to compare packed pack neighbours with shift, result in a
@@ -2250,9 +2283,9 @@ short unsigned int extract_components(uint64_t gol[]) {
     int i,j,ij,ij1,log2n;
     short unsigned int k,nside,nlabel,patt;
     short unsigned int histside[log2N+1];
-    uint64_t fullpatt;
+    // uint64_t fullpatt;   // debugging
     int wpixels;
-    quadnode * q;
+    uint64_t hashkey;
 
     ncomponents = label_components(gol);                                                                // label connected components
     nlabel = ncomponents;
@@ -2323,16 +2356,16 @@ short unsigned int extract_components(uint64_t gol[]) {
         nside = 1<<log2n;                                                                               // convert nside to next power of 2 for quadtree analysis;
         wpixels = 0;
         for(ij=0;ij<nside*nside;ij++) {
-            ij1 =   ((complist[i].W+(ij&(nside-1)))&(N-1)) +                                              // calculate coordinate ij1 in full array of ij index in the component square
+            ij1 =   ((complist[i].W+(ij&(nside-1)))&(N-1)) +                                            // calculate coordinate ij1 in full array of ij index in the component square
                  N*((complist[i].N+(ij>>log2n))&(N-1));
             working[ij] = (label[ij1]==i) ? 0x1ull : 0ull;                                              // use working array to store binary component image
             if (working[ij]) wpixels++;
         }
-        q = quadimage(working,&patt,log2n);                                                             // quadtree hash code of component image: needs to work for all nside=2^n
-        if(q==NULL) {                                                                                   // components either have (quad!=NULL and patt==0) or (quad==NULL and patt!=0)
+        hashkey = quadimage(working,&patt,log2n);                                                       // quadtree hash code of component image: needs to work for all nside=2^n
+        if(!hashkey) {                                                                                  // components either have (quad!=NULL and patt==0) or (quad==NULL and patt!=0)
             complist[i].patt=patt;
             complist[i].quad=0ull;
-            // DEBUGGING
+            /* DEBUGGING
             fullpatt = (uint64_t) patt;
             POPCOUNT64C(fullpatt, ij1);
             if (ij1 != complist[i].pixels) {
@@ -2340,10 +2373,11 @@ short unsigned int extract_components(uint64_t gol[]) {
                                                     totsteps, i, patt, complist[i].pixels, fullpatt, ij1, wpixels, nside);
                 fprintf(stderr,"                 N S W E = (%4d %4d %4d %4d) lastrc %d\n",complist[i].N,complist[i].S,complist[i].W,complist[i].E,complist[i].lastrc);
             }
+            */
         }
         else {
             complist[i].patt=0;
-            complist[i].quad=q->hashkey;
+            complist[i].quad=hashkey;
         }
     }
 
@@ -2749,9 +2783,9 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
     smask = (uint64_t) survivalmask;                                            // convert to 64 bit mask for efficient usage here
     bmask = (uint64_t) birthmask;
     ncodingmask = (1ull<<ncoding)-1ull;                                         // mask for number of bits coding for each lut rule: <=4 for birth and survival case
-    if (ncoding==4) allcoding = 0xffffffffffffffff;                             // mask for total gene coding region
-    else if (ncoding ==2) allcoding = 0xffffffff;
-    else allcoding = 0xffff;
+    if (ncoding==4)         allcoding = 0xffffffffffffffff;                     // mask for total gene coding region
+    else if (ncoding ==2)   allcoding = 0xffffffff;
+    else                    allcoding = 0xffff;
     for (ij=0; ij<N2; ij++) {                                                   // loop over all sites of 2D torus with side length N
         i = ij & Nmask;  j = ij >> log2N;                                       // row & column
         jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                       // toroidal (j+1)*N and (j-1)*N
@@ -2799,9 +2833,9 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
                     else
                         for (genecode=allcoding,k=0;k<8;k++)                    // decodes genes with fixed length encoding by AND
                             genecode &= (gol[nb[k]]?golg[nb[k]]:allcoding);     // AND of live neighbours encodes birth rule & survival rule
-                    if(survivalgene) genecode = (genecode&(0xffffffffull<<32)) | (golg[ij]&0xffffffffull);  // if central gene determines survival
-                    survive=(((genecode>>((s-1)*ncoding)) & ncodingmask) == ncodingmask) && ((smask>>(s-1))&1ull) ? 1 : 0;
-                    if (overwrite || !gol[ij]) birth=(((genecode>>((8+(s-1))*ncoding)) & ncodingmask) == ncodingmask) && ((bmask>>(s-1))&1ull) ? 1 : 0;
+                    if(survivalgene) genecode = (genecode&((8ull*ncoding-1ull)<<(ncoding*8))) | (golg[ij]&(8ull*ncoding-1ull));  // if central gene determines survival
+                    survive=(((genecode>>((s-1)*ncoding)) & ncodingmask) == ncodingmask) && ((smask>>(s-1))&1ull) ? 1ull : 0ull;
+                    if (overwrite || !gol[ij]) birth=(((genecode>>((8+(s-1))*ncoding)) & ncodingmask) == ncodingmask) && ((bmask>>(s-1))&1ull) ? 1ull : 0ull;
                     // if(s ==3 && genecode!=genegol[selection-8]) fprintf(stderr,"genecode %llx != genegol %llx at ij %d\n",genecode,genegol[selection-8],ij);
                 }
             }
@@ -2812,7 +2846,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         }
         else survive = birth = s2or3 = gols = 0ull;
 
-        if(birth) { // birth
+        if(birth) {                                                         // birth allowed by rules encoded in local genes (may still fail by selection)
             if (repscheme & R_7_random_resln) {
                 RAND128P(randnr);                                           // inline exp so compiler recognizes auto-vec,
                 kch = ((randnr>>32)&0xffff) % s;                            // choose random in this option only
