@@ -217,6 +217,7 @@ int histcumpixelssqrt[N+1];         // histogram of patterns binned on an intege
 const int NLM = N2>>2;              // maximum number of discrete components possible N2/4
 short unsigned int label[N2];       // labels for pixels in connected component labelling
 short unsigned int oldlabel[N2];    // previous time step labels for connected component labelling
+short unsigned int labelcc[N2];     // label array to reassemble and display individual components
 typedef struct equivrec {           // equivalence record
   short unsigned int pt;            // parent of record : integer index into eqv array at lower integer location
   short unsigned int rank;          // rank of equivalence class tree, may be used to accelerate union-find
@@ -414,7 +415,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // node_hash            hash function for a node specified by 4 64-bit pointers
 // hash_patt_find       find quadtree hash for pattern (leaf of quadtree consists of 4 64bit integers defining a 16x16 pixel array)
 // hash_node_find       find quadtree hash for node (node is specified by its four quadrant pointers (64 bit))
-// quadimage            construct quadtree for an entire image, reporting if the image has been found previously
+// quadimage            construct quadtree for an entire image or connected component, reporting if the image has been found previously, returning hashkey
 
 //.......................................................................................................................................................
 // pack012neighbors     pack all up to 2nd neighbours in single word
@@ -581,7 +582,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
     double rescalecolor;
     quadnode *q;
     static int numones[16]={0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4};
-    // unsigned int histsize[log2N+1];     // for keeping track of quad size distribution, histograms are now collected in activitieshashquad() not here
+    int labelimage(uint64_t hashkeypatt, short unsigned int labelimg[], short unsigned int label, int offset);
 
     if(colorfunction==0) { // colorfunction based on multiplicative hash
         // see https://stackoverflow.com/questions/6943493/hash-table-with-64-bit-values-as-key/33871291
@@ -779,9 +780,15 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
         }
     }
     else if(colorfunction==9) {                                     // colorfunction based on unique labelling of separate components in image
+        for (ij=0; ij<NN2; ij++) labelcc[ij]=relabel[label[ij]];    // transfer labels to interactive working area
+        for(d=popcount=ij=0;ij<ncomponents;ij++) if (d<complist[ij].log2n) {d=complist[ij].log2n;popcount=ij;} // find first of largest components
+        for (ij=0; ij<NN2; ij++) if (label[ij]==complist[popcount].label) labelcc[ij]=0xffff;    // label max size component white at site
+        for (ij=0; ij<(1<<(d<<1)); ij++) labelcc[(ij&((1<<d)-1)) + (ij>>d)] = 0;  // initialize component drawing area to zero in corner
+        labelimage(complist[popcount].quad, labelcc, 0xffff, 0);    // extract this component and label it white
         for (ij=0; ij<NN2; ij++) {
-            if (gol[ij]) {
-                quad = (uint64_t) relabel[label[ij]];               // use gene variable simply as label for connected component (no connection with gene)
+            if (labelcc[ij]) {
+                // quad = (uint64_t) relabel[label[ij]];            // use gene variable simply as label for connected component (no connection with gene)
+                quad = (uint64_t) labelcc[ij];                      // use gene variable simply as label for connected component (no connection with gene)
                 mask = quad * 11400714819323198549ull;              // map label (quasi-uniformly) into larger unsigned colour space
                 mask = mask >> (64 - 32);                           // hash with optimal prime multiplicator down to 32 bits
                 mask |= 0x080808ffull;                              // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
@@ -793,7 +800,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                     else popcount=1;                                // should never occur, but just in case, assume novel
                     if (popcount>1) mask &= (mask&0x3f3f3fff);      // darken non novel components (currently a little too much)
                 }
-                if (label[ij] == 0xffff) mask = 0xffffffffull;      // recolor debug components and components with max label white
+                if (labelcc[ij] == 0xffff) mask = 0xffffffffull;      // recolor debug components and components with max label white
                 cgolg[ij] = (int) mask;
             }
             else cgolg[ij] = 0;
@@ -1629,8 +1636,8 @@ uint64_t quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {       
     quadnode * golq[N2>>8];
     int n = 1 << log2n;
     uint64_t hashkey;
-    extern void pack16neighbors(uint64_t gol[],short unsigned int *patt,int log2n);
-    extern void pack64neighbors(uint64_t gol[],uint64_t golp[],int log2n);
+    extern inline void pack16neighbors(uint64_t gol[],short unsigned int *patt,int log2n);
+    extern inline void pack64neighbors(uint64_t gol[],uint64_t golp[],int log2n);
     
     if(n<16) {                                                                      // n < 16
         if (n==8) {                                                                 // n == 8
@@ -1686,8 +1693,33 @@ uint64_t quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {       
 }
 
 
-int labelimage(quadnode * quadimage, short unsigned int labelimg[], int xyoffset, short unsigned int label) { // rebuild image from quadimage at with label
-    
+int labelimage(uint64_t hashkeypatt, short unsigned int labelimg[], short unsigned int label, int offset) { // rebuild image from quadimage at with label
+    short unsigned int patt;
+    int n;
+    quadnode * q;
+    // uint64_t nw,ne,sw,se;
+    extern inline void unpack16neighbors(const short unsigned golpw, short unsigned int labelimg[],const unsigned int label,const int offset);
+    extern inline void unpack64neighbors(const uint64_t golpw, short unsigned int labelimg[],const unsigned int label,const int offset);
+    if(hashkeypatt<65536) {patt = hashkeypatt; unpack16neighbors(patt,labelimg,label,offset);}
+    else if((q = (quadnode *) hashtable_find(&quadtable, hashkeypatt)) != NULL) {
+        if(q->isnode) {                                     // hashed item is regular quadnode
+            n = q->size >> 1;
+            if (q->nw) labelimage(q->nw, labelimg, label, (offset+n*N)&N2mask);
+            if (q->ne) labelimage(q->ne, labelimg, label, (((offset+n)&Nmask)+n*N)&N2mask);
+            if (q->sw) labelimage(q->sw, labelimg, label, offset);
+            if (q->se) labelimage(q->se, labelimg, label, (offset+n)&Nmask);
+        }
+        else {                                              // hashed item is pattern
+            if (q->nw <65536) {patt = q->nw; unpack16neighbors(patt,labelimg,label,(offset+4*N)&N2mask);}
+            else unpack64neighbors(q->nw,labelimg,label,(offset+8*N)&N2mask);
+            if (q->ne) {if (q->ne< 65536) {patt = q->ne; unpack16neighbors(patt,labelimg,label,(((offset+4)&Nmask)+4*N)&N2mask);}
+                        else unpack64neighbors(q->ne,labelimg,label,(((offset+8)&Nmask)+8*N)&N2mask);}
+            if (q->sw) {if (q->sw< 65536) {patt = q->sw; unpack16neighbors(patt,labelimg,label,offset);}
+                        else unpack64neighbors(q->sw,labelimg,label,offset);}
+            if (q->se) {if (q->se< 65536) {patt = q->se; unpack16neighbors(patt,labelimg,label,(offset+4)&Nmask);}
+                        else unpack64neighbors(q->se,labelimg,label,(offset+8)&Nmask);}
+        }
+    }
     return label;
 }
 //------------------------------------------------------- pack012,3neighbors -------------------------------------------------------------------------------
