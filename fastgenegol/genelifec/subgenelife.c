@@ -155,12 +155,14 @@ quadnode * qimage;
 int quadcollisions = 0;
 HASHTABLE_SIZE_T const* quadtypes;  // pointer to stored hash table keys (which are the quadtypes)
 quadnode* quaditems;                // list of quadnode structured items stored in hash table
+int quadhashfreeze = 0;             // prevent quad hash table expansion temporarily (used in the middle of quadimage()) 
+int quadhashxpending = 0;           // a quadhash table expansion request is pending
 typedef struct smallpatt {          // stored binary patterns for 4*4 subarrays or smaller (16bit)
-    unsigned short int size;         // side length of square image corresponding to pattern
-    unsigned short int reserve;      // reserved for future use, padding to even number of 64-bit words for record
-    unsigned int activity;           // number of references to finding this pattern
-    unsigned int firsttime;          // first time pattern was identified
-    unsigned int lasttime;           // last time pattern was identified
+    unsigned short int size;        // side length of square image corresponding to pattern
+    unsigned short int reserve;     // reserved for future use, padding to even number of 64-bit words for record
+    unsigned int activity;          // number of references to finding this pattern
+    unsigned int firsttime;         // first time pattern was identified
+    unsigned int lasttime;          // last time pattern was identified
 } smallpatt;
 smallpatt smallpatts[65536];
 //-------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1627,7 +1629,7 @@ quadnode * quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {     
     int n = 1 << log2n;
     extern void pack16neighbors(uint64_t gol[],short unsigned int *patt,int log2n);
     extern void pack64neighbors(uint64_t gol[],uint64_t golp[],int log2n);
-
+    
     if(n<16) {                                                                      // n < 16
         if (n==8) {                                                                 // n == 8
             pack64neighbors(gol,golp,log2n);
@@ -1650,6 +1652,7 @@ quadnode * quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {     
         }
     }
     else  {                                                                         // n >= 16
+        quadhashfreeze = 1;                                                         // freeze quad hash table against expansion ( to ensure valid pointers during array ops)
         pack64neighbors(gol,golp,log2n);                                            // 8x8 blocks of gol pixels packed into single 64bit words in golp
         n3=n>>3;                                                                    // n3=n/8 is number of such 8x8 blocks along each side of square : n3 is at least 2 here (n>=16)
         // for(ij=0;ij<n3*n3;ij++) { if (ij%8 == 0) fprintf(stderr,"\n step %d ij %d",totsteps,ij);fprintf(stderr," %llx ",golp[ij]);} fprintf(stderr,"\n");
@@ -1665,6 +1668,7 @@ quadnode * quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {     
             }
         }
         // if(golq[0]!=NULL) if(golq[0]->activity > 1) fprintf(stderr,"step %d image already found at t = %d activity %d\n",totsteps,golq[0]->firsttime,golq[0]->activity);
+        quadhashfreeze = 0;                                                         // unfreeze quad hash table
         return(golq[0]);
     }
 

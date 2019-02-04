@@ -17,6 +17,9 @@ before you include this file in *one* C/C++ file to create the implementation.
     #define HASHTABLE_U64 unsigned long long
 #endif
 
+extern int quadhashfreeze;
+extern int quadhashxpending;
+
 typedef struct hashtable_t hashtable_t;
 
 void hashtable_init( hashtable_t* table, int item_size, int initial_capacity, void* memctx );
@@ -413,7 +416,8 @@ void hashtable_init( hashtable_t* table, int item_size, int initial_capacity, vo
     table->slots = (struct hashtable_internal_slot_t*) HASHTABLE_MALLOC( table->memctx, (HASHTABLE_SIZE_T) slots_size );
     HASHTABLE_ASSERT( table->slots );
     HASHTABLE_MEMSET( table->slots, 0, (HASHTABLE_SIZE_T) slots_size );
-    table->item_capacity = (int) hashtable_internal_pow2ceil( (HASHTABLE_U32) initial_capacity );
+    // table->item_capacity = (int) hashtable_internal_pow2ceil( (HASHTABLE_U32) initial_capacity ); // original tight capacity
+    table->item_capacity = (int) hashtable_internal_pow2ceil( (HASHTABLE_U32) ( initial_capacity + initial_capacity / 2 ) ); // JSMcCaskill modified to allow expansion delay
     table->items_key = (HASHTABLE_U64*) HASHTABLE_MALLOC( table->memctx, 
         table->item_capacity * ( sizeof( *table->items_key ) + sizeof( *table->items_slot ) + table->item_size ) + table->item_size );
     HASHTABLE_ASSERT( table->items_key );
@@ -577,9 +581,22 @@ void hashtable_insert( hashtable_t* table, HASHTABLE_U64 key, void const* item )
     while( table->slots[ slot ].key_hash )
         slot = ( slot + 1 ) & slot_mask;
 
-    if( table->count >= table->item_capacity ) {
-        fprintf(stderr,"Expanding hash table items at table count %d\n",table->count);   // JSMcCaskill debug
-        hashtable_internal_expand_items( table );
+//    if( table->count >= table->item_capacity ) {
+    if( table->count >= ( table->item_capacity - table->item_capacity / 3 ) ) {                // JSMcCaskill provide slack to support delayed expansion
+        if (!quadhashfreeze)  {                                                                // JSMcCaskill if not frozen size
+            if (quadhashxpending)  {                                                           // JSMcCaskill report delayed expansion after freeze
+                fprintf(stderr,"Expanding hash table items at table count %d  after delay\n",table->count); // JSMcCaskill report delayed expansion after freeze
+                quadhashxpending = 0;                                                          // JSMcCaskill expansion no longer pending
+            }                                                                                  // JSMcCaskill
+            else                                                                               // JSMcCaskill undelayed regular expansion
+                fprintf(stderr,"Expansion hash table items at table count %d\n",table->count); // JSMcCaskill undelayed regular expansion
+            hashtable_internal_expand_items( table );
+        }                                                                                      // JSMcCaskill end of unfrozen condition
+        else quadhashxpending = 1;                                                             // JSMcCaskill hash table expansion pending
+        if( table->count >= ( table->item_capacity) ) {                                        // JSMcCaskill hash table expansion mandatory : frozen too long
+            fprintf(stderr,"Error: Expansion during freeze forced for hash table items at table count %d\n",table->count); // JSMcCaskill
+            hashtable_internal_expand_items( table );                                          // JSMcCaskill
+        }                                                                                      // JSMcCaskill
     }
 
     HASHTABLE_ASSERT( !table->slots[ slot ].key_hash && ( hash & (HASHTABLE_U32) slot_mask ) == (HASHTABLE_U32) base_slot );
