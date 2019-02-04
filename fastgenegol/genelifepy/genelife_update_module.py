@@ -94,7 +94,7 @@ libcd.get_genealogytrace.argtypes = [uint64_array,c_int]
 libcd.get_sorted_popln_act.restype = c_int
 libcd.get_sorted_popln_act.argtypes = [int_array, uint64_array, int_array, int_array]
 libcd.get_connected_comps.restype = c_int
-libcd.get_connected_comps.argtypes = [uint_array, uint_array]
+libcd.get_connected_comps.argtypes = [uint_array, uint_array,c_int, c_int]
 libcd.get_ncomponents.restype = c_int
 libcd.get_ncomponents.argtypes = None
 libcd.get_components.restype = c_int
@@ -207,8 +207,8 @@ def get_genealogytrace(genealogytrace):
 def get_sorted_popln_act( gindices, genes, popcnts, activities):
     return libcd.get_sorted_popln_act(gindices, genes, popcnts, activities)
 
-def get_connected_comps(connlabel,connlen):
-    return libcd.get_connected_comps(connlabel,connlen)
+def get_connected_comps(connlabel,connlen,x,y):
+    return libcd.get_connected_comps(connlabel,connlen,x,y)
 
 def get_ncomponents():
     return libcd.get_ncomponents()

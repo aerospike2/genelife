@@ -194,6 +194,7 @@ int ymaxq = 2000;                   // quad pattern activity scale max for plott
 int activitymax;                    // max of activity in genealogical record of current population
 int noveltyfilter = 0;              // novelty filter for colorfunction 9 : if on (key "n"), darkens non-novel components (activity>1) in display
 int activity_size_colormode = 0;    // color by size for colorfunction 10 : if on (key "p")  1 log2 enclosing square size 2 use sqrt(#pixels)
+int xdisplay,ydisplay = -1;         // display x and y coordinates selected by mouse in python
 //------------------------------------------------ arrays for time tracing, activity and genealogies ----------------------------------------------------
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
@@ -416,7 +417,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // hash_patt_find       find quadtree hash for pattern (leaf of quadtree consists of 4 64bit integers defining a 16x16 pixel array)
 // hash_node_find       find quadtree hash for node (node is specified by its four quadrant pointers (64 bit))
 // quadimage            construct quadtree for an entire image or connected component, reporting if the image has been found previously, returning hashkey
-
+// labelimage           rebuild image in a chosen label array from quadimage at chosen offset with chosen label
 //.......................................................................................................................................................
 // pack012neighbors     pack all up to 2nd neighbours in single word
 // pack0123neighbors    pack all up to 3rd neighbours in single word
@@ -576,7 +577,7 @@ extern inline void setcolor(unsigned int *color,int n) // for coloring by quad s
 
 void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2) {
     uint64_t gene, gdiff, g2c, mask, quad;
-    int ij,k,activity,popcount;
+    int ij,k,activity,popcount,labelxy;
     unsigned int d,d0,d1,d2;
     unsigned int color[3],colormax;
     double rescalecolor;
@@ -781,10 +782,14 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
     }
     else if(colorfunction==9) {                                     // colorfunction based on unique labelling of separate components in image
         for (ij=0; ij<NN2; ij++) labelcc[ij]=relabel[label[ij]];    // transfer labels to interactive working area
-        for(d=popcount=ij=0;ij<ncomponents;ij++) if (d<complist[ij].log2n) {d=complist[ij].log2n;popcount=ij;} // find first of largest components
-        for (ij=0; ij<NN2; ij++) if (label[ij]==complist[popcount].label) labelcc[ij]=0xffff;    // label max size component white at site
-        for (ij=0; ij<(1<<(d<<1)); ij++) labelcc[(ij&((1<<d)-1)) + (ij>>d)] = 0;  // initialize component drawing area to zero in corner
-        labelimage(complist[popcount].quad, labelcc, 0xffff, 0);    // extract this component and label it white
+        if(xdisplay>=0 && ydisplay>=0) {
+            if ((labelxy=label[xdisplay+ydisplay*N])) {
+                for (ij=0; ij<NN2; ij++) if (label[ij]==complist[labelxy].label) labelcc[ij]=0xffff;    // label chosen component white at its current location
+                d=complist[labelxy].log2n;
+                for (ij=0; ij<(1<<(d<<1)); ij++) labelcc[(ij&((1<<d)-1)) + (ij>>d)] = 1;  // initialize component drawing area to zero in corner
+                labelimage(complist[labelxy].quad, labelcc, 0xffff, 0);    // extract this component and label it white
+            }
+        }
         for (ij=0; ij<NN2; ij++) {
             if (labelcc[ij]) {
                 // quad = (uint64_t) relabel[label[ij]];            // use gene variable simply as label for connected component (no connection with gene)
@@ -1670,13 +1675,13 @@ uint64_t quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {       
         n3=n>>3;                                                                    // n3=n/8 is number of such 8x8 blocks along each side of square : n3 is at least 2 here (n>=16)
         // for(ij=0;ij<n3*n3;ij++) { if (ij%8 == 0) fprintf(stderr,"\n step %d ij %d",totsteps,ij);fprintf(stderr," %llx ",golp[ij]);} fprintf(stderr,"\n");
         for (ij=ij1=0;ij<n3*n3;ij+=2,ij1++) {                                       //  hash all 16x16 patterns (2x2 of golp words) found as leaves of the quadtree
-            golq[ij1]=hash_patt_find(golp[(ij+n3)],golp[(ij+n3)+1],golp[ij],golp[ij+1]); // hash_patt_find(nw,ne,sw,se) adds quad leaf entry if pattern not found
+            golq[ij1]=hash_patt_find(golp[ij],golp[ij+1],golp[(ij+n3)],golp[(ij+n3)+1]); // hash_patt_find(nw,ne,sw,se) adds quad leaf entry if pattern not found
             ij+= ((ij+2)&(n3-1)) ? 0 : n3;                                          // skip odd rows since these are the northern parts of quads generated on even rows
         }
 
         for(n3 >>= 1; n3>1; n3 >>= 1) {                                             // proceed up the hierarchy amalgamating 2x2 blocks to next level until reach top
             for (ij=ij1=0;ij<n3*n3;ij+=2,ij1++) {                                   // hash_node_find(nw,ne,sw,se) adds quad node entry if node not found & updates activities
-                golq[ij1]=hash_node_find(golq[(ij+n3)]->hashkey,golq[(ij+n3)+1]->hashkey,golq[ij]->hashkey,golq[ij+1]->hashkey);
+                golq[ij1]=hash_node_find(golq[ij]->hashkey,golq[ij+1]->hashkey,golq[ (ij+n3)]->hashkey,golq[(ij+n3)+1]->hashkey);
                 ij+= ((ij+2)&(n3-1)) ? 0 : n3;                                      // skip odd rows since these are the northern parts of quads generated on even rows
             }
         }
@@ -1704,20 +1709,20 @@ int labelimage(uint64_t hashkeypatt, short unsigned int labelimg[], short unsign
     else if((q = (quadnode *) hashtable_find(&quadtable, hashkeypatt)) != NULL) {
         if(q->isnode) {                                     // hashed item is regular quadnode
             n = q->size >> 1;
-            if (q->nw) labelimage(q->nw, labelimg, label, (offset+n*N)&N2mask);
-            if (q->ne) labelimage(q->ne, labelimg, label, (((offset+n)&Nmask)+n*N)&N2mask);
-            if (q->sw) labelimage(q->sw, labelimg, label, offset);
-            if (q->se) labelimage(q->se, labelimg, label, (offset+n)&Nmask);
+            if (q->nw) labelimage(q->nw, labelimg, label, offset);
+            if (q->ne) labelimage(q->ne, labelimg, label, (offset+n)&Nmask);
+            if (q->sw) labelimage(q->sw, labelimg, label, (offset+n*N)&N2mask);
+            if (q->se) labelimage(q->se, labelimg, label, (((offset+n)&Nmask)+n*N)&N2mask);
         }
         else {                                              // hashed item is pattern
-            if (q->nw <65536) {patt = q->nw; unpack16neighbors(patt,labelimg,label,(offset+4*N)&N2mask);}
-            else unpack64neighbors(q->nw,labelimg,label,(offset+8*N)&N2mask);
-            if (q->ne) {if (q->ne< 65536) {patt = q->ne; unpack16neighbors(patt,labelimg,label,(((offset+4)&Nmask)+4*N)&N2mask);}
-                        else unpack64neighbors(q->ne,labelimg,label,(((offset+8)&Nmask)+8*N)&N2mask);}
-            if (q->sw) {if (q->sw< 65536) {patt = q->sw; unpack16neighbors(patt,labelimg,label,offset);}
-                        else unpack64neighbors(q->sw,labelimg,label,offset);}
-            if (q->se) {if (q->se< 65536) {patt = q->se; unpack16neighbors(patt,labelimg,label,(offset+4)&Nmask);}
-                        else unpack64neighbors(q->se,labelimg,label,(offset+8)&Nmask);}
+            if (q->nw <65536) {patt = q->nw; unpack16neighbors(patt,labelimg,label,offset);}
+            else unpack64neighbors(q->nw,labelimg,label,offset);
+            if (q->ne) {if (q->ne< 65536) {patt = q->ne; unpack16neighbors(patt,labelimg,label,(offset+8)&Nmask);}
+                        else unpack64neighbors(q->ne,labelimg,label,(offset+8)&Nmask);}
+            if (q->sw) {if (q->sw< 65536) {patt = q->sw; unpack16neighbors(patt,labelimg,label,(offset+8*N)&N2mask);}
+                        else unpack64neighbors(q->sw,labelimg,label,(offset+8*N)&N2mask);}
+            if (q->se) {if (q->se< 65536) {patt = q->se; unpack16neighbors(patt,labelimg,label,(((offset+8)&Nmask)+8*N)&N2mask);}
+                        else unpack64neighbors(q->se,labelimg,label,(((offset+8)&Nmask)+8*N)&N2mask);}
         }
     }
     return label;
@@ -1808,15 +1813,18 @@ extern inline void pack64neighbors(uint64_t gol[],uint64_t golp[],int log2n) {  
     for (ij1=0;ij1<(n2>>6);ij1++) golp[ij1]=0ull;
     for(k=0;k<64;k++)
         for (ij1=0,ij=0;ij<n2;ij+=8) {
-             golp[ij1++] |= gol[(ij &(n-1))+(k&0x7)+n*((ij>>log2n)+(k>>3))]<<k;
-             ij+= ((ij+8)&(n-1)) ? 0 : (8-1)*n;
+            int k1 = k&0xf; int k2 = k>>4;
+            // golp[ij1++] |= gol[(ij &(n-1))+(k&0x7)+n*((ij>>log2n)+(k>>3))]<<k;                               // blocked as 8*8 not compatible with smallpatts
+            golp[ij1++] |= gol[(ij &(n-1))+ ((k1&3)+((k2&1)<<2)) +n*((ij>>log2n)+((k1>>2)+((k2>>1)<<2)))]<<k;   // blocked as 4*4*4
+            ij+= ((ij+8)&(n-1)) ? 0 : (8-1)*n;
         }
 }
 //.......................................................................................................................................................
 extern inline void unpack64neighbors(const uint64_t golpw, short unsigned int labelimg[],const unsigned int label,const int offset){
     int k,ij;
-    for(k=0;k<64;k++) {
-        ij = deltaxy(offset,k&0x7,k>>3);
+    for(k=0;k<64;k++) {                                                         // bits blocked as 4*4*4 so that 1st 16 bits are nw 4*4 block
+        int k1 = k&0xf; int k2 = k>>4;
+        ij = deltaxy(offset,(k1&3)+((k2&1)<<2),(k1>>2)+((k2>>1)<<2));
         labelimg[ij] = (golpw>>k)&0x1 ? label : 0;
     }
 }
@@ -4710,7 +4718,7 @@ int get_nspecies() {
     return(nspeciesnow);
 }
 
-int get_connected_comps(unsigned int outlabel[], unsigned int outconnlen[]) {
+int get_connected_comps(unsigned int outlabel[], unsigned int outconnlen[], int x, int y) {
     int i,ij;
     for (ij=0; ij<N2; ij++) {
         outlabel[ij] = (unsigned int) label[ij];
@@ -4718,6 +4726,8 @@ int get_connected_comps(unsigned int outlabel[], unsigned int outconnlen[]) {
     for (i=1;i<ncomponents+1;i++) {
         outconnlen[i] = (unsigned int) connlen[i];
     }
+    xdisplay = x;
+    ydisplay = y;
     return ncomponents;
 }
 
