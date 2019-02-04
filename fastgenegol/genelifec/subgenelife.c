@@ -786,7 +786,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
             if ((labelxy=label[xdisplay+ydisplay*N])) {
                 for (ij=0; ij<NN2; ij++) if (label[ij]==complist[labelxy].label) labelcc[ij]=0xffff;    // label chosen component white at its current location
                 d=complist[labelxy].log2n;
-                for (ij=0; ij<(1<<(d<<1)); ij++) labelcc[(ij&((1<<d)-1)) + (ij>>d)] = 1;  // initialize component drawing area to zero in corner
+                for (ij=0; ij<(1<<(d<<1)); ij++) labelcc[(ij&((1<<d)-1)) + (ij>>d)*N] = 0;  // initialize component drawing area to zero in corner
                 labelimage(complist[labelxy].quad, labelcc, 0xffff, 0);    // extract this component and label it white
             }
         }

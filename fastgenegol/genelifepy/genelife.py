@@ -681,6 +681,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             print ("step %d pixel data %s" % (framenr,pixeldat))
                         elif colorfunction == 9:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
+                            colorgrid()
                             pixeldat = "(%d,%d) label %4d nrconn %d" % (x,y,connlabel[y*N+x],connlen[connlabel[y*N+x]])
                         elif colorfunction == 10:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
@@ -766,6 +767,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             genelife.set_selectedgene(golg[x+y*N])
                         elif colorfunction == 9:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
+                            colorgrid()
                             pixeldat = "(%d,%d) label %4d nr.conn %d" % (x,y,connlabel[y*N+x],connlen[connlabel[y*N+x]])
                         elif colorfunction == 10:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
