@@ -1473,7 +1473,7 @@ extern inline uint64_t node_hash(const uint64_t a, const uint64_t b, const uint6
    return r ;
 }
 //.......................................................................................................................................................
-extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, const uint64_t sw, const uint64_t se) {
+extern inline uint64_t hash_patt_find(const uint64_t nw, const uint64_t ne, const uint64_t sw, const uint64_t se) {
         quadnode *q;
         uint64_t h,nnw,nne,nsw,nse;
         int nr1,nr1s;
@@ -1511,7 +1511,7 @@ extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, co
                     quadinit.ne=ne;
                     quadinit.sw=sw;
                     quadinit.se=se;
-                    quadinit.size=(ne || sw || se) ? 16 : 8;
+                    quadinit.size=16; // (ne || sw || se) ? 16 : 8;
                     quadinit.firsttime=totsteps;
                     quadinit.lasttime=totsteps;
                     POPCOUNT64C(nw,nr1);nr1s=nr1;
@@ -1531,7 +1531,7 @@ extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, co
             quadinit.ne=ne;
             quadinit.sw=sw;
             quadinit.se=se;
-            quadinit.size=(ne || sw || se) ? 16 : 8;
+            quadinit.size=16; // (ne || sw || se) ? 16 : 8;
             quadinit.firsttime=totsteps;
             quadinit.lasttime=totsteps;
             POPCOUNT64C(nw,nr1);nr1s=nr1;
@@ -1542,10 +1542,10 @@ extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, co
             hashtable_insert(&quadtable, h,(quadnode *) &quadinit);
             q = (quadnode *) hashtable_find(&quadtable, h);
         }
-        return(q);
+        return(q->hashkey);
 }
 //.......................................................................................................................................................
-extern inline quadnode * hash_node_find(const uint64_t nw, const uint64_t ne, const uint64_t sw, const uint64_t se) {
+extern inline uint64_t hash_node_find(const uint64_t nw, const uint64_t ne, const uint64_t sw, const uint64_t se) {
                                                                 // should only be called if arguments are hashtable keys, not bit patterns
         quadnode *q,*qnw,*qne,*qsw,*qse;
         uint64_t h,nnw,nne,nsw,nse;
@@ -1588,17 +1588,23 @@ extern inline quadnode * hash_node_find(const uint64_t nw, const uint64_t ne, co
                     quadinit.firsttime=totsteps;
                     quadinit.lasttime=totsteps;
                     quadinit.pop1s=0;
-                    if((qnw = (quadnode *) hashtable_find(&quadtable, nw)) == NULL) fprintf(stderr,"Error nw node not found in hashtable.\n");
-                    else {
-                        quadinit.pop1s+=qnw->pop1s;
-                        quadinit.size=qnw->size<<1;
+                    quadinit.size=0;
+                    if (nw) {
+                        if((qnw = (quadnode *) hashtable_find(&quadtable, nw)) == NULL) fprintf(stderr,"Error nw node not found in hashtable.\n");
+                        else {quadinit.pop1s+=qnw->pop1s;quadinit.size=qnw->size<<1;}
                     }
-                    if((qne = (quadnode *) hashtable_find(&quadtable, ne)) == NULL) fprintf(stderr,"Error ne node not found in hashtable.\n");
-                    else quadinit.pop1s+=qne->pop1s;
-                    if((qsw = (quadnode *) hashtable_find(&quadtable, sw)) == NULL) fprintf(stderr,"Error sw node not found in hashtable.\n");
-                    else quadinit.pop1s+=qsw->pop1s;
-                    if((qse = (quadnode *) hashtable_find(&quadtable, se)) == NULL) fprintf(stderr,"Error se node not found in hashtable.\n");
-                    else quadinit.pop1s+=qse->pop1s;
+                    if (ne) {
+                        if ((qne = (quadnode *) hashtable_find(&quadtable, ne)) == NULL) fprintf(stderr,"Error ne node not found in hashtable.\n");
+                        else {quadinit.pop1s+=qne->pop1s;quadinit.size=qne->size<<1;}
+                    }
+                    if (sw) {
+                        if((qsw = (quadnode *) hashtable_find(&quadtable, sw)) == NULL) fprintf(stderr,"Error sw node not found in hashtable.\n");
+                        else {quadinit.pop1s+=qsw->pop1s;quadinit.size=qsw->size<<1;}
+                    }
+                    if (se) {
+                        if((qse = (quadnode *) hashtable_find(&quadtable, se)) == NULL) fprintf(stderr,"Error se node not found in hashtable.\n");
+                        else {quadinit.pop1s+=qse->pop1s;quadinit.size=qse->size<<1;}
+                    }
                     hashtable_insert(&quadtable, h,(quadnode *) &quadinit);
                     q = (quadnode *) hashtable_find(&quadtable, h);
                     // fprintf(stderr,"step %d quadhash node stored %llx %llx %llx %llx hash %llx\n", totsteps, nw, ne, sw, se, h);
@@ -1615,22 +1621,27 @@ extern inline quadnode * hash_node_find(const uint64_t nw, const uint64_t ne, co
             quadinit.firsttime=totsteps;
             quadinit.lasttime=totsteps;
             quadinit.pop1s=0;
-            if((qnw = (quadnode *) hashtable_find(&quadtable, nw)) == NULL) fprintf(stderr,"Error nw node not found in hashtable.\n");
-            else {
-                quadinit.pop1s+=qnw->pop1s;
-                quadinit.size=qnw->size<<1;
+            if (nw) {
+                if((qnw = (quadnode *) hashtable_find(&quadtable, nw)) == NULL) fprintf(stderr,"Error nw node not found in hashtable.\n");
+                else {quadinit.pop1s+=qnw->pop1s;quadinit.size=qnw->size<<1;}
             }
-            if((qne = (quadnode *) hashtable_find(&quadtable, ne)) == NULL) fprintf(stderr,"Error ne node not found in hashtable.\n");
-            else quadinit.pop1s+=qne->pop1s;
-            if((qsw = (quadnode *) hashtable_find(&quadtable, sw)) == NULL) fprintf(stderr,"Error sw node not found in hashtable.\n");
-            else quadinit.pop1s+=qsw->pop1s;
-            if((qse = (quadnode *) hashtable_find(&quadtable, se)) == NULL) fprintf(stderr,"Error se node not found in hashtable.\n");
-            else quadinit.pop1s+=qse->pop1s;
+            if (ne) {
+                if ((qne = (quadnode *) hashtable_find(&quadtable, ne)) == NULL) fprintf(stderr,"Error ne node not found in hashtable.\n");
+                else {quadinit.pop1s+=qne->pop1s;quadinit.size=qne->size<<1;}
+            }
+            if (sw) {
+                if((qsw = (quadnode *) hashtable_find(&quadtable, sw)) == NULL) fprintf(stderr,"Error sw node not found in hashtable.\n");
+                else {quadinit.pop1s+=qsw->pop1s;quadinit.size=qsw->size<<1;}
+            }
+            if (se) {
+                if((qse = (quadnode *) hashtable_find(&quadtable, se)) == NULL) fprintf(stderr,"Error se node not found in hashtable.\n");
+                else {quadinit.pop1s+=qse->pop1s;quadinit.size=qse->size<<1;}
+            }
             hashtable_insert(&quadtable, h,(quadnode *) &quadinit);
             q = (quadnode *) hashtable_find(&quadtable, h);
             // fprintf(stderr,"step %d quadhash node stored %llx %llx %llx %llx hash %llx\n", totsteps, nw, ne, sw, se, h);
         }
-        return(q);
+        return(q->hashkey);
 }
 //.......................................................................................................................................................
 uint64_t quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {           // routine to generate a quadtree for an entire binary image of long words
@@ -1638,9 +1649,8 @@ uint64_t quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {       
                                                                                     // assumes that n is power of 2
     unsigned int ij,ij1,n3;
     uint64_t golp[N2>>6];
-    quadnode * golq[N2>>8];
+    uint64_t golq[N2>>8];
     int n = 1 << log2n;
-    uint64_t hashkey;
     extern inline void pack16neighbors(uint64_t gol[],short unsigned int *patt,int log2n);
     extern inline void pack64neighbors(uint64_t gol[],uint64_t golp[],int log2n);
     
@@ -1648,11 +1658,7 @@ uint64_t quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {       
         if (n==8) {                                                                 // n == 8
             pack64neighbors(gol,golp,log2n);
             golq[0]=hash_patt_find(golp[0],0ull,0ull,0ull);
-            if(golq[0]!=NULL) return(golq[0]->hashkey);
-            else {
-                fprintf(stderr,"Error in quadimage with n==8 null hash_patt_find\n");
-                return(0ull);
-            }
+            return(golq[0]);
         }
         else {                                                                      // n == 4,2,1   use smallpatts array to store patterns (more efficient than continued quadtree)
             pack16neighbors(gol,patt,log2n);
@@ -1666,14 +1672,14 @@ uint64_t quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {       
                 smallpatts[*patt].firsttime=totsteps;
                 smallpatts[*patt].lasttime=totsteps;
             }
-            return 0ull;                                                               // in this case image key is returned in *patt rather than quad key
+            return (uint64_t) *patt;                                                               // in this case image key is returned in *patt rather than quad key
         }
     }
     else  {                                                                         // n >= 16
-        quadtable.expansion_frozen = 1;                                                         // freeze quad hash table against expansion ( to ensure valid pointers during array ops)
         pack64neighbors(gol,golp,log2n);                                            // 8x8 blocks of gol pixels packed into single 64bit words in golp
         n3=n>>3;                                                                    // n3=n/8 is number of such 8x8 blocks along each side of square : n3 is at least 2 here (n>=16)
         // for(ij=0;ij<n3*n3;ij++) { if (ij%8 == 0) fprintf(stderr,"\n step %d ij %d",totsteps,ij);fprintf(stderr," %llx ",golp[ij]);} fprintf(stderr,"\n");
+        quadtable.expansion_frozen = 1;                                             // freeze quad hash table against expansion ( to ensure valid pointers during array ops)
         for (ij=ij1=0;ij<n3*n3;ij+=2,ij1++) {                                       //  hash all 16x16 patterns (2x2 of golp words) found as leaves of the quadtree
             golq[ij1]=hash_patt_find(golp[ij],golp[ij+1],golp[(ij+n3)],golp[(ij+n3)+1]); // hash_patt_find(nw,ne,sw,se) adds quad leaf entry if pattern not found
             ij+= ((ij+2)&(n3-1)) ? 0 : n3;                                          // skip odd rows since these are the northern parts of quads generated on even rows
@@ -1681,23 +1687,17 @@ uint64_t quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {       
 
         for(n3 >>= 1; n3>1; n3 >>= 1) {                                             // proceed up the hierarchy amalgamating 2x2 blocks to next level until reach top
             for (ij=ij1=0;ij<n3*n3;ij+=2,ij1++) {                                   // hash_node_find(nw,ne,sw,se) adds quad node entry if node not found & updates activities
-                golq[ij1]=hash_node_find(golq[ij]->hashkey,golq[ij+1]->hashkey,golq[ (ij+n3)]->hashkey,golq[(ij+n3)+1]->hashkey);
-                ij+= ((ij+2)&(n3-1)) ? 0 : n3;                                      // skip odd rows since these are the northern parts of quads generated on even rows
+                golq[ij1]=hash_node_find(golq[ij],golq[ij+1],golq[ (ij+n3)],golq[(ij+n3)+1]);
+                ij+= ((ij+2)&(n3-1)) ? 0 : n3;                                      // skip odd rows since these are the southern parts of quads generated on even rows
             }
         }
         // if(golq[0]!=NULL) if(golq[0]->activity > 1) fprintf(stderr,"step %d image already found at t = %d activity %d\n",totsteps,golq[0]->firsttime,golq[0]->activity);
-        if(golq[0]!=NULL) hashkey = golq[0]->hashkey;
-        else {
-            fprintf(stderr,"Error in quadimage with n>=16 null hash_node_find\n");
-            hashkey = 0ull;
-        }
+        
         quadtable.expansion_frozen = 0;                                                         // unfreeze quad hash table
-        return(hashkey);
+        return(golq[0]);
     }
-
 }
-
-
+//.......................................................................................................................................................
 int labelimage(uint64_t hashkeypatt, short unsigned int labelimg[], short unsigned int label, int offset) { // rebuild image from quadimage at with label
     short unsigned int patt;
     int n;
@@ -1710,19 +1710,19 @@ int labelimage(uint64_t hashkeypatt, short unsigned int labelimg[], short unsign
         if(q->isnode) {                                     // hashed item is regular quadnode
             n = q->size >> 1;
             if (q->nw) labelimage(q->nw, labelimg, label, offset);
-            if (q->ne) labelimage(q->ne, labelimg, label, (offset+n)&Nmask);
+            if (q->ne) labelimage(q->ne, labelimg, label, offset-(offset&Nmask)+((offset+n)&Nmask));
             if (q->sw) labelimage(q->sw, labelimg, label, (offset+n*N)&N2mask);
-            if (q->se) labelimage(q->se, labelimg, label, (((offset+n)&Nmask)+n*N)&N2mask);
+            if (q->se) labelimage(q->se, labelimg, label, (offset-(offset&Nmask)+((offset+n)&Nmask)+n*N)&N2mask);
         }
         else {                                              // hashed item is pattern
-            if (q->nw <65536) {patt = q->nw; unpack16neighbors(patt,labelimg,label,offset);}
-            else unpack64neighbors(q->nw,labelimg,label,offset);
-            if (q->ne) {if (q->ne< 65536) {patt = q->ne; unpack16neighbors(patt,labelimg,label,(offset+8)&Nmask);}
-                        else unpack64neighbors(q->ne,labelimg,label,(offset+8)&Nmask);}
-            if (q->sw) {if (q->sw< 65536) {patt = q->sw; unpack16neighbors(patt,labelimg,label,(offset+8*N)&N2mask);}
-                        else unpack64neighbors(q->sw,labelimg,label,(offset+8*N)&N2mask);}
-            if (q->se) {if (q->se< 65536) {patt = q->se; unpack16neighbors(patt,labelimg,label,(((offset+8)&Nmask)+8*N)&N2mask);}
-                        else unpack64neighbors(q->se,labelimg,label,(((offset+8)&Nmask)+8*N)&N2mask);}
+            if (q->nw) {/*if (q->nw <65536) {patt = q->nw; unpack16neighbors(patt,labelimg,label,offset);}
+                        else */unpack64neighbors(q->nw,labelimg,label,offset);}
+            if (q->ne) {/*if (q->ne< 65536) {patt = q->ne; unpack16neighbors(patt,labelimg,label,offset-(offset&Nmask)+((offset+8)&Nmask));}
+                        else */unpack64neighbors(q->ne,labelimg,label,offset-(offset&Nmask)+((offset+8)&Nmask));}
+            if (q->sw) {/*if (q->sw< 65536) {patt = q->sw; unpack16neighbors(patt,labelimg,label,(offset+8*N)&N2mask);}
+                        else */unpack64neighbors(q->sw,labelimg,label,(offset+8*N)&N2mask);}
+            if (q->se) {/*if (q->se< 65536) {patt = q->se; unpack16neighbors(patt,labelimg,label,(offset-(offset&Nmask)+((offset+8)&Nmask)+8*N)&N2mask));}
+                        else */unpack64neighbors(q->se,labelimg,label,(offset-(offset&Nmask)+((offset+8)&Nmask)+8*N)&N2mask);}
         }
     }
     return label;
@@ -1811,17 +1811,18 @@ extern inline void pack64neighbors(uint64_t gol[],uint64_t golp[],int log2n) {  
         return;
     }
     for (ij1=0;ij1<(n2>>6);ij1++) golp[ij1]=0ull;
-    for(k=0;k<64;k++)
+    for(k=0;k<64;k++) {
+        int kx = ((k&0xf)&3)+(((k>>4)&1)<<2); int ky = ((k&0xf)>>2)+(((k>>4)>>1)<<2);
         for (ij1=0,ij=0;ij<n2;ij+=8) {
-            int k1 = k&0xf; int k2 = k>>4;
-            // golp[ij1++] |= gol[(ij &(n-1))+(k&0x7)+n*((ij>>log2n)+(k>>3))]<<k;                               // blocked as 8*8 not compatible with smallpatts
-            golp[ij1++] |= gol[(ij &(n-1))+ ((k1&3)+((k2&1)<<2)) +n*((ij>>log2n)+((k1>>2)+((k2>>1)<<2)))]<<k;   // blocked as 4*4*4
+            // golp[ij1++] |= gol[(ij &(n-1))+(k&0x7)+n*((ij>>log2n)+(k>>3))]<<k;// blocked as 8*8 not compatible with smallpatts
+            golp[ij1++] |= gol[(ij &(n-1))+ kx +n*((ij>>log2n)+ky)]<<k;          // blocked as 4*4*4
             ij+= ((ij+8)&(n-1)) ? 0 : (8-1)*n;
         }
+    }
 }
 //.......................................................................................................................................................
 extern inline void unpack64neighbors(const uint64_t golpw, short unsigned int labelimg[],const unsigned int label,const int offset){
-    int k,ij;
+    int k,ij;                                                                   // only unpacks one word
     for(k=0;k<64;k++) {                                                         // bits blocked as 4*4*4 so that 1st 16 bits are nw 4*4 block
         int k1 = k&0xf; int k2 = k>>4;
         ij = deltaxy(offset,(k1&3)+((k2&1)<<2),(k1>>2)+((k2>>1)<<2));
