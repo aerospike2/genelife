@@ -148,7 +148,7 @@ typedef struct quadnode {           // stored quadtree binary pattern nodes for 
     unsigned int pop1s;             // 32 bit number of 1s in quadnode
     unsigned int firsttime;         // first time node was identified
     unsigned int lasttime;          // last time node was identified : used to determine if part of current timestep
-    unsigned int reserve;           // reserve field : giving size of record an even number of 64bit words
+    unsigned int topactivity;       // activity of pattern as top of connected component (last field : giving size of record an even number of 64bit words)
 } quadnode;
 quadnode quadinit = {0ull,0ull,0ull,0ull,0ull,0,0,1,0,0,0,0};
 quadnode * qimage;
@@ -787,7 +787,8 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 for (ij=0; ij<NN2; ij++) if (label[ij]==complist[labelxy].label) labelcc[ij]=0xffff;    // label chosen component white at its current location
                 d=complist[labelxy].log2n;
                 for (ij=0; ij<(1<<(d<<1)); ij++) labelcc[(ij&((1<<d)-1)) + (ij>>d)*N] = 0;  // initialize component drawing area to zero in corner
-                labelimage(complist[labelxy].quad, labelcc, 0xffff, 0);    // extract this component and label it white
+                if (complist[labelxy].quad) labelimage(complist[labelxy].quad, labelcc, 0xffff, 0);    // extract this component and label it white
+                else labelimage(complist[labelxy].patt, labelcc, 0xffff, 0);                            // component involves patt not quad
             }
         }
         for (ij=0; ij<NN2; ij++) {
@@ -1473,7 +1474,7 @@ extern inline uint64_t node_hash(const uint64_t a, const uint64_t b, const uint6
    return r ;
 }
 //.......................................................................................................................................................
-extern inline uint64_t hash_patt_find(const uint64_t nw, const uint64_t ne, const uint64_t sw, const uint64_t se) {
+extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, const uint64_t sw, const uint64_t se) {
         quadnode *q;
         uint64_t h,nnw,nne,nsw,nse;
         int nr1,nr1s;
@@ -1511,7 +1512,7 @@ extern inline uint64_t hash_patt_find(const uint64_t nw, const uint64_t ne, cons
                     quadinit.ne=ne;
                     quadinit.sw=sw;
                     quadinit.se=se;
-                    quadinit.size=16; // (ne || sw || se) ? 16 : 8;
+                    quadinit.size= (ne || sw || se) ? 16 : 16;//8;
                     quadinit.firsttime=totsteps;
                     quadinit.lasttime=totsteps;
                     POPCOUNT64C(nw,nr1);nr1s=nr1;
@@ -1531,7 +1532,7 @@ extern inline uint64_t hash_patt_find(const uint64_t nw, const uint64_t ne, cons
             quadinit.ne=ne;
             quadinit.sw=sw;
             quadinit.se=se;
-            quadinit.size=16; // (ne || sw || se) ? 16 : 8;
+            quadinit.size= (ne || sw || se) ? 16 : 16;//8;
             quadinit.firsttime=totsteps;
             quadinit.lasttime=totsteps;
             POPCOUNT64C(nw,nr1);nr1s=nr1;
@@ -1542,10 +1543,10 @@ extern inline uint64_t hash_patt_find(const uint64_t nw, const uint64_t ne, cons
             hashtable_insert(&quadtable, h,(quadnode *) &quadinit);
             q = (quadnode *) hashtable_find(&quadtable, h);
         }
-        return(q->hashkey);
+        return(q);
 }
 //.......................................................................................................................................................
-extern inline uint64_t hash_node_find(const uint64_t nw, const uint64_t ne, const uint64_t sw, const uint64_t se) {
+extern inline quadnode * hash_node_find(const uint64_t nw, const uint64_t ne, const uint64_t sw, const uint64_t se) {
                                                                 // should only be called if arguments are hashtable keys, not bit patterns
         quadnode *q,*qnw,*qne,*qsw,*qse;
         uint64_t h,nnw,nne,nsw,nse;
@@ -1587,8 +1588,10 @@ extern inline uint64_t hash_node_find(const uint64_t nw, const uint64_t ne, cons
                     quadinit.se=se;
                     quadinit.firsttime=totsteps;
                     quadinit.lasttime=totsteps;
-                    quadinit.pop1s=0;
-                    quadinit.size=0;
+                    quadinit.pop1s=0;                            // incremented below
+                    quadinit.size=0;                             // incremented below
+                    quadinit.activity=1;
+                    quadinit.topactivity=0;                      // incremented only in quadimage at top level
                     if (nw) {
                         if((qnw = (quadnode *) hashtable_find(&quadtable, nw)) == NULL) fprintf(stderr,"Error nw node not found in hashtable.\n");
                         else {quadinit.pop1s+=qnw->pop1s;quadinit.size=qnw->size<<1;}
@@ -1621,6 +1624,8 @@ extern inline uint64_t hash_node_find(const uint64_t nw, const uint64_t ne, cons
             quadinit.firsttime=totsteps;
             quadinit.lasttime=totsteps;
             quadinit.pop1s=0;
+            quadinit.activity=1;
+            quadinit.topactivity=0;
             if (nw) {
                 if((qnw = (quadnode *) hashtable_find(&quadtable, nw)) == NULL) fprintf(stderr,"Error nw node not found in hashtable.\n");
                 else {quadinit.pop1s+=qnw->pop1s;quadinit.size=qnw->size<<1;}
@@ -1641,7 +1646,7 @@ extern inline uint64_t hash_node_find(const uint64_t nw, const uint64_t ne, cons
             q = (quadnode *) hashtable_find(&quadtable, h);
             // fprintf(stderr,"step %d quadhash node stored %llx %llx %llx %llx hash %llx\n", totsteps, nw, ne, sw, se, h);
         }
-        return(q->hashkey);
+        return(q);
 }
 //.......................................................................................................................................................
 uint64_t quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {           // routine to generate a quadtree for an entire binary image of long words
@@ -1649,19 +1654,20 @@ uint64_t quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {       
                                                                                     // assumes that n is power of 2
     unsigned int ij,ij1,n3;
     uint64_t golp[N2>>6];
-    uint64_t golq[N2>>8];
+    quadnode * golq[N2>>8];
     int n = 1 << log2n;
-    extern inline void pack16neighbors(uint64_t gol[],short unsigned int *patt,int log2n);
+    extern inline short unsigned int pack16neighbors(uint64_t gol[],int log2n);
     extern inline void pack64neighbors(uint64_t gol[],uint64_t golp[],int log2n);
     
     if(n<16) {                                                                      // n < 16
         if (n==8) {                                                                 // n == 8
             pack64neighbors(gol,golp,log2n);
             golq[0]=hash_patt_find(golp[0],0ull,0ull,0ull);
-            return(golq[0]);
+            golq[0]->topactivity++;
+            return(golq[0]->hashkey);
         }
         else {                                                                      // n == 4,2,1   use smallpatts array to store patterns (more efficient than continued quadtree)
-            pack16neighbors(gol,patt,log2n);
+            *patt=pack16neighbors(gol,log2n);
             if(smallpatts[*patt].activity) {                                       // pattern found
                 smallpatts[*patt].activity++;
                 smallpatts[*patt].lasttime=totsteps;
@@ -1672,7 +1678,7 @@ uint64_t quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {       
                 smallpatts[*patt].firsttime=totsteps;
                 smallpatts[*patt].lasttime=totsteps;
             }
-            return (uint64_t) *patt;                                                               // in this case image key is returned in *patt rather than quad key
+            return 0ull;                                                            // in this case image key is returned in *patt rather than quad key
         }
     }
     else  {                                                                         // n >= 16
@@ -1687,14 +1693,14 @@ uint64_t quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {       
 
         for(n3 >>= 1; n3>1; n3 >>= 1) {                                             // proceed up the hierarchy amalgamating 2x2 blocks to next level until reach top
             for (ij=ij1=0;ij<n3*n3;ij+=2,ij1++) {                                   // hash_node_find(nw,ne,sw,se) adds quad node entry if node not found & updates activities
-                golq[ij1]=hash_node_find(golq[ij],golq[ij+1],golq[ (ij+n3)],golq[(ij+n3)+1]);
+                golq[ij1]=hash_node_find(golq[ij]->hashkey,golq[ij+1]->hashkey,golq[ (ij+n3)]->hashkey,golq[(ij+n3)+1]->hashkey);
                 ij+= ((ij+2)&(n3-1)) ? 0 : n3;                                      // skip odd rows since these are the southern parts of quads generated on even rows
             }
         }
         // if(golq[0]!=NULL) if(golq[0]->activity > 1) fprintf(stderr,"step %d image already found at t = %d activity %d\n",totsteps,golq[0]->firsttime,golq[0]->activity);
-        
+        golq[0]->topactivity++;
         quadtable.expansion_frozen = 0;                                                         // unfreeze quad hash table
-        return(golq[0]);
+        return(golq[0]->hashkey);
     }
 }
 //.......................................................................................................................................................
@@ -1715,14 +1721,15 @@ int labelimage(uint64_t hashkeypatt, short unsigned int labelimg[], short unsign
             if (q->se) labelimage(q->se, labelimg, label, (offset-(offset&Nmask)+((offset+n)&Nmask)+n*N)&N2mask);
         }
         else {                                              // hashed item is pattern
-            if (q->nw) {/*if (q->nw <65536) {patt = q->nw; unpack16neighbors(patt,labelimg,label,offset);}
-                        else */unpack64neighbors(q->nw,labelimg,label,offset);}
-            if (q->ne) {/*if (q->ne< 65536) {patt = q->ne; unpack16neighbors(patt,labelimg,label,offset-(offset&Nmask)+((offset+8)&Nmask));}
-                        else */unpack64neighbors(q->ne,labelimg,label,offset-(offset&Nmask)+((offset+8)&Nmask));}
-            if (q->sw) {/*if (q->sw< 65536) {patt = q->sw; unpack16neighbors(patt,labelimg,label,(offset+8*N)&N2mask);}
-                        else */unpack64neighbors(q->sw,labelimg,label,(offset+8*N)&N2mask);}
-            if (q->se) {/*if (q->se< 65536) {patt = q->se; unpack16neighbors(patt,labelimg,label,(offset-(offset&Nmask)+((offset+8)&Nmask)+8*N)&N2mask));}
-                        else */unpack64neighbors(q->se,labelimg,label,(offset-(offset&Nmask)+((offset+8)&Nmask)+8*N)&N2mask);}
+            n=8;
+            if (q->nw) {if (q->nw <65536) {patt = q->nw; unpack16neighbors(patt,labelimg,label,offset);}
+                        else unpack64neighbors(q->nw,labelimg,label,offset);}
+            if (q->ne) {if (q->ne< 65536) {patt = q->ne; unpack16neighbors(patt,labelimg,label,offset-(offset&Nmask)+((offset+n)&Nmask));}
+                        else unpack64neighbors(q->ne,labelimg,label,offset-(offset&Nmask)+((offset+n)&Nmask));}
+            if (q->sw) {if (q->sw< 65536) {patt = q->sw; unpack16neighbors(patt,labelimg,label,(offset+n*N)&N2mask);}
+                        else unpack64neighbors(q->sw,labelimg,label,(offset+n*N)&N2mask);}
+            if (q->se) {if (q->se< 65536) {patt = q->se; unpack16neighbors(patt,labelimg,label,(offset-(offset&Nmask)+((offset+n)&Nmask)+n*N)&N2mask);}
+                        else unpack64neighbors(q->se,labelimg,label,(offset-(offset&Nmask)+((offset+n)&Nmask)+n*N)&N2mask);}
         }
     }
     return label;
@@ -1776,27 +1783,36 @@ extern inline void pack49neighbors(uint64_t gol[],uint64_t golp[]) {            
                                                                                   // mask removes bit numbers 16,18,24,26,32,33,36,37,48,49,50,52,53,56,58
 }
 //.......................................................................................................................................................
-extern inline void pack16neighbors(uint64_t wgol[],short unsigned int golp[],int log2n) { // routine to pack 4x4 subarrays of binary square array wgol (nxn) into single words
-    unsigned int ij,ij1,k;                                                           // assuming golp length >= (n*n)>>4, side length of square is n (power of 2)
-    int n = 1 << log2n;
-    int n2 = n*n;
-    for (ij1=0;ij1<(n2>>4);ij1++) golp[ij1]=0;
-    if (n==1) golp[0]=(short unsigned int) (wgol[0]);
-    else if (n==2) golp[0]=(short unsigned int) (wgol[0]+(wgol[1]<<1)+(wgol[2]<<2)+(wgol[3]<<3));
-    else if (n>=4) {
-        for (ij=ij1=0;ij<n2;ij+=4,ij1++) {
-            for(k=0;k<4;k++) golp[ij1] |= (short unsigned int) ((wgol[k*n]+(wgol[k*n+1]<<1)+(wgol[k*n+2]<<2)+(wgol[k*n+3]<<3))<<(k<<2));
-            ij+= ((ij+4)&(n-1)) ? 0 : (4-1)*n;
-        }
+extern inline short unsigned int pack16neighbors(uint64_t wgol[], int log2n) {    // routine to pack up to 4x4 subarray of binary square array wgol (nxn) into single word
+    uint64_t golp;                                                      // assuming side length of square is n (power of 2)
+    if (log2n==0) return((short unsigned int) wgol[0]);
+    else if (log2n==1) return((short unsigned int) (wgol[0]+(wgol[1]<<1)+(wgol[2]<<2)+(wgol[3]<<3)));
+    else if (log2n==2) {
+        golp=0ull;
+        golp |=  (wgol[0]+(wgol[1]<<1)+(wgol[4]<<2)+(wgol[5]<<3));
+        golp |= ((wgol[2]+(wgol[3]<<1)+(wgol[6]<<2)+(wgol[7]<<3))<<4);
+        golp |= ((wgol[8]+(wgol[9]<<1)+(wgol[12]<<2)+(wgol[13]<<3))<<8);
+        golp |= ((wgol[10]+(wgol[11]<<1)+(wgol[14]<<2)+(wgol[15]<<3))<<12);
+        return((short unsigned int) golp);
     }
-    else fprintf(stderr,"pack16neighbours called with not permitted value of n %d\n",n);
+    else {fprintf(stderr,"pack16neighbours called with not permitted value of log2n %d\n",log2n);return(0);}
 }
 //.......................................................................................................................................................
 extern inline void unpack16neighbors(const short unsigned golpw, short unsigned int labelimg[],const unsigned int label,const int offset){
     int k,ij;
-    for(k=0;k<16;k++) {
-        ij = deltaxy(offset,k&0x3,k>>2);
-        labelimg[ij] = (golpw>>k)&0x1 ? label : 0;
+    if (golpw < 2) labelimg[0] = golpw ? label : 0;
+    else if (golpw < 16) {
+        for(k=0;k<4;k++) {
+            ij = deltaxy(offset,k&0x1,k>>1);
+            labelimg[ij] = (golpw>>k)&0x1 ? label : 0;
+        }
+    }
+    else {
+        for(k=0;k<16;k++) {
+            int k1 = k&0x1; int k2 = (k>>1)&0x1;
+            ij = deltaxy(offset,k1+(((k>>2)&0x1)<<1),k2+((k>>3)<<1));
+            labelimg[ij] = (golpw>>k)&0x1 ? label : 0;
+        }
     }
 }
 //.......................................................................................................................................................
@@ -4805,7 +4821,7 @@ int get_quadnodes(quadnode quadnodes[],int narraysize) {
         quadnodes[i].pop1s=quaditems[i].pop1s;
         quadnodes[i].firsttime=quaditems[i].firsttime;
         quadnodes[i].lasttime=quaditems[i].lasttime;
-        quadnodes[i].reserve=quaditems[i].reserve;
+        quadnodes[i].topactivity=quaditems[i].topactivity;
     }
 
     return nallspeciesquad;

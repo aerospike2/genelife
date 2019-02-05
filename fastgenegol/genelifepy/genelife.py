@@ -731,6 +731,10 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     genelife.set_displayoneplane(displayoneplane)
                     if not updatesenabled:
                         updatesenabled=True
+                if colorfunction==9:
+                    ncomponents=genelife.get_connected_comps(connlabel,connlen,-1,-1)
+                    colorgrid()
+                pixeldat = ""
             elif event.type==pg.MOUSEMOTION:
                 if mouseclicked:
                     mouse_pos = pg.mouse.get_pos()
