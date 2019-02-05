@@ -789,8 +789,17 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 for (ij=0; ij<(1<<(d<<1)); ij++) labelcc[(ij&((1<<d)-1)) + (ij>>d)*N] = 0;  // initialize component drawing area to zero in corner
                 if (complist[labelxy].quad) labelimage(complist[labelxy].quad, labelcc, 0xffff, 0);    // extract this component and label it white
                 else labelimage(complist[labelxy].patt, labelcc, 0xffff, 0);                            // component involves patt not quad
+                short unsigned int conn = connlists[labelxy];
+                while(conn) {
+                    for (ij=0; ij<NN2; ij++) if (oldlabel[ij]==connections[conn].oldlab) {
+                        if (labelcc[ij]==0xffff) labelcc[ij]=0xfffd; // color old connected components overlapping pink
+                        else labelcc[ij]=0xfffe;                     // color old connected components not overlapping red
+                    }
+                    conn=connections[conn].next;
+                }
             }
         }
+        
         for (ij=0; ij<NN2; ij++) {
             if (labelcc[ij]) {
                 // quad = (uint64_t) relabel[label[ij]];            // use gene variable simply as label for connected component (no connection with gene)
@@ -806,7 +815,9 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                     else popcount=1;                                // should never occur, but just in case, assume novel
                     if (popcount>1) mask &= (mask&0x3f3f3fff);      // darken non novel components (currently a little too much)
                 }
-                if (labelcc[ij] == 0xffff) mask = 0xffffffffull;      // recolor debug components and components with max label white
+                if (labelcc[ij] == 0xffff) mask = 0xffffffffull;      // recolor selected component white
+                else if (labelcc[ij] == 0xfffd) mask = 0x8080ffffull; // recolor connected old components overlapping with selected component pink
+                else if (labelcc[ij] == 0xfffe) mask = 0x0000ffffull; // recolor connected old components not overlapping with selected component red
                 cgolg[ij] = (int) mask;
             }
             else cgolg[ij] = 0;
