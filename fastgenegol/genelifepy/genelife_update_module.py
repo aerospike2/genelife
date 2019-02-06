@@ -43,7 +43,7 @@ quaddtype=[('hashkey',c_uint64),('nw',c_uint64),('ne',c_uint64),('sw',c_uint64),
 quad_array = npct.ndpointer(dtype=quaddtype, ndim=1, flags=['CONTIGUOUS','ALIGNED'])
 
 # smallpatt type to retrieve smallpatts from C using numpy and ctypes
-smallpattdtype=[('size',c_uint16),('reserve',c_uint16),('activity',c_uint32),('firsttime',c_uint32),('lasttime',c_uint32)]
+smallpattdtype=[('topactivity',c_uint32),('activity',c_uint32),('firsttime',c_uint32),('lasttime',c_uint32)]
 smallpatt_array = npct.ndpointer(dtype=smallpattdtype, ndim=1, flags=['CONTIGUOUS','ALIGNED'])
 
 # load the library, using numpy mechanisms

@@ -156,8 +156,8 @@ int quadcollisions = 0;
 HASHTABLE_SIZE_T const* quadtypes;  // pointer to stored hash table keys (which are the quadtypes)
 quadnode* quaditems;                // list of quadnode structured items stored in hash table
 typedef struct smallpatt {          // stored binary patterns for 4*4 subarrays or smaller (16bit)
-    unsigned short int size;        // side length of square image corresponding to pattern
-    unsigned short int reserve;     // reserved for future use, padding to even number of 64-bit words for record
+    // unsigned short int size;        // side length of square image corresponding to pattern
+    unsigned int topactivity;       // number of references to finding this pattern as top level of connected component
     unsigned int activity;          // number of references to finding this pattern
     unsigned int firsttime;         // first time pattern was identified
     unsigned int lasttime;          // last time pattern was identified
@@ -393,6 +393,13 @@ const uint64_t r1 = 0x1111111111111111ull;
     }                                          /* note that Anderson's algorithm was incorrect, see also profile comparison in standalone lsb64.c */ \
 }                                              /* this macro calculates the LSB 1 (ie from the bottom) not the MSB 1 (ie from the top) that the integer log function finds. */
 //----------------------------------------------------- list of subroutines -----------------------------------------------------------------------------
+// integerSrt           direct bit processing algorithm to implement integer sqrt (largest integer smaller than sqrt) : but floating point sqrt is faster
+// log2r                fast integer logarithm working only for arguments which are powers of 2 (not used but slightly faster than log2a when applicable)
+// log2lower            fast integer logarithm working for all integers : largest integer smaller than or equal to logarithm base 2 of argument
+// log2upper            fast integer logarithm working for all integers : smallest integer larger than or equal to logarithm base 2 of argument
+// sqrtupper            fast integer sqrt working for all integers : smallest integer larger than or equal to sqrt of argument
+//.......................................................................................................................................................
+// set_color            inline function to assign rainbow colors
 // colorgenes1          colour genes specified as input parameters
 // colorgenes           colour genes specified at current time point
 //.......................................................................................................................................................
@@ -414,7 +421,9 @@ const uint64_t r1 = 0x1111111111111111ull;
 // patt_hash            hash function for a pattern specified by 4 64-bit (8x8) patterns
 // newkey               assign one of free keys kept in a linked list, allocated 1024 at a time (used if hash-key already occupied with different quadtree)
 // node_hash            hash function for a node specified by 4 64-bit pointers
-// hash_patt_find       find quadtree hash for pattern (leaf of quadtree consists of 4 64bit integers defining a 16x16 pixel array)
+// hash_patt16_store      store new pattern in small pattern table
+// hash_patt16_find       find quadtree hash for pattern (leaf of quadtree consists of 4 64bit integers defining a 16x16 pixel array)
+// hash_node_store      store new node with hashkey h and subnodes nw,ne,sw,se in hash table
 // hash_node_find       find quadtree hash for node (node is specified by its four quadrant pointers (64 bit))
 // quadimage            construct quadtree for an entire image or connected component, reporting if the image has been found previously, returning hashkey
 // labelimage           rebuild image in a chosen label array from quadimage at chosen offset with chosen label
@@ -509,8 +518,8 @@ const uint64_t r1 = 0x1111111111111111ull;
 // get_sorted_popln_act return sorted population and activities (sorted by current population numbers)
 // delay                time delay in ms for graphics
 // printxy              terminal screen print of array on xterm
-//--------------------------------------------------------------------------------------------------------------------------------------------------------
-//------------------------------------------------------- colorgenes -------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------------------------------------------
+//--------------------------------------------------------------- colorgenes ----------------------------------------------------------------------------
 extern inline int integerSqrt(int n) {                  // the largest integer smaller than the square root of n (n>=0)
     int shift,nShifted,result,candidateResult;
     // only works for n >= 0;
@@ -535,9 +544,8 @@ extern inline int integerSqrt(int n) {                  // the largest integer s
     }
     return result;
 }
-
-extern inline unsigned int mylog2r(unsigned int v)// find the log2 of v = power of 2, warning wrong answers for v not power of 2
-{
+//.......................................................................................................................................................
+extern inline unsigned int log2r(unsigned int v) { // find the log2 of v = power of 2, warning wrong answers for v not power of 2
     // From:  https://graphics.stanford.edu/~seander/bithacks.html#IntegerLog
     static const unsigned int b[] = {0xAAAAAAAA, 0xCCCCCCCC, 0xF0F0F0F0,
                                      0xFF00FF00, 0xFFFF0000};
@@ -548,9 +556,11 @@ extern inline unsigned int mylog2r(unsigned int v)// find the log2 of v = power 
     r |= ((v & b[1]) != 0) << 1;
     return(r);
 }
+//.......................................................................................................................................................
+extern inline unsigned int log2lower(unsigned int v) { // find the integer log2 of v (lower): works for all 32 bit integer v > 0
+// Adapted by John McCaskill starting from the power of two version at https://graphics.stanford.edu/~seander/bithacks.html#IntegerLog
+// log2upper uses the fact that this routine gives log2lower(0)=0
 
-extern inline unsigned int mylog2a(unsigned int v)// find the integer log2 of v : works for all 32 bit integer v > 0
-{// Adapted by John McCaskill starting from the power of two version at https://graphics.stanford.edu/~seander/bithacks.html#IntegerLog
     static const unsigned int b[] = {0xAAAAAAAA, 0xCCCCCCCC, 0xF0F0F0F0,
                                      0xFF00FF00, 0xFFFF0000};
     register int k = 4;
@@ -563,9 +573,18 @@ extern inline unsigned int mylog2a(unsigned int v)// find the integer log2 of v 
 
     return(r);
 }
+//.......................................................................................................................................................
+extern inline unsigned int log2upper(unsigned int v) { // find the integer log2 of v (upper): works for all 32 bit integer v > 0
 
-extern inline void setcolor(unsigned int *color,int n) // for coloring by quad size...
-{
+    return v ? 1 + log2lower(v-1) : 0;              // assuming as in this implementation that log2lower(0) == 0
+}
+//.......................................................................................................................................................
+extern inline unsigned int sqrtupper(unsigned int v) { // smallest integer larger than or equal to sqrt of argument
+
+    return v ? 1 + (int) sqrt(v-1) : 0;
+}
+//.......................................................................................................................................................
+extern inline void setcolor(unsigned int *color,int n) { // for coloring by quad size...
     // rainbow colors from running rainbow(8) in R : last two are repeats to avoid crash for log2N > 9
     static const unsigned int rainbow[]={0x7F0000FF, 0x7F7F00FF, 0x007F00FF, 0xFF0000FF, 0xFFFF00FF, 0x00FF00FF, 0x00FFFFFF, 0x0000FFFF, 0xFF00FFFF, 0xFF00FFFF, 0xFF00FFFF};
     unsigned int mycol;
@@ -574,7 +593,7 @@ extern inline void setcolor(unsigned int *color,int n) // for coloring by quad s
     color[1] = (mycol & 0xff0000) >> 4;   // G
     color[2] = (mycol & 0xff00) >> 2;     // B
 }
-
+//.......................................................................................................................................................
 void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2) {
     uint64_t gene, gdiff, g2c, mask, quad;
     int ij,k,activity,popcount,labelxy;
@@ -786,9 +805,6 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
             if ((labelxy=label[xdisplay+ydisplay*N])) {
                 for (ij=0; ij<NN2; ij++) if (label[ij]==complist[labelxy].label) labelcc[ij]=0xffff;    // label chosen component white at its current location
                 d=complist[labelxy].log2n;
-                for (ij=0; ij<(1<<(d<<1)); ij++) labelcc[(ij&((1<<d)-1)) + (ij>>d)*N] = 0;  // initialize component drawing area to zero in corner
-                if (complist[labelxy].quad) labelimage(complist[labelxy].quad, labelcc, 0xffff, 0);    // extract this component and label it white
-                else labelimage(complist[labelxy].patt, labelcc, 0xffff, 0);                            // component involves patt not quad
                 short unsigned int conn = connlists[labelxy];
                 while(conn) {
                     for (ij=0; ij<NN2; ij++) if (oldlabel[ij]==connections[conn].oldlab) {
@@ -797,6 +813,9 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                     }
                     conn=connections[conn].next;
                 }
+                for (ij=0; ij<(1<<(d<<1)); ij++) labelcc[(ij&((1<<d)-1)) + (ij>>d)*N] = 0;  // initialize component drawing area to zero in top left corner
+                if (complist[labelxy].quad) labelimage(complist[labelxy].quad, labelcc, 0xffff, 0); // extract this component and label it white
+                else labelimage(complist[labelxy].patt, labelcc, 0xffff, 0);  // component involves patt not quad
             }
         }
         
@@ -816,7 +835,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                     if (popcount>1) mask &= (mask&0x3f3f3fff);      // darken non novel components (currently a little too much)
                 }
                 if (labelcc[ij] == 0xffff) mask = 0xffffffffull;      // recolor selected component white
-                else if (labelcc[ij] == 0xfffd) mask = 0x8080ffffull; // recolor connected old components overlapping with selected component pink
+                else if (labelcc[ij] == 0xfffd) mask = 0xc0c0ffffull; // recolor connected old components overlapping with selected component pink
                 else if (labelcc[ij] == 0xfffe) mask = 0x0000ffffull; // recolor connected old components not overlapping with selected component red
                 cgolg[ij] = (int) mask;
             }
@@ -834,8 +853,11 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                     mask |= 0x080808ffull;                              // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
                 }
                 else if (activity_size_colormode == 1) {                // color by log2n, enclosing square size
-                    if(acttraceqt[ij] && (q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL) d = mylog2a((unsigned int) q->size);
-                    else if (!acttraceqt[ij] && quad<65536ull && smallpatts[quad].activity) d = mylog2a((unsigned int) smallpatts[quad].size);
+                    if(acttraceqt[ij] && (q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL) d = log2upper((unsigned int) q->size);
+                    else if (!acttraceqt[ij] && quad<65536ull && smallpatts[quad].activity) {
+                        if (quad) d = log2upper(sqrtupper((int) quad));
+                        else d = 0;
+                    }
                     else {fprintf(stderr,"quad pattern not found in colorfunction for activities\n");d=0;}
                     if(d>log2N){fprintf(stderr,"Error in colorfunction 10, size error %d\n",d);d=0;}
                     setcolor(color,d);
@@ -843,8 +865,8 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 }
                 else {                                                  // color by sqrt of nr of live pixels (up to max value of 255)
                     int popmax = 255;
-                    if(acttraceqt[ij] && (q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL) popcount = (int) sqrt((int) q->pop1s);
-                    else if (!acttraceqt[ij] && quad<65536ull && smallpatts[quad].activity) { POPCOUNT64C((uint64_t) quad,popcount); popcount = (int) sqrt((double) popcount);}
+                    if(acttraceqt[ij] && (q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL) popcount = sqrtupper((int) q->pop1s);
+                    else if (!acttraceqt[ij] && quad<65536ull && smallpatts[quad].activity) { POPCOUNT64C((uint64_t) quad,popcount); popcount = (int) sqrtupper(popcount);}
                     else {fprintf(stderr,"quad pattern not found in colorfunction for activities\n");popcount=0;}
                     // fprintf(stderr,"step %d ij %d popcount %d\n",totsteps,ij,popcount);
                     if(popcount>popmax) popcount=popmax;
@@ -862,11 +884,11 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
 void colorgenes(int cgolg[], int NN2) {
     colorgenes1(gol, golg, golgstats, cgolg, NN2);
 }
-//-------------------------------------------------------- randprob ------------------------------------------------------------
+//------------------------------------------------------------- randprob --------------------------------------------------------------------------------
 extern inline uint64_t randprob(unsigned int uprob, unsigned int randnr) {
     return(randnr < uprob ? 1ull : 0ull);
 }
-//------------------------------------------------------- selectone ------------------------------------------------------------
+//------------------------------------------------------------- selectone -------------------------------------------------------------------------------
 extern inline void selectone_of_2(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene, unsigned int kch) {
 // birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene. Non-random result.
     unsigned int k,d0,d1,d2,d3,dd,swap;                  // number of ones in various gene combinations
@@ -1122,7 +1144,7 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
         *nbmask |= ((bestnbmask>>k)&0x1ull)<<((nb1i>>(k<<2))&0x7);
     return(nbest);
 }
-//------------------------------------------------------- selectone_nbs -------------------------------------------------------------------------------------
+//------------------------------------------------------------- selectone_nbs ---------------------------------------------------------------------------
 extern inline void selectone_nbs(int s, uint64_t nb2i, int nb[], uint64_t gol[], uint64_t golg[], uint64_t * birth, uint64_t *newgene) {
 // birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene.
     int k, kanc, l, nb1[8], ij1, i1, j1, j1p1, j1m1, i1p1, i1m1;
@@ -1161,13 +1183,13 @@ extern inline void selectone_nbs(int s, uint64_t nb2i, int nb[], uint64_t gol[],
         *newgene = golg[nb[(nb2i>>(kanc<<2))&0x7]];
     }
 }
-//------------------------------------------------------- selectdifft0 -------------------------------------------------------------------------------------
+//-------------------------------------------------------------- selectdifft0 ---------------------------------------------------------------------------
 extern inline unsigned int selectdifft0(uint64_t nbmask, int *crot, int *kodd) {
     *kodd = 0;
     *crot = 0;
     return(0);                                               // replication of live nb in bit 0 of canonical rotation
 }
-//------------------------------------------------------- selectdifft1 -------------------------------------------------------------------------------------
+//-------------------------------------------------------------- selectdifft1 ---------------------------------------------------------------------------
 extern inline unsigned int selectdifft1(uint64_t nbmask, int *crot, int *kodd) {
 // selection based on canonical rotation
     int k,kmin;
@@ -1330,7 +1352,7 @@ extern inline unsigned int selectdifft6(uint64_t nbmask, int *crot, int *kodd) {
     if (canonical) return(kmin);                                      // replication of live neigbour in bit 0 of canonical rotation
     else return((kmin+k)&0x7);                                        // rotate unique nb k left (kmin) back to orig nb pat
 }
-//...................................................................................................................................................
+//.......................................................................................................................................................
 extern inline unsigned int selectdifft7(uint64_t nbmask, int *crot, int *kodd) {
 // selection based on canonical rotation
     int k,kmin;
@@ -1348,7 +1370,7 @@ extern inline unsigned int selectdifft7(uint64_t nbmask, int *crot, int *kodd) {
     if (canonical) return(kmin);                            // replication of live nb in bit 0 of canonical rotation
     else  return((kmin+3)&0x7);                             // replication of live nb in bit 3 (middle) of canonical rotation
 }
-//...................................................................................................................................................
+//.......................................................................................................................................................
 extern inline unsigned int selectdifft(int sum, uint64_t nbmask, int *crot, int *kodd, int *nsame) {
         int kch;
         *nsame = 0;
@@ -1372,7 +1394,7 @@ extern inline unsigned int selectdifft(int sum, uint64_t nbmask, int *crot, int 
                     default: return(0);
         }
 }
-//...................................................................................................................................................
+//.......................................................................................................................................................
 extern inline uint64_t disambiguate(unsigned int kch, uint64_t nb1i, int nb[], uint64_t golg[], int nsame, uint64_t *birth, uint64_t randnr) {
     uint64_t gene,newgene;
     unsigned int d,dmin;
@@ -1405,7 +1427,7 @@ extern inline uint64_t disambiguate(unsigned int kch, uint64_t nb1i, int nb[], u
                  return(0ull);
     }
 }
-//------------------------------------------------------- hash gene inline fns ----------------------------------------------------------------------
+//------------------------------------------------------------ hash gene inline fns ---------------------------------------------------------------------
 extern inline void hashaddgene(uint64_t gene,uint64_t ancestor) {
     genedata gdata;
     if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
@@ -1478,32 +1500,123 @@ extern inline uint64_t patt_hash(const uint64_t a, const uint64_t b, const uint6
     return r ;
 }
 //.......................................................................................................................................................
-// now not used : could use instead of patt_hash for hash_node_find
+extern inline quadnode * hash_patt8_store(const uint64_t h, const uint64_t patt) {
+    int nr1;
+    quadinit.hashkey = h;
+    quadinit.isnode=0;
+    quadinit.nw=patt;
+    quadinit.ne=0;
+    quadinit.sw=0;
+    quadinit.se=0;
+    quadinit.size= 8;
+    quadinit.firsttime=totsteps;
+    quadinit.lasttime=totsteps;
+    POPCOUNT64C(patt,nr1);
+    quadinit.pop1s =nr1;
+    hashtable_insert(&quadtable, h,(quadnode *) &quadinit);
+    return (quadnode *) hashtable_find(&quadtable, h);
+}
+//.......................................................................................................................................................
+extern inline void hash_patt4_find(const short unsigned int patt) {
+
+    if(smallpatts[patt].activity) {                                         // pattern found
+        smallpatts[patt].activity++;
+        smallpatts[patt].lasttime=totsteps;
+    }
+    else {                                                                  // store new pattern
+        // smallpatts[patt].size=log2upper(patt);
+        smallpatts[patt].activity++;
+        smallpatts[patt].firsttime=totsteps;
+        smallpatts[patt].lasttime=totsteps;
+    }
+}
+//.......................................................................................................................................................
+extern inline quadnode * hash_patt8_find(const uint64_t patt) {
+        quadnode *q;
+        uint64_t h,npatt;
+        short unsigned int nw,ne,sw,se;
+        const uint64_t randomizer = 11400714819323198549ull;
+
+        h = patt_hash(patt,patt+1,patt+2,patt+3);
+        if((q = (quadnode *) hashtable_find(&quadtable, h)) != NULL) {
+                                                        // check if pattern found in hash table is correct
+            if( patt == q->nw &&  0ull == q->ne && 0ull == q->sw && 0ull ==q->se && !q->isnode) {
+                q->activity++;q->lasttime=totsteps;
+            }
+            else {                                      // collision in hash table at leaf level
+                npatt=patt*randomizer;
+                h = patt_hash(npatt,npatt+1,npatt+2,npatt+3);
+                if((q = (quadnode *) hashtable_find(&quadtable, h)) != NULL) {
+                                                        // check if pattern found in hash table is correct
+                    if( patt == q->nw &&  0ull == q->ne && 0ull == q->sw && 0ull ==q->se && !q->isnode) {
+                        q->activity++;q->lasttime=totsteps;
+                    }
+                    else {                                      // collision in hash table at 8-leaf level
+                        quadcollisions++;
+                        fprintf(stderr,"at %d quadhash 2ndary 8-pattern collision %llx hash %llx collides with %llx %llx %llx %llx\n",
+                                totsteps,patt,h,q->nw,q->ne,q->sw,q->se);
+                    }
+                }
+                else {                                           // new node or pattern, save in hash table
+                    q = hash_patt8_store(h,patt);
+                }
+            }
+        }
+        else {                                           // new node or pattern, save in hash table
+            q = hash_patt8_store(h,patt);
+        }
+        nw = patt & 0xffff;ne = (patt>>16) & 0xffff;sw = (patt>>32) & 0xffff; se = (patt>>48) & 0xffff;
+        if(nw) hash_patt4_find(nw);if(ne) hash_patt4_find(ne);   // find or store 8x8 64-bit subpatterns, updating activities and lasttime
+        if(sw) hash_patt4_find(sw);if(se) hash_patt4_find(se);   // store if new, otherwise update
+        return(q);
+}
+//.......................................................................................................................................................
 extern inline uint64_t node_hash(const uint64_t a, const uint64_t b, const uint64_t c, const uint64_t d) {
+// now not used : could use instead of patt_hash for hash_node_find
    uint64_t r = (65537*(d)+257*(c)+17*(b)+5*(a));
    r += (r >> 11);
    return r ;
 }
 //.......................................................................................................................................................
-extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, const uint64_t sw, const uint64_t se) {
-        quadnode *q;
+extern inline quadnode * hash_patt16_store(const uint64_t h, const uint64_t nw, const uint64_t ne, const uint64_t sw, const uint64_t se) {
+    int nr1,nr1s;
+    quadinit.hashkey = h;
+    quadinit.isnode=0;
+    quadinit.nw=nw;
+    quadinit.ne=ne;
+    quadinit.sw=sw;
+    quadinit.se=se;
+    quadinit.size= 16;
+    quadinit.firsttime=totsteps;
+    quadinit.lasttime=totsteps;
+    POPCOUNT64C(nw,nr1);nr1s=nr1;
+    POPCOUNT64C(ne,nr1);nr1s+=nr1;
+    POPCOUNT64C(sw,nr1);nr1s+=nr1;
+    POPCOUNT64C(se,nr1);nr1s+=nr1;
+    quadinit.pop1s =nr1s;
+    hashtable_insert(&quadtable, h,(quadnode *) &quadinit);
+    return (quadnode *) hashtable_find(&quadtable, h);
+}
+//.......................................................................................................................................................
+extern inline quadnode * hash_patt16_find(const uint64_t nw, const uint64_t ne, const uint64_t sw, const uint64_t se) {
+        quadnode *q,*q8;
         uint64_t h,nnw,nne,nsw,nse;
-        int nr1,nr1s;
+        const uint64_t randomizer = 11400714819323198549ull;
+
         h = patt_hash(nw,ne,sw,se);
         if((q = (quadnode *) hashtable_find(&quadtable, h)) != NULL) {
                                                         // check if pattern found in hash table is correct
             if( nw == q->nw &&  ne == q->ne && sw == q->sw && se ==q->se && !q->isnode) {
                 q->activity++;q->lasttime=totsteps;
-                // Still need to update activities of 4 subpatterns if non-zero !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             }
             else {                                      // collision in hash table at leaf level
                 // quadcollisions++;
                 // fprintf(stderr,"at %d quadhash pattern collision %llx %llx %llx %llx hash %llx collides %llx %llx %llx %llx\n",
                 //    totsteps,nw,ne,sw,se,h,q->nw.patt,q->ne.patt,q->sw.patt,q->se.patt);
-                nnw=nw*11400714819323198549ull;
-                nne=ne*11400714819323198549ull;
-                nsw=sw*11400714819323198549ull;
-                nse=se*11400714819323198549ull;
+                nnw=nw*randomizer;
+                nne=ne*randomizer;
+                nsw=sw*randomizer;
+                nse=se*randomizer;
                 h = patt_hash(nnw,nne,nsw,nse);
                 if((q = (quadnode *) hashtable_find(&quadtable, h)) != NULL) {
                                                         // check if pattern found in hash table is correct
@@ -1517,63 +1630,60 @@ extern inline quadnode * hash_patt_find(const uint64_t nw, const uint64_t ne, co
                     }
                 }
                 else {                                           // new node or pattern, save in hash table
-                    quadinit.hashkey = h;
-                    quadinit.isnode=0;
-                    quadinit.nw=nw;
-                    quadinit.ne=ne;
-                    quadinit.sw=sw;
-                    quadinit.se=se;
-                    quadinit.size= (ne || sw || se) ? 16 : 16;//8;
-                    quadinit.firsttime=totsteps;
-                    quadinit.lasttime=totsteps;
-                    POPCOUNT64C(nw,nr1);nr1s=nr1;
-                    POPCOUNT64C(ne,nr1);nr1s+=nr1;
-                    POPCOUNT64C(sw,nr1);nr1s+=nr1;
-                    POPCOUNT64C(se,nr1);nr1s+=nr1;
-                    quadinit.pop1s =nr1s;
-                    hashtable_insert(&quadtable, h,(quadnode *) &quadinit);
-                    q = (quadnode *) hashtable_find(&quadtable, h);
+                    q = hash_patt16_store(h,nw,ne,sw,se);
                 }
             }
         }
         else {                                           // new node or pattern, save in hash table
-            quadinit.hashkey = h;
-            quadinit.isnode=0;
-            quadinit.nw=nw;
-            quadinit.ne=ne;
-            quadinit.sw=sw;
-            quadinit.se=se;
-            quadinit.size= (ne || sw || se) ? 16 : 16;//8;
-            quadinit.firsttime=totsteps;
-            quadinit.lasttime=totsteps;
-            POPCOUNT64C(nw,nr1);nr1s=nr1;
-            POPCOUNT64C(ne,nr1);nr1s+=nr1;
-            POPCOUNT64C(sw,nr1);nr1s+=nr1;
-            POPCOUNT64C(se,nr1);nr1s+=nr1;
-            quadinit.pop1s =nr1s;
-            hashtable_insert(&quadtable, h,(quadnode *) &quadinit);
-            q = (quadnode *) hashtable_find(&quadtable, h);
+            q = hash_patt16_store(h,nw,ne,sw,se);
         }
+        if(nw) q8 = hash_patt8_find(nw);if(ne) q8 = hash_patt8_find(ne);   // find or store 8x8 64-bit subpatterns, updating activities and lasttime
+        if(sw) q8 = hash_patt8_find(sw);if(se) q8 = hash_patt8_find(se);   // store if new, otherwise update
         return(q);
+}
+//.......................................................................................................................................................
+extern inline quadnode * hash_node_store(uint64_t h, uint64_t nw, uint64_t ne, uint64_t sw, uint64_t se) {
+    quadnode *q;
+    quadinit.hashkey = h;
+    quadinit.isnode=1;
+    quadinit.nw=nw;quadinit.ne=ne;quadinit.sw=sw;quadinit.se=se;
+    quadinit.firsttime=totsteps;quadinit.lasttime=totsteps;
+    quadinit.pop1s=0;quadinit.size=0;                           // incremented below
+    quadinit.activity=1;quadinit.topactivity=0;                 // incremented only in quadimage at top level
+    
+    if (nw) {
+        if ((q = (quadnode *) hashtable_find(&quadtable, nw)) == NULL) fprintf(stderr,"Error nw node not found in hashtable.\n");
+        else {quadinit.pop1s+=q->pop1s;quadinit.size=q->size<<1;}
+    }
+    if (ne) {
+        if ((q = (quadnode *) hashtable_find(&quadtable, ne)) == NULL) fprintf(stderr,"Error ne node not found in hashtable.\n");
+        else {quadinit.pop1s+=q->pop1s;quadinit.size=q->size<<1;}
+    }
+    if (sw) {
+        if((q = (quadnode *) hashtable_find(&quadtable, sw)) == NULL) fprintf(stderr,"Error sw node not found in hashtable.\n");
+        else {quadinit.pop1s+=q->pop1s;quadinit.size=q->size<<1;}
+    }
+    if (se) {
+        if((q = (quadnode *) hashtable_find(&quadtable, se)) == NULL) fprintf(stderr,"Error se node not found in hashtable.\n");
+        else {quadinit.pop1s+=q->pop1s;quadinit.size=q->size<<1;}
+    }
+    
+    hashtable_insert(&quadtable, h,(quadnode *) &quadinit);
+    return (quadnode *) hashtable_find(&quadtable, h);
 }
 //.......................................................................................................................................................
 extern inline quadnode * hash_node_find(const uint64_t nw, const uint64_t ne, const uint64_t sw, const uint64_t se) {
                                                                 // should only be called if arguments are hashtable keys, not bit patterns
-        quadnode *q,*qnw,*qne,*qsw,*qse;
+        quadnode *q;
         uint64_t h,nnw,nne,nsw,nse;
+    
         h = node_hash(nw,ne,sw,se);                             // alternatively use patt_hash : but this is optimized for 64 bit keys (unlikely to have 0 or low values)
         if((q = (quadnode *) hashtable_find(&quadtable, h)) != NULL) {
             if(nw == q->nw && ne == q->ne && sw == q->sw && se == q->se && q->isnode) { // node found in hash table
                 q->activity++;q->lasttime=totsteps;
                 // Still need to update activities of 4 subnodes if non-zero !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                /* fprintf(stderr,"at %d quadhash node repeat %llx %llx %llx %llx hash %llx\n", totsteps,
-                    (uint64_t) nw,(uint64_t) ne,(uint64_t) sw,(uint64_t) se,(uint64_t) h);  // simple recording for now, later do chaining or whatever */
             }
             else {                                              // collision in hash table at node level
-                // quadcollisions++;
-                // fprintf(stderr,"at %d quadhash node collision %llx %llx %llx %llx hash %llx collides %llx %llx %llx %llx\n", totsteps,
-                //     (uint64_t) nw,(uint64_t) ne,(uint64_t) sw,(uint64_t) se,(uint64_t) h,
-                //     (uint64_t) q->nw.node, (uint64_t) q->ne.node, (uint64_t) q->sw.node, (uint64_t) q->se.node);  // simple recording for now, later do chaining or whatever
                 nnw=nw * 11400714819323198549ull;
                 nne= ne * 11400714819323198549ull;
                 nsw=(uint64_t) sw * 11400714819323198549ull;
@@ -1590,73 +1700,11 @@ extern inline quadnode * hash_node_find(const uint64_t nw, const uint64_t ne, co
                                  nw, ne, sw, se, h, q->nw, q->ne,  q->sw, q->se);  // simple recording for now, later do further chaining or whatever
                     }
                 }
-                else {                                           // new node, save in hash table
-                    quadinit.hashkey = h;
-                    quadinit.isnode=1;
-                    quadinit.nw=nw;
-                    quadinit.ne=ne;
-                    quadinit.sw=sw;
-                    quadinit.se=se;
-                    quadinit.firsttime=totsteps;
-                    quadinit.lasttime=totsteps;
-                    quadinit.pop1s=0;                            // incremented below
-                    quadinit.size=0;                             // incremented below
-                    quadinit.activity=1;
-                    quadinit.topactivity=0;                      // incremented only in quadimage at top level
-                    if (nw) {
-                        if((qnw = (quadnode *) hashtable_find(&quadtable, nw)) == NULL) fprintf(stderr,"Error nw node not found in hashtable.\n");
-                        else {quadinit.pop1s+=qnw->pop1s;quadinit.size=qnw->size<<1;}
-                    }
-                    if (ne) {
-                        if ((qne = (quadnode *) hashtable_find(&quadtable, ne)) == NULL) fprintf(stderr,"Error ne node not found in hashtable.\n");
-                        else {quadinit.pop1s+=qne->pop1s;quadinit.size=qne->size<<1;}
-                    }
-                    if (sw) {
-                        if((qsw = (quadnode *) hashtable_find(&quadtable, sw)) == NULL) fprintf(stderr,"Error sw node not found in hashtable.\n");
-                        else {quadinit.pop1s+=qsw->pop1s;quadinit.size=qsw->size<<1;}
-                    }
-                    if (se) {
-                        if((qse = (quadnode *) hashtable_find(&quadtable, se)) == NULL) fprintf(stderr,"Error se node not found in hashtable.\n");
-                        else {quadinit.pop1s+=qse->pop1s;quadinit.size=qse->size<<1;}
-                    }
-                    hashtable_insert(&quadtable, h,(quadnode *) &quadinit);
-                    q = (quadnode *) hashtable_find(&quadtable, h);
-                    // fprintf(stderr,"step %d quadhash node stored %llx %llx %llx %llx hash %llx\n", totsteps, nw, ne, sw, se, h);
-                }
+                else q=hash_node_store(h,nw,ne,sw,se);          // new node, save in hash table
             }
         }
-        else {                                                  // new node, save in hash table
-            quadinit.hashkey = h;
-            quadinit.isnode=1;
-            quadinit.nw=nw;
-            quadinit.ne=ne;
-            quadinit.sw=sw;
-            quadinit.se=se;
-            quadinit.firsttime=totsteps;
-            quadinit.lasttime=totsteps;
-            quadinit.pop1s=0;
-            quadinit.activity=1;
-            quadinit.topactivity=0;
-            if (nw) {
-                if((qnw = (quadnode *) hashtable_find(&quadtable, nw)) == NULL) fprintf(stderr,"Error nw node not found in hashtable.\n");
-                else {quadinit.pop1s+=qnw->pop1s;quadinit.size=qnw->size<<1;}
-            }
-            if (ne) {
-                if ((qne = (quadnode *) hashtable_find(&quadtable, ne)) == NULL) fprintf(stderr,"Error ne node not found in hashtable.\n");
-                else {quadinit.pop1s+=qne->pop1s;quadinit.size=qne->size<<1;}
-            }
-            if (sw) {
-                if((qsw = (quadnode *) hashtable_find(&quadtable, sw)) == NULL) fprintf(stderr,"Error sw node not found in hashtable.\n");
-                else {quadinit.pop1s+=qsw->pop1s;quadinit.size=qsw->size<<1;}
-            }
-            if (se) {
-                if((qse = (quadnode *) hashtable_find(&quadtable, se)) == NULL) fprintf(stderr,"Error se node not found in hashtable.\n");
-                else {quadinit.pop1s+=qse->pop1s;quadinit.size=qse->size<<1;}
-            }
-            hashtable_insert(&quadtable, h,(quadnode *) &quadinit);
-            q = (quadnode *) hashtable_find(&quadtable, h);
-            // fprintf(stderr,"step %d quadhash node stored %llx %llx %llx %llx hash %llx\n", totsteps, nw, ne, sw, se, h);
-        }
+        else q=hash_node_store(h,nw,ne,sw,se);                  // new node, save in hash table
+
         return(q);
 }
 //.......................................................................................................................................................
@@ -1673,22 +1721,14 @@ uint64_t quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {       
     if(n<16) {                                                                      // n < 16
         if (n==8) {                                                                 // n == 8
             pack64neighbors(gol,golp,log2n);
-            golq[0]=hash_patt_find(golp[0],0ull,0ull,0ull);
+            golq[0]=hash_patt8_find(golp[0]);
             golq[0]->topactivity++;
             return(golq[0]->hashkey);
         }
         else {                                                                      // n == 4,2,1   use smallpatts array to store patterns (more efficient than continued quadtree)
             *patt=pack16neighbors(gol,log2n);
-            if(smallpatts[*patt].activity) {                                       // pattern found
-                smallpatts[*patt].activity++;
-                smallpatts[*patt].lasttime=totsteps;
-            }
-            else {                                                                  // store new pattern
-                smallpatts[*patt].size=n;
-                smallpatts[*patt].activity++;
-                smallpatts[*patt].firsttime=totsteps;
-                smallpatts[*patt].lasttime=totsteps;
-            }
+            hash_patt4_find(*patt);
+            smallpatts[*patt].topactivity++;
             return 0ull;                                                            // in this case image key is returned in *patt rather than quad key
         }
     }
@@ -1698,7 +1738,7 @@ uint64_t quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {       
         // for(ij=0;ij<n3*n3;ij++) { if (ij%8 == 0) fprintf(stderr,"\n step %d ij %d",totsteps,ij);fprintf(stderr," %llx ",golp[ij]);} fprintf(stderr,"\n");
         quadtable.expansion_frozen = 1;                                             // freeze quad hash table against expansion ( to ensure valid pointers during array ops)
         for (ij=ij1=0;ij<n3*n3;ij+=2,ij1++) {                                       //  hash all 16x16 patterns (2x2 of golp words) found as leaves of the quadtree
-            golq[ij1]=hash_patt_find(golp[ij],golp[ij+1],golp[(ij+n3)],golp[(ij+n3)+1]); // hash_patt_find(nw,ne,sw,se) adds quad leaf entry if pattern not found
+            golq[ij1]=hash_patt16_find(golp[ij],golp[ij+1],golp[(ij+n3)],golp[(ij+n3)+1]); // hash_patt16_find(nw,ne,sw,se) adds quad leaf entry if pattern not found
             ij+= ((ij+2)&(n3-1)) ? 0 : n3;                                          // skip odd rows since these are the northern parts of quads generated on even rows
         }
 
@@ -1745,7 +1785,7 @@ int labelimage(uint64_t hashkeypatt, short unsigned int labelimg[], short unsign
     }
     return label;
 }
-//------------------------------------------------------- pack012,3neighbors -------------------------------------------------------------------------------
+//----------------------------------------------------------- pack012,3neighbors ------------------------------------------------------------------------
 #define deltaxy(ij,x,y)  ((ij - (ij&Nmask) + (((ij+(x))&Nmask) + (y)*N)) & N2mask)
 #define deltaxyn(ij,x,y,log2n)  ((ij - (ij&((1<<log2n)-1)) + (((ij+(x))&Nmask) + (y)*N)) & N2mask)
 //.......................................................................................................................................................
@@ -1908,10 +1948,10 @@ extern inline void packandcompare(uint64_t newgol[],uint64_t working[],uint64_t 
         }
     }
 }
-//------------------------------------------------------- connected component labelling ---------------------------------------------------------------
+//----------------------------------------------------------- connected component labelling -------------------------------------------------------------
+extern inline short unsigned int lab_union(equivrec eqv[], short unsigned int i, short unsigned int j) {
 // Combine two trees containing node i and j. Union by rank with halving - see https://en.wikipedia.org/wiki/Disjoint-set_data_structure
 // Return the root of union tree in equivalence relation's disjoint union-set forest
-extern inline short unsigned int lab_union(equivrec eqv[], short unsigned int i, short unsigned int j) {
     short unsigned int root = i;
     while (eqv[root].pt<root) {
         eqv[root].pt = eqv[eqv[root].pt].pt;        // halving algorithm to compress path on the fly
@@ -2028,7 +2068,6 @@ extern inline short unsigned int label_cell(int ij,short unsigned int *nlabel) {
     return labelij;
 }
 //.......................................................................................................................................................
-// Check labels
 void checklabels(equivrec eqv[],unsigned short int *nlabel) {
     short unsigned int xlabel = 0;
     short unsigned int i;
@@ -2041,8 +2080,8 @@ void checklabels(equivrec eqv[],unsigned short int *nlabel) {
     if (xlabel) fprintf(stderr,"Error for %d cases\n",xlabel);
 }
 //.......................................................................................................................................................
-// Flatten the Union-Find tree and relabel the components.
 void flattenlabels(equivrec eqv[],unsigned short int *nlabel) {
+// Flatten the Union-Find tree and relabel the components.
     short unsigned int xlabel = 1;
     short unsigned int i;
     for (i = 1; i <= *nlabel; i++) {
@@ -2056,8 +2095,8 @@ void flattenlabels(equivrec eqv[],unsigned short int *nlabel) {
     *nlabel = xlabel-1;
 }
 //.......................................................................................................................................................
-// fast component labelling, updating global equivalence table equiv and placing labels in global array label, return number of labels
 short unsigned int label_components(uint64_t gol[]) {
+// fast component labelling, updating global equivalence table equiv and placing labels in global array label, return number of labels
     int i,ij,sum,maxoverlap,overallmaxoverlap;              //   abc   scan mask to calculate label at position e
     short unsigned int nlabel = 0;                          //   de
     short unsigned int oldnlabel;                           //   with lapmod need also: ret
@@ -2471,7 +2510,7 @@ short unsigned int extract_components(uint64_t gol[]) {
 
     return nlabel;
 }
-//------------------------------------------------------- geography -----------------------------------------------------------------------------------
+//----------------------------------------------------------------- geography ---------------------------------------------------------------------------
 void v_scroll(uint64_t newgol[],uint64_t newgolg[]) {
     int ij,scroll_needed;
 
@@ -2577,7 +2616,7 @@ void random_soup(uint64_t gol[],uint64_t golg[],uint64_t newgol[],uint64_t newgo
         }
     }
 }
-//------------------------------------------------------- update_23 ---------------------------------------------------------------------------------
+//---------------------------------------------------------------- update_23 ----------------------------------------------------------------------------
 void update_23(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){
     // update for dissection of genetic rule variants within nearest neighbor sum s=2 or 3 only for survival and birth
     // update GoL for toroidal field which has side length which is a binary power of 2
@@ -2823,7 +2862,7 @@ void update_23(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgo
     // fprintf(stderr,"DEBUG cnts %d %d\n",DEBUGCNT1, DEBUGCNT2);
 
 }
-//------------------------------------------------------- update_lut_sum -----------------------------------------------------------------------------------
+//---------------------------------------------------------------- update_lut_sum -----------------------------------------------------------------------
 void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){    // selection models 8,9
 // update GoL for toroidal field which has side length which is a binary power of 2
 // encode without if structures for optimal vector treatment
@@ -2995,7 +3034,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
     
     // fprintf(stderr,"DEBUG cnts %d %d\n",DEBUGCNT1, DEBUGCNT2);
 }
-//------------------------------------------------------------- update_lut_dist -----------------------------------------------------------------------------------
+//---------------------------------------------------------------- update_lut_dist ----------------------------------------------------------------------
 void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 10,11
 // update GoL for toroidal field which has side length which is a binary power of 2
 // encode without if structures for optimal vector treatment
@@ -3171,7 +3210,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
     }
     // qimage = quadimage(newgol,&patt,log2N); // quadtree hash of entire image
 }
-//------------------------------------------------------- update_lut_canon_rot -----------------------------------------------------------------------------------
+//---------------------------------------------------------------- update_lut_canon_rot -----------------------------------------------------------------
 void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 12,13
 /*
     configurations are distinguished by number of ones and the canonical rotation of the 8-bit live neighbour pattern
@@ -3364,7 +3403,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
     }
     // qimage = quadimage(newgol,&patt,log2N); // quadtree hash of entire image
 }
-//------------------------------------------------------- update_lut_2Dsym -----------------------------------------------------------------------------------
+//---------------------------------------------------------------- update_lut_2Dsym ---------------------------------------------------------------------
 void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 14,15
 /*
     all different configurations under the standard 2D 4-rotation and 4-reflection symmetries are distinguished
@@ -3584,7 +3623,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64
     }
     // qimage = quadimage(newgol,&patt,log2N); // quadtree hash of entire image
 }
-//------------------------------------------------------- update_gol16 -----------------------------------------------------------------------------------
+//---------------------------------------------------------------- update_gol16 -------------------------------------------------------------------------
 void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]) {     // selection models 16-19
 // genes specify on which of 16 planes the gol states at that site are visible: specified by 16 bits 0,4,8,... in gene
 // when multiple copy processes are active for gol states, the one with the lowest bit position is applied to most difft gene copying
@@ -3718,7 +3757,7 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
         if(newgolg[ij]!=gene0) hashgeneactivity(newgolg[ij],"hash storage error 5 in update_gol16, gene %llx not stored\n");
     }
 }
-//------------------------------------------------------- update_gol64 -----------------------------------------------------------------------------------
+//---------------------------------------------------------------- update_gol64 -------------------------------------------------------------------------
 void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]) {  // selection model 20+, routine for 64x-gol packed update with 1 gene plane
     unsigned int ij,ij1,k,k1,kch,kb,sum,nmut,nbmask,birthinitplane,plane;
     uint64_t golij,gs,newgs,newgs3d,sums00,sums10,sums01,sums11,sums02,sums12,sums16[4],sums3D[4];
@@ -3909,7 +3948,7 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
 
     // fprintf(stderr,"step %d NbP %d planemask %llx\n",totsteps, NbP,  plcodingmask );
 }
-//------------------------------------------------------- update_gol2match ------------------------------------------------------------------------------
+//---------------------------------------------------------------- update_gol2match ---------------------------------------------------------------------
 void update_gol2match(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]) {     // selection model 14,15
 // gol states on one plane interact with genes hard coupled to the gol states on a second plane
 // this may also be viewed simply as genes with gol dynamics interacting with non-genetic entities with gol dynamics
@@ -3985,7 +4024,7 @@ void update_gol2match(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_
         if(newgol[ij]>>1) hashgeneactivity(newgolg[ij],"hash storage error 4 in update_gol2, gene %llx not stored\n");
     }
 }
-//------------------------------------------------------- stats routines -----------------------------------------------------------------------------------
+//----------------------------------------------------------------- stats routines ----------------------------------------------------------------------
 void tracestats(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int NN2) { // trace various stats over time of the simulation
     int ij,cnt,k,d,dc,gt[4],st[10];
     uint64_t gene,statflag;
@@ -4037,7 +4076,7 @@ void get_stats(int outstats[], int outgtypes[], int outstepstats[], int outconfi
     for(i=0; i<10*numStats; i++) outstepstats[i] = stepstats[i];
     if (nhistG==nstatG) for(i=0; i<Noff*numStats; i++) outconfigstats[i] = configstats[i];
 }
-//------------------------------------------------------- countconfigs -----------------------------------------------------------------------------------
+//----------------------------------------------------------------- countconfigs ------------------------------------------------------------------------
 void countconfigs(){        // count translated configs specified by offset array
     // for non zero nb patterns we count if the same pattern occurs at the central site and its offset address in space time
     int ij,i,j,k,t,ip1,im1,jp1,jm1,o,ij1,i1,j1;
@@ -4074,7 +4113,7 @@ void countconfigs(){        // count translated configs specified by offset arra
         }
     }
 }
-//------------------------------------------------------- get_ ... -----------------------------------------------------------------------------------
+//-------------------------------------------------------------------- get_ ... -------------------------------------------------------------------------
 void get_histo(int outhisto[],int numHistoC){
     int i;
     if(numHistoC != numHisto){
@@ -4108,9 +4147,9 @@ int get_activities(uint64_t actgenes[], int activities[], int narraysize) {
 
     return nlivegenes;
 }
-//...........................................................................................................................................................
-// get_all_activities   get all activity statistics of genes (since t=0) from C to python
+//.......................................................................................................................................................
 int get_all_activities(uint64_t genes[], int activities[], int narraysize) {
+// get_all_activities   get all activity statistics of genes (since t=0) from C to python
     int k, nspecies;
 
     nspecies = hashtable_count(&genetable);
@@ -4131,9 +4170,9 @@ int get_all_activities(uint64_t genes[], int activities[], int narraysize) {
     }
     return nspecies;
 }
-//...........................................................................................................................................................
-// get_quad_activities  get all activity statistics of quads (since t=0) from C to python
+//.......................................................................................................................................................
 int get_quad_activities(uint64_t quads[], int activities[], int narraysize) {
+// get_quad_activities  get all activity statistics of quads (since t=0) from C to python
     int k, nspecies;
     quadnode *q;
 
@@ -4155,7 +4194,7 @@ int get_quad_activities(uint64_t quads[], int activities[], int narraysize) {
     }
     return nspecies;
 }
-//------------------------------------------------------- genelife_update -----------------------------------------------------------------------------------
+//------------------------------------------------------------------ genelife_update --------------------------------------------------------------------
 void genelife_update (int nsteps, int nhist, int nstat) {
     /* update GoL and gene arrays for toroidal field which has side length which is a binary power of 2 */
     /* encode as much as possible without if structures (use ? : instead) in update routines for optimal vector treatment */
@@ -4216,7 +4255,7 @@ void genelife_update (int nsteps, int nhist, int nstat) {
 
     }
 }
-//------------------------------------------------------- initialize_planes ---------------------------------------------------------------------------
+//----------------------------------------------------------------- initialize_planes -------------------------------------------------------------------
 void initialize_planes(int offs[],  int No) {
     int i,j,idx;
     static int notfirst = 0;
@@ -4281,7 +4320,7 @@ void initialize_planes(int offs[],  int No) {
     planesgs[4] = planegs4; planesgs[5] = planegs5; planesgs[6] = planegs6; planesgs[7] = planegs7;
 #endif
 }
-//------------------------------------------------------- readFile and writeFile ---------------------------------------------------------------
+//---------------------------------------------------------------- readFile and writeFile ---------------------------------------------------------------
 int readFile(char * code, const char *fileName) {
   FILE *file;
   char tmp;
@@ -4309,7 +4348,7 @@ int writeFile(char *fileName)  {   // initialize 32x32 genepat file with all emp
     fclose(file);
     return error;
 }
-//------------------------------------------------------- initialize ---------------------------------------------------------------------------
+//---------------------------------------------------------------- initialize ---------------------------------------------------------------------------
 void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams) {
     int hcnt;
     int ij,ij1,i0,j0,i,j,Nf,k,cnt,icf,nstartgenes;
@@ -4346,7 +4385,11 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         }
         g*=42;
     } */
-
+    /*
+    for (j=0;j<257;j++) {
+        fprintf(stderr,"test of patterns j %5d log2upper(j) %5d log2upper(sqrtupper(j)) %5d\n",j,log2upper(j),log2upper(sqrtupper(j)));
+    }
+    */
     srand(1234567); // Range: rand returns numbers in the range of [0, RAND_MAX ), and RAND_MAX is specified with a minimum value of 32,767. i.e. 15 bit
     state[0] = rand();state[1] = rand();
     cnt = 0;
@@ -4573,7 +4616,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     // qimage = quadimage(gol,&patt,log2N); // quadtree hash of entire image
     ncomponents=extract_components(gol);
 }
-//------------------------------------------------------- set ...---------------------------------------------------------------------------
+//-------------------------------------------------------------------- set ...---------------------------------------------------------------------------
 void set_colorfunction(int colorfunctionval) {
     if(colorfunction>10) fprintf(stderr,"error colorfunction value passed %d too large\n",colorfunctionval);
     else     colorfunction = colorfunctionval;
@@ -4695,8 +4738,7 @@ void set_noveltyfilter() {
 void set_activity_size_colormode() {
     activity_size_colormode = (activity_size_colormode+1) %3;
 }
-//------------------------------------------------------- get ... ---------------------------------------------------------------------------
-//.......................................................................................................................................................
+//------------------------------------------------------------------- get ... ---------------------------------------------------------------------------
 int get_log2N() {
     return(log2N);
 }
@@ -4745,7 +4787,7 @@ int get_nspecies() {
         if(geneitems[k].popcount) nspeciesnow++;
     return(nspeciesnow);
 }
-
+//.......................................................................................................................................................
 int get_connected_comps(unsigned int outlabel[], unsigned int outconnlen[], int x, int y) {
     int i,ij;
     for (ij=0; ij<N2; ij++) {
@@ -4796,14 +4838,13 @@ int get_smallpatts(smallpatt smallpattsout[],int narraysize) {
         return -1;
     }
     for (count=i=0;i<65536;i++) {
-        smallpattsout[i].size= smallpatts[i].size;
-        smallpattsout[i].reserve= smallpatts[i].reserve;
+        // smallpattsout[i].size= smallpatts[i].size;
+        smallpattsout[i].topactivity= smallpatts[i].topactivity;
         smallpattsout[i].activity= smallpatts[i].activity;
         count += smallpatts[i].activity ? 1 : 0;
         smallpattsout[i].firsttime= smallpatts[i].firsttime;
         smallpattsout[i].lasttime= smallpatts[i].lasttime;
     }
-
     return count;
 }
 //.......................................................................................................................................................
@@ -4871,7 +4912,7 @@ void get_curgolgstats(uint64_t outgolgstats[], int NN) {
         outgolgstats[ij] = golgstats[ij];                       // Note that golgstats is not dealt with in planes !
     }
 }
-//------------------------------------------------------- countspecies ---------------------------------------------------------------------------
+//-------------------------------------------------------------- countspecies ---------------------------------------------------------------------------
 int cmpfunc (const void * pa, const void * pb) {
    // return ( *(int*)pa - *(int*)pb );
    return ((*(const uint64_t *)pa > *(const uint64_t *)pb)  ? 1 : -1);
@@ -5011,8 +5052,7 @@ void countspecieshash() {  /* counts numbers of all different species using qsor
     free(golgs);
     golgs = NULL;
 }
-
-//------------------------------------------------------- activitieshash ---------------------------------------------------------------------------
+//------------------------------------------------------------ activitieshash ---------------------------------------------------------------------------
 int activitieshash() {  /* count activities of all currently active gene species */
     int i, j, ij, ij1, x, nspecies, nspeciesnow, popcnt0, popcnt1;
     int *gindices,*popln,*activities;
@@ -5132,7 +5172,7 @@ int get_sorted_popln_act( int gindices[], uint64_t genes[], int popln[], int act
     nspecies=activitieshashx(gindices, genes, popln, activities);        // sets acttrace and returns current population arrays
     return(nspecies);
 }
-//...............................................................................................................................................
+//.......................................................................................................................................................
 int activitieshashquad() {  /* count activities of all currently active quad images of connected components */
     int i, j, ij, ij1, x, nspecies, nspeciesnow, popcnt0, popcnt1;
     int *qindices,*popln,*activities;
@@ -5152,8 +5192,8 @@ int activitieshashquad() {  /* count activities of all currently active quad ima
         for(i=0;i<=log2N;i++) histcumlogpattsize[i]=0;
         for(i=0;i<=N;i++) histcumpixelssqrt[i]=0;
         for (i=0; i<nspecies; i++) {
-            histcumlogpattsize[mylog2a(quaditems[i].size)]++;
-            histcumpixelssqrt[(int) sqrt(quaditems[i].pop1s)]++;
+            histcumlogpattsize[log2upper(quaditems[i].size)]++;
+            histcumpixelssqrt[sqrtupper(quaditems[i].pop1s)]++;
         }
     }
     
@@ -5258,7 +5298,7 @@ int activitieshashquad() {  /* count activities of all currently active quad ima
     
     return(nspeciesnow);
 }
-//------------------------------------------------------- genealogies ---------------------------------------------------------------------------
+//--------------------------------------------------------------- genealogies ---------------------------------------------------------------------------
 int cmpfunc4 (const void * pa, const void * pb) {
    return ( geneitems[*(const int *)pa].firsttime > geneitems[*(const int *)pb].firsttime ? 1 : -1);
 }
@@ -5456,7 +5496,7 @@ int genealogies() {  /* genealogies of all currently active species */
 
     return(jmax);
 }
-//------------------------------------------------------- misc ---------------------------------------------------------------------------
+//---------------------------------------------------------------------- misc ---------------------------------------------------------------------------
 void delay(int milliseconds) {
     long pause;
     clock_t now,then;
