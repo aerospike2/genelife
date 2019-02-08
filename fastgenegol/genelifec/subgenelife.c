@@ -3,8 +3,8 @@
 //
 // Project fastgenegol
 //
-// First created by John McCaskill on 14.07.17. Last modified Nov 2018.
-// Copyright © 2017,2018 European Center for Living Technology. All rights reserved.
+// First created by John McCaskill on 14.07.17. Last modified Feb 2019.
+// Copyright © 2017,2018,2019 European Center for Living Technology. All rights reserved.
 //
 
 #include <stdio.h>
@@ -13,10 +13,6 @@
 #include <inttypes.h>
 #include <time.h>
 #include <math.h>
-
-
-int DEBUGCNT1=0;
-int DEBUGCNT2=0;
 
 //-----------------------------------------------------------size of array -------------------------------------------------------------------------
 const int log2N = 9;                // toroidal array of side length N = 2 to the power of log2N (minimum log2N is 6 i.e. 64x64)
@@ -239,11 +235,13 @@ component complist[NLM];            // current array of components
 int ncomponents = 0;                // current number of components (= current number of labels)
 int oldncomponents = 0;             // number of components in previuous time step
 typedef struct connection {         // connection of connected component at time t to another component at t-1
-    short unsigned int oldlab;
-    short unsigned int newlab;
-    unsigned int next;
-    unsigned int nextf;
-    unsigned int overlap;
+    short unsigned int oldlab;      // label at time t-1
+    short unsigned int newlab;      // label at time t
+    unsigned int next;              // next connection index in list of backward connections for a given labelled component at time t (newlab)
+    unsigned int nextf;             // next connection index in list of forward connections for a given labelled component at time t-1 (oldlab)
+    unsigned int overlap;           // sum of neighboring pixels (9-nbhd) between old and new component
+    unsigned int woverlap;          // integer permil overlap out of all forward connections from old component i.e. int (1000*overlap/sum(overlaps))
+    unsigned int aoverlap;          // integer permil woverlap out of all backward connections from new component i.e. int (1000*woverlap/sum(woverlaps))
 } connection;
 connection connections[N2];         // open memory reservoir of connection nodes to use in connection lists
 unsigned int connlists[NLM];        // entry points for connection list corresponding to each labelled component
@@ -2099,7 +2097,7 @@ void flattenlabels(equivrec eqv[],unsigned short int *nlabel) {
 //.......................................................................................................................................................
 short unsigned int label_components(uint64_t gol[]) {
 // fast component labelling, updating global equivalence table equiv and placing labels in global array label, return number of labels
-    int i,ij,sum,maxoverlap,overallmaxoverlap;              //   abc   scan mask to calculate label at position e
+    int i,ij,sum,sumoverlap,maxoverlap,overallmaxoverlap;   //   abc   scan mask to calculate label at position e
     short unsigned int nlabel = 0;                          //   de
     short unsigned int oldnlabel;                           //   with lapmod need also: ret
     short unsigned int lab,conn,connprev,connf,maxlabel;
@@ -2251,18 +2249,28 @@ short unsigned int label_components(uint64_t gol[]) {
 
     overallmaxoverlap = 0;
     connpreff[0]=0;
-    for(i=1;i<=oldnlabel;i++) {                             // calclulate max overlap connection and overall max overlap
+    for(i=1;i<=oldnlabel;i++) {                             // calclulate weighted overlaps and max overlap connection and overall max overlap
+        sumoverlap = 0;
         connf=connlistsf[i];
         maxlabel=0; maxoverlap = 0;
         while(connf) {
              if(connections[connf].overlap>maxoverlap) {
                 maxoverlap=connections[connf].overlap;
+                sumoverlap+=connections[connf].overlap;
                 maxlabel = connections[connf].newlab;
             }
             connf=connections[connf].nextf;
         }
         if(maxoverlap>overallmaxoverlap) overallmaxoverlap = maxoverlap;
         connpreff[i]=maxlabel;
+        
+        connf=connlistsf[i];                                // save weighted permil forward overlaps : .woverlap
+        while(connf) {
+             if(connections[connf].overlap>maxoverlap) {
+                connections[connf].woverlap=(connections[connf].overlap*1000)/sumoverlap;
+            }
+            connf=connections[connf].nextf;
+        }
     }
 
     for(i=1;i<=nlabel;i++) {                               // prune other connections for mutually preferred matchings
@@ -2730,22 +2738,15 @@ void update_23(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgo
                         }
                       }
                       else statflag |= F_2select;                           // ancestor has been chosen in selectone_of_2
-                      // fprintf(stderr,"DEBUG ERROR entered selection with threesome\n");
                   }
                   else {
                       newgene = golg[nbch];
-                      /* if(birth) {
-                        fprintf(stderr,"DEBUG selectone_of_s with s %d: newgene %16llx nbmask %2llx kch %d: genes ",s,newgene,nbmask,kch);
-                        for(k=0;k<8;k++) if ((nbmask>>k)&0x1ull) fprintf(stderr," %llx",golg[nb[k]]); fprintf(stderr,"\n");
-                        DEBUGCNT1++;
-                      } */
                   }
                 } // end if not all live neighbors the same
                 else {
                     statflag |= F_3g_same;
                     newgene = livegenes[0];                                 // genes all the same : copy first one
                     if((~enforcebirth&0x1) && rulemodij) birth = 0ull;      // no birth for 3 identical genes if not enforcebirth3 and rulemod
-                    // if (birth) fprintf(stderr,"DEBUG ERROR birth with identical threesome\n");
                 }
               } // end central site empty or overwrite mode
             }  // end if s==3
@@ -2755,7 +2756,6 @@ void update_23(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgo
                     if ((0x1ull&(overwrite>>1))||!gol[ij]) {                // either overwrite on for s==2 or central site is empty
                         if (add2nd) {
                             selectone_nbs(s,nb1i,nb,gol,golg,&birth,&newgene); //2nd nb modulation
-                            // fprintf(stderr,"DEBUG ERROR entered 2nd nb with twosome\n");
                         }
                         else {
                             nbmask = (0x1ull<<(nb1i&0x7)) + (0x1ull<<((nb1i>>4)&0x7));
@@ -2763,19 +2763,12 @@ void update_23(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgo
                             if ((pos_canon_neutral>>1)&0x1) {               // enforce gene independent birth for s = 2 (corrected 31.1.2019, remove repscheme&)
                                 newgene = golg[nb[kch]];
                                 birth = 1ull;
-                                // fprintf(stderr,"DEBUG ERROR entered gene indept birth with twosome\n");
                             }
                             else {
                                 selectone_of_2(s,nb1i,nb,golg,&birth,&newgene,kch);
-                                /* if(birth) {
-                                    fprintf(stderr,"DEBUG selectone_of_s with s %d: newgene %16llx nbmask %2llx kch %d: genes ",s,newgene,nbmask,kch);
-                                    for(k=0;k<8;k++) if ((nbmask>>k)&0x1ull) fprintf(stderr," %llx",golg[nb[k]]); fprintf(stderr,"\n");
-                                    DEBUGCNT2++;
-                                }*/
                             }
                             if(repscheme & R_10_13_2birth_k4) {             // birth only on the active subset of 4 canonical 2-live nb configs if any are active
                                 if(~repscheme & (R_10_2birth_k0<<(kch-1))) birth = 0ull;   // cancel birth if chosen configuration not active
-                                // fprintf(stderr,"DEBUG ERROR entered subset canon with twosome\n");
                             }
                         }
 
@@ -2788,7 +2781,6 @@ void update_23(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgo
                                 else birth = 0ull;
                             }
                             else birth = 1ull;
-                            // fprintf(stderr,"DEBUG ERROR entered enforced birth with twosome\n");
                         }
                         if (birth) statflag |= F_2select;
                     }
@@ -2861,8 +2853,6 @@ void update_23(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgo
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
     // qimage = quadimage(newgol,&patt,log2N); // quadtree hash of entire image
-    // fprintf(stderr,"DEBUG cnts %d %d\n",DEBUGCNT1, DEBUGCNT2);
-
 }
 //---------------------------------------------------------------- update_lut_sum -----------------------------------------------------------------------
 void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){    // selection models 8,9
@@ -3033,8 +3023,6 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
     // qimage = quadimage(newgol,&patt,log2N); // quadtree hash of entire image
-    
-    // fprintf(stderr,"DEBUG cnts %d %d\n",DEBUGCNT1, DEBUGCNT2);
 }
 //---------------------------------------------------------------- update_lut_dist ----------------------------------------------------------------------
 void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgolg[]){     // selection models 10,11
