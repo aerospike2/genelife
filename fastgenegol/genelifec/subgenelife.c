@@ -189,7 +189,7 @@ int ymaxq = 2000;                   // quad pattern activity scale max for plott
 // double log2ymax = 25.0;          // activity scale max 2^25 = 33.5 * 10^6 : suffers from discrete steps at bottom, not used
 int activitymax;                    // max of activity in genealogical record of current population
 int noveltyfilter = 0;              // novelty filter for colorfunction 9 : if on (key "n"), darkens non-novel components (activity>1) in display
-int activity_size_colormode = 0;    // color by size for colorfunction 10 : if on (key "p")  1 log2 enclosing square size 2 use sqrt(#pixels)
+int activity_size_colormode = 0;    // color by size for colorfunction 10 : if on (key "p")  1 log2 enclosing square size 2 use #pixels 3 use sqrt(#pixels)
 int xdisplay,ydisplay = -1;         // display x and y coordinates selected by mouse in python
 //------------------------------------------------ arrays for time tracing, activity and genealogies ----------------------------------------------------
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
@@ -431,6 +431,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // pack49neighbors      fast routine to pack all up to 3rd neighbours in single word : oder of bits dictated by hiearchical assembly
 // pack16neighbors      pack 4x4 blocks in single uint64_t word using 16 bits
 // unpack16neighbors    unpack 16 bit word to 4x4 block at offset in full array of labels, marking with chosen label
+// log2size             return log2 of linear size of pattern in integer power of 2 for small patterns 0-65535
 // pack64neighbors      pack 8x8 blocks in single uint64_t (long) word with 64 bits
 // unpack64neighbors    unpack 64 bit word to 8x8 block at offset in full array of labels, marking with chosen label
 // compare_neighbors    compare packed pack neighbours with one given x,y shift of arbitrary size
@@ -454,20 +455,15 @@ const uint64_t r1 = 0x1111111111111111ull;
 // update_gol64         update version for 64 parallel gol planes, currently without genetic coupling (routine not yet used) : sel 20-24
 // update_gol2match     update version for 2 parallel gol planes, coupled by a gene on one plane by matching of neighborhood : sel 25
 //.......................................................................................................................................................
-// tracestats           record the current stats in time trace
-// get_stats            get the traced statistics from C to python
-// countconfigs         count the configs with pthon specified offsets in (x,y,t)
-//.......................................................................................................................................................
-// get_hist             get the histogram from C to python
-// get_activities       get the current activity statistics of genes from C to python
-// get_all_activities   get all activity statistics of genes (since t=0) from C to python
-// get_quad_activities  get all activity statistics of quads (since t=0) from C to python
-//.......................................................................................................................................................
 // genelife_update      call update, collect statistics if required and rotate planes
 // initialize_planes    initialize periodic sequence of planes to record rolling time window of up to maxPlanes time points (≤8)
 // readFile             read file of gol/golg array (32x32) data
 // writeFile            write file of gol/golg array (32x32) data
 // initialize           initialize simulation parameters and arrays
+//.......................................................................................................................................................
+// countconfigs         count the configs with python specified offsets in (x,y,t)
+// tracestats           record the current stats in time trace
+// get_stats            get the traced statistics from C to python
 //.......................................................................................................................................................
 // set_colorfunction    set color function integer from GUI for use in patterning and coloring display
 // setget_act_ymax      set activity ymax for scaling of gene activity plot
@@ -483,37 +479,42 @@ const uint64_t r1 = 0x1111111111111111ull;
 // set_surviveover      set the two masks for survival and overwrite from python (survivalmask, overwritemask)
 // set_vscrolling       set vertical scrolling to track fronts of growth in vertical upwards direction
 // set_noveltyfilter    set novelty filter for darkening already encountered components in connected component display (colorfunction 9)
-// set_activity_size_colormode set colormode by size for colorfunction 10 : 0 by ID  1 log2 enclosing square size 2 use sqrt(#pixels)
+// set_activity_size_colormode set colormode by size for colorfunction 10 : 0 by ID  1 log2 enclosing square size 2 use #pixels 3 use sqrt(#pixels)
 //.......................................................................................................................................................
 // get_log2N            get the current log2N value from C to python
 // get_curgol           get current gol array from C to python
 // get_curgolg          get current golg array from C to python
 // get_acttrace         get current acttrace array C to python
 // get genealogy_trace  get current trace of genealogies to python
+// get_nspecies         get number of species from C to python
+// get_hist             get the histogram from C to python
+// get_activities       get the current activity statistics of genes from C to python
+// get_all_activities   get all activity statistics of genes (since t=0) from C to python
+// get_quad_activities  get all activity statistics of quads (since t=0) from C to python
 // get_components       get all current connected component data structures
 // get_smallpatts       get array of small pattern data structures including sizes and activities
 // get_quadnodes        get all hashed quadnodes including hashkey, sizes and activities
 // get_genes            get all hashed genes with data structures including activity counts, extinctions etc
 // get_curgolgstats     get current golgstats array C to python
+// get_sorted_popln_act return sorted population and activities (sorted by current population numbers)
 //.......................................................................................................................................................
 // cmpfunc              compare gene values as numerical unsigned numbers
 // cmpfunc1             compare gene counts in population
-// countspecies1        count genes with gene array specified as input parameters
-// countspecies         count different genes with genes specified at current time point
 // cmpfunc2             compare gene values corresponding to given number index in hash table
 // cmpfunc3             compare population counts of hash stored genes
 // cmpfunc3q            compare pixel counts (pop1s) of hash stored quad patterns
 // cmpfunc3qs           compare pixel counts (pop1s) of hash stored small patterns
-// countspecieshash     count different genes in current population from record of all species that have existed
-// activitieshash       calculate array of current gene activities and update acttrace array of genes in activity plot format
-// activitieshashquad   calculate array of current quad activities and update acttraceq array of patterns in activity plot format
 // cmpfunc4             compare birth times of hash stored genes
 // cmpfunc5             compare common genealogy level gene values of hash stored genes
 // cmpfunct6            compare according to ancestry in genealogytrace using activity ordering
 // cmpfunc7             compare according to ancestry in genealogytrace using population size ordering
+// countspecies1        count genes with gene array specified as input parameters
+// countspecies         count different genes with genes specified at current time point
+// countspecieshash     count different genes in current population from record of all species that have existed
+// activitieshash       calculate array of current gene activities and update acttrace array of genes in activity plot format
+// activitieshashquad   calculate array of current quad activities and update acttraceq array of patterns in activity plot format
 // genealogies          calculate and display genealogies
 //.......................................................................................................................................................
-// get_sorted_popln_act return sorted population and activities (sorted by current population numbers)
 // delay                time delay in ms for graphics
 // printxy              terminal screen print of array on xterm
 //-------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -563,6 +564,7 @@ extern inline unsigned int log2lower(unsigned int v) { // find the integer log2 
                                      0xFF00FF00, 0xFFFF0000};
     register int k = 4;
     register unsigned int r,s;
+    if(!v) return 0;
     s = ((v & b[k])   != 0); r  = s; v &= s ? b[k] : ~b[k]; r<<=1;
     s = ((v & b[--k]) != 0); r |= s; v &= s ? b[k] : ~b[k]; r<<=1;
     s = ((v & b[--k]) != 0); r |= s; v &= s ? b[k] : ~b[k]; r<<=1;
@@ -603,6 +605,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
     quadnode *q;
     static int numones[16]={0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4};
     int labelimage(uint64_t hashkeypatt, short unsigned int labelimg[], short unsigned int label, int offset);
+    extern inline int log2size(const short unsigned int golpw);
 
     if(colorfunction==0) { // colorfunction based on multiplicative hash
         // see https://stackoverflow.com/questions/6943493/hash-table-with-64-bit-values-as-key/33871291
@@ -863,8 +866,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 else if (activity_size_colormode == 1) {                // color by log2n, enclosing square size
                     if(acttraceqt[ij] && (q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL) d = log2upper((unsigned int) q->size);
                     else if (!acttraceqt[ij] && quad<65536ull && smallpatts[quad].activity) {
-                        if (quad) d = log2upper(sqrtupper((int) quad));
-                        else d = 0;
+                        d = log2size((short unsigned int) quad);
                     }
                     else {fprintf(stderr,"quad pattern not found in colorfunction for activities\n");d=0;}
                     if(d>log2N){fprintf(stderr,"Error in colorfunction 10, size error %d\n",d);d=0;}
@@ -873,12 +875,13 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 }
                 else {                                                  // color by sqrt of nr of live pixels (up to max value of 255)
                     int popmax = 255;
-                    if(acttraceqt[ij] && (q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL) popcount = sqrtupper((int) q->pop1s);
-                    else if (!acttraceqt[ij] && quad<65536ull && smallpatts[quad].activity) { POPCOUNT64C((uint64_t) quad,popcount); popcount = (int) sqrtupper(popcount);}
+                    if(acttraceqt[ij] && (q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL) popcount = q->pop1s;
+                    else if (!acttraceqt[ij] && quad<65536ull && smallpatts[quad].activity) {POPCOUNT64C((uint64_t) quad,popcount);}
                     else {fprintf(stderr,"quad pattern not found in colorfunction for activities\n");popcount=0;}
+                    if (activity_size_colormode == 3) popcount = (int) sqrtupper(popcount);
                     // fprintf(stderr,"step %d ij %d popcount %d\n",totsteps,ij,popcount);
                     if(popcount>popmax) popcount=popmax;
-                    color[0]=popcount;
+                    color[0]=popcount;color[0]= color[0]>255 ? 255: color[0];
                     color[1]=popcount<<3;color[1]=color[1]>255 ? 255: color[1];
                     color[2]=popcount<<6;color[2]=color[2]>255 ? 255: color[2];
                     for(d=0,mask=0xff;d<3;d++) mask |= color[d]<<((d<<3)+8);
@@ -1873,6 +1876,12 @@ extern inline void unpack16neighbors(const short unsigned golpw, short unsigned 
             labelimg[ij] = (golpw>>k)&0x1 ? label : 0;
         }
     }
+}
+//.......................................................................................................................................................
+extern inline int log2size(const short unsigned int golpw) {
+    if (golpw < 2) return 0;
+    else if (golpw < 16) return 1;
+    else return 2;
 }
 //.......................................................................................................................................................
 extern inline void pack64neighbors(uint64_t gol[],uint64_t golp[],int log2n) {    // routine to pack 8x8 subarrays of full binary array gol into single words
@@ -4022,176 +4031,6 @@ void update_gol2match(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_
         if(newgol[ij]>>1) hashgeneactivity(newgolg[ij],"hash storage error 4 in update_gol2, gene %llx not stored\n");
     }
 }
-//----------------------------------------------------------------- stats routines ----------------------------------------------------------------------
-void tracestats(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int NN2) { // trace various stats over time of the simulation
-    int ij,cnt,k,d,dc,gt[4],st[10];
-    uint64_t gene,statflag;
-
-    if (statcnts == arraysize) {                                            // relallocate memory for arrays : double size
-        arraysize*=2;
-        livesites = (int *)realloc(livesites, arraysize * sizeof(int));
-        genestats = (int *)realloc(genestats, arraysize * 4 * sizeof(int));
-        stepstats = (int *)realloc(stepstats, arraysize * 10 * sizeof(int));
-        if (nhistG==nstatG) configstats = (int *)realloc(configstats, arraysize * Noff * sizeof(int));
-    }
-    for (ij=cnt=0;ij<NN2;ij++) {
-        if(gol[ij]) cnt++;
-    }
-    for(d=0;d<4;d++) gt[d]=0;
-    for(k=0;k<10;k++) st[k]=0;
-    for (ij=cnt=0;ij<NN2;ij++) {
-        statflag = golgstats[ij];
-        for(k=0;k<10;k++) if(statflag&(0x1<<k)) st[k]++;
-        if(gol[ij]) {
-            gene=golg[ij];
-            POPCOUNT64C(gene,d);
-            switch (selection) {
-                case 0:
-                case 1: if(d==64) d--; dc=(d>>4)&0x3;break;
-                case 2:
-                case 3: dc=d&0x3;break;
-                default:if(d==64) d--; dc=(d>>4)&0x3;
-            }
-            gt[dc]++;
-        }
-    }
-
-    livesites[statcnts] = cnt;
-    for(d=0;d<4;d++) genestats[statcnts*4+d]=gt[d];
-    for(k=0;k<10;k++) stepstats[statcnts*10+k]=st[k];
-    if (nhistG==nstatG) for(k=0;k<10;k++) configstats[statcnts*Noff+k]=histo[k];
-    statcnts++;
-}
-
-void get_stats(int outstats[], int outgtypes[], int outstepstats[], int outconfigstats[], int numStats ){
-    int i;
-    if(numStats > arraysize){
-        fprintf(stderr,"Ack! numStats = %d  > arraysize = %d\n",numStats,arraysize);
-        exit(1);
-    }
-    for(i=0; i<numStats; i++) outstats[i] = livesites[i];
-    for(i=0; i<4*numStats; i++) outgtypes[i] = genestats[i];
-    for(i=0; i<10*numStats; i++) outstepstats[i] = stepstats[i];
-    if (nhistG==nstatG) for(i=0; i<Noff*numStats; i++) outconfigstats[i] = configstats[i];
-}
-//----------------------------------------------------------------- countconfigs ------------------------------------------------------------------------
-void countconfigs(){        // count translated configs specified by offset array
-    // for non zero nb patterns we count if the same pattern occurs at the central site and its offset address in space time
-    int ij,i,j,k,t,ip1,im1,jp1,jm1,o,ij1,i1,j1;
-    uint64_t nbmask1,nbmask2;
-    int nb[9];
-    uint64_t *pl, *pl0;
-
-    for (o=0;o<Noff;o++) histo[o] = 0;
-
-    pl0 = planes[curPlane];
-    for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
-        i = ij & Nmask;  j = ij >> log2N;                                   // row & column
-        jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
-        ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                         // toroidal i+1, i-1
-        nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1;           // new order of nbs
-        nb[4]=jp1+ip1; nb[5]=jp1+i; nb[6]=jp1+im1; nb[7]=j*N+im1;
-        nb[8]=ij;
-        for (k=0,nbmask1=0ull;k<9;k++) nbmask1 |= (*(pl0+nb[k]))<<k;            // calculate nbmask for comparison below
-        if(nbmask1) {
-            for (o=0;o<Noff;o++) {
-                i1 = (i+offsets[o][0]) & Nmask;                              // periodic boundary conditions for N power of 2
-                j1 = (j+offsets[o][1]) & Nmask;
-                t = (curPlane+offsets[o][2]) & (numPlane-1);                // periodic in numPlane if this is power of 2
-                pl = planes[t];
-                ij1 = i1 + j1*N;
-                jp1 = ((j1+1) & Nmask)*N; jm1 = ((j1-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
-                ip1 =  (i1+1) & Nmask; im1 =  (i1-1) & Nmask;                         // toroidal i+1, i-1
-                nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1;           // new order of nbs
-                nb[4]=jp1+ip1; nb[5]=jp1+i; nb[6]=jp1+im1; nb[7]=j*N+im1;
-                nb[8]=ij1;
-                for (k=0,nbmask2=0ull;k<9;k++) nbmask2 |= (*(pl+nb[k]))<<k;                          // also calculate nbmask for use below
-                if(nbmask1==nbmask2) histo[o]++;
-            }
-        }
-    }
-}
-//-------------------------------------------------------------------- get_ ... -------------------------------------------------------------------------
-void get_histo(int outhisto[],int numHistoC){
-    int i;
-    if(numHistoC != numHisto){
-        fprintf(stderr,"Ack! numHisto = %d  != numHistoC = %d\n",numHisto,numHistoC);
-        exit(1);
-    }
-    for(i=0; i<numHisto; i++) outhisto[i] = histo[i];
-}
-//.......................................................................................................................................................
-int get_activities(uint64_t actgenes[], int activities[], int narraysize) {
-    int k, nlivegenes, nspecies;
-
-    nspecies = hashtable_count(&genetable);
-    genotypes = hashtable_keys(&genetable);
-    geneitems = (genedata*) hashtable_items( &genetable );
-    // fprintf(stderr,"The number of different species that have ever existed is %d\n",nspecies);
-
-    for (k=nlivegenes=0; k<nspecies; k++) {
-        if((genedataptr = (genedata *) hashtable_find(&genetable, genotypes[k])) != NULL) {
-            if(genedataptr->popcount) {
-                if (nlivegenes <= narraysize) {
-                    actgenes[nlivegenes] = genotypes[k];
-                    activities[nlivegenes] = genedataptr->activity;
-                }
-                nlivegenes++;
-            }
-        }
-        else fprintf(stderr,"get_activities error, no entry for gene %llx in hash table\n", genotypes[k]);
-    }
-    if (nlivegenes > narraysize) fprintf(stderr,"Error: array size %d to small to hold live activities %d, increase it\n",narraysize,nlivegenes);
-
-    return nlivegenes;
-}
-//.......................................................................................................................................................
-int get_all_activities(uint64_t genes[], int activities[], int narraysize) {
-// get_all_activities   get all activity statistics of genes (since t=0) from C to python
-    int k, nspecies;
-
-    nspecies = hashtable_count(&genetable);
-    genotypes = hashtable_keys(&genetable);
-    geneitems = (genedata *) hashtable_items( &genetable );
-    // fprintf(stderr,"The number of different species that have ever existed is %d\n",nspecies);
-    if (nspecies > narraysize) {
-        fprintf(stderr,"Error: array size %d to small to hold all activities %d, increase it\n",narraysize,nspecies);
-        return nspecies;
-    }
-
-    for (k=0; k<nspecies; k++) {
-        if((genedataptr = (genedata *) hashtable_find(&genetable, genotypes[k])) != NULL) {
-            genes[k] = genotypes[k];
-            activities[k] = genedataptr->activity;
-        }
-        else fprintf(stderr,"get_all_activities error, no entry for gene %llx in hash table\n", genotypes[k]);
-    }
-    return nspecies;
-}
-//.......................................................................................................................................................
-int get_quad_activities(uint64_t quads[], int activities[], int narraysize) {
-// get_quad_activities  get all activity statistics of quads (since t=0) from C to python
-    int k, nspecies;
-    quadnode *q;
-
-    nspecies = hashtable_count(&quadtable);
-    quadkeys = hashtable_keys(&quadtable);
-    quaditems = (quadnode *) hashtable_items( &genetable );
-    // fprintf(stderr,"The number of different species that have ever existed is %d\n",nspecies);
-    if (nspecies > narraysize) {
-        fprintf(stderr,"Error: array size %d to small to hold all quad activities %d, increase it\n",narraysize,nspecies);
-        return nspecies;
-    }
-
-    for (k=0; k<nspecies; k++) {
-        if((q = (quadnode *) hashtable_find(&quadtable, quadkeys[k])) != NULL) {
-            quads[k] = quadkeys[k];
-            activities[k] = q->activity;
-        }
-        else fprintf(stderr,"get_quad_activities error, no entry for quad %llx in hash table\n", quadkeys[k]);
-    }
-    return nspecies;
-}
 //------------------------------------------------------------------ genelife_update --------------------------------------------------------------------
 void genelife_update (int nsteps, int nhist, int nstat) {
     /* update GoL and gene arrays for toroidal field which has side length which is a binary power of 2 */
@@ -4201,6 +4040,8 @@ void genelife_update (int nsteps, int nhist, int nstat) {
     int activitieshash(void);                                                 // count activities of all currently active gene species
     int activitieshashquad(void);                                             // count activities of all currently active quad pattern species
     int genealogies(void);                                                    // genealogies of all currently active species
+    void tracestats(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int NN2); // trace statistics based on gol,golg
+    void countconfigs(void);
 
     nhistG = nhist;                                                           // intervals for collecting histograms
     nstatG = nstat;
@@ -4531,6 +4372,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     if(notfirst) {
         hashtable_term(&genetable);
         hashtable_term(&quadtable);
+        memset(smallpatts,0,sizeof(smallpatt)*65536);
     }
     hashtable_init(&genetable,sizeof(genedata),N2<<2,0);         // initialize dictionary for genes
     hashtable_init(&quadtable,sizeof(quadnode),N2<<2,0);         // initialize dictionary for quadtree patterns
@@ -4598,6 +4440,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     for (ij=0; ij<N2; ij++) {
         acttrace[ij]=rootgene;                 // initialize activity traces to root gene
         acttraceq[ij]=rootgene;                // initialize activity traces of patterns to root gene
+        acttraceqt[ij]=0;
         genealogytrace[ij] = rootgene;
     }
 
@@ -4613,6 +4456,94 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
 
     // qimage = quadimage(gol,&patt,log2N); // quadtree hash of entire image
     ncomponents=extract_components(gol);
+}
+//----------------------------------------------------------------- stats routines ----------------------------------------------------------------------
+void countconfigs() {        // count translated configs specified by offset array
+    // for non zero nb patterns we count if the same pattern occurs at the central site and its offset address in space time
+    int ij,i,j,k,t,ip1,im1,jp1,jm1,o,ij1,i1,j1;
+    uint64_t nbmask1,nbmask2;
+    int nb[9];
+    uint64_t *pl, *pl0;
+
+    for (o=0;o<Noff;o++) histo[o] = 0;
+
+    pl0 = planes[curPlane];
+    for (ij=0; ij<N2; ij++) {                                               // loop over all sites of 2D torus with side length N
+        i = ij & Nmask;  j = ij >> log2N;                                   // row & column
+        jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
+        ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                         // toroidal i+1, i-1
+        nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1;           // new order of nbs
+        nb[4]=jp1+ip1; nb[5]=jp1+i; nb[6]=jp1+im1; nb[7]=j*N+im1;
+        nb[8]=ij;
+        for (k=0,nbmask1=0ull;k<9;k++) nbmask1 |= (*(pl0+nb[k]))<<k;            // calculate nbmask for comparison below
+        if(nbmask1) {
+            for (o=0;o<Noff;o++) {
+                i1 = (i+offsets[o][0]) & Nmask;                              // periodic boundary conditions for N power of 2
+                j1 = (j+offsets[o][1]) & Nmask;
+                t = (curPlane+offsets[o][2]) & (numPlane-1);                // periodic in numPlane if this is power of 2
+                pl = planes[t];
+                ij1 = i1 + j1*N;
+                jp1 = ((j1+1) & Nmask)*N; jm1 = ((j1-1) & Nmask)*N;                   // toroidal (j+1)*N and (j-1)*N
+                ip1 =  (i1+1) & Nmask; im1 =  (i1-1) & Nmask;                         // toroidal i+1, i-1
+                nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1;           // new order of nbs
+                nb[4]=jp1+ip1; nb[5]=jp1+i; nb[6]=jp1+im1; nb[7]=j*N+im1;
+                nb[8]=ij1;
+                for (k=0,nbmask2=0ull;k<9;k++) nbmask2 |= (*(pl+nb[k]))<<k;                          // also calculate nbmask for use below
+                if(nbmask1==nbmask2) histo[o]++;
+            }
+        }
+    }
+}
+void tracestats(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int NN2) { // trace various stats over time of the simulation
+    int ij,cnt,k,d,dc,gt[4],st[10];
+    uint64_t gene,statflag;
+
+    if (statcnts == arraysize) {                                            // relallocate memory for arrays : double size
+        arraysize*=2;
+        livesites = (int *)realloc(livesites, arraysize * sizeof(int));
+        genestats = (int *)realloc(genestats, arraysize * 4 * sizeof(int));
+        stepstats = (int *)realloc(stepstats, arraysize * 10 * sizeof(int));
+        if (nhistG==nstatG) configstats = (int *)realloc(configstats, arraysize * Noff * sizeof(int));
+    }
+    for (ij=cnt=0;ij<NN2;ij++) {
+        if(gol[ij]) cnt++;
+    }
+    for(d=0;d<4;d++) gt[d]=0;
+    for(k=0;k<10;k++) st[k]=0;
+    for (ij=cnt=0;ij<NN2;ij++) {
+        statflag = golgstats[ij];
+        for(k=0;k<10;k++) if(statflag&(0x1<<k)) st[k]++;
+        if(gol[ij]) {
+            gene=golg[ij];
+            POPCOUNT64C(gene,d);
+            switch (selection) {
+                case 0:
+                case 1: if(d==64) d--; dc=(d>>4)&0x3;break;
+                case 2:
+                case 3: dc=d&0x3;break;
+                default:if(d==64) d--; dc=(d>>4)&0x3;
+            }
+            gt[dc]++;
+        }
+    }
+
+    livesites[statcnts] = cnt;
+    for(d=0;d<4;d++) genestats[statcnts*4+d]=gt[d];
+    for(k=0;k<10;k++) stepstats[statcnts*10+k]=st[k];
+    if (nhistG==nstatG) for(k=0;k<10;k++) configstats[statcnts*Noff+k]=histo[k];
+    statcnts++;
+}
+//.......................................................................................................................................................
+void get_stats(int outstats[], int outgtypes[], int outstepstats[], int outconfigstats[], int numStats ){
+    int i;
+    if(numStats > arraysize){
+        fprintf(stderr,"Ack! numStats = %d  > arraysize = %d\n",numStats,arraysize);
+        exit(1);
+    }
+    for(i=0; i<numStats; i++) outstats[i] = livesites[i];
+    for(i=0; i<4*numStats; i++) outgtypes[i] = genestats[i];
+    for(i=0; i<10*numStats; i++) outstepstats[i] = stepstats[i];
+    if (nhistG==nstatG) for(i=0; i<Noff*numStats; i++) outconfigstats[i] = configstats[i];
 }
 //-------------------------------------------------------------------- set ...---------------------------------------------------------------------------
 void set_colorfunction(int colorfunctionval) {
@@ -4733,8 +4664,9 @@ void set_vscrolling() {
 void set_noveltyfilter() {
     noveltyfilter=1-noveltyfilter;
 }
+//.......................................................................................................................................................
 void set_activity_size_colormode() {
-    activity_size_colormode = (activity_size_colormode+1) %3;
+    activity_size_colormode = (activity_size_colormode+1) % 4;
 }
 //------------------------------------------------------------------- get ... ---------------------------------------------------------------------------
 int get_log2N() {
@@ -4786,6 +4718,87 @@ int get_nspecies() {
     return(nspeciesnow);
 }
 //.......................................................................................................................................................
+void get_histo(int outhisto[],int numHistoC){
+    int i;
+    if(numHistoC != numHisto){
+        fprintf(stderr,"Ack! numHisto = %d  != numHistoC = %d\n",numHisto,numHistoC);
+        exit(1);
+    }
+    for(i=0; i<numHisto; i++) outhisto[i] = histo[i];
+}
+//.......................................................................................................................................................
+int get_activities(uint64_t actgenes[], int activities[], int narraysize) {
+    int k, nlivegenes, nspecies;
+
+    nspecies = hashtable_count(&genetable);
+    genotypes = hashtable_keys(&genetable);
+    geneitems = (genedata*) hashtable_items( &genetable );
+    // fprintf(stderr,"The number of different species that have ever existed is %d\n",nspecies);
+
+    for (k=nlivegenes=0; k<nspecies; k++) {
+        if((genedataptr = (genedata *) hashtable_find(&genetable, genotypes[k])) != NULL) {
+            if(genedataptr->popcount) {
+                if (nlivegenes <= narraysize) {
+                    actgenes[nlivegenes] = genotypes[k];
+                    activities[nlivegenes] = genedataptr->activity;
+                }
+                nlivegenes++;
+            }
+        }
+        else fprintf(stderr,"get_activities error, no entry for gene %llx in hash table\n", genotypes[k]);
+    }
+    if (nlivegenes > narraysize) fprintf(stderr,"Error: array size %d to small to hold live activities %d, increase it\n",narraysize,nlivegenes);
+
+    return nlivegenes;
+}
+//.......................................................................................................................................................
+int get_all_activities(uint64_t genes[], int activities[], int narraysize) {
+// get_all_activities   get all activity statistics of genes (since t=0) from C to python
+    int k, nspecies;
+
+    nspecies = hashtable_count(&genetable);
+    genotypes = hashtable_keys(&genetable);
+    geneitems = (genedata *) hashtable_items( &genetable );
+    // fprintf(stderr,"The number of different species that have ever existed is %d\n",nspecies);
+    if (nspecies > narraysize) {
+        fprintf(stderr,"Error: array size %d to small to hold all activities %d, increase it\n",narraysize,nspecies);
+        return nspecies;
+    }
+
+    for (k=0; k<nspecies; k++) {
+        if((genedataptr = (genedata *) hashtable_find(&genetable, genotypes[k])) != NULL) {
+            genes[k] = genotypes[k];
+            activities[k] = genedataptr->activity;
+        }
+        else fprintf(stderr,"get_all_activities error, no entry for gene %llx in hash table\n", genotypes[k]);
+    }
+    return nspecies;
+}
+//.......................................................................................................................................................
+int get_quad_activities(uint64_t quads[], int activities[], int narraysize) {
+// get_quad_activities  get all activity statistics of quads (since t=0) from C to python
+    int k, nspecies;
+    quadnode *q;
+
+    nspecies = hashtable_count(&quadtable);
+    quadkeys = hashtable_keys(&quadtable);
+    quaditems = (quadnode *) hashtable_items( &genetable );
+    // fprintf(stderr,"The number of different species that have ever existed is %d\n",nspecies);
+    if (nspecies > narraysize) {
+        fprintf(stderr,"Error: array size %d to small to hold all quad activities %d, increase it\n",narraysize,nspecies);
+        return nspecies;
+    }
+
+    for (k=0; k<nspecies; k++) {
+        if((q = (quadnode *) hashtable_find(&quadtable, quadkeys[k])) != NULL) {
+            quads[k] = quadkeys[k];
+            activities[k] = q->activity;
+        }
+        else fprintf(stderr,"get_quad_activities error, no entry for quad %llx in hash table\n", quadkeys[k]);
+    }
+    return nspecies;
+}
+//.......................................................................................................................................................
 int get_connected_comps(unsigned int outlabel[], unsigned int outconnlen[], int x, int y) {
     int i,ij;
     for (ij=0; ij<N2; ij++) {
@@ -4798,11 +4811,11 @@ int get_connected_comps(unsigned int outlabel[], unsigned int outconnlen[], int 
     ydisplay = y;
     return ncomponents;
 }
-
+//.......................................................................................................................................................
 int get_ncomponents() {
     return(ncomponents);
 }
-
+//.......................................................................................................................................................
 int get_components(component components[],int narraysize) {
     int i;
     if (narraysize<ncomponents) {
@@ -4910,12 +4923,19 @@ void get_curgolgstats(uint64_t outgolgstats[], int NN) {
         outgolgstats[ij] = golgstats[ij];                       // Note that golgstats is not dealt with in planes !
     }
 }
-//-------------------------------------------------------------- countspecies ---------------------------------------------------------------------------
+//.......................................................................................................................................................
+int get_sorted_popln_act( int gindices[], uint64_t genes[], int popln[], int activities[]) {
+    int nspecies;
+    int activitieshashx(int gindices[], uint64_t genes[], int popln[], int activities[]);
+    nspecies=activitieshashx(gindices, genes, popln, activities);        // sets acttrace and returns current population arrays
+    return(nspecies);
+}
+//-------------------------------------------------------------- comparison fns -------------------------------------------------------------------------
 int cmpfunc (const void * pa, const void * pb) {
    // return ( *(int*)pa - *(int*)pb );
    return ((*(const uint64_t *)pa > *(const uint64_t *)pb)  ? 1 : -1);
 }
-
+//.......................................................................................................................................................
 int cmpfunc1 ( const void *pa, const void *pb ) {
     const uint64_t *a = (const uint64_t *) pa;
     const uint64_t *b = (const uint64_t *) pb;
@@ -4924,7 +4944,89 @@ int cmpfunc1 ( const void *pa, const void *pb ) {
     else
         return (int) (b[1] - a[1]);
 }
+//.......................................................................................................................................................
+int cmpfunc2 (const void * pa, const void * pb) {
+    return ( genotypes[*(const int*)pa] > genotypes[*(const int*)pb] ? 1 : -1);
+}
+//.......................................................................................................................................................
+int cmpfunc3 (const void * pa, const void * pb) {
+    return ( geneitems[*(const int*)pa].popcount < geneitems[*(const int*)pb].popcount ? 1 : -1);
+}
+//.......................................................................................................................................................
+int cmpfunc3q (const void * pa, const void * pb) {
+    return ( quaditems[*(const int*)pa].pop1s < quaditems[*(const int*)pb].pop1s ? 1 : -1);
+}
+//.......................................................................................................................................................
+int cmpfunc3qs (const void * pa, const void * pb) {
+    uint64_t a,b;
+    int na,nb;
+    a = (uint64_t) *(const int*)pa;
+    b = (uint64_t) *(const int*)pb;
+    POPCOUNT64C(a,na);
+    POPCOUNT64C(b,nb);
+    return ( na < nb ? 1 : -1);
+}
+//.......................................................................................................................................................
+int cmpfunc4 (const void * pa, const void * pb) {
+   return ( geneitems[*(const int *)pa].firsttime > geneitems[*(const int *)pb].firsttime ? 1 : -1);
+}
+//.......................................................................................................................................................
+int cmpfunc5 (const void * pa, const void * pb) {               // sort according to ancestry in genealogytrace
 
+   int i1,i2,ij1,ij2,j;
+   uint64_t gene1,gene2;
+   i1=*(const int *)pa; i2=*(const int *)pb;
+
+   for (j=0;j<genealogydepth;j++) {
+        ij1 = i1+j*N; ij2 = i2+j*N;
+        gene1=working[ij1]; gene2=working[ij2];
+        if(gene1!=gene2) return((((gene1 > gene2) && (gene1!=rootgene)) || (gene2==rootgene)) ? 1 : -1);
+    }
+    return(0);
+}
+//.......................................................................................................................................................
+int cmpfunc6 (const void * pa, const void * pb) {               // sort according to ancestry in genealogytrace using activity ordering
+   int i1,i2,ij1,ij2,j;
+   uint64_t gene1,gene2;
+   i1=*(const int *)pa; i2=*(const int *)pb;
+   int act1,act2;
+
+   for (j=0;j<genealogydepth;j++) {
+        ij1 = i1+j*N; ij2 = i2+j*N;
+        gene1=working[ij1]; gene2=working[ij2];
+        if(gene1!=gene2)  {
+            if((gene1!=rootgene) && (gene2 != rootgene)) {
+                if((genedataptr = (genedata *) hashtable_find(&genetable, gene1)) != NULL) act1 = genedataptr->activity; else act1 = 0;
+                if((genedataptr = (genedata *) hashtable_find(&genetable, gene2)) != NULL) act2 = genedataptr->activity; else act2 = 0;
+                return(act1 > act2 ? 1 : (act1==act2 ? (gene1 > gene2 ? 1 : -1) : -1));
+            }
+            else return((gene2==rootgene) ? 1 : -1);
+        }
+    }
+    return(0);
+}
+//.......................................................................................................................................................
+int cmpfunc7 (const void * pa, const void * pb) {               // sort according to ancestry in genealogytrace using popln size ordering
+   int i1,i2,ij1,ij2,j;
+   uint64_t gene1,gene2;
+   i1=*(const int *)pa; i2=*(const int *)pb;
+   int pop1,pop2;
+
+   for (j=0;j<genealogydepth;j++) {
+        ij1 = i1+j*N; ij2 = i2+j*N;
+        gene1=working[ij1]; gene2=working[ij2];
+        if(gene1!=gene2)  {
+            if((gene1!=rootgene) && (gene2 != rootgene)) {
+                if((genedataptr = (genedata *) hashtable_find(&genetable, gene1)) != NULL) pop1 = genedataptr->popcount; else pop1 = 0;
+                if((genedataptr = (genedata *) hashtable_find(&genetable, gene2)) != NULL) pop2 = genedataptr->popcount; else pop2 = 0;
+                return(pop1 > pop2 ? 1 : (pop1==pop2 ? (gene1 > gene2 ? 1 : -1) : -1));
+            }
+            else return((gene2==rootgene) ? 1 : -1);
+        }
+    }
+    return(0);
+}
+//-------------------------------------------------------------- countspecies ---------------------------------------------------------------------------
 void countspecies1(uint64_t gol[], uint64_t golg[], int N2) {     /* counts numbers of all different species using qsort first */
     int ij, k, ngenes, ijlast, nspecies, counts[N2], nones;
     uint64_t last, golgs[N2], fitness;
@@ -4984,33 +5086,11 @@ void countspecies1(uint64_t gol[], uint64_t golg[], int N2) {     /* counts numb
     fprintf(stderr,"pmutmask\tinit1\tinitr\tncoding\tstartchoice\n");
     fprintf(stderr,"%x\t\t%d\t%d\t%d\t%d\n",pmutmask,initial1density,initialrdensity,ncoding,startgenechoice);
 }
-
+//.......................................................................................................................................................
 void countspecies() {                                                       // counts current species without using hash tables
     countspecies1(gol, golg, N2);
 }
 //.......................................................................................................................................................
-int cmpfunc2 (const void * pa, const void * pb) {
-    return ( genotypes[*(const int*)pa] > genotypes[*(const int*)pb] ? 1 : -1);
-}
-
-int cmpfunc3 (const void * pa, const void * pb) {
-    return ( geneitems[*(const int*)pa].popcount < geneitems[*(const int*)pb].popcount ? 1 : -1);
-}
-
-int cmpfunc3q (const void * pa, const void * pb) {
-    return ( quaditems[*(const int*)pa].pop1s < quaditems[*(const int*)pb].pop1s ? 1 : -1);
-}
-
-int cmpfunc3qs (const void * pa, const void * pb) {
-    uint64_t a,b;
-    int na,nb;
-    a = (uint64_t) *(const int*)pa;
-    b = (uint64_t) *(const int*)pb;
-    POPCOUNT64C(a,na);
-    POPCOUNT64C(b,nb);
-    return ( na < nb ? 1 : -1);
-}
-
 void countspecieshash() {  /* counts numbers of all different species using qsort first */
     int k, *golgs, nspecies, nspeciesnow, nones;
     uint64_t last;
@@ -5133,7 +5213,7 @@ int activitieshash() {  /* count activities of all currently active gene species
     free(gindices);free(activities);free(genes);free(popln);
     return(nspeciesnow);
 }
-
+//.......................................................................................................................................................
 int activitieshashx(int gindices[], uint64_t genes[], int popln[], int activities[]) {  /* python interface to count activities of all currently active species, no display */
     int i, j, nspecies, nspeciesnow;
     const int maxact = 10000;
@@ -5163,12 +5243,6 @@ int activitieshashx(int gindices[], uint64_t genes[], int popln[], int activitie
 
     return(nspeciesnow);                                            // exit here without doing display
 
-}
-
-int get_sorted_popln_act( int gindices[], uint64_t genes[], int popln[], int activities[]) {
-    int nspecies;
-    nspecies=activitieshashx(gindices, genes, popln, activities);        // sets acttrace and returns current population arrays
-    return(nspecies);
 }
 //.......................................................................................................................................................
 int activitieshashquad() {  /* count activities of all currently active quad images of connected components */
@@ -5297,66 +5371,6 @@ int activitieshashquad() {  /* count activities of all currently active quad ima
     return(nspeciesnow);
 }
 //--------------------------------------------------------------- genealogies ---------------------------------------------------------------------------
-int cmpfunc4 (const void * pa, const void * pb) {
-   return ( geneitems[*(const int *)pa].firsttime > geneitems[*(const int *)pb].firsttime ? 1 : -1);
-}
-
-int cmpfunc5 (const void * pa, const void * pb) {               // sort according to ancestry in genealogytrace
-
-   int i1,i2,ij1,ij2,j;
-   uint64_t gene1,gene2;
-   i1=*(const int *)pa; i2=*(const int *)pb;
-
-   for (j=0;j<genealogydepth;j++) {
-        ij1 = i1+j*N; ij2 = i2+j*N;
-        gene1=working[ij1]; gene2=working[ij2];
-        if(gene1!=gene2) return((((gene1 > gene2) && (gene1!=rootgene)) || (gene2==rootgene)) ? 1 : -1);
-    }
-    return(0);
-}
-
-int cmpfunc6 (const void * pa, const void * pb) {               // sort according to ancestry in genealogytrace using activity ordering
-   int i1,i2,ij1,ij2,j;
-   uint64_t gene1,gene2;
-   i1=*(const int *)pa; i2=*(const int *)pb;
-   int act1,act2;
-
-   for (j=0;j<genealogydepth;j++) {
-        ij1 = i1+j*N; ij2 = i2+j*N;
-        gene1=working[ij1]; gene2=working[ij2];
-        if(gene1!=gene2)  {
-            if((gene1!=rootgene) && (gene2 != rootgene)) {
-                if((genedataptr = (genedata *) hashtable_find(&genetable, gene1)) != NULL) act1 = genedataptr->activity; else act1 = 0;
-                if((genedataptr = (genedata *) hashtable_find(&genetable, gene2)) != NULL) act2 = genedataptr->activity; else act2 = 0;
-                return(act1 > act2 ? 1 : (act1==act2 ? (gene1 > gene2 ? 1 : -1) : -1));
-            }
-            else return((gene2==rootgene) ? 1 : -1);
-        }
-    }
-    return(0);
-}
-
-int cmpfunc7 (const void * pa, const void * pb) {               // sort according to ancestry in genealogytrace using popln size ordering
-   int i1,i2,ij1,ij2,j;
-   uint64_t gene1,gene2;
-   i1=*(const int *)pa; i2=*(const int *)pb;
-   int pop1,pop2;
-
-   for (j=0;j<genealogydepth;j++) {
-        ij1 = i1+j*N; ij2 = i2+j*N;
-        gene1=working[ij1]; gene2=working[ij2];
-        if(gene1!=gene2)  {
-            if((gene1!=rootgene) && (gene2 != rootgene)) {
-                if((genedataptr = (genedata *) hashtable_find(&genetable, gene1)) != NULL) pop1 = genedataptr->popcount; else pop1 = 0;
-                if((genedataptr = (genedata *) hashtable_find(&genetable, gene2)) != NULL) pop2 = genedataptr->popcount; else pop2 = 0;
-                return(pop1 > pop2 ? 1 : (pop1==pop2 ? (gene1 > gene2 ? 1 : -1) : -1));
-            }
-            else return((gene2==rootgene) ? 1 : -1);
-        }
-    }
-    return(0);
-}
-
 int genealogies() {  /* genealogies of all currently active species */
     int j, jmax, i, ij, nspecies, nspeciesnow, birthstep;
     int j1, j2, j3, activity, gorder[N];
@@ -5503,7 +5517,7 @@ void delay(int milliseconds) {
     while( (now-then) < pause )
         now = clock();
 }
-
+//.......................................................................................................................................................
 void printxy (uint64_t gol[],uint64_t golg[]) {   /* print the game of life configuration */
     int    ij, col, X, Y;
     // https://stackoverflow.com/questions/27159322/rgb-values-of-the-colors-in-the-ansi-extended-colors-index-17-255

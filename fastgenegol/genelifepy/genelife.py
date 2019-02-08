@@ -490,6 +490,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     selectiontext0007 = ["largest value","most ones","scissors-well-stone-paper","not well ordered","two target","predator prey","cooperative","neutral"];
     selectiontext0815 = ["sum fixed","sum variable","edge fixed","edge variable","canonical fixed","canonical variable","2D sym fixed","2D sym variable"];
     selectiontext1623 = ["2-16 plane pairwise","2-16 plane pairwise","2-16 plane nearby","2-16 plane nearby","2-64 plane matching","2-64 plane matching","2-64 plane matching","2-64 plane matching"]
+    actsizecoltxt= [" color from hashkey"," color log2 of size"," color # pixels"," color sqrt # pixels"]
     
     buttonhelp0007 =    ["0. selective birth for 3-live-nbs ","1. selective birth for 2-live-nbs ",
                          "2. canonical 0 position vs difft  ","3. bypass selection for 2-live-nbs ",
@@ -847,9 +848,11 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     print 'step',framenr,"noveltyfilter changed to ",noveltyfilter
                     genelife.set_noveltyfilter()
                 elif event.key == pg.K_p:
-                    activity_size_colormode=(activity_size_colormode+1)%3
+                    
+                    activity_size_colormode=(activity_size_colormode+1)%4
                     print 'step',framenr,"activity_size_colormode changed to ",activity_size_colormode
                     genelife.set_activity_size_colormode()
+                    pixeldat=actsizecoltxt[activity_size_colormode]
                 elif event.key == pg.K_q:
                     if pg.key.get_mods() & pg.KMOD_ALT:
                         quadrants = input("Enter an integer between -1 and 6: ")
@@ -1008,7 +1011,7 @@ def parhelp():
     print "H           ","toggle horizon mode on or off: upper half of array obeys unmodified GoL rule"
     print "<space>     ","pause simulation, allowing ongoing display control"
     print "n           ","toggle novelty filter on/off for connected component color function 9"
-    print "p           ","toggle activity_size_colormode on/off 0,1,2 for (no,log2n,sqrt(pixels)) size display of activities in color function 10"
+    print "p           ","rotate activity_size_colormode 0,1,2,3 for (no,log2n,pixels,sqrt(pixels)) size display of activities in color function 10"
     print "q,Q         ","incr or decr quadrant parameter choice : -1 = no quadrants, 0-4 are first 5 bit pairs of repscheme, 5,6 surv and overwrite"
     print "r           ","toggle random soup domain on or off"
     print "R           ","toggle intermittent feathered random soup domain on or off"
