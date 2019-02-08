@@ -223,7 +223,7 @@ typedef struct equivrec {           // equivalence record
   short unsigned int pt;            // parent of record : integer index into eqv array at lower integer location
   short unsigned int rank;          // rank of equivalence class tree, may be used to accelerate union-find
   short unsigned int size;          // number of cells (lattice sites) with this label in current array
-  short unsigned int reserve;       // reserved for future use, filling record overall size to single long int (64bit)
+  short unsigned int overlaps;      // reserved for future use, filling record overall size to single long int (64bit)
 } equivrec;
 equivrec eqv[NLM];                  // equivalences between labels
 typedef struct component {          // data structure for identified connected components in gol array
@@ -233,7 +233,7 @@ typedef struct component {          // data structure for identified connected c
     short unsigned int patt;        // for small components of size 4x4 pixels or less, the image is encoded directly in the pattern patt
     uint64_t quad;                  // hashkey for quadtree node of subimage for component
     unsigned int pixels;            // number of pixels on
-    unsigned int reserve;           // reserve to ensure structure is  a whole numebr of 64 bit words (for efficiency and ndarray python communication)
+    unsigned int overlaps;          // total overlaps of component with other components (ensure structure is whole nrr of 64-bit words for ndarray python comm)
 } component;
 component complist[NLM];            // current array of components
 int ncomponents = 0;                // current number of components (= current number of labels)
@@ -585,13 +585,15 @@ extern inline unsigned int sqrtupper(unsigned int v) { // smallest integer large
 }
 //.......................................................................................................................................................
 extern inline void setcolor(unsigned int *color,int n) { // for coloring by quad size...
-    // rainbow colors from running rainbow(8) in R : last two are repeats to avoid crash for log2N > 9
-    static const unsigned int rainbow[]={0x7F0000FF, 0x7F7F00FF, 0x007F00FF, 0xFF0000FF, 0xFFFF00FF, 0x00FF00FF, 0x00FFFFFF, 0x0000FFFF, 0xFF00FFFF, 0xFF00FFFF, 0xFF00FFFF};
+    // rainbow colors from running from fields::tim.colors(11) in R by Tim Hoar : assuming log2N <= 10 (limited by display size)
+    // "#00008F" "#0000F5" "#005AFF" "#00BDFF" "#23FFDC" "#87FF78" "#ECFF13" "#FFAD00" "#FF4A00" "#E40000" "#800000"
+    static const unsigned int rainbow[]={0x800000FF, 0xE40000FF, 0xFF4A00FF, 0xFFAD00FF, 0xECFF13FF, 0x87FF78FF, 0x23FFDCFF, 0x00BDFFFF, 0x005AFFFF, 0x0000F5FF, 0x00008FFF};
+
     unsigned int mycol;
     mycol = rainbow[n];
-    color[0] = (mycol & 0xff000000) >> 6; // R
+    color[0] = (mycol & 0xff000000) >> 6; // B
     color[1] = (mycol & 0xff0000) >> 4;   // G
-    color[2] = (mycol & 0xff00) >> 2;     // B
+    color[2] = (mycol & 0xff00) >> 2;     // R
 }
 //.......................................................................................................................................................
 void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2) {
@@ -5230,7 +5232,7 @@ int activitieshashquad() {  /* count activities of all currently active quad ima
         for (i=0; i<nspeciesnow; i++) {                               // set arrays of ids, popln (nr 1 pixels), and activities from hash table
             qids[i]=quadtypes[qindices[i]];
             popln[i]=quaditems[qindices[i]].pop1s;
-            activities[i]=quaditems[qindices[i]].activity;
+            activities[i]=quaditems[qindices[i]].topactivity;
         }
 
         for(j=0;j<nspeciesnow;j++) {                                 // main loop to construct new display column for activities
@@ -5260,7 +5262,7 @@ int activitieshashquad() {  /* count activities of all currently active quad ima
     
     if (nspeciesnow<maxact) {                                        // overlay activities of smallpatts up to maxact
         for (nallspeciessmall=nspeciessmall=i=0;i<65536; i++) {
-            if (smallpatts[i].activity) {
+            if (smallpatts[i].topactivity) {
                 qsallindices[nallspeciessmall++]=i;
                 if (smallpatts[i].lasttime == totsteps) qsindices[nspeciessmall++]=i;   // indices of current patterns
             }
@@ -5272,7 +5274,7 @@ int activitieshashquad() {  /* count activities of all currently active quad ima
         
         activities = (int *) malloc(nspeciessmall*sizeof(int));
         for (i=0; i<nspeciessmall; i++) {
-            activities[i]=smallpatts[qsindices[i]].activity;
+            activities[i]=smallpatts[qsindices[i]].topactivity;
         }
         
         for(j=0;j<nspeciessmall;j++) {
