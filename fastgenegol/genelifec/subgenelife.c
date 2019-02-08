@@ -149,7 +149,7 @@ typedef struct quadnode {           // stored quadtree binary pattern nodes for 
 quadnode quadinit = {0ull,0ull,0ull,0ull,0ull,0,0,1,0,0,0,0};
 quadnode * qimage;
 int quadcollisions = 0;
-HASHTABLE_SIZE_T const* quadtypes;  // pointer to stored hash table keys (which are the quadtypes)
+HASHTABLE_SIZE_T const* quadkeys;   // pointer to stored hash table keys (which are the quadkeys)
 quadnode* quaditems;                // list of quadnode structured items stored in hash table
 typedef struct smallpatt {          // stored binary patterns for 4*4 subarrays or smaller (16bit)
     // unsigned short int size;        // side length of square image corresponding to pattern
@@ -843,9 +843,17 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
         }
     }
     else if(colorfunction==10){                                     //activities for patterns with size weighted colours
+        uint64_t qid;
+        for (ij=0; ij<NN2; ij++) labelcc[ij]=0;
+        if(xdisplay>=0 && ydisplay>=0) {
+            if ((qid=acttraceq[xdisplay+ydisplay*N])) {
+                labelimage(qid, labelcc, 0xffff, 0);                // extract this component and label it white
+            }
+        }
         for (ij=0; ij<N2; ij++) {
             quad=acttraceq[ij];
-            if (quad == rootgene) mask = 0x3f3f3fff;                // grey color for background, all root genes
+            if(labelcc[ij]) mask = 0xffffffff;
+            else if (quad == rootgene) mask = 0x3f3f3fff;                // grey color for background, all root genes
             else {
                 if (activity_size_colormode == 0) {
                     mask = quad * 11400714819323198549ul;
@@ -4167,7 +4175,7 @@ int get_quad_activities(uint64_t quads[], int activities[], int narraysize) {
     quadnode *q;
 
     nspecies = hashtable_count(&quadtable);
-    quadtypes = hashtable_keys(&quadtable);
+    quadkeys = hashtable_keys(&quadtable);
     quaditems = (quadnode *) hashtable_items( &genetable );
     // fprintf(stderr,"The number of different species that have ever existed is %d\n",nspecies);
     if (nspecies > narraysize) {
@@ -4176,11 +4184,11 @@ int get_quad_activities(uint64_t quads[], int activities[], int narraysize) {
     }
 
     for (k=0; k<nspecies; k++) {
-        if((q = (quadnode *) hashtable_find(&quadtable, quadtypes[k])) != NULL) {
-            quads[k] = quadtypes[k];
+        if((q = (quadnode *) hashtable_find(&quadtable, quadkeys[k])) != NULL) {
+            quads[k] = quadkeys[k];
             activities[k] = q->activity;
         }
-        else fprintf(stderr,"get_quad_activities error, no entry for quad %llx in hash table\n", quadtypes[k]);
+        else fprintf(stderr,"get_quad_activities error, no entry for quad %llx in hash table\n", quadkeys[k]);
     }
     return nspecies;
 }
@@ -4843,7 +4851,7 @@ int get_quadnodes(quadnode quadnodes[],int narraysize) {
 
     // these three calls executed through hashactivityquad if colorfunction 9 or 10
     // nallspeciesquad = hashtable_count(&quadtable);
-    // quadtypes = hashtable_keys(&quadtable);
+    // quadkeys = hashtable_keys(&quadtable);
     // quaditems = (quadnode*) hashtable_items( &quadtable );
 
     if (narraysize<nallspeciesquad) {
@@ -5174,7 +5182,7 @@ int activitieshashquad() {  /* count activities of all currently active quad ima
     const int maxact = 10000;
 
     nspecies = hashtable_count(&quadtable);
-    quadtypes = hashtable_keys(&quadtable);
+    quadkeys = hashtable_keys(&quadtable);
     quaditems = (quadnode*) hashtable_items( &quadtable );
 
 
@@ -5218,7 +5226,7 @@ int activitieshashquad() {  /* count activities of all currently active quad ima
         activities = (int *) malloc(nspeciesnow*sizeof(int));
 
         for (i=0; i<nspeciesnow; i++) {                               // set arrays of ids, popln (nr 1 pixels), and activities from hash table
-            qids[i]=quadtypes[qindices[i]];
+            qids[i]=quadkeys[qindices[i]];
             popln[i]=quaditems[qindices[i]].pop1s;
             activities[i]=quaditems[qindices[i]].topactivity;
         }

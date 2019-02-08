@@ -685,7 +685,8 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             pixeldat = "(%d,%d) label %4d nrconn %d" % (x,y,connlabel[y*N+x],connlen[connlabel[y*N+x]])
                         elif colorfunction == 10:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
-                            pixeldat = "(%d,%d) label %4d nrconn %d" % (x,y,connlabel[y*N+x],connlen[connlabel[y*N+x]])  # MODIFY
+                            colorgrid()
+                            pixeldat = "(%d,%d)" % (x,y)
                 elif event.button == 3:          # info on button or single plane choice (selection>=20) right mouse button (-click)
                     mouse_pos = pg.mouse.get_pos()
                     if scalex2:
@@ -731,7 +732,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     genelife.set_displayoneplane(displayoneplane)
                     if not updatesenabled:
                         updatesenabled=True
-                if colorfunction==9:
+                if colorfunction==9 or colorfunction==10:
                     ncomponents=genelife.get_connected_comps(connlabel,connlen,-1,-1)
                     colorgrid()
                 pixeldat = ""
@@ -775,7 +776,8 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             pixeldat = "(%d,%d) label %4d nr.conn %d" % (x,y,connlabel[y*N+x],connlen[connlabel[y*N+x]])
                         elif colorfunction == 10:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
-                            pixeldat = "(%d,%d) label %4d nr.conn %d" % (x,y,connlabel[y*N+x],connlen[connlabel[y*N+x]])  # MODIFY
+                            colorgrid()
+                            pixeldat = "(%d,%d)" % (x,y)
                 elif mouseclicked2:
                     if colorfunction == 2:
                         mouse_pos = pg.mouse.get_pos()
