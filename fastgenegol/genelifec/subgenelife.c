@@ -585,8 +585,13 @@ extern inline unsigned int sqrtupper(unsigned int v) { // smallest integer large
 }
 //.......................................................................................................................................................
 extern inline void setcolor(unsigned int *color,int n) { // for coloring by quad size...
-    // rainbow colors from running rainbow(8) in R : last two are repeats to avoid crash for log2N > 9
-    static const unsigned int rainbow[]={0x7F0000FF, 0x7F7F00FF, 0x007F00FF, 0xFF0000FF, 0xFFFF00FF, 0x00FF00FF, 0x00FFFFFF, 0x0000FFFF, 0xFF00FFFF, 0xFF00FFFF, 0xFF00FFFF};
+    // rainbow colors from running fields::tim.colors(10) in R
+    // last two are repeats to avoid crash for log2N > 9
+
+    static const unsigned int rainbow[]={
+        0x00008FFF, 0x0000FFFF, 0x0070FFFF, 0x00DFFFFF, 0x50FFAFFF, 0xBFFF40FF, 0xFFCF00FF, 0xFF6000FF, 0xEF0000FF, 0x800000FF,0x800000FF
+};
+
     unsigned int mycol;
     mycol = rainbow[n];
     color[0] = (mycol & 0xff000000) >> 6; // R
