@@ -143,6 +143,8 @@ libcd.set_noveltyfilter.restype = None
 libcd.set_noveltyfilter.argtypes = []
 libcd.set_activity_size_colormode.restype = None
 libcd.set_activity_size_colormode.argtypes = []
+libcd.set_gcolors.restype = None
+libcd.set_gcolors.argtypes = []
 
 def get_log2N():
     return libcd.get_log2N()
@@ -281,3 +283,6 @@ def set_noveltyfilter():
 
 def set_activity_size_colormode():
     return libcd.set_activity_size_colormode()
+
+def set_gcolors():
+    return libcd.set_gcolors()

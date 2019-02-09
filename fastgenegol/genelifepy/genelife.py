@@ -53,6 +53,7 @@ oldymaxq = ymaxq
 maxPlane = 4
 offdx = offdy = offdt = 0
 quadrants = -1
+gcolor = 0
 
                                          # counter and toggle initialization
 
@@ -474,7 +475,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     global N,NbP
     global gol,golg,golgstats
     global connlabel,connlen,ncomponents
-    global colorfunction
+    global colorfunction,gcolor
     global ymax,ymaxq,oldymax,oldymaxq
     global updatesenabled
     global rulemod,repscheme,survivalmask,birthmask,overwritemask,ancselectmask,selection,ncoding,displayplanes
@@ -525,6 +526,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     oldymax = genelife.setget_act_ymax(ymax)
     oldymaxq = genelife.setget_act_ymaxq(ymaxq)
     displayoneplane=64
+    gcolor=0
 
     if selection>=16 & selection<19:
         displayplanes = (0x1<<NbP)-1
@@ -843,12 +845,16 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                         ymaxq = ymaxq / 2
                         oldymaxq = genelife.setget_act_ymaxq(ymaxq)
                         print 'step',framenr,'new ymaxq =',ymaxq
+                elif event.key == pg.K_g:
+                    if colorfunction == 9:
+                        gcolor = gcolor-1
+                        genelife.set_gcolors()
+                        print 'step',framenr,'new gcolor =',gcolor
                 elif event.key == pg.K_n:
                     noveltyfilter=1-noveltyfilter
                     print 'step',framenr,"noveltyfilter changed to ",noveltyfilter
                     genelife.set_noveltyfilter()
                 elif event.key == pg.K_p:
-                    
                     activity_size_colormode=(activity_size_colormode+1)%4
                     print 'step',framenr,"activity_size_colormode changed to ",activity_size_colormode
                     genelife.set_activity_size_colormode()
@@ -1007,6 +1013,7 @@ def parhelp():
     print "left mouse  ","extract information about local state inside the array, or control buttons below"
     print "right mouse ","choose single plane for GoL display in colorfunction 2 for selection 16-19"
     print "<- , ->     ","decrement or increment the colorfunction analysis type mod 11"
+    print "g           ","toggle on/off inherited coloring of connected components from overlapping components"
     print "h           ","print this help"
     print "H           ","toggle horizon mode on or off: upper half of array obeys unmodified GoL rule"
     print "<space>     ","pause simulation, allowing ongoing display control"

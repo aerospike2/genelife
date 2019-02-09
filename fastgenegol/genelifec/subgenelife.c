@@ -62,6 +62,7 @@ int initfield = 0;                  // 0 input from random field of random or st
 int colorfunction = 0;              // color function choice of 0: hash or 1: functional (color classes depends on selection parameter)
                                     // 2: as in 1 but color sites where last step was non GoL rule yellow, 3: as in 2 but yellow if state produced by non GoL
                                     // 4: activities 5: genealogies without time 6: genealogies with time 7: genealogies with time and activity 8: gliders
+                                    // 9: connected components 10 : connected component activities
 #define ASCII_ESC 27                /* escape for printing terminal commands, such as cursor repositioning : only used in non-graphic version */
 //-----------------------------------------masks for named repscheme bits (selection 0-7) ----------------------------------------------------------------
 #define R_0_2sel_3live     0x1      /* 1: for 3-live-n birth, employ selection on two least different live neighbours for ancestor */
@@ -229,19 +230,20 @@ typedef struct component {          // data structure for identified connected c
     short unsigned int patt;        // for small components of size 4x4 pixels or less, the image is encoded directly in the pattern patt
     uint64_t quad;                  // hashkey for quadtree node of subimage for component
     unsigned int pixels;            // number of pixels on
-    unsigned int overlaps;          // total overlaps of component with other components (ensure structure is whole nrr of 64-bit words for ndarray python comm)
+    unsigned int gcolor  ;          // inherited drifting color mix from connected components (ensure structure is whole nrr of 64-bit words for ndarray python comm)
 } component;
 component complist[NLM];            // current array of components
+component oldcomplist[NLM];         // old (previous time step) list of components
 int ncomponents = 0;                // current number of components (= current number of labels)
-int oldncomponents = 0;             // number of components in previuous time step
+int oldncomponents = 0;             // number of components in previous time step
 typedef struct connection {         // connection of connected component at time t to another component at t-1
     short unsigned int oldlab;      // label at time t-1
     short unsigned int newlab;      // label at time t
     unsigned int next;              // next connection index in list of backward connections for a given labelled component at time t (newlab)
     unsigned int nextf;             // next connection index in list of forward connections for a given labelled component at time t-1 (oldlab)
     unsigned int overlap;           // sum of neighboring pixels (9-nbhd) between old and new component
-    unsigned int woverlap;          // integer permil overlap out of all forward connections from old component i.e. int (1000*overlap/sum(overlaps))
-    unsigned int aoverlap;          // integer permil woverlap out of all backward connections from new component i.e. int (1000*woverlap/sum(woverlaps))
+    float woverlap;                 // weighted overlap out of all forward connections from old component i.e. overlap/sum(overlaps))
+    float aoverlap;                 // weighted woverlap out of all backward connections from new component i.e. woverlap/sum(woverlaps))
 } connection;
 connection connections[N2];         // open memory reservoir of connection nodes to use in connection lists
 unsigned int connlists[NLM];        // entry points for connection list corresponding to each labelled component
@@ -251,10 +253,12 @@ unsigned int connlenf[NLM];         // lengths of connection lists for connected
 unsigned int connpref[NLM];         // preferred backward connected component at time t-1 for each component at time t
 unsigned int connpreff[NLM];        // preferred forward connected component at time t for each component at time t-1
 int connused = 0;                   // used connection nodes
+int gcolors = 0;                    // use inherited colors to color connected components
 //............................................... optimal linear assignment t-1 to t ....................................................................
 // #include "lapjv.h"               // modified from Tomas Kazmar python interfaced implementation of Jonker-Volgenant LAPMOD algorithm, if using lapmod.c
 unsigned int iilap[NLM];            // indices of start of each variable length row in sparse cost matrix : first entry 0, last entry nclap
 unsigned int cclap[N2];             // sparse cost matrix for mapping connected components at t-1 to t (overlaps) containing nclap entries
+unsigned int recolor[NLM];          // recolor connected component based on colors of connected components and random drift
 short unsigned int kklap[N2];       // column indices for successive entries in cost matrix
 short unsigned int xlap[NLM];       // returned list of assignments: columns assigned to rows
 short unsigned int ylap[NLM];       // returned list of assignments: rows assigned to columns
@@ -480,6 +484,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // set_vscrolling       set vertical scrolling to track fronts of growth in vertical upwards direction
 // set_noveltyfilter    set novelty filter for darkening already encountered components in connected component display (colorfunction 9)
 // set_activity_size_colormode set colormode by size for colorfunction 10 : 0 by ID  1 log2 enclosing square size 2 use #pixels 3 use sqrt(#pixels)
+// set_gcolors          set connected component colors as inherited colors from colliding connected components with random drift
 //.......................................................................................................................................................
 // get_log2N            get the current log2N value from C to python
 // get_curgol           get current gol array from C to python
@@ -591,9 +596,52 @@ extern inline void setcolor(unsigned int *color,int n) { // for coloring by quad
 
     unsigned int mycol;
     mycol = rainbow[n];
-    color[0] = (mycol & 0xff000000) >> 6; // B
-    color[1] = (mycol & 0xff0000) >> 4;   // G
-    color[2] = (mycol & 0xff00) >> 2;     // R
+    color[2] = (mycol >> 24) & 0xff; // B
+    color[1] = (mycol >> 16) & 0xff; // G
+    color[0] = (mycol >> 8) & 0xff;  // R
+}
+//.......................................................................................................................................................
+extern inline unsigned int labelcolor( short unsigned int label) {
+    uint64_t mask;
+    unsigned int color;
+    mask = (uint64_t) label;
+    mask = mask * 11400714819323198549ull;          // map label (quasi-uniformly) into larger unsigned colour space
+    color = mask >> (64 - 32);                      // hash with optimal prime multiplicator down to 32 bits
+    color |= 0x080808ffull;                         // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
+    return color;
+}
+//.......................................................................................................................................................
+extern inline unsigned int drift( unsigned int color, uint64_t rand) {
+    unsigned int red,green,blue;
+    
+    red = (color >> 8) & 0xff;
+    green = (color >> 16) & 0xff;
+    blue = (color >> 24) & 0xff;
+    red = (red+(rand & 0x3))&0xff;
+    green = (green + ((rand>>8) & 0x3))&0xff;
+    blue = (blue + ((rand>>16) & 0x3))&0xff;
+    color = (red<<8) | (green<<16) | (blue<<24) | 0xff;
+    return color;
+}
+//.......................................................................................................................................................
+extern inline unsigned int mixcolor( short unsigned int label,uint64_t rand) {
+    unsigned int color,conn;
+    float aoverlap;
+    unsigned int red,blue,green;
+
+    blue = green = red = 0;
+    conn = connlists[label];
+    while(conn) {
+        color=oldcomplist[connections[conn].oldlab].gcolor;             // use stored inherited color of old label
+        aoverlap=connections[conn].aoverlap;
+        blue+= ((color>>24)&0xff)*aoverlap;
+        green+=((color>>16)&0xff)*aoverlap;
+        red+=((color>>8)&0xff)*aoverlap;
+        conn=connections[conn].next;
+    }
+    color = ((blue&0xff)<<24) | ((green&0xff)<<16) | ((red&0xff)<<8) | 0xff;
+    color = drift(color,rand);
+    return color;
 }
 //.......................................................................................................................................................
 void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2) {
@@ -803,6 +851,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
         }
     }
     else if(colorfunction==9) {                                     // colorfunction based on unique labelling of separate components in image
+
         for (ij=0; ij<NN2; ij++) labelcc[ij]=relabel[label[ij]];    // transfer labels to interactive working area
         if(xdisplay>=0 && ydisplay>=0) {
             if ((labelxy=label[xdisplay+ydisplay*N])) {
@@ -821,8 +870,9 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 else labelimage(complist[labelxy].patt, labelcc, 0xffff, 0);  // component involves patt not quad
             }
         }
-        
-        for (ij=0; ij<NN2; ij++) {
+ 
+        if (!gcolors) {
+          for (ij=0; ij<NN2; ij++) {
             if (labelcc[ij]) {
                 // quad = (uint64_t) relabel[label[ij]];            // use gene variable simply as label for connected component (no connection with gene)
                 quad = (uint64_t) labelcc[ij];                      // use gene variable simply as label for connected component (no connection with gene)
@@ -843,6 +893,21 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 cgolg[ij] = (int) mask;
             }
             else cgolg[ij] = 0;
+          }
+        }
+        else {                                                       // with gcolors set, color according to computed inherited label colours
+          for (ij=0; ij<NN2; ij++) {
+            if (label[ij]) {
+                unsigned int r,g,b;
+                d=complist[label[ij]].gcolor;
+                b=(d>>24)&0xff;g=(d>>16)&0xff;r=(d>>8)&0xff;
+                b= b>127 ? (255-b)<<1 : b<<1;                       // replace colors
+                g= g>127 ? (255-g)<<1 : g<<1;
+                r= r>127 ? (255-r)<<1 : r<<1;
+                cgolg[ij] = (int) ((b<<24) | (g<<16) | (r<<8) | 0xff);
+            }
+            else cgolg[ij] = 0;
+          }
         }
     }
     else if(colorfunction==10){                                     //activities for patterns with size weighted colours
@@ -871,7 +936,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                     else {fprintf(stderr,"quad pattern not found in colorfunction for activities\n");d=0;}
                     if(d>log2N){fprintf(stderr,"Error in colorfunction 10, size error %d\n",d);d=0;}
                     setcolor(color,d);
-                    mask = (color[0]<<8) | (color[1]<<4) |  (color[2]<<2) | 0xff;
+                    mask = (color[0]<<8) | (color[1]<<16) |  (color[2]<<24) | 0xff;
                 }
                 else {                                                  // color by sqrt of nr of live pixels (up to max value of 255)
                     int popmax = 255;
@@ -2118,6 +2183,7 @@ short unsigned int label_components(uint64_t gol[]) {
     short unsigned int nlabel = 0;                          //   de
     short unsigned int oldnlabel;                           //   with lapmod need also: ret
     short unsigned int lab,conn,connprev,connf,maxlabel;
+    float rsumoverlap;
     int nunique,nzconnect,nremconnect;
     int dx[9]={0,-1,0,1,1,1,0,-1,-1};
     int dy[9]={0,-1,-1,-1,0,1,1,1,0};
@@ -2271,9 +2337,9 @@ short unsigned int label_components(uint64_t gol[]) {
         connf=connlistsf[i];
         maxlabel=0; maxoverlap = 0;
         while(connf) {
-             if(connections[connf].overlap>maxoverlap) {
+            sumoverlap+=connections[connf].overlap;
+            if (connections[connf].overlap>maxoverlap) {
                 maxoverlap=connections[connf].overlap;
-                sumoverlap+=connections[connf].overlap;
                 maxlabel = connections[connf].newlab;
             }
             connf=connections[connf].nextf;
@@ -2281,12 +2347,26 @@ short unsigned int label_components(uint64_t gol[]) {
         if(maxoverlap>overallmaxoverlap) overallmaxoverlap = maxoverlap;
         connpreff[i]=maxlabel;
         
-        connf=connlistsf[i];                                // save weighted permil forward overlaps : .woverlap
+        rsumoverlap = 1.0/(float) sumoverlap;
+        connf=connlistsf[i];                                // save weighted forward overlaps : .woverlap
         while(connf) {
-             if(connections[connf].overlap>maxoverlap) {
-                connections[connf].woverlap=(connections[connf].overlap*1000)/sumoverlap;
-            }
+            connections[connf].woverlap=rsumoverlap*connections[connf].overlap;
             connf=connections[connf].nextf;
+        }
+    }
+    
+    for(i=1;i<=nlabel;i++) {                                 // construct alternative overlap aoverlap from woverlap
+        rsumoverlap = 0.;                                    // reuse rsumoverlap as floating point sum before doing reciprocal
+        conn=connlists[i];
+        while(conn) {
+            rsumoverlap+=connections[conn].woverlap;
+            conn=connections[conn].next;
+        }
+        rsumoverlap = 1.0/rsumoverlap;
+        conn=connlists[i];                                  // save alternative weighted backward overlaps : .aoverlap
+        while(conn) {
+            connections[conn].aoverlap=rsumoverlap*connections[conn].woverlap;
+            conn=connections[conn].next;
         }
     }
 
@@ -2419,9 +2499,14 @@ short unsigned int extract_components(uint64_t gol[]) {
     short unsigned int histside[log2N+1];
     // uint64_t fullpatt;   // debugging
     int wpixels;
-    uint64_t hashkey;
-
-    ncomponents = label_components(gol);                                                                // label connected components
+    uint64_t hashkey,rand;
+    static int first = 1;
+    
+    for(i=1;i<=ncomponents;i++) {
+        oldcomplist[i]=complist[i];                                                                     // copy whole component struct to previous time step list
+    }
+    oldncomponents=ncomponents;
+    ncomponents = label_components(gol);                                                                // label connected components at this time step
     nlabel = ncomponents;
 
     for(i=1;i<=nlabel;i++) {                                                                            // initialize component structures for horizontal scan
@@ -2515,6 +2600,20 @@ short unsigned int extract_components(uint64_t gol[]) {
         }
     }
 
+    
+    if(first) {
+        for(i=1;i<=nlabel;i++) {
+            complist[i].gcolor=labelcolor(i);
+        }
+        first=0;
+    }
+    else {
+        for(i=1;i<=nlabel;i++) {
+            RAND128P(rand);
+            complist[i].gcolor=mixcolor(i,rand);
+        }
+    }
+    
     for(i=0;i<=log2N;i++) {
         histside[i]=0;
     }
@@ -4668,6 +4767,10 @@ void set_noveltyfilter() {
 void set_activity_size_colormode() {
     activity_size_colormode = (activity_size_colormode+1) % 4;
 }
+//.......................................................................................................................................................
+void set_gcolors() {
+    gcolors = 1-gcolors;
+}
 //------------------------------------------------------------------- get ... ---------------------------------------------------------------------------
 int get_log2N() {
     return(log2N);
@@ -4823,7 +4926,8 @@ int get_components(component components[],int narraysize) {
         return -1;
     }
     for (i=1;i<=ncomponents;i++) {
-        components[i-1].N=complist[i].N;
+        components[i-1]=complist[i];
+        /*components[i-1].N=complist[i].N;
         components[i-1].S=complist[i].S;
         components[i-1].W=complist[i].W;
         components[i-1].E=complist[i].E;
@@ -4833,7 +4937,7 @@ int get_components(component components[],int narraysize) {
         components[i-1].patt=complist[i].patt;
         components[i-1].quad=complist[i].quad;
         components[i-1].pixels=complist[i].pixels;
-        // components[i-1].reserve=complist[i].reserve;
+        components[i-1].gcolor=complist[i].gcolor;*/
         /* if (i<100) fprintf(stderr,"Component %d: (N,W,S,E)=(%d,%d,%d,%d), lastrc=%d, label=%d, log2n=%d, patt=%d, quad=%llx, pixels=%d\n",i,
             complist[i].N,complist[i].W,complist[i].S,complist[i].E,complist[i].lastrc,complist[i].label,
             complist[i].log2n,complist[i].patt,complist[i].quad,complist[i].pixels); */
@@ -4873,7 +4977,8 @@ int get_quadnodes(quadnode quadnodes[],int narraysize) {
     }
 
     for (i=0;i<nallspeciesquad;i++) {
-        quadnodes[i].hashkey=quaditems[i].hashkey;
+        quadnodes[i]=quaditems[i];
+        /*quadnodes[i].hashkey=quaditems[i].hashkey;
         quadnodes[i].nw=quaditems[i].nw;
         quadnodes[i].ne=quaditems[i].ne;
         quadnodes[i].sw=quaditems[i].sw;
@@ -4884,7 +4989,7 @@ int get_quadnodes(quadnode quadnodes[],int narraysize) {
         quadnodes[i].pop1s=quaditems[i].pop1s;
         quadnodes[i].firsttime=quaditems[i].firsttime;
         quadnodes[i].lasttime=quaditems[i].lasttime;
-        quadnodes[i].topactivity=quaditems[i].topactivity;
+        quadnodes[i].topactivity=quaditems[i].topactivity;*/
     }
 
     return nallspeciesquad;
@@ -4904,14 +5009,15 @@ int get_genes(genedata genelist[],int narraysize) {
     }
 
     for (i=0;i<nallspeciesquad;i++) {
-        genelist[i].popcount=geneitems[i].popcount;
+        genelist[i]=geneitems[i];
+        /* genelist[i].popcount=geneitems[i].popcount;
         genelist[i].firsttime=geneitems[i].firsttime;
         genelist[i].lasttime=geneitems[i].lasttime;
         genelist[i].lastextinctiontime=geneitems[i].lastextinctiontime;
         genelist[i].activity=geneitems[i].activity;
         genelist[i].nextinctions=geneitems[i].nextinctions;
         genelist[i].gene=geneitems[i].gene;
-        genelist[i].firstancestor=geneitems[i].firstancestor;
+        genelist[i].firstancestor=geneitems[i].firstancestor;*/
     }
 
     return nallspecies;
