@@ -847,7 +847,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                         print 'step',framenr,'new ymaxq =',ymaxq
                 elif event.key == pg.K_g:
                     if colorfunction == 9:
-                        gcolor = gcolor-1
+                        gcolor = (gcolor+1)%10;
                         genelife.set_gcolors()
                         print 'step',framenr,'new gcolor =',gcolor
                 elif event.key == pg.K_n:
