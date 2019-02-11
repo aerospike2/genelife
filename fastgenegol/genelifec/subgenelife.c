@@ -230,7 +230,7 @@ typedef struct component {          // data structure for identified connected c
     short unsigned int patt;        // for small components of size 4x4 pixels or less, the image is encoded directly in the pattern patt
     uint64_t quad;                  // hashkey for quadtree node of subimage for component
     unsigned int pixels;            // number of pixels on
-    unsigned int gcolor  ;          // inherited drifting color mix from connected components (ensure structure is whole nrr of 64-bit words for ndarray python comm)
+    float gcolor  ;                 // inherited drifting color hue mixed from connected comp's (structure needs whole nr of 64-bit words for ndarray python comm.)
 } component;
 component complist[NLM];            // current array of components
 component oldcomplist[NLM];         // old (previous time step) list of components
@@ -611,36 +611,38 @@ extern inline unsigned int labelcolor( short unsigned int label) {
     return color;
 }
 //.......................................................................................................................................................
-extern inline unsigned int drift( unsigned int color, uint64_t rand) {
-    unsigned int red,green,blue;
-    
-    red = (color >> 8) & 0xff;
-    green = (color >> 16) & 0xff;
-    blue = (color >> 24) & 0xff;
-    red = (red+(rand & 0x3))&0xff;
-    green = (green + ((rand>>8) & 0x3))&0xff;
-    blue = (blue + ((rand>>16) & 0x3))&0xff;
-    color = (red<<8) | (green<<16) | (blue<<24) | 0xff;
-    return color;
+extern inline unsigned int rgba( float hue) {                            // converts hue (0..1) to rgb+alpha
+    unsigned int r,g,b;
+    unsigned int k;
+    float hue6 = hue*6.0;
+
+    k = (unsigned int) (6.*hue); if (k==6) k = 0;  // deal with possible round off error
+    r=g=b=0x00;
+    switch (k) {
+        case 0: r = 0xff; g = (unsigned int)((hue6)*256.0);   g = g>0xff?0xff:g;break;
+        case 1: g = 0xff; r = (unsigned int)((2.-hue6)*256.0);r = r>0xff?0xff:r;break;
+        case 2: g = 0xff; b = (unsigned int)((hue6-2.)*256.0);b = b>0xff?0xff:b;break;
+        case 3: b = 0xff; g = (unsigned int)((4.-hue6)*256.0);g = g>0xff?0xff:g;break;
+        case 4: b = 0xff; r = (unsigned int)((hue6-4.)*256.0);r = r>0xff?0xff:r;break;
+        case 5: r = 0xff; b = (unsigned int)((6.-hue6)*256.0);b = b>0xff?0xff:b;break;
+        default: fprintf(stderr,"step %d Error in hut to rgb color switch - case %d out of bounds\n",totsteps,k);
+    }
+    return ((r<<8) | (g<<16) | (b<<24) | 0xff);
 }
 //.......................................................................................................................................................
-extern inline unsigned int mixcolor( short unsigned int label,uint64_t rand) {
-    unsigned int color,conn;
-    float aoverlap;
-    unsigned int red,blue,green;
+extern inline float mixcolor( short unsigned int label,uint64_t rand) {
+    unsigned int conn;
+    float color;
+    const float eps = 0.00001;
 
-    blue = green = red = 0;
-    conn = connlists[label];
+    color = 0.0;
+    conn = connlists[label];                                            // NB conn is not a label but an index in the array of possible connections
     while(conn) {
-        color=oldcomplist[connections[conn].oldlab].gcolor;             // use stored inherited color of old label
-        aoverlap=connections[conn].aoverlap;
-        blue+= ((color>>24)&0xff)*aoverlap;
-        green+=((color>>16)&0xff)*aoverlap;
-        red+=((color>>8)&0xff)*aoverlap;
+        color+= oldcomplist[connections[conn].oldlab].gcolor*connections[conn].aoverlap;                         // increase to 16 bit before doing weighting
         conn=connections[conn].next;
     }
-    color = ((blue&0xff)<<24) | ((green&0xff)<<16) | ((red&0xff)<<8) | 0xff;
-    color = drift(color,rand);
+    color += eps*(float)(rand&0xff);                                          // random drift of color
+    color = color>1.0 ? color-1.0 : color;
     return color;
 }
 //.......................................................................................................................................................
@@ -897,15 +899,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
         }
         else {                                                       // with gcolors set, color according to computed inherited label colours
           for (ij=0; ij<NN2; ij++) {
-            if (label[ij]) {
-                unsigned int r,g,b;
-                d=complist[label[ij]].gcolor;
-                b=(d>>24)&0xff;g=(d>>16)&0xff;r=(d>>8)&0xff;
-                b= b>127 ? (255-b)<<1 : b<<1;                       // replace colors
-                g= g>127 ? (255-g)<<1 : g<<1;
-                r= r>127 ? (255-r)<<1 : r<<1;
-                cgolg[ij] = (int) ((b<<24) | (g<<16) | (r<<8) | 0xff);
-            }
+            if (label[ij]) cgolg[ij] = (int) rgba(complist[label[ij]].gcolor);
             else cgolg[ij] = 0;
           }
         }
@@ -2398,7 +2392,7 @@ short unsigned int label_components(uint64_t gol[]) {
             connf=connlistsf[i];
             while(connf) {
                 lab = connections[connf].newlab;
-                if(connpreff[connpref[lab]]!=lab) {        // only connect to labels that are not preassigned by mutuality to another label
+                if(connpreff[connpref[lab]]!=lab) {           // only connect to labels that are not preassigned by mutuality to another label
                     kklap[nclap]=connections[connf].newlab;   // for maxmatch labels for sparse cost matrix column index kk are newlab : and run from 1 to nlabel
                     cclap[nclap]=connections[connf].overlap ?  (1+overallmaxoverlap-connections[connf].overlap) :  100 * overallmaxoverlap;   // use if minimizing cost
                     // if (cclap[nclap]<0) fprintf(stderr,"error in cost matrix from genelife, negative value at %d\n",nclap);
@@ -2500,7 +2494,6 @@ short unsigned int extract_components(uint64_t gol[]) {
     // uint64_t fullpatt;   // debugging
     int wpixels;
     uint64_t hashkey,rand;
-    static int first = 1;
     
     for(i=1;i<=ncomponents;i++) {
         oldcomplist[i]=complist[i];                                                                     // copy whole component struct to previous time step list
@@ -2601,13 +2594,12 @@ short unsigned int extract_components(uint64_t gol[]) {
     }
 
     
-    if(first) {
+    if(totsteps==0) {                                                                                         // initialize colors to labels for t=0
         for(i=1;i<=nlabel;i++) {
-            complist[i].gcolor=labelcolor(i);
+            complist[i].gcolor=(float)(i-1)/ (float) nlabel;
         }
-        first=0;
     }
-    else {
+    else {                                                                                              // for t>0 mixcolors from overlapping connected components
         for(i=1;i<=nlabel;i++) {
             RAND128P(rand);
             complist[i].gcolor=mixcolor(i,rand);
