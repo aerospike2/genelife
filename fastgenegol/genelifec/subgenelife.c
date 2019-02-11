@@ -630,9 +630,9 @@ extern inline unsigned int rgba( float hue) {                            // conv
     return ((r<<8) | (g<<16) | (b<<24) | 0xff);
 }
 //.......................................................................................................................................................
-extern inline float mixcolor( short unsigned int label,uint64_t rand) {
+extern inline float mixcolor( short unsigned int label,uint64_t rand) { // mix colors from overlapping components, add random drift of colour
     unsigned int conn;
-    float color,color1,color2,x1,y1,x,y;
+    float color,color1,x1,y1,x,y;
     const float eps = 0.0002;
     #define PI 3.14159265
     const float i2pi = 1./(2.*PI);
@@ -640,18 +640,18 @@ extern inline float mixcolor( short unsigned int label,uint64_t rand) {
     color = x = y = 0.0;
     conn = connlists[label];                                            // NB conn is not a label but an index in the array of possible connections
     while(conn) {
-        color1= oldcomplist[connections[conn].oldlab].gcolor;  // mix colors based on aoverlap wieghts
+        color1= oldcomplist[connections[conn].oldlab].gcolor;           // mix colors based on aoverlap weights
         x1 = cosf(2.*PI*color1);                                        // averaging of circular variable requires converting to x,y vector and average
         y1 = sinf(2.*PI*color1);
-        color2 = atan2f(y1,x1)*i2pi;
+        /* color2 = atan2f(y1,x1)*i2pi;
         color2 = color2 < 0. ? color2 + 1. : color2;
-        if (fabsf(color2-color1) > eps) fprintf(stderr,"step %d label %d non inverted arctan color1 %f color2 %f\n",totsteps,label,color1,color2);
+        if (fabsf(color2-color1) > eps) fprintf(stderr,"step %d label %d non inverted arctan color1 %f color2 %f\n",totsteps,label,color1,color2);*/
         x += x1*connections[conn].aoverlap;
         y += y1*connections[conn].aoverlap;
         conn=connections[conn].next;
     }
     color = atan2f(y,x)*i2pi;                                           // atan2 returns principal value in range [-PI, PI]
-    color = color < 0. ? color + 1. : color;                            // for negative values add 2*PI to get back to 0,2PI
+    color = color < 0. ? color + 1. : color;                            // for negative values add 2*PI to get back to range [0,2PI]
     color += eps*(((float)(rand&0xff)) - 127.5);                        // random drift of color
     color = color>1.0 ? color-1.0 : color;
     color = color<0.0 ? color+1.0 : color;
