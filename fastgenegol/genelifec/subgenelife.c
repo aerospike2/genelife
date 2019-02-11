@@ -633,7 +633,7 @@ extern inline unsigned int rgba( float hue) {                            // conv
 extern inline float mixcolor( short unsigned int label,uint64_t rand) { // mix colors from overlapping components, add random drift of colour
     unsigned int conn;
     float color,color1,x1,y1,x,y;
-    const float eps = 0.0002;
+    float eps = 0.0001*gcolors;
     #define PI 3.14159265
     const float i2pi = 1./(2.*PI);
 
