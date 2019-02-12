@@ -1568,6 +1568,35 @@ extern inline void hashgeneactivity(uint64_t gene, const char errorformat[]) {
         else fprintf(stderr,errorformat,4,totsteps,gene);
 }
 //------------------------------------------------------- hash quadtree inline fns ----------------------------------------------------------------------
+extern inline uint16_t rotate16(uint16_t patt) {                                        // rotate bits in 4x4 pattern for 90 deg clockwise rotation
+    uint16_t rotate4[16]={0,2,8,10,1,3,9,11,4,6,12,14,5,7,13,15};
+    uint16_t nw,ne,sw,se;
+    
+    nw=patt&0xf;patt>>=4; nw=rotate4[nw];
+    ne=patt&0xf;patt>>=4; ne=rotate4[ne];
+    sw=patt&0xf;patt>>=4; sw=rotate4[sw];
+    se=patt&0xf;          se=rotate4[se];
+    return sw | (nw<<4) | (se<<8) | (ne<<12) ;
+}
+//.......................................................................................................................................................
+extern inline uint64_t rotate64(uint64_t patt) {                                        // rotate bits in 8x8 pattern for 90 deg clockwise rotation
+    uint64_t nw,ne,sw,se;
+    
+    nw=patt&0xff;patt>>=16; nw=(uint64_t) rotate16((uint16_t) nw);
+    ne=patt&0xff;patt>>=16; ne=(uint64_t) rotate16((uint16_t) ne);
+    sw=patt&0xff;patt>>=16; sw=(uint64_t) rotate16((uint16_t) sw);
+    se=patt&0xff;           se=(uint64_t) rotate16((uint16_t) se);
+    return sw | (nw<<16) | (se<<32) | (ne<<48) ;
+}
+//.......................................................................................................................................................
+extern inline void rotate4x64(uint64_t *nw, uint64_t *ne, uint64_t *sw, uint64_t *se) { // rotate bits in 16x16 pattern for 90 deg clockwise rotation
+    *nw=rotate64(*sw); *ne=rotate64(*sw); *sw=rotate64(*se); *se=rotate64(*ne);
+}
+//.......................................................................................................................................................
+extern inline void rotatequad(uint64_t *nw, uint64_t *ne, uint64_t *sw, uint64_t *se) { // rotate bits in quad pattern for 90 deg clockwise rotation
+// NYI 1. hash_node(*nw,*ne,*sw,*se) 2. lookup hash entry of hash & check id 3. if patt then call rotate4x64 else do 4 calls to rotatequad with subnodes
+}
+//.......................................................................................................................................................
 extern inline uint64_t patt_hash(const uint64_t a, const uint64_t b, const uint64_t c, const uint64_t d) {
                                                         // this hash function works much better than that used in golly for example
     uint64_t a1,b1,c1,d1,r;
