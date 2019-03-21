@@ -373,10 +373,9 @@ def show0(count=True):
     cancol=init_buttons()                           # initialize parameter buttons
     
     colorgrid()
-    # pg.transform.scale2x(scr,screen)       # use this for standard dithered display
     if scalex2:
-        # pg.transform.scale2xact(scr,screen)  # use this for custom pygame no smoother such as in scale2x   python3 need to update pygame in pygame 3
-        pg.transform.scale2x(scr,screen)       # use this for standard dithered display
+        # pg.transform.scale2x(scr,screen)       # use this for standard dithered display
+        pg.transform.scale2xact(scr,screen)    # use this for custom pygame no smoother such as in scale2x
     pg.display.flip()
     if(count):
         genelife.countspecieshash()
@@ -463,8 +462,8 @@ def step(count=True):
     caption = "Gene Life at iteration %d" % framenr
     pg.display.set_caption(caption)
 
-    # pg.transform.scale2x(scr,screen)  # use this for standard dithered display
     if scalex2:
+         # pg.transform.scale2x(scr,screen)  # use this for standard dithered display
          pg.transform.scale2xact(scr,screen)  # use this for custom pygame no smoother
     pg.display.flip()
     if (count):
@@ -947,10 +946,9 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
         elif colorfunction == 10: caption = caption + ("ymaxq %d " % ymaxq)
         if pixeldat: caption = caption + pixeldat
         pg.display.set_caption(caption)
-        # pg.transform.scale2x(scr,screen)   # use this for pygame scale2x with smoother
         if scalex2:
-            # pg.transform.scale2xact(scr,screen)  # use this for custom pygame no smoother    python3 update required of egg
-            pg.transform.scale2x(scr,screen)   # use this for pygame scale2x with smoother
+            pg.transform.scale2xact(scr,screen)  # use this for custom pygame no smoother    python3 update required of egg
+            # pg.transform.scale2x(scr,screen)   # use this for pygame scale2x with smoother
         pg.display.update()                    # copies the screen to the display (or use .flip() but this is slower)
         # pg.display.flip()
 #-----------------------------------------------------------------------------------------------------------
