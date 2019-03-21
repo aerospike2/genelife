@@ -336,9 +336,7 @@ def display_init():
     if (Height <=512):
         scalex2 = True
         screen = pg.display.set_mode([2*Width, 2*Height+32])     # opens the pygame window
-        # screen = pg.display.set_mode((2*Width, 2*Height+32),pg.FULLSCREEN|pg.DOUBLEBUF|pg.HWSURFACE,32) # opens pygame fullscreen : enter/return with key f
-        # screen = pg.display.set_mode((2*Width, 2*Height+32),pg.DOUBLEBUF|pg.OPENGL,32)
-        scr = pg.surface.Surface((Width,Height+16), 0)
+        scr = pg.surface.Surface([Width,Height+16], 0)
     else:
         scalex2 = False
         screen = pg.display.set_mode([Width, Height+16])
@@ -853,16 +851,6 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                         ymaxq = ymaxq // 2
                         oldymaxq = genelife.setget_act_ymaxq(ymaxq)
                         print('step',framenr,'new ymaxq =',ymaxq)
-                if (event.key == pg.K_f):
-                    if scalex2:
-                        screensize=(2*Width, 2*(Height+16))
-                    else:
-                        screensize=(Width, Height+16)
-                    if screen.get_flags() & pg.FULLSCREEN:
-                        screen = pg.display.set_mode(screensize)
-                        # screen = pg.display.set_mode(screensize,pg.DOUBLEBUF|pg.OPENGL,32)
-                    else:
-                        screen = pg.display.set_mode(screensize,pg.FULLSCREEN|pg.DOUBLEBUF|pg.HWSURFACE,32)
                 elif event.key == pg.K_g:
                     if colorfunction == 9:
                         gcolor = (gcolor+1)%10;
