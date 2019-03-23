@@ -5,12 +5,14 @@ from   matplotlib.colors import ListedColormap
 import matplotlib.animation as animation
 import matplotlib
 import genelife_update_module as genelife
+import ctypes
 import sdl2
 import sdl2.ext
-import sdl2.timer
-import ctypes
 
-# converted to python 3 from python 2.7  in Mar 2019
+# conversion to python 3 preparation
+# (i) check all integer divisions : explicit // since / gives float in python 3
+# (ii) check file access with 't' or 'b' options : none (indirectly via pygame only)
+#
 
 # Variables that are read-only in python notebook
 log2N = genelife.get_log2N()                #  log2N=7 => N=128 get value from C library which is where it must be changed
@@ -19,8 +21,8 @@ N2 = N*N
 Nmask = N-1
 Width = N
 Height = N
-NbP = 1
 
+NbP = 1
 gol = np.zeros(N2,np.uint64)
 golg = np.zeros(N2,np.uint64)
 golgstats = np.zeros(N2,np.uint64)
@@ -32,8 +34,8 @@ connlen = np.zeros(N2//4,np.uint32)
 cgrid = np.zeros((N,N),np.int32)
 cgolg =np.zeros(N2,np.int32)
 colorfunction = 0
-surf = None
-window = None
+scr= None
+screen = None
 scalex2 = False
 ncanon=[]
 cancol=[]
@@ -64,8 +66,6 @@ gcolor = 0
 
 cnt = 0
 framenr = 0
-mstime = 0
-framerate=0.0
 savecnt = 0                              # counter for saved images
 randomsoup = 0
 vscrolling = 0
@@ -204,34 +204,8 @@ def packrepscheme(repscheme,survivalmask,overwritemask):
         print("Error: can't pack masks, they are too large!")
     return(repscheme)
 
-#-------------------------------------- SDL implemented graphics routines ----------------------------------
-#  Draws filled rectangle = [x, y, width, height] on the passed surface
-def draw_rect(surface, color, rectangle):
-        sdl_color = sdl2.ext.Color(color[0],color[1],color[2])
-        sdl2.ext.fill(surface, color, rectangle)
-#  Get mouse coordinates
-def mouse_get_pos():
-    mouse32bitstate=sdl2.mouse.SDL_GetMouseState(ctypes.byref(x),ctypes.byref(y))
-    return((x,y))
-#  Set window caption
-def set_caption(title):
-    # sdl2.SDL_SetWindowTitle(window, title)
-    window.title = title
-    # sdl2.ext.Window.DEFAULTPOS = (1000, 32)
-
-"""
-Remaining routines to move to sdl2
-    pg(old).display.set_mode
-    pg(old).surface.Surface       sdl2.ext.Window.get_surface()
-    pg(old).surfarray.pixels2d    sdl2.ext.pixels2d(takes numpy array object as argument)
-    pg(old).transform.scale2x     not needed : fix source size as before and target size as before. Scaling is automatic
-    pg(old).transform.scale2xact  not needed : fix source size as before and target size as before. Scaling is automatic
-    pg(old).display.update   sdl2.ext.Window.refresh
-    pg(old).display.flip     sdl2.ext.Window.refresh
-    screen.get_flags & pg(old).FULLSCREEN
-    pg(old).image.save
-"""
 #-----------------------------------------------------------------------------------------------------------
+
 
 def init_button_arrays():
     """ initialize information for button area at base of display"""
@@ -274,7 +248,7 @@ def init_button_arrays():
 
 def init_buttons():    # initialize parameter buttons
     global repscheme,survivalmask,birthmask,overwritemask,ancselectmask,selection,ncoding,displayplanes
-    global surf,scalex2
+    global scr,scalex2
     global Height,Width
     global log2N,NbP
     global ncanon
@@ -284,8 +258,8 @@ def init_buttons():    # initialize parameter buttons
     else:
         sc = 2
     cancol=init_button_arrays()
-    draw_rect(surf,[50,50,50],[0,Height+4,Width,10*sc])
-    # draw_rect(surf,[50,50,50],[0,Height+6,Width,7*sc])
+    draw_rect(scr,[50,50,50],[0,Height+4,Width,10*sc])
+    # draw_rect(scr,[50,50,50],[0,Height+6,Width,7*sc])
 
     if selection<8:
         for k in range(18):
@@ -295,52 +269,52 @@ def init_buttons():    # initialize parameter buttons
                 bit = (survivalmask>>(k-14))&0x1
             elif k<18:
                 bit = (overwritemask>>(k-16))&0x1
-            draw_rect(surf,cancol[0][k]*(1+bit),[k<<(log2N-6),Height+6,3*sc,3*sc])
+            draw_rect(scr,cancol[0][k]*(1+bit),[k<<(log2N-6),Height+6,3*sc,3*sc])
         j = 0;
         for k in range(len(ncanon[0])):
-            draw_rect(surf,[200,200,200],[(j<<(log2N-6))-1 if j else 0,Height+4,sc,sc])
+            draw_rect(scr,[200,200,200],[(j<<(log2N-6))-1 if j else 0,Height+4,sc,sc])
             j = j+ncanon[0][k]
     elif selection<10:
         for k in range(8):
-            draw_rect(surf,cancol[1][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
-            draw_rect(surf,cancol[1][k+8]*(1+((birthmask>>(k))&0x1)),[(k+8)<<(log2N-6),Height+6,3*sc,3*sc])
-            draw_rect(surf,cancol[1][k+16]*(1+((overwritemask>>(k))&0x1)),[(k+16)<<(log2N-6),Height+6,3*sc,3*sc])
+            draw_rect(scr,cancol[1][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+            draw_rect(scr,cancol[1][k+8]*(1+((birthmask>>(k))&0x1)),[(k+8)<<(log2N-6),Height+6,3*sc,3*sc])
+            draw_rect(scr,cancol[1][k+16]*(1+((overwritemask>>(k))&0x1)),[(k+16)<<(log2N-6),Height+6,3*sc,3*sc])
         j = 0;
         for k in range(len(ncanon[1])):
-            draw_rect(surf,[200,200,200],[(j<<(log2N-6))-1 if j else 0,Height+4,sc,sc])
+            draw_rect(scr,[200,200,200],[(j<<(log2N-6))-1 if j else 0,Height+4,sc,sc])
             j = j+ncanon[1][k]
     elif selection<12:
-        # draw_rect(surf,[200,200,200],[(23<<(log2N-6))-1,Height+6,1,9])
+        # draw_rect(scr,[200,200,200],[(23<<(log2N-6))-1,Height+6,1,9])
         for k in range(23):
-            draw_rect(surf,cancol[2][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
-            draw_rect(surf,cancol[2][k+23]*(1+((birthmask>>(k))&0x1)),[(k+23)<<(log2N-6),Height+6,3*sc,3*sc])
+            draw_rect(scr,cancol[2][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+            draw_rect(scr,cancol[2][k+23]*(1+((birthmask>>(k))&0x1)),[(k+23)<<(log2N-6),Height+6,3*sc,3*sc])
         for k in range(8):
-            draw_rect(surf,cancol[2][k+46]*(1+((overwritemask>>(k))&0x1)),[(k+46)<<(log2N-6),Height+6,3*sc,3*sc])
+            draw_rect(scr,cancol[2][k+46]*(1+((overwritemask>>(k))&0x1)),[(k+46)<<(log2N-6),Height+6,3*sc,3*sc])
         j = 0;
         for k in range(len(ncanon[2])):
-            draw_rect(surf,[200,200,200],[(j<<(log2N-6))-1 if j else 0,Height+4,sc,sc])
+            draw_rect(scr,[200,200,200],[(j<<(log2N-6))-1 if j else 0,Height+4,sc,sc])
             j = j+ncanon[2][k]
     elif selection<14:
-        # draw_rect(surf,[200,200,200],[(32<<(log2N-6))-1,Height+6,1,9])
+        # draw_rect(scr,[200,200,200],[(32<<(log2N-6))-1,Height+6,1,9])
         for k in range(32):
-            draw_rect(surf,cancol[3][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
-            draw_rect(surf,cancol[3][k+32]*(1+((birthmask>>(k))&0x1)),[(k+32)<<(log2N-6),Height+6,3*sc,3*sc])
+            draw_rect(scr,cancol[3][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+            draw_rect(scr,cancol[3][k+32]*(1+((birthmask>>(k))&0x1)),[(k+32)<<(log2N-6),Height+6,3*sc,3*sc])
         for k in range(8):
-            draw_rect(surf,cancol[3][k+64]*(1+((overwritemask>>(k))&0x1)),[(k+32)<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
+            draw_rect(scr,cancol[3][k+64]*(1+((overwritemask>>(k))&0x1)),[(k+32)<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
         j = 0;
         for k in range(len(ncanon[3])):
-            draw_rect(surf,[200,200,200],[(j<<(log2N-6))-1 if j else 0,Height+4,sc,sc])
+            draw_rect(scr,[200,200,200],[(j<<(log2N-6))-1 if j else 0,Height+4,sc,sc])
             j = j+ncanon[3][k]
     elif selection<16:
-        # draw_rect(surf,[200,200,200],[(32<<(log2N-6))-1,Height+6,1,9])
+        # draw_rect(scr,[200,200,200],[(32<<(log2N-6))-1,Height+6,1,9])
         for k in range(32):
-            draw_rect(surf,cancol[4][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
-            draw_rect(surf,cancol[4][k+32]*(1+((birthmask>>(k))&0x1)),[(k+32)<<(log2N-6),Height+6,3*sc,3*sc])
+            draw_rect(scr,cancol[4][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+            draw_rect(scr,cancol[4][k+32]*(1+((birthmask>>(k))&0x1)),[(k+32)<<(log2N-6),Height+6,3*sc,3*sc])
         for k in range(8):
-            draw_rect(surf,cancol[4][k+64]*(1+((overwritemask>>(k))&0x1)),[(k+32)<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
+            draw_rect(scr,cancol[4][k+64]*(1+((overwritemask>>(k))&0x1)),[(k+32)<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
         j = 0;
         for k in range(len(ncanon[4])):
-            draw_rect(surf,[200,200,200],[(j<<(log2N-6))-1 if j else 0,Height+4,sc,sc])
+            draw_rect(scr,[200,200,200],[(j<<(log2N-6))-1 if j else 0,Height+4,sc,sc])
             j = j+ncanon[4][k]
     elif selection>=16 and selection<=19:
         NbP = (ncoding>>16)&0xf
@@ -349,42 +323,48 @@ def init_buttons():    # initialize parameter buttons
             NbP = 16
         for k in range(21):
             if k<NbP:
-                draw_rect(surf,cancol[4][k]*2,[k<<(log2N-6),Height+6,3*sc,3*sc])
+                draw_rect(scr,cancol[4][k]*2,[k<<(log2N-6),Height+6,3*sc,3*sc])
             elif k<16:
-                draw_rect(surf,[80,80,80],[k<<(log2N-6),Height+6,3*sc,3*sc]) // grey
+                draw_rect(scr,[80,80,80],[k<<(log2N-6),Height+6,3*sc,3*sc]) // grey
             elif k<21:
                 bit = (repscheme>>(k-16))&0x1
-                draw_rect(surf,cancol[4][k]*(1+bit),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                draw_rect(scr,cancol[4][k]*(1+bit),[k<<(log2N-6),Height+6,3*sc,3*sc])
     return(cancol)
 #-----------------------------------------------------------------------------------------------------------
 
 def display_init():
-    global window,surf,scalex2,Width,Height
+    global screen,scr,scalex2,Width,Height
     global caption,cnt,cgrid,dispinit
 
     dispinit = True
-    sdl2.ext.init()
-    # clock = sdl2.ext.time.Clock()  # only works in modified version of pysdl2 see https://lukems.github.io/py-sdl2/modules/sdl2ext_time.html
-    caption = "Gene Life at iteration %d" % cnt
     if (Height <=512):
         scalex2 = True
-        window = sdl2.ext.Window(caption,(2*Width, 2*(Height+16)),(1000,60))     # opens sdl2 window, add flags for last parameter
-        surf = sdl2.ext.Window.get_surface(window)             # !!!! FIX to half size # scr = sdl2.surface.Surface((Width,Height+16), 0)
+        screen = pg.display.set_mode([2*Width, 2*Height+32])     # opens the pygame window
+        # screen = pg.display.set_mode((2*Width, 2*Height+32),pg.FULLSCREEN|pg.DOUBLEBUF|pg.HWSURFACE,32) # opens pygame fullscreen : enter/return with key f
+        # screen = pg.display.set_mode((2*Width, 2*Height+32),pg.DOUBLEBUF|pg.OPENGL,32)
+        scr = pg.surface.Surface((Width,Height+16), 0)
     else:
         scalex2 = False
-        window = sdl2.ext.Window(caption,(Width, Height+16),(1000,60))     # opens sdl2 window
-        surf = sdl2.ext.Window.get_surface(window)
+        screen = pg.display.set_mode([Width, Height+16])
+        scr = screen
 
     cnt = 0
-    window.show()
-    sdl2.ext.Window.refresh(window)
-    cgrid=sdl2.ext.pixels2d(surf)
+    caption = "Gene Life at iteration %d" % cnt
+    pg.display.set_caption(caption)
+    
+    if scalex2:
+        pg.transform.scale2x(scr,screen)
+        pg.display.update()
+        cgrid = pg.surfarray.pixels2d(scr)
+    else:
+        pg.display.update()
+        cgrid = pg.surfarray.pixels2d(screen)
 #-----------------------------------------------------------------------------------------------------------
 
 def show0(count=True):
 # display initial population and count species
     global framenr
-    global surf, window, scalex2,caption
+    global scr, screen, scalex2,caption
     # global repscheme,survivalmask,overwritemask,ancselectmask,selection
     global cancol
     global dispinit
@@ -392,15 +372,16 @@ def show0(count=True):
     if not dispinit:
         display_init()
     caption = "Gene Life at iteration %d" % framenr
-    set_caption(caption)
+    pg.display.set_caption(caption)
 
     cancol=init_buttons()                           # initialize parameter buttons
     
     colorgrid()
-    # if scalex2:
-        # pgx.transform.scale2x(scr,screen)       # use this for standard dithered display
-        # pgx.transform.scale2xact(scr,screen)    # use this for custom pygame no smoother such as in scale2x
-    sdl2.ext.Window.refresh(window)
+    if scalex2:
+        # pg.transform.scale2x(scr,screen)       # use this for standard dithered display
+        pg.transform.scale2xact(scr,screen)    # use this for custom pygame no smoother such as in scale2x
+        # for SDL2 see http://lazyfoo.net/tutorials/SDL/05_optimized_surface_loading_and_soft_stretching/index.php
+    pg.display.flip()
     if(count):
         genelife.countspecieshash()
 #-----------------------------------------------------------------------------------------------------------
@@ -476,7 +457,7 @@ def step(count=True):
     """single step and update display and species counts"""
     global framenr
     #global gol,golg,golgstats
-    global surf, window, scalex2
+    global scr, screen, scalex2
     global dispinit
     
     if not dispinit:
@@ -484,12 +465,12 @@ def step(count=True):
 
     update_sim(1, 1, 0, 1, 0, 0, count)
     caption = "Gene Life at iteration %d" % framenr
-    set_caption(caption)
+    pg.display.set_caption(caption)
 
-    # if scalex2:
-         # pgx.transform.scale2x(scr,screen)  # use this for standard dithered display
-         # pgx.transform.scale2xact(scr,screen)  # use this for custom pygame no smoother
-    sdl2.ext.Window.refresh(window)
+    if scalex2:
+         # pg.transform.scale2x(scr,screen)  # use this for standard dithered display
+         pg.transform.scale2xact(scr,screen)  # use this for custom pygame no smoother
+    pg.display.flip()
     if (count):
         genelife.countspecieshash()
 #-----------------------------------------------------------------------------------------------------------
@@ -501,8 +482,8 @@ def step(count=True):
 # keys lower case - decrement, upper case - increment, alt - input value: y,Y ymax q,Q quadrant
 # misc. keys save image
 def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
-    global mstime,framenr,framerate
-    global surf, window, scalex2
+    global framenr
+    global scr, screen, scalex2
     global N,NbP
     global gol,golg,golgstats
     global connlabel,connlen,ncomponents
@@ -519,7 +500,6 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     global maxPlane,offdx,offdy,offdt,quadrants,displayoneplane
     global parhelp
 
-    mstime = sdl2.timer.SDL_GetTicks()
     selectiontext0007 = ["largest value","most ones","scissors-well-stone-paper","not well ordered","two target","predator prey","cooperative","neutral"];
     selectiontext0815 = ["sum fixed","sum variable","edge fixed","edge variable","canonical fixed","canonical variable","2D sym fixed","2D sym variable"];
     selectiontext1623 = ["2-16 plane pairwise","2-16 plane pairwise","2-16 plane nearby","2-16 plane nearby","2-64 plane matching","2-64 plane matching","2-64 plane matching","2-64 plane matching"]
@@ -563,20 +543,18 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     if selection>=16 & selection<19:
         displayplanes = (0x1<<NbP)-1
 
-    while (gogo):
+    while gogo:
         for event in sdl2.ext.get_events():
             if event.type==sdl2.SDL_QUIT:
                 mouseclicked = False
                 gogo = False
-                sdl2.ext.quit()                  # check that quitting SDL here is OK
             if event.type==sdl2.SDL_MOUSEBUTTONDOWN:
-                if event.button == 2:            # quit event loop on middle mouse button (option-click)
+                if event.button == 2:          # quit event loop on middle mouse button (option-click)
                     mouseclicked = False
                     gogo = False
-                    sdl2.ext.quit()              # check that quitting SDL here is OK
                 elif event.button == 1:          # get mouse coords on mouse event
                     mouseclicked = True
-                    mouse_pos = mouse_get_pos()
+                    mousestate = sdl2.mouse.SDL_GetMouseState(mouse_pos)
                     if scalex2:
                         x = (int) (mouse_pos[0]//2)
                         y = (int) (mouse_pos[1]//2)
@@ -600,7 +578,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                                     bit = (overwritemask>>(k-16))&0x1
                                     print(("step %d overwritemask changed to %x" % (framenr,overwritemask)))
                                 survivalmask
-                                draw_rect(surf,cancol[0][k]*(1+bit),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                draw_rect(scr,cancol[0][k]*(1+bit),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 surviveover[0],surviveover[1]= survivalmask,overwritemask      # 2nd elt only picked up in C as overwrite for selection<8
                                 genelife.set_surviveover64(surviveover)
                                 genelife.set_repscheme(repscheme)
@@ -609,15 +587,15 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                                 if k<8:
                                     survivalmask = survivalmask ^ (1<<k)
                                     print(("step %d survivalmask changed to %x" % (framenr,survivalmask)))
-                                    draw_rect(surf,cancol[1][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                    draw_rect(scr,cancol[1][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 elif k<16:
                                     birthmask = birthmask ^ (1<<(k-8))
                                     print(("step %d birthmask changed to %x" % (framenr,birthmask)))
-                                    draw_rect(surf,cancol[1][k]*(1+((birthmask>>(k-8))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                    draw_rect(scr,cancol[1][k]*(1+((birthmask>>(k-8))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 else:
                                     overwritemask = overwritemask ^ (1<<(k-16))
                                     print(("step %d overwritemask changed to %x" % (framenr,overwritemask)))
-                                    draw_rect(surf,cancol[1][k]*(1+((overwritemask>>(k-16))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                    draw_rect(scr,cancol[1][k]*(1+((overwritemask>>(k-16))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 surviveover[0],surviveover[1],surviveover[2]= survivalmask,birthmask,overwritemask
                                 genelife.set_surviveover64(surviveover)
                         elif selection < 12:
@@ -625,15 +603,15 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                                 if k<23:
                                     survivalmask = survivalmask ^ (1<<k)
                                     print(("step %d survivalmask changed to %x" % (framenr,survivalmask)))
-                                    draw_rect(surf,cancol[2][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                    draw_rect(scr,cancol[2][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 elif k<46:
                                     birthmask = birthmask ^ (1<<(k-23))
                                     print(("step %d birthmask changed to %x" % (framenr,birthmask)))
-                                    draw_rect(surf,cancol[2][k]*(1+((birthmask>>(k-23))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                    draw_rect(scr,cancol[2][k]*(1+((birthmask>>(k-23))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 else:
                                     overwritemask = overwritemask ^ (1<<(k-46))
                                     print(("step %d overwritemask changed to %x" % (framenr,overwritemask)))
-                                    draw_rect(surf,cancol[2][k]*(1+((overwritemask>>(k-46))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                    draw_rect(scr,cancol[2][k]*(1+((overwritemask>>(k-46))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 surviveover[0],surviveover[1],surviveover[2]= survivalmask,birthmask,overwritemask
                                 genelife.set_surviveover64(surviveover)
                         elif selection<14:
@@ -641,16 +619,16 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                                 if k<32:
                                     survivalmask = survivalmask ^ (1<<k)
                                     print(("step %d survivalmask changed to %x" % (framenr,survivalmask)))
-                                    draw_rect(surf,cancol[3][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                    draw_rect(scr,cancol[3][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 else:
                                     if y<N+12:
                                         birthmask = birthmask ^ (1<<(k-32))
                                         print(("step %d birthmask changed to %x" % (framenr,birthmask)))
-                                        draw_rect(surf,cancol[3][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                        draw_rect(scr,cancol[3][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                     else:
                                         overwritemask = overwritemask ^ (1<<(k-32))
                                         print(("step %d overwritemask changed to %x" % (framenr,overwritemask)))
-                                        draw_rect(surf,cancol[3][k+32]*(1+((overwritemask>>(k-32))&0x1)),[k<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
+                                        draw_rect(scr,cancol[3][k+32]*(1+((overwritemask>>(k-32))&0x1)),[k<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
                                 surviveover[0],surviveover[1],surviveover[2]= survivalmask,birthmask,overwritemask
                                 genelife.set_surviveover64(surviveover)
                         elif selection<16:
@@ -658,27 +636,27 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                                 if k<32:
                                     survivalmask = survivalmask ^ (1<<k)
                                     print(("step %d survivalmask changed to %x" % (framenr,survivalmask)))
-                                    draw_rect(surf,cancol[4][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                    draw_rect(scr,cancol[4][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 else:
                                     if y<N+12:
                                         birthmask = birthmask ^ (1<<(k-32))
                                         print(("step %d birthmask changed to %x" % (framenr,birthmask)))
-                                        draw_rect(surf,cancol[4][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                        draw_rect(scr,cancol[4][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                     else:
                                         overwritemask = overwritemask ^ (1<<(k-32))
                                         print(("step %d overwritemask changed to %x" % (framenr,overwritemask)))
-                                        draw_rect(surf,cancol[4][k+32]*(1+((overwritemask>>(k-32))&0x1)),[k<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
+                                        draw_rect(scr,cancol[4][k+32]*(1+((overwritemask>>(k-32))&0x1)),[k<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
                                 surviveover[0],surviveover[1],surviveover[2]= survivalmask,birthmask,overwritemask
                                 genelife.set_surviveover64(surviveover)
                         elif selection < 20:
                             if k<NbP:
                                 displayplanes = displayplanes ^ (1<<k)
-                                draw_rect(surf,cancol[4][k]*(1+((displayplanes>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                draw_rect(scr,cancol[4][k]*(1+((displayplanes>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 genelife.set_displayplanes(displayplanes)
                             elif k>=16 and k<21:
                                 repscheme = repscheme ^ (1<<(k-16))
                                 print(("step %d repscheme changed to %x" % (framenr,repscheme)))
-                                draw_rect(surf,cancol[4][k]*(1+((repscheme>>(k-16))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                draw_rect(scr,cancol[4][k]*(1+((repscheme>>(k-16))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 genelife.set_repscheme(repscheme)
                     else: # y<N
                         if colorfunction < 4 or colorfunction == 8:
@@ -698,16 +676,16 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                                 print(("step %d pixel data %s" % (framenr,pixeldat)))
                                 if selection == 8:                              # color rule table rectangles at base by rule derived from gene at current pixel
                                     for k in range(16):
-                                        draw_rect(surf,cancol[1][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                        draw_rect(scr,cancol[1][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 elif selection == 10:
                                     for k in range(46):
-                                        draw_rect(surf,cancol[2][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                        draw_rect(scr,cancol[2][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 elif selection == 12:
                                     for k in range(64):
-                                        draw_rect(surf,cancol[3][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                        draw_rect(scr,cancol[3][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 elif selection == 14:
                                     for k in range(64):
-                                        draw_rect(surf,cancol[4][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                        draw_rect(scr,cancol[4][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
                         elif colorfunction == 4:
                             genelife.get_acttrace(golg)
                             pixeldat = "(%d,%d) gene %016x" % (x,y,golg[x+y*N])
@@ -744,26 +722,26 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                                 buttonhelp = buttonhelp0007[k]
                     mouseclicked2 = True
 
-            elif event.type==sdl2.SDL_MOUSEBUTTONUP:
+            elif event.type==pg.MOUSEBUTTONUP:
                 mouseclicked = False
                 mouseclicked2 = False
                 buttonhelp = ""
                 if selection == 8:                                  # reset mask control buttons to survivalmask and birthmask control colours
                     for k in range(16):
-                        if k<8: draw_rect(surf,cancol[1][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
-                        else: draw_rect(surf,cancol[1][k]*(1+((birthmask>>(k-8))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                        if k<8: draw_rect(scr,cancol[1][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                        else: draw_rect(scr,cancol[1][k]*(1+((birthmask>>(k-8))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                 elif selection == 10:
                     for k in range(46):
-                        if k<23: draw_rect(surf,cancol[2][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
-                        else: draw_rect(surf,cancol[2][k]*(1+((birthmask>>(k-23))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                        if k<23: draw_rect(scr,cancol[2][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                        else: draw_rect(scr,cancol[2][k]*(1+((birthmask>>(k-23))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                 elif selection==12:
                     for k in range(64):
-                        if k<32: draw_rect(surf,cancol[3][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
-                        else: draw_rect(surf,cancol[3][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                        if k<32: draw_rect(scr,cancol[3][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                        else: draw_rect(scr,cancol[3][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                 elif selection==14:
                     for k in range(64):
-                        if k<32: draw_rect(surf,cancol[4][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
-                        else: draw_rect(surf,cancol[4][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                        if k<32: draw_rect(scr,cancol[4][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                        else: draw_rect(scr,cancol[4][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                 if selection>=20:
                     displayoneplane=64
                     genelife.set_displayoneplane(displayoneplane)
@@ -773,7 +751,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     ncomponents=genelife.get_connected_comps(connlabel,connlen,-1,-1)
                     colorgrid()
                 pixeldat = ""
-            elif event.type==sdl2.SDL_MOUSEMOTION:
+            elif event.type==pg.MOUSEMOTION:
                 if mouseclicked:
                     mouse_pos = mouse_get_pos()
                     if scalex2:
@@ -790,16 +768,16 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             pixeldat = "(%d,%d) gol %016x gene %016x status %016x" % (x,y,gol[x+y*N],golg[x+y*N],golgstats[x+y*N])
                             if selection == 8:
                                 for k in range(16):
-                                    draw_rect(surf,cancol[1][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                    draw_rect(scr,cancol[1][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
                             elif selection ==10:
                                 for k in range(46):
-                                    draw_rect(surf,cancol[2][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                    draw_rect(scr,cancol[2][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
                             elif selection ==12:
                                 for k in range(64):
-                                    draw_rect(surf,cancol[3][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                    draw_rect(scr,cancol[3][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
                             elif selection ==14:
                                 for k in range(64):
-                                    draw_rect(surf,cancol[4][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                    draw_rect(scr,cancol[4][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
                         elif colorfunction == 4:
                             genelife.get_acttrace(golg)
                             pixeldat = "(%d,%d) gene %016x" % (x,y,golg[x+y*N])
@@ -843,28 +821,25 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             k=x>>(log2N-6)
                             if k<18:
                                 buttonhelp = buttonhelp0007[k]
-            elif event.type == sdl2.SDL_KEYDOWN:
-                keystatus = sdl2.SDL_GetKeyboardState(None) # keystatus should also reveal if pressed if previous line doesn't work
-                if keystatus[sdl2.SDL_SCANCODE_W]:
-                    print("the w key was pressed")
-                if keystatus[sdl2.SDL_SCANCODE_H]:
-                    if   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT:
+            elif event.type == pg.KEYDOWN:
+                if event.key == pg.K_h:
+                    if pg.key.get_mods() & pg.KMOD_SHIFT:
                         rulemod = rulemod ^ 2   # horizon mode with GoL in upper half toggled on/off
                         print(("step %d rulemod changed to %x (Horizon mode)" % (framenr,rulemod)))
                         genelife.set_rulemod(rulemod)
                     else:
                         parhelp()
-                elif keystatus[sdl2.SDL_SCANCODE_SPACE]:
+                elif event.key == pg.K_SPACE:
                     pause = 1-pause
-                elif keystatus[sdl2.SDL_SCANCODE_RIGHT]:
+                elif event.key == pg.K_RIGHT:
                     colorfunction = (colorfunction + 1) % 11
                     genelife.set_colorfunction(colorfunction)
                     print('step',framenr,'colorfunction changed to',colorfunction)
-                elif keystatus[sdl2.SDL_SCANCODE_LEFT]:
+                elif event.key == pg.K_LEFT:
                     colorfunction = (colorfunction - 1) % 11
                     genelife.set_colorfunction(colorfunction)
                     print('step',framenr,'colorfunction changed to',colorfunction)
-                elif keystatus[sdl2.SDLK_PLUS] or keystatus[sdl2.SDLK_KP_PLUS]:
+                elif event.key == pg.K_PLUS or event.key == pg.K_KP_PLUS or event.key == pg.K_EQUALS:
                     if colorfunction == 4:
                         ymax = ymax * 2
                         oldymax = genelife.setget_act_ymax(ymax)
@@ -873,7 +848,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                         ymaxq = ymaxq * 2
                         oldymaxq = genelife.setget_act_ymaxq(ymaxq)
                         print('step',framenr,'new ymaxq =',ymaxq)
-                elif event.key == keystatus[sdl2.SDL_SCANCODE_MINUS]:
+                elif event.key == pg.K_MINUS:
                     if colorfunction == 4:
                         ymax = ymax // 2
                         oldymax = genelife.setget_act_ymax(ymax)
@@ -882,48 +857,45 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                         ymaxq = ymaxq // 2
                         oldymaxq = genelife.setget_act_ymaxq(ymaxq)
                         print('step',framenr,'new ymaxq =',ymaxq)
-                if keystatus[sdl2.SDL_SCANCODE_F]:
-                    if   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT:
-                        if scalex2:
-                            windowsize=(2*Width, 2*(Height+16))
-                        else:
-                            windowsize=(Width, Height+16)
-                        if window.get_flags() & pg.FULLSCREEN:
-                            window = pg.display.set_mode(windowsize)
-                            # screen = pg.display.set_mode(screensize,pg.DOUBLEBUF|pg.OPENGL,32)
-                        else:
-                            sdl2.SDL_SetWindowFullscreen(window)
+                if (event.key == pg.K_f):
+                    if scalex2:
+                        screensize=(2*Width, 2*(Height+16))
                     else:
-                        print("no of frames per second (av. last 10) = %f" % framerate)
-                elif keystatus[sdl2.SDL_SCANCODE_G]:
+                        screensize=(Width, Height+16)
+                    if screen.get_flags() & pg.FULLSCREEN:
+                        screen = pg.display.set_mode(screensize)
+                        # screen = pg.display.set_mode(screensize,pg.DOUBLEBUF|pg.OPENGL,32)
+                    else:
+                        screen = pg.display.set_mode(screensize,pg.FULLSCREEN|pg.DOUBLEBUF|pg.HWSURFACE,32)
+                elif event.key == pg.K_g:
                     if colorfunction == 9:
                         gcolor = (gcolor+1)%10;
                         genelife.set_gcolors()
                         print('step',framenr,'new gcolor =',gcolor)
-                elif keystatus[sdl2.SDL_SCANCODE_N]:
+                elif event.key == pg.K_n:
                     noveltyfilter=1-noveltyfilter
                     print('step',framenr,"noveltyfilter changed to ",noveltyfilter)
                     genelife.set_noveltyfilter()
-                elif keystatus[sdl2.SDL_SCANCODE_P]:
+                elif event.key == pg.K_p:
                     activity_size_colormode=(activity_size_colormode+1)%4
                     print('step',framenr,"activity_size_colormode changed to ",activity_size_colormode)
                     genelife.set_activity_size_colormode()
                     pixeldat=actsizecoltxt[activity_size_colormode]
-                elif keystatus[sdl2.SDL_SCANCODE_Q]:
-                    if   sdl2.SDL_GetModState() & sdl2.KMOD_ALT:
+                elif event.key == pg.K_q:
+                    if pg.key.get_mods() & pg.KMOD_ALT:
                         quadrants = eval(input("Enter an integer between -1 and 6: "))
-                    elif   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT:
+                    elif pg.key.get_mods() & pg.KMOD_SHIFT:
                         if quadrants < 7: quadrants = quadrants+1
                     else:
                         if quadrants >= 0: quadrants = quadrants-1
                     print('step',framenr,"quadrants changed to ",quadrants)
                     genelife.set_quadrant(quadrants)
-                elif keystatus[sdl2.SDL_SCANCODE_R]:
-                    if   sdl2.SDL_GetModState() & sdl2.KMOD_ALT:
+                elif event.key == pg.K_r:
+                    if pg.key.get_mods() & pg.KMOD_ALT:
                         rbackground,randomsoup = eval(input("Enter rbackground [0-32768] and randomsoup (2 GoL gene, 1 random gene:"))
                         print('step',framenr,"rbackground changed to ",rbackground,"with gene input",randomsoup,"(2 GoL,1 random)")
                         genelife.set_rbackground(rbackground,randomsoup)
-                    elif   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT:
+                    elif pg.key.get_mods() & pg.KMOD_SHIFT:
                         randomsoup = 2 if randomsoup !=2 else 0
                         print('step',framenr,"randomsoup changed to ",randomsoup)
                         genelife.set_randomsoup(randomsoup)
@@ -931,31 +903,27 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                         randomsoup = 1 if randomsoup !=1 else 0
                         print('step',framenr,"randomsoup changed to ",randomsoup)
                         genelife.set_randomsoup(randomsoup)
-                elif keystatus[sdl2.SDL_SCANCODE_S]:
-                    fname = "images/genelife_sel%02d_t%03d_r%08x_s%03d.jpeg" % (selection,framenr,repscheme,savecnt)
-                    err = sdl2.surface.SDL_SaveBMP(window, fname)
-                    if err:
-                        print("error %d file not saved" % err)
-                    else:
-                        print("image saved "+fname)
+                elif event.key == pg.K_s:
+                    pg.image.save(screen, "images/genelife_sel%02d_t%03d_r%08x_s%03d.jpeg" % (selection,framenr,repscheme,savecnt))
+                    print(("image saved "+"images/genelife_sel%02d_t%03d_r%08x_s%03d.jpeg" % (selection,framenr,repscheme,savecnt)))
                     savecnt = savecnt + 1
-                elif keystatus[sdl2.SDL_SCANCODE_T]:
-                    if   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT:
+                elif event.key == pg.K_t:
+                    if pg.key.get_mods() & pg.KMOD_SHIFT:
                         if(offdt<0): offdt = offdt+1
                     elif offdt>-maxPlane+1: offdt = offdt-1
                     print('step',framenr,"offset dt changed to ",offdt)
                     genelife.set_offsets(offdx,offdy,offdt)
-                elif keystatus[sdl2.SDL_SCANCODE_V]:
+                elif event.key == pg.K_v:
                     vscrolling=1-vscrolling
                     print('step',framenr,"vscrolling changed to ",vscrolling)
                     genelife.set_vscrolling()
-                elif keystatus[sdl2.SDL_SCANCODE_X]:
-                    if   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT: offdx = offdx+1
+                elif event.key == pg.K_x:
+                    if pg.key.get_mods() & pg.KMOD_SHIFT: offdx = offdx+1
                     else: offdx = offdx-1
                     print('step',framenr,"offset dx changed to ",offdx)
                     genelife.set_offsets(offdx,offdx,offdt)
-                elif keystatus[sdl2.SDL_SCANCODE_Y]:
-                    if   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT: offdy = offdy+1
+                elif event.key == pg.K_y:
+                    if pg.key.get_mods() & pg.KMOD_SHIFT: offdy = offdy+1
                     else: offdy = offdy-1
                     print('step',framenr,"offset dy changed to ",offdy)
                     genelife.set_offsets(offdx,offdy,offdt)
@@ -982,15 +950,12 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
             caption = caption + ("ncomponents %d " % (ncomponents))
         elif colorfunction == 10: caption = caption + ("ymaxq %d " % ymaxq)
         if pixeldat: caption = caption + pixeldat
-        set_caption(caption)
-        sdl2.ext.Window.refresh(window)                # copies the window to the display
-        if framenr % 10 == 0:
-            mslasttime = mstime
-            mstime = sdl2.timer.SDL_GetTicks()
-            framerate = 1./((mstime-mslasttime)/10000.0)
-        # sdl2.ext.time.Clock.tick()                   # requires modified pysdl2 see sdl2.ext.time.Clock above
-        # framerate = sdl2.ext.time.Clock.get_fps()    # requires modified pysdl2 see sdl2.ext.time.Clock above
-
+        pg.display.set_caption(caption)
+        if scalex2:
+            pg.transform.scale2xact(scr,screen)  # use this for custom pygame no smoother    python3 update required of egg
+            # pg.transform.scale2x(scr,screen)   # use this for pygame scale2x with smoother
+        pg.display.update()                    # copies the screen to the display (or use .flip() but this is slower)
+        # pg.display.flip()
 #-----------------------------------------------------------------------------------------------------------
 
 def parhelp():
@@ -1070,8 +1035,6 @@ def parhelp():
     print("left mouse  ","extract information about local state inside the array, or control buttons below")
     print("right mouse ","choose single plane for GoL display in colorfunction 2 for selection 16-19")
     print("<- , ->     ","decrement or increment the colorfunction analysis type mod 11")
-    print("f           ","print frame rate in fps (average of last 10 frames NYI")
-    print("F           ","toggle to fullscreen NYI")
     print("g           ","toggle on/off inherited coloring of connected components from overlapping components")
     print("h           ","print this help")
     print("H           ","toggle horizon mode on or off: upper half of array obeys unmodified GoL rule")

@@ -15,7 +15,7 @@
 #include <math.h>
 
 //-----------------------------------------------------------size of array -------------------------------------------------------------------------
-const int log2N = 9;                // toroidal array of side length N = 2 to the power of log2N (minimum log2N is 6 i.e. 64x64)
+const int log2N = 10;                // toroidal array of side length N = 2 to the power of log2N (minimum log2N is 6 i.e. 64x64)
 const int N = 0x1 << log2N;         // only side lengths powers of 2 allowed to enable efficient implementation of periodic boundaries
 const int N2 = N*N;                 // number of sites in square-toroidal array
 const int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
