@@ -565,26 +565,28 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     if selection>=16 & selection<19:
         displayplanes = (0x1<<NbP)-1
 
+    event = sdl2.SDL_Event()
     while (gogo):
-        for event in sdl2.ext.get_events():
-            if event.type==sdl2.SDL_QUIT:
+        # for event in sdl2.ext.get_events():
+        if (sdl2.SDL_PollEvent(ctypes.byref(event))):
+            if event.type == sdl2.SDL_QUIT:
                 mouseclicked = False
                 gogo = False
-                sdl2.ext.quit()                  # check that quitting SDL here is OK
-            if event.type==sdl2.SDL_MOUSEBUTTONDOWN:
-                if event.button == 2:            # quit event loop on middle mouse button (option-click)
+                # sdl2.ext.quit()                  # check that quitting SDL here is OK
+            if event.type == sdl2.SDL_MOUSEBUTTONDOWN:
+                if event.button.button == sdl2.SDL_BUTTON_MIDDLE:            # quit event loop on middle mouse button (option-click)
+                    print("DEBUG inside mouse middle button pressed")
                     mouseclicked = False
                     gogo = False
-                    sdl2.ext.quit()              # check that quitting SDL here is OK
-                elif event.button == 1:          # get mouse coords on mouse event
+                    # sdl2.ext.quit()              # check that quitting SDL here is OK
+                elif event.button.button == sdl2.SDL_BUTTON_LEFT:          # get mouse coords on mouse event
                     mouseclicked = True
-                    mouse_pos = mouse_get_pos()
                     if scalex2:
-                        x = (int) (mouse_pos[0]//2)
-                        y = (int) (mouse_pos[1]//2)
+                        x = (int) (event.button.x//2)
+                        y = (int) (event.button.y//2)
                     else:
-                        x = mouse_pos[0]
-                        y = mouse_pos[1]
+                        x = event.button.x
+                        y = event.button.y
                     if y >= N:
                         k=x>>(log2N-6)
                         if selection<8:
@@ -726,14 +728,13 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
                             colorgrid()
                             pixeldat = "(%d,%d)" % (x,y)
-                elif event.button == 3:          # info on button or single plane choice (selection>=20) right mouse button (-click)
-                    mouse_pos = mouse_get_pos()
+                elif event.button.button ==  sdl2.SDL_BUTTON_RIGHT:          # info on button or single plane choice (selection>=20) right mouse button (-click)
                     if scalex2:
-                        x = (int) (mouse_pos[0]//2)
-                        y = (int) (mouse_pos[1]//2)
+                        x = (int) (event.button.x//2)
+                        y = (int) (event.button.y//2)
                     else:
-                        x = mouse_pos[0]
-                        y = mouse_pos[1]
+                        x = event.button.x
+                        y = event.button.y
                     if y >= N:
                         if selection>=20:
                             k=x>>(log2N-6)
@@ -777,13 +778,12 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                 pixeldat = ""
             elif event.type==sdl2.SDL_MOUSEMOTION:
                 if mouseclicked:
-                    mouse_pos = mouse_get_pos()
                     if scalex2:
-                        x = (int) (mouse_pos[0]//2)
-                        y = (int) (mouse_pos[1]//2)
+                        x = (int) (event.motion.x//2)
+                        y = (int) (event.motion.y//2)
                     else:
-                        x = mouse_pos[0]
-                        y = mouse_pos[1]
+                        x = event.motion.x
+                        y = event.motion.y
                     if x < N and y < N:
                         if colorfunction < 4 or colorfunction == 8:
                             genelife.get_curgol(gol)    # get current gol,golg,golgstats arrays
@@ -819,13 +819,12 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             pixeldat = "(%d,%d)" % (x,y)
                 elif mouseclicked2:
                     if colorfunction == 2:
-                        mouse_pos = mouse_get_pos()
                         if scalex2:
-                            x = (int) (mouse_pos[0]//2)
-                            y = (int) (mouse_pos[1]//2)
+                            x = (int) (event.motion.x//2)
+                            y = (int) (event.motion.y//2)
                         else:
-                            x = mouse_pos[0]
-                            y = mouse_pos[1]
+                            x = event.motion.x
+                            y = event.motion.y
                         if y >= N and selection==12:
                             k=x>>(log2N-6)
                             if k<64:
@@ -834,13 +833,12 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             if updatesenabled:
                                 updatesenabled=False
                     if selection<8:
-                        mouse_pos = mouse_get_pos()
                         if scalex2:
-                            x = (int) (mouse_pos[0]//2)
-                            y = (int) (mouse_pos[1]//2)
+                            x = (int) (event.motion.x//2)
+                            y = (int) (event.motion.y//2)
                         else:
-                            x = mouse_pos[0]
-                            y = mouse_pos[1]
+                            x = event.motion.x
+                            y = event.motion.y
                         if y >= N:
                             k=x>>(log2N-6)
                             if k<18:
