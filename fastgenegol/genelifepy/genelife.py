@@ -368,13 +368,15 @@ def display_init():
     caption = "Gene Life at iteration %d" % cnt
     if (Height <=512):
         scalex2 = True
-        window = sdl2.ext.Window(caption,(2*Width, 2*(Height+16)),(1000,60))     # opens sdl2 window, add flags for last parameter
+        window = sdl2.ext.Window(caption,(2*Width, 2*(Height+16)),(1000,60),sdl2.SDL_PIXELFORMAT_BGRA8888)     # opens sdl2 window, add flags for last parameter
         surf = sdl2.ext.Window.get_surface(window)             # !!!! FIX to half size # scr = sdl2.surface.Surface((Width,Height+16), 0)
     else:
         scalex2 = False
         window = sdl2.ext.Window(caption,(Width, Height+16),(1000,60))     # opens sdl2 window
         surf = sdl2.ext.Window.get_surface(window)
-
+    pf = sdl2.SDL_GetWindowPixelFormat(window.window)   # https://stackoverflow.com/questions/24576570/updating-window-position-in-pysdl2-help
+    pfname = sdl2.SDL_GetPixelFormatName(pf)
+    print("pixel format name is %s" % pfname)
     cnt = 0
     window.show()
     sdl2.ext.Window.refresh(window)

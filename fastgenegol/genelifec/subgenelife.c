@@ -961,6 +961,10 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
             cgolg[ij]= (int) mask;
         }
     }
+    for (ij=0; ij<N2; ij++) {                 // convert BGRA format (pygame) to ARGB (PySDL2)
+        uint32_t c = cgolg[ij];
+        cgolg[ij]=((c&0xff)<<24) | ((c&0xff00)<<8) | ((c&0xff0000)>>8) | ((c&0xff000000)>>24);
+    }
 }
 //.......................................................................................................................................................
 void colorgenes(int cgolg[], int NN2) {
