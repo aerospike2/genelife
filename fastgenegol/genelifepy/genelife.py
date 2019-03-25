@@ -11,6 +11,10 @@ import sdl2.timer
 import ctypes
 
 # converted to python 3 from python 2.7  in Mar 2019
+# converted from pygame to PySDL2 with SDL2 in Mar 2019
+version = sdl2.SDL_version()
+sdl2.SDL_GetVersion(ctypes.byref(version))
+print("Running with SDL version %d.%d.%d." % (version.major, version.minor, version.patch))
 
 # Variables that are read-only in python notebook
 log2N = genelife.get_log2N()                #  log2N=7 => N=128 get value from C library which is where it must be changed
