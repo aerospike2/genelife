@@ -375,14 +375,15 @@ def display_init():
         scalex2 = False
         window = sdl2.ext.Window(caption,(Width, Height+16),(1000,60),
                                           sdl2.SDL_WINDOW_SHOWN|sdl2.SDL_WINDOW_INPUT_FOCUS|sdl2.SDL_WINDOW_MOUSE_FOCUS)     # opens sdl2 window
-        surf = sdl2.ext.Window.get_surface(window)
+        surf = sdl2.ext.Window.get_surface(window)  # ARGB format pixels, use SDL_ConvertSurface if need to convert surface efficiently
 
     pf = sdl2.SDL_GetWindowPixelFormat(window.window)   # https://stackoverflow.com/questions/24576570/updating-window-position-in-pysdl2-help
     pfname = sdl2.SDL_GetPixelFormatName(pf)
     # print("pixel format name is %s" % pfname)
 
     cnt = 0
-    window.show()
+    # window.show()
+    sdl2.SDL_RaiseWindow(window.window)
     sdl2.ext.Window.refresh(window)
     cgrid=sdl2.ext.pixels2d(surf)
 #-----------------------------------------------------------------------------------------------------------
@@ -579,8 +580,6 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                 # sdl2.ext.quit()                  # check that quitting SDL here is OK
             if event.type == sdl2.SDL_MOUSEBUTTONDOWN:
                 if   (sdl2.SDL_GetModState() & sdl2.KMOD_ALT) | (event.button.button == sdl2.SDL_BUTTON_MIDDLE): # quit event loop on middle mouse button (option-click)
-                # if event.button.button == sdl2.SDL_BUTTON_MIDDLE:            
-                    print("DEBUG inside mouse middle button pressed")
                     mouseclicked = False
                     gogo = False
                     # sdl2.ext.quit()              # check that quitting SDL here is OK
