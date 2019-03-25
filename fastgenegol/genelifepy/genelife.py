@@ -574,7 +574,8 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                 gogo = False
                 # sdl2.ext.quit()                  # check that quitting SDL here is OK
             if event.type == sdl2.SDL_MOUSEBUTTONDOWN:
-                if event.button.button == sdl2.SDL_BUTTON_MIDDLE:            # quit event loop on middle mouse button (option-click)
+                if   (sdl2.SDL_GetModState() & sdl2.KMOD_ALT) | (event.button.button == sdl2.SDL_BUTTON_MIDDLE): # quit event loop on middle mouse button (option-click)
+                # if event.button.button == sdl2.SDL_BUTTON_MIDDLE:            
                     print("DEBUG inside mouse middle button pressed")
                     mouseclicked = False
                     gogo = False
@@ -910,7 +911,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     genelife.set_activity_size_colormode()
                     pixeldat=actsizecoltxt[activity_size_colormode]
                 elif keystatus[sdl2.SDL_SCANCODE_Q]:
-                    if   sdl2.SDL_GetModState() & sdl2.KMOD_ALT:
+                    if   sdl2.SDL_GetModState() & sdl2.KMOD_LALT:
                         quadrants = eval(input("Enter an integer between -1 and 6: "))
                     elif   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT:
                         if quadrants < 7: quadrants = quadrants+1
@@ -919,7 +920,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     print('step',framenr,"quadrants changed to ",quadrants)
                     genelife.set_quadrant(quadrants)
                 elif keystatus[sdl2.SDL_SCANCODE_R]:
-                    if   sdl2.SDL_GetModState() & sdl2.KMOD_ALT:
+                    if   sdl2.SDL_GetModState() & sdl2.KMOD_LALT:
                         rbackground,randomsoup = eval(input("Enter rbackground [0-32768] and randomsoup (2 GoL gene, 1 random gene:"))
                         print('step',framenr,"rbackground changed to ",rbackground,"with gene input",randomsoup,"(2 GoL,1 random)")
                         genelife.set_rbackground(rbackground,randomsoup)
