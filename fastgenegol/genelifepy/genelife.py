@@ -39,6 +39,7 @@ colorfunction = 0
 surf = None
 window = None
 scalex2 = False
+rescale = False
 ncanon=[]
 cancol=[]
 caption = ""
@@ -218,22 +219,18 @@ def mouse_get_pos():
     mouse32bitstate=sdl2.mouse.SDL_GetMouseState(ctypes.byref(x),ctypes.byref(y))
     return((x,y))
 #  Set window caption
-def set_caption(title):
+def set_caption(window, title):
     # sdl2.SDL_SetWindowTitle(window, title)
     window.title = title
     # sdl2.ext.Window.DEFAULTPOS = (1000, 32)
 
 """
 Remaining routines to move to sdl2
-    pg(old).display.set_mode
     pg(old).surface.Surface       sdl2.ext.Window.get_surface()
-    pg(old).surfarray.pixels2d    sdl2.ext.pixels2d(takes numpy array object as argument)
     pg(old).transform.scale2x     not needed : fix source size as before and target size as before. Scaling is automatic
     pg(old).transform.scale2xact  not needed : fix source size as before and target size as before. Scaling is automatic
-    pg(old).display.update   sdl2.ext.Window.refresh
-    pg(old).display.flip     sdl2.ext.Window.refresh
     screen.get_flags & pg(old).FULLSCREEN
-    pg(old).image.save
+    pg(old).image.save          # was jpg now bmp
 """
 #-----------------------------------------------------------------------------------------------------------
 
@@ -363,14 +360,14 @@ def init_buttons():    # initialize parameter buttons
 #-----------------------------------------------------------------------------------------------------------
 
 def display_init():
-    global window,surf,scalex2,Width,Height
+    global window,surf,scalex2,Width,Height,rescale
     global caption,cnt,cgrid,dispinit
 
     dispinit = True
     sdl2.ext.init()
     # clock = sdl2.ext.time.Clock()  # only works in modified version of pysdl2 see https://lukems.github.io/py-sdl2/modules/sdl2ext_time.html
     caption = "Gene Life at iteration %d" % cnt
-    if (Height <=512):
+    if (Height <= 512 and rescale):            # Not yet ported well to SDL2
         scalex2 = True
         window = sdl2.ext.Window(caption,(2*Width, 2*(Height+16)),(1000,60),sdl2.SDL_PIXELFORMAT_BGRA8888)     # opens sdl2 window, add flags for last parameter
         surf = sdl2.ext.Window.get_surface(window)             # !!!! FIX to half size # scr = sdl2.surface.Surface((Width,Height+16), 0)
@@ -379,9 +376,11 @@ def display_init():
         window = sdl2.ext.Window(caption,(Width, Height+16),(1000,60),
                                           sdl2.SDL_WINDOW_SHOWN|sdl2.SDL_WINDOW_INPUT_FOCUS|sdl2.SDL_WINDOW_MOUSE_FOCUS)     # opens sdl2 window
         surf = sdl2.ext.Window.get_surface(window)
+
     pf = sdl2.SDL_GetWindowPixelFormat(window.window)   # https://stackoverflow.com/questions/24576570/updating-window-position-in-pysdl2-help
     pfname = sdl2.SDL_GetPixelFormatName(pf)
-    print("pixel format name is %s" % pfname)
+    # print("pixel format name is %s" % pfname)
+
     cnt = 0
     window.show()
     sdl2.ext.Window.refresh(window)
@@ -399,7 +398,7 @@ def show0(count=True):
     if not dispinit:
         display_init()
     caption = "Gene Life at iteration %d" % framenr
-    set_caption(caption)
+    set_caption(window,caption)
 
     cancol=init_buttons()                           # initialize parameter buttons
     
@@ -491,7 +490,7 @@ def step(count=True):
 
     update_sim(1, 1, 0, 1, 0, 0, count)
     caption = "Gene Life at iteration %d" % framenr
-    set_caption(caption)
+    set_caption(window,caption)
 
     # if scalex2:
          # pgx.transform.scale2x(scr,screen)  # use this for standard dithered display
@@ -850,10 +849,8 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             if k<18:
                                 buttonhelp = buttonhelp0007[k]
             elif event.type == sdl2.SDL_KEYDOWN:
-                keystatus = sdl2.SDL_GetKeyboardState(None) # keystatus should also reveal if pressed if previous line doesn't work
-                if keystatus[sdl2.SDL_SCANCODE_W]:
-                    print("the w key was pressed")
-                if keystatus[sdl2.SDL_SCANCODE_H]:
+                keystatus = sdl2.SDL_GetKeyboardState(None) # keystatus should also reveal if pressed if event structure doesn't work
+                if keystatus[sdl2.SDL_SCANCODE_H]:          # alternatively use: if event.key == sdl2.SDL_SCANCODE_H:
                     if   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT:
                         rulemod = rulemod ^ 2   # horizon mode with GoL in upper half toggled on/off
                         print(("step %d rulemod changed to %x (Horizon mode)" % (framenr,rulemod)))
@@ -870,7 +867,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     colorfunction = (colorfunction - 1) % 11
                     genelife.set_colorfunction(colorfunction)
                     print('step',framenr,'colorfunction changed to',colorfunction)
-                elif keystatus[sdl2.SDLK_PLUS] or keystatus[sdl2.SDLK_KP_PLUS]:
+                elif event.key == sdl2.SDLK_PLUS or keystatus[sdl2.SDL_SCANCODE_KP_PLUS]:   # note virtual key SDLK_PLUS has no SCANCODE equivalent
                     if colorfunction == 4:
                         ymax = ymax * 2
                         oldymax = genelife.setget_act_ymax(ymax)
@@ -879,7 +876,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                         ymaxq = ymaxq * 2
                         oldymaxq = genelife.setget_act_ymaxq(ymaxq)
                         print('step',framenr,'new ymaxq =',ymaxq)
-                elif event.key == keystatus[sdl2.SDL_SCANCODE_MINUS]:
+                elif keystatus[sdl2.SDL_SCANCODE_MINUS]:
                     if colorfunction == 4:
                         ymax = ymax // 2
                         oldymax = genelife.setget_act_ymax(ymax)
@@ -888,8 +885,10 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                         ymaxq = ymaxq // 2
                         oldymaxq = genelife.setget_act_ymaxq(ymaxq)
                         print('step',framenr,'new ymaxq =',ymaxq)
-                if keystatus[sdl2.SDL_SCANCODE_F]:
+                elif keystatus[sdl2.SDL_SCANCODE_F]:
+                    print("entering key F")
                     if   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT:
+                        print("entering shift key F")
                         if scalex2:
                             windowsize=(2*Width, 2*(Height+16))
                         else:
@@ -900,6 +899,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                         else:
                             sdl2.SDL_SetWindowFullscreen(window)
                     else:
+                        print("entering key f")
                         print("no of frames per second (av. last 10) = %f" % framerate)
                 elif keystatus[sdl2.SDL_SCANCODE_G]:
                     if colorfunction == 9:
@@ -988,7 +988,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
             caption = caption + ("ncomponents %d " % (ncomponents))
         elif colorfunction == 10: caption = caption + ("ymaxq %d " % ymaxq)
         if pixeldat: caption = caption + pixeldat
-        set_caption(caption)
+        set_caption(window, caption)
         sdl2.ext.Window.refresh(window)                # copies the window to the display
         if framenr % 10 == 0:
             mslasttime = mstime
