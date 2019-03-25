@@ -43,8 +43,14 @@ rescale = False
 ncanon=[]
 cancol=[]
 caption = ""
-
 dispinit = False
+
+cgrid2 = np.zeros((N,N),np.int32)
+window2 = None
+surf2 = None
+caption2 = ""
+dispinit2 = False
+
 updatesenabled = True
 displayplanes=0xffff
 displayoneplane=64
@@ -360,8 +366,8 @@ def init_buttons():    # initialize parameter buttons
 #-----------------------------------------------------------------------------------------------------------
 
 def display_init():
-    global window,surf,scalex2,Width,Height,rescale
-    global caption,cnt,cgrid,dispinit
+    global scalex2,Width,Height,rescale,cnt
+    global window,surf,caption,cgrid,dispinit
 
     dispinit = True
     sdl2.ext.init()
@@ -386,18 +392,38 @@ def display_init():
     sdl2.SDL_RaiseWindow(window.window)
     sdl2.ext.Window.refresh(window)
     cgrid=sdl2.ext.pixels2d(surf)
+
+#-----------------------------------------------------------------------------------------------------------
+
+def display_init2():
+    global Width,Height,cnt
+    global window2,surf2,caption2,cgrid,dispinit2
+    
+    dispinit2 = True
+    caption2 = "Gene Life Window 2 at iteration %d" % cnt
+
+    window2 = sdl2.ext.Window(caption2,(2*Width, 2*(Height+16)),(800,360))     # opens sdl2 window
+    # renderer = sdl2.ext.Renderer(window2)
+    surf2 = sdl2.ext.Window.get_surface(window2)  # ARGB format pixels, use SDL_ConvertSurface if need to convert surface efficiently
+    window2.show()
+    # sdl2.SDL_RenderPresent(renderer)
+    # factory = sdl2.ext.SpriteFactory(sdl2.ext.TEXTURE, renderer=renderer)
+    sdl2.ext.Window.refresh(window2)
+    print("in display-init2")
+    # cgrid2=sdl2.ext.pixels2d(surf2)
 #-----------------------------------------------------------------------------------------------------------
 
 def show0(count=True):
 # display initial population and count species
     global framenr
-    global surf, window, scalex2,caption
+    global surf, window, scalex2, caption, dispinit
+    global surf2, window2, caption2, dispinit2
     # global repscheme,survivalmask,overwritemask,ancselectmask,selection
     global cancol
-    global dispinit
-    
+
     if not dispinit:
         display_init()
+        display_init2()
     caption = "Gene Life at iteration %d" % framenr
     set_caption(window,caption)
 
@@ -408,6 +434,7 @@ def show0(count=True):
         # pgx.transform.scale2x(scr,screen)       # use this for standard dithered display
         # pgx.transform.scale2xact(scr,screen)    # use this for custom pygame no smoother such as in scale2x
     sdl2.ext.Window.refresh(window)
+    
     if(count):
         genelife.countspecieshash()
 #-----------------------------------------------------------------------------------------------------------
@@ -483,11 +510,12 @@ def step(count=True):
     """single step and update display and species counts"""
     global framenr
     #global gol,golg,golgstats
-    global surf, window, scalex2
-    global dispinit
+    global surf, window, scalex2, dispinit
+    global surf2, window2, caption2, dispinit2
     
     if not dispinit:
         display_init()
+        display_init2()
 
     update_sim(1, 1, 0, 1, 0, 0, count)
     caption = "Gene Life at iteration %d" % framenr
@@ -509,7 +537,8 @@ def step(count=True):
 # misc. keys save image
 def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     global mstime,framenr,framerate
-    global surf, window, scalex2
+    global surf, window, scalex2, caption, dispinit
+    global surf2, window2, caption2, dispinit2
     global N,NbP
     global gol,golg,golgstats
     global connlabel,connlen,ncomponents
@@ -520,7 +549,6 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     global savecnt
     global cancol
     global Height,Width
-    global dispinit
     global randomsoup,vscrolling,noveltyfilter,activity_size_colormode
     global gogo,pause,mouseclicked,mouseclicked2,pixeldat,paramdat
     global maxPlane,offdx,offdy,offdt,quadrants,displayoneplane
@@ -549,6 +577,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
 
     if not dispinit:
         display_init()
+        display_init2()
     cancol=init_buttons()
     
     surviveover = np.array([survivalmask,birthmask,overwritemask],dtype=np.uint32)
@@ -989,6 +1018,9 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
         if pixeldat: caption = caption + pixeldat
         set_caption(window, caption)
         sdl2.ext.Window.refresh(window)                # copies the window to the display
+        sdl2.ext.fill(surf2, 0)
+        sdl2.SDL_BlitScaled(surf,None,surf2,None)
+        sdl2.ext.Window.refresh(window2)                # copies the 2nd window to the display
         if framenr % 10 == 0:
             mslasttime = mstime
             mstime = sdl2.timer.SDL_GetTicks()
