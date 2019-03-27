@@ -56,12 +56,15 @@ render2 = True                            # whether to use renderer on surface 2
 renderer2 = None
 texture2 = None
 image2 = None
+message2 = None
+font2 = None
+textColor2 = None
 
 grect = sdl2.SDL_Rect()
-grect.x = 0
-grect.y = 0
-grect.w = Width
-grect.h = Height
+grect.x = Width//2
+grect.y = Height//2
+grect.w = Width//2
+grect.h = 20
 
 updatesenabled = True
 displayplanes=0xffff
@@ -409,7 +412,7 @@ def display_init():
 
 def display_init2():
     global Width,Height,cnt
-    global window2,surface2,caption2,cgrid,dispinit2,render2,texture2,renderer2,factory2,cgolg,grect,image2
+    global window2,surface2,caption2,cgrid,dispinit2,render2,texture2,renderer2,factory2,cgolg,grect,image2,message2,font2,textColor2
     
     dispinit2 = True
     caption2 = "Gene Life Window 2 at iteration %d" % cnt
@@ -428,6 +431,22 @@ def display_init2():
         sdl2.SDL_SetRenderDrawColor( sdlrenderer2, 0x00, 0x00, 0x00, 0x00 )
         sdl2.SDL_RenderClear(sdlrenderer2)
         
+        if sdl2.sdlttf.TTF_Init() == -1:
+            print("TTF_Init: %s" % sdl2.sdlttf.TTF_GetError())
+        # font2 = sdl2.sdlttf.TTF_OpenFont( str.encode("lazy.ttf"), 28 )
+        font2 = sdl2.sdlttf.TTF_OpenFont( str.encode("Arial.ttf"), 14 )
+        textColor2=sdl2.SDL_Color()
+        textColor2.r = 255
+        textColor2.a = 255
+        textColor2.g = 255
+        textColor2.b = 255
+        
+        message = sdl2.sdlttf.TTF_RenderText_Solid( font2, str.encode("Genelife frame %5d" % cnt), textColor2 )
+        grect.w = message.contents.w
+        grect.h = message.contents.h
+        if not message:
+            print("error rendering message")
+
         # font_file = sysfont.get_font("freesans")
         # print(font_file)
         # font_manager = sdl2.ext.FontManager(font_file, size=24)
@@ -441,6 +460,8 @@ def display_init2():
         sdl2.ext.fill(surface2.contents, 0)
         image2=factory2.from_surface(surface2)
         sdl2.SDL_RenderCopy(sdlrenderer2, image2.texture, None, None)
+        message2 = factory2.from_surface(message)
+        sdl2.SDL_RenderCopy(sdlrenderer2, message2.texture, None, grect)
         sdl2.SDL_RenderPresent(sdlrenderer2)
 
         # texture2 = sdl2.SDL_CreateTextureFromSurface(renderer2, surface2);    # destroy with sdl2.SDL_DestroyTexture(texture2)
@@ -584,7 +605,7 @@ def step(count=True):
 def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     global mstime,framenr,framerate
     global surface, window, scalex2, caption, dispinit
-    global surface2, window2, caption2, dispinit2, grect, render2, renderer2, factory2, image2
+    global surface2, window2, caption2, dispinit2, grect, render2, renderer2, factory2, image2, message2, font2, textColor2
     global N,NbP
     global gol,golg,golgstats
     global connlabel,connlen,ncomponents
@@ -1074,6 +1095,11 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                 sdl2.SDL_BlitScaled(surface,None,surface2,None)
                 image2=factory2.from_surface(surface2)
                 sdl2.SDL_RenderCopy(sdlrenderer2, image2.texture, None, None)  # last two parameters are source and dest rect (e.g. grect)
+                message = sdl2.sdlttf.TTF_RenderText_Solid( font2, str.encode("Genelife frame %5d" % cnt), textColor2 )
+                message2 = factory2.from_surface(message)
+                grect.w = message.contents.w
+                grect.h = message.contents.h
+                sdl2.SDL_RenderCopy(sdlrenderer2, message2.texture, None, grect)
                 sdl2.SDL_RenderPresent(sdlrenderer2)
                 
                 """
