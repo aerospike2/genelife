@@ -8,7 +8,9 @@ import genelife_update_module as genelife
 import sdl2
 import sdl2.ext
 import sdl2.timer
+import sdl2.sdlttf
 import ctypes
+# import python_utilities
 
 # converted to python 3 from python 2.7  in Mar 2019
 # converted from pygame to PySDL2 with SDL2 in Mar 2019
@@ -50,9 +52,16 @@ window2 = None
 surface2 = None
 caption2 = ""
 dispinit2 = False
-render2 = False                            # whether to use renderer on surface 2 : NB frees surface2 after defining texture2
+render2 = True                            # whether to use renderer on surface 2 : NB frees surface2 after defining texture2
 renderer2 = None
 texture2 = None
+image2 = None
+
+grect = sdl2.SDL_Rect()
+grect.x = 0
+grect.y = 0
+grect.w = Width
+grect.h = Height
 
 updatesenabled = True
 displayplanes=0xffff
@@ -400,7 +409,7 @@ def display_init():
 
 def display_init2():
     global Width,Height,cnt
-    global window2,surface2,caption2,cgrid,dispinit2,render2,texture2,renderer2
+    global window2,surface2,caption2,cgrid,dispinit2,render2,texture2,renderer2,factory2,cgolg,grect,image2
     
     dispinit2 = True
     caption2 = "Gene Life Window 2 at iteration %d" % cnt
@@ -410,19 +419,39 @@ def display_init2():
     
     if render2:                                  # see this tutorial https://dev.to/noah11012/using-sdl2-2d-accelerated-renderering-1kcb
         # renderer2 = sdl2.ext.Renderer(window2)
-        renderer2 = sdl2.SDL_CreateRenderer( window2.window, -1, sdl2.SDL_RENDERER_ACCELERATED | sdl2.SDL_RENDERER_PRESENTVSYNC );
+        # renderer2 = sdl2.SDL_CreateRenderer( window2.window, -1, sdl2.SDL_RENDERER_ACCELERATED | sdl2.SDL_RENDERER_PRESENTVSYNC );
+        renderer2 = sdl2.ext.Renderer(window2)
         if (not renderer2):
             print("Failed to create renderer for window")
             print("SDL2 Error: ", sdl2.SDL_GetError())
+        sdlrenderer2 = renderer2.sdlrenderer
+        sdl2.SDL_SetRenderDrawColor( sdlrenderer2, 0x00, 0x00, 0x00, 0x00 )
+        sdl2.SDL_RenderClear(sdlrenderer2)
+        
+        # font_file = sysfont.get_font("freesans")
+        # print(font_file)
+        # font_manager = sdl2.ext.FontManager(font_file, size=24)
+        # factory2 = sdl2.ext.SpriteFactory(sdl2.ext.TEXTURE, renderer=renderer2,fontmanager=font_manager)
+        
+        factory2 = sdl2.ext.SpriteFactory(sdl2.ext.TEXTURE, renderer=renderer2)
+        # surface2 = sdl2.ext.Window.get_surface(window2)
+        # surface2 = sdl2.SDL_CreateRGBSurface( 0, Width*2, (Height+16)*2, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000 ) # format not recog by fill
+        surface2=sdl2.SDL_CreateRGBSurfaceWithFormat( 0, Width*2, (Height+16)*2, 32, sdl2.SDL_PIXELFORMAT_ARGB32)
+        # print(surface2.contents.format.contents)
+        sdl2.ext.fill(surface2.contents, 0)
+        image2=factory2.from_surface(surface2)
+        sdl2.SDL_RenderCopy(sdlrenderer2, image2.texture, None, None)
+        sdl2.SDL_RenderPresent(sdlrenderer2)
+
         # texture2 = sdl2.SDL_CreateTextureFromSurface(renderer2, surface2);    # destroy with sdl2.SDL_DestroyTexture(texture2)
-        texture2 = sdl2.SDL_CreateTexture( renderer2, sdl2.SDL_PIXELFORMAT_ARGB8888, sdl2.SDL_TEXTUREACCESS_STREAMING, Width, Height+16 );
-        if(not texture2):
-            print("Failed to convert surface into a texture")
-            print("SDL2 Error: ", sdl2.SDL_GetError())
-        surface2 = sdl2.SDL_CreateRGBSurface(0,Width,Height+16, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000 )
-        sdl2.SDL_RenderClear(renderer2)
-        sdl2.SDL_RenderCopy(renderer2, texture2, None, None)
-        sdl2.SDL_RenderPresent(renderer2)
+        # texture2 = sdl2.SDL_CreateTexture( renderer2, sdl2.SDL_PIXELFORMAT_ARGB8888, sdl2.SDL_TEXTUREACCESS_STREAMING, Width, Height+16 );
+        # if(not texture2):
+        #    print("Failed to convert surface into a texture")
+        #    print("SDL2 Error: ", sdl2.SDL_GetError())
+        # surface2 = sdl2.SDL_CreateRGBSurface( 0, Width, Height, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000 )
+        # sdl2.SDL_RenderClear(renderer2)
+        # sdl2.SDL_RenderCopy(renderer2, texture2, None, None)
+        # sdl2.SDL_RenderPresent(renderer2)
         # factory = sdl2.ext.SpriteFactory(sdl2.ext.TEXTURE, renderer=renderer)
     else:
         surface2 = sdl2.ext.Window.get_surface(window2)  # ARGB format pixels, use SDL_ConvertSurface if need to convert surface efficiently
@@ -555,7 +584,7 @@ def step(count=True):
 def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     global mstime,framenr,framerate
     global surface, window, scalex2, caption, dispinit
-    global surface2, window2, caption2, dispinit2
+    global surface2, window2, caption2, dispinit2, grect, render2, renderer2, factory2, image2
     global N,NbP
     global gol,golg,golgstats
     global connlabel,connlen,ncomponents
@@ -1037,9 +1066,17 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
         sdl2.ext.Window.refresh(window)                # copies the window to the display
         
         if render2:
-                sdl2.SDL_SetRenderDrawColor( renderer2, 0xFF, 0xFF, 0xFF, 0xFF );
-                sdl2.SDL_RenderClear( renderer2 );
+                sdlrenderer2 = renderer2.sdlrenderer
+                # sdl2.SDL_SetRenderDrawColor( sdlrenderer2, 0xFF, 0xFF, 0xFF, 0xFF )
+                sdl2.SDL_SetRenderDrawColor( sdlrenderer2, 0x00, 0x00, 0x00, 0x00 )
+                sdl2.SDL_RenderClear( sdlrenderer2 )
+                sdl2.ext.fill(surface2.contents, 0)
+                sdl2.SDL_BlitScaled(surface,None,surface2,None)
+                image2=factory2.from_surface(surface2)
+                sdl2.SDL_RenderCopy(sdlrenderer2, image2.texture, None, None)  # last two parameters are source and dest rect (e.g. grect)
+                sdl2.SDL_RenderPresent(sdlrenderer2)
                 
+                """
                 rect = sdl2.SDL_Rect()
                 rect.x = 0
                 rect.y = 0
@@ -1049,17 +1086,17 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                 sdl2.SDL_LockTexture(texture2, rect, ctypes.byref(ctypes.c_void_p(surface2.contents.pixels)), ctypes.byref(ctypes.c_int(surface2.contents.pitch)))
                 # https://stackoverflow.com/questions/4355524/getting-data-from-ctypes-array-into-numpy
                 # buffer = np.core.multiarray.int_asbuffer(surface2.contents.pixels, 8*Width*Height)  # at runtime says xxx not implemented
-                buffer_from_memory = ctypes.pythonapi.PyMemoryView_FromMemory
+                buffer_from_memory = ctypes.pythonapi.PyMemoryView_FromObject
                 buffer_from_memory.restype = ctypes.py_object
-                buffer = buffer_from_memory(ctypes.c_void_p(surface2.contents.pixels), 8*Width*Height)
+                #buffer = buffer_from_memory(ctypes.c_void_p(surface2.contents.pixels), 8*Width*Height)
+                buffer = buffer_from_memory(surface2.contents.pixels, 8*Width*Height)
                 # nppixels = typeslib.as_array((ctypes.c_uint32 * (Height*Width)).from_address(ctypes.c_void_p(surface2.contents.pixels)))
                 nppixels = np.frombuffer(buffer, ctypes.c_uint32)
                 nppixels[:] = cgolg[:]
                 sdl2.SDL_UnlockTexture(texture2)
-
                 sdl2.SDL_RenderCopy( renderer2, texture2, rect, None);
-
                 sdl2.SDL_RenderPresent( renderer2 )
+                """
         else:
             sdl2.ext.fill(surface2, 0)
             sdl2.SDL_BlitScaled(surface,None,surface2,None)
