@@ -415,8 +415,7 @@ def display_init2():
     global window2,surface2,caption2,cgrid,dispinit2,render2,texture2,renderer2,factory2,cgolg,grect,image2,message2,font2,textColor2
     
     dispinit2 = True
-    caption2 = "Gene Life Window 2 at iteration %d" % cnt
-
+    caption2 = "Gene Life Magnified 2X"
     window2 = sdl2.ext.Window(caption2,(2*Width, 2*(Height+16)),(800,360))     # opens sdl2 window
     window2.show()
     
@@ -434,7 +433,7 @@ def display_init2():
         if sdl2.sdlttf.TTF_Init() == -1:
             print("TTF_Init: %s" % sdl2.sdlttf.TTF_GetError())
         # font2 = sdl2.sdlttf.TTF_OpenFont( str.encode("lazy.ttf"), 28 )
-        font2 = sdl2.sdlttf.TTF_OpenFont( str.encode("Arial.ttf"), 14 )
+        font2 = sdl2.sdlttf.TTF_OpenFont( str.encode("Arial.ttf"), 10 )
         textColor2=sdl2.SDL_Color()
         textColor2.r = 255
         textColor2.a = 255
@@ -442,6 +441,8 @@ def display_init2():
         textColor2.b = 255
         
         message = sdl2.sdlttf.TTF_RenderText_Solid( font2, str.encode("Genelife frame %5d" % cnt), textColor2 )
+        grect.x = 20
+        grect.y = 20
         grect.w = message.contents.w
         grect.h = message.contents.h
         if not message:
