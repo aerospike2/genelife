@@ -8,7 +8,7 @@ import genelife_update_module as genelife
 import sdl2
 import sdl2.ext
 import sdl2.timer
-import sdl2.sdlttf
+import sdl2.sdlttf  # install library from https://www.libsdl.org/projects/SDL_ttf/
 import ctypes
 # import python_utilities
 
@@ -59,6 +59,7 @@ image2 = None
 message2 = None
 font2 = None
 textColor2 = None
+windowID2 = None
 
 grect = sdl2.SDL_Rect()
 grect.x = Width//2
@@ -245,14 +246,6 @@ def set_caption(window, title):
     window.title = title
     # sdl2.ext.Window.DEFAULTPOS = (1000, 32)
 
-"""
-Remaining routines to move to sdl2
-    pg(old).surface.Surface       sdl2.ext.Window.get_surface()
-    pg(old).transform.scale2x     not needed : fix source size as before and target size as before. Scaling is automatic
-    pg(old).transform.scale2xact  not needed : fix source size as before and target size as before. Scaling is automatic
-    screen.get_flags & pg(old).FULLSCREEN
-    pg(old).image.save          # was jpg now bmp
-"""
 #-----------------------------------------------------------------------------------------------------------
 
 def init_button_arrays():
@@ -412,11 +405,12 @@ def display_init():
 
 def display_init2():
     global Width,Height,cnt
-    global window2,surface2,caption2,cgrid,dispinit2,render2,texture2,renderer2,factory2,cgolg,grect,image2,message2,font2,textColor2
+    global window2,surface2,caption2,cgrid,dispinit2,render2,texture2,renderer2,factory2,cgolg,grect,image2,message2,font2,textColor2,windowID2
     
     dispinit2 = True
     caption2 = "Gene Life Magnified 2X"
     window2 = sdl2.ext.Window(caption2,(2*Width, 2*(Height+16)),(800,360))     # opens sdl2 window
+    windowID2 = sdl2.SDL_GetWindowID(window2.window)
     window2.show()
     
     if render2:                                  # see this tutorial https://dev.to/noah11012/using-sdl2-2d-accelerated-renderering-1kcb
@@ -436,12 +430,12 @@ def display_init2():
         font2 = sdl2.sdlttf.TTF_OpenFont( str.encode("Arial.ttf"), 10 )
         textColor2=sdl2.SDL_Color()
         textColor2.r = 255
-        textColor2.a = 255
+        textColor2.a = 100
         textColor2.g = 255
         textColor2.b = 255
         
         message = sdl2.sdlttf.TTF_RenderText_Solid( font2, str.encode("Genelife frame %5d" % cnt), textColor2 )
-        grect.x = 20
+        grect.x = Width*2-message.contents.w-20
         grect.y = 20
         grect.w = message.contents.w
         grect.h = message.contents.h
@@ -498,9 +492,7 @@ def show0(count=True):
     cancol=init_buttons()                           # initialize parameter buttons
     
     colorgrid()
-    # if scalex2:
-        # pgx.transform.scale2x(scr,screen)       # use this for standard dithered display
-        # pgx.transform.scale2xact(scr,screen)    # use this for custom pygame no smoother such as in scale2x
+
     sdl2.ext.Window.refresh(window)
     
     if(count):
@@ -589,9 +581,6 @@ def step(count=True):
     caption = "Gene Life at iteration %d" % framenr
     set_caption(window,caption)
 
-    # if scalex2:
-         # pgx.transform.scale2x(scr,screen)  # use this for standard dithered display
-         # pgx.transform.scale2xact(scr,screen)  # use this for custom pygame no smoother
     sdl2.ext.Window.refresh(window)
     if (count):
         genelife.countspecieshash()
@@ -606,7 +595,7 @@ def step(count=True):
 def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     global mstime,framenr,framerate
     global surface, window, scalex2, caption, dispinit
-    global surface2, window2, caption2, dispinit2, grect, render2, renderer2, factory2, image2, message2, font2, textColor2
+    global surface2, window2, caption2, dispinit2, grect, render2, renderer2, factory2, image2, message2, font2, textColor2, windowID2
     global N,NbP
     global gol,golg,golgstats
     global connlabel,connlen,ncomponents
@@ -682,7 +671,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     # sdl2.ext.quit()              # check that quitting SDL here is OK
                 elif event.button.button == sdl2.SDL_BUTTON_LEFT:          # get mouse coords on mouse event
                     mouseclicked = True
-                    if scalex2:
+                    if scalex2 or (event.window.windowID == windowID2):
                         x = (int) (event.button.x//2)
                         y = (int) (event.button.y//2)
                     else:
@@ -830,7 +819,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             colorgrid()
                             pixeldat = "(%d,%d)" % (x,y)
                 elif event.button.button ==  sdl2.SDL_BUTTON_RIGHT:          # info on button or single plane choice (selection>=20) right mouse button (-click)
-                    if scalex2:
+                    if scalex2 or event.window.windowID == windowID2:
                         x = (int) (event.button.x//2)
                         y = (int) (event.button.y//2)
                     else:
@@ -879,7 +868,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                 pixeldat = ""
             elif event.type==sdl2.SDL_MOUSEMOTION:
                 if mouseclicked:
-                    if scalex2:
+                    if scalex2 or event.window.windowID == windowID2:
                         x = (int) (event.motion.x//2)
                         y = (int) (event.motion.y//2)
                     else:
@@ -920,7 +909,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             pixeldat = "(%d,%d)" % (x,y)
                 elif mouseclicked2:
                     if colorfunction == 2:
-                        if scalex2:
+                        if scalex2 or event.window.windowID == windowID2:
                             x = (int) (event.motion.x//2)
                             y = (int) (event.motion.y//2)
                         else:
@@ -934,7 +923,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                             if updatesenabled:
                                 updatesenabled=False
                     if selection<8:
-                        if scalex2:
+                        if scalex2 or event.window.windowID == windowID2:
                             x = (int) (event.motion.x//2)
                             y = (int) (event.motion.y//2)
                         else:
@@ -985,7 +974,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     print("entering key F")
                     if   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT:
                         print("entering shift key F")
-                        if scalex2:
+                        if scalex2 or event.window.windowID == windowID2:
                             windowsize=(2*Width, 2*(Height+16))
                         else:
                             windowsize=(Width, Height+16)
