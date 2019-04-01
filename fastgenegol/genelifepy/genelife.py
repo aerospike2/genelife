@@ -565,6 +565,48 @@ def set_params():
     pr_params()
     
 #-----------------------------------------------------------------------------------------------------------
+#
+# activity: run for N generations and plot the quantiles vs time (semilog)
+# assumes runparams, simparams are set
+
+def activity(N=1000,nquant=10,acttype="live", # all = all genes, live = live genes only,  quad = quad patterns, small = small patterns
+             maxnum=100000,init=True):        # for quads maxnum needs to be bumped up (e.g. > 2*10^6), which slows things down
+    if acttype=="live":
+        doact = genelife.get_activities
+    elif acttype=="all":
+        doact = genelife.get_all_activities
+    elif acttype=="quad":
+        doact = genelife.get_quad_activities
+    else:
+        printf("unknown acttype:  ",acttype)
+
+    activities = np.zeros(maxnum,np.int32)
+
+    data=np.zeros(maxnum,np.uint64)
+    qqq = [[None]*nquant for _ in range(N)]
+    qq = [x/nquant for x in range(nquant)]
+    nspecies = [None]*N
+
+    if init:
+        genelife.initialize_planes(npoffsets)
+        genelife.initialize(runparams,simparams)
+    genelife.genelife_update(1,0,0)
+    nspecies[0]=doact(data,activities)
+
+    for j in range(1,N):
+        ac = [activities[i] for i in range(len(activities)) if activities[i]>1]
+        qqq[j] = np.quantile(ac,qq)
+        genelife.genelife_update(1,0,0)
+        nspecies[j]=doact(data,activities)
+
+    for j in range(10):
+        foo = [qqq[i][j] for i in range(N)]
+        plt.semilogy(foo)
+    plt.show()
+    plt.plot(nspecies);
+
+
+#-----------------------------------------------------------------------------------------------------------
 
 def step(count=True):
     """single step and update display and species counts"""
