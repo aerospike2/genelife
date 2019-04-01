@@ -4,7 +4,7 @@ import matplotlib.colors as mpcolors
 from   matplotlib.colors import ListedColormap
 import matplotlib.animation as animation
 import matplotlib
-import genelife_update_module as genelife
+import genelife_c_interface as genelife
 import sdl2
 import sdl2.ext
 import sdl2.timer

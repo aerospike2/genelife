@@ -109,8 +109,7 @@
 		521C1456214DDE9400E17A8F /* dispgenelife */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = dispgenelife; sourceTree = BUILT_PRODUCTS_DIR; };
 		521C1464214DDF0400E17A8F /* actgenelife */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = actgenelife; sourceTree = BUILT_PRODUCTS_DIR; };
 		521FDCE21F287A6100F08FFB /* fastgenegol */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = fastgenegol; sourceTree = BUILT_PRODUCTS_DIR; };
-		521FDCEB1F287DEE00F08FFB /* genelife_pygame.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = genelife_pygame.py; path = genelifepy/genelife_pygame.py; sourceTree = SOURCE_ROOT; };
-		521FDCEC1F287DEE00F08FFB /* genelife_update_module.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = genelife_update_module.py; path = genelifepy/genelife_update_module.py; sourceTree = SOURCE_ROOT; };
+		521FDCEC1F287DEE00F08FFB /* genelife_c_interface.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = genelife_c_interface.py; path = genelifepy/genelife_c_interface.py; sourceTree = SOURCE_ROOT; };
 		521FDCF01F287E7100F08FFB /* fastgenegol.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgenegol.c; path = genelifec/fastgenegol.c; sourceTree = SOURCE_ROOT; };
 		521FDCF11F287E7100F08FFB /* fastgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgenelife.c; path = genelifec/fastgenelife.c; sourceTree = SOURCE_ROOT; };
 		521FDCF41F287ECE00F08FFB /* fastgol.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgol.c; path = genelifec/fastgol.c; sourceTree = SOURCE_ROOT; };
@@ -206,9 +205,8 @@
 			children = (
 				5206B81421507F2E00394209 /* activity.py */,
 				5206B81321507EF500394209 /* display.py */,
-				521FDCEB1F287DEE00F08FFB /* genelife_pygame.py */,
+				521FDCEC1F287DEE00F08FFB /* genelife_c_interface.py */,
 				52ADC4832244044900F9B46A /* genelife.py */,
-				521FDCEC1F287DEE00F08FFB /* genelife_update_module.py */,
 			);
 			path = genelifepy;
 			sourceTree = "<group>";
