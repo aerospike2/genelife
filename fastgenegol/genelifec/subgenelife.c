@@ -61,7 +61,7 @@ int initfield = 0;                  // 0 input from random field of random or st
                                     // value i>1: initialized to random field on central ixi block only, outside this zero.
 int colorfunction = 0;              // color function choice of 0: hash or 1: functional (color classes depends on selection parameter)
                                     // 2: as in 1 but color sites where last step was non GoL rule yellow, 3: as in 2 but yellow if state produced by non GoL
-                                    // 4: activities 5: genealogies without time 6: genealogies with time 7: genealogies with time and activity 8: gliders
+                                    // 4: activities 5: populations 6: genealogies without time 7: genealogies with time brightness by activity 8: gliders
                                     // 9: connected components 10 : connected component activities
 #define ASCII_ESC 27                /* escape for printing terminal commands, such as cursor repositioning : only used in non-graphic version */
 //-----------------------------------------masks for named repscheme bits (selection 0-7) ----------------------------------------------------------------
@@ -199,6 +199,7 @@ int *livesites = NULL;              // dynamic array pointer for statistics of n
 int *genestats = NULL;              // dynamic array pointer for statistics of number of 4 genotype classes over time
 int *stepstats = NULL;              // dynamic array pointer for statistics of site update types over time
 int *configstats = NULL;            // dynamic array pointer for statistics of gol site configurations (x,y,t) offsets
+uint64_t poptrace[N2];              // scrolled trace of last N time points of population of genes
 uint64_t acttrace[N2];              // scrolled trace of last N time points of activity of genes
 uint64_t acttraceq[N2];             // scrolled trace of last N time points of activity of quad patterns
 unsigned char acttraceqt[N2];       // type of entry in acttraceq : 1 quad, 0 smallpatt (<65536) i.e. corresponding to isnode
@@ -812,6 +813,31 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
             cgolg[ij]= (int) mask;
         }
     }
+    else if(colorfunction==5){                                  //activities
+        int actmax = 0;                                         // need to bring this parameter up to python
+        for (ij=0; ij<N2; ij++) {
+            gene=poptrace[ij];
+            if (gene == rootgene) mask = 0x3f3f3fff;            // grey color for background, all root genes
+            else {
+                if (gene == 0ull) gene = 11778L;                // random color for gene==0
+                mask = gene * 11400714819323198549ul;
+                mask = mask >> (64 - 32);                       // hash with optimal prime multiplicator down to 32 bits
+                mask |= 0x080808ffull;                          // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
+                if(actmax) {
+                    popcount=0;
+                    if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) popcount = genedataptr->popcount;
+                    else fprintf(stderr,"gene not found in colorfunction for activities\n");
+                    if(popcount>actmax) popcount=actmax;
+                    colormax=0;
+                    for(d=0;d<3;d++) if((color[d]=( (mask>>(8+(d<<3))) & 0xff))>colormax) colormax=color[d];
+                    rescalecolor=(log((double)popcount)/log((double)actmax))*((double)0xff/(double)colormax);
+                    for(d=0;d<3;d++) color[d]=(unsigned int) (((double) color[d])*rescalecolor);
+                    for(d=0,mask=0xff;d<3;d++) mask |= color[d]<<((d<<3)+8);
+                }
+            }
+            cgolg[ij]= (int) mask;
+        }
+    }
     else if(colorfunction<8){                                       //genealogies
         for (ij=0; ij<N2; ij++) {
             gene=genealogytrace[ij];
@@ -819,22 +845,21 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
             if (gene == selectedgene) mask = 0xffffffff; else
             if (gene == rootgene) mask = 0x000000ff;                // black color for root
             else {
-                if(colorfunction==7) {
-                    activity = 0;
-                    if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) activity = genedataptr->activity;
-                    else fprintf(stderr,"gene not found in colorfunction for genealogy\n");
-                }
                 if (gene == 0ull) gene = 11778L;                    // random color for gene==0
                 mask = gene * 11400714819323198549ul;
                 mask = mask >> (64 - 32);                           // hash with optimal prime multiplicator down to 32 bits
                 mask |= 0x080808ffull; // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
                 if(colorfunction==7) {                              // rescale color brightness by activity/activitymax
+                    activity = 0;
+                    if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) activity = genedataptr->activity;
+                    else fprintf(stderr,"gene not found in colorfunction for genealogy\n");
                     colormax=0;
                     for(d=0;d<3;d++) if((color[d]=( (mask>>(8+(d<<3))) & 0xff))>colormax) colormax=color[d];
-                    rescalecolor=((double)(activity*0xff))/((double)(activitymax*colormax));         // integer version doesn't work
+                    rescalecolor=0.25+0.75*((double)(activity*255))/((double)(activitymax*colormax));         // integer version doesn't work
                     for(d=0;d<3;d++) color[d]=(unsigned int) (((double) color[d])*rescalecolor);     // rescale colors by activity/activitymax
                     for(d=0,mask=0xff;d<3;d++) mask |= color[d]<<((d<<3)+8);
                 }
+                else {};    // no rescaling of colours for case 6 (formerly cases 5 and 6)
             }
             cgolg[ij]=(int) mask;
         }
@@ -4574,6 +4599,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         }
     }
     for (ij=0; ij<N2; ij++) {
+        poptrace[ij]=rootgene;                 // initialize population traces to root gene
         acttrace[ij]=rootgene;                 // initialize activity traces to root gene
         acttraceq[ij]=rootgene;                // initialize activity traces of patterns to root gene
         acttraceqt[ij]=0;
@@ -5275,9 +5301,9 @@ void countspecieshash() {  /* counts numbers of all different species using qsor
 }
 //------------------------------------------------------------ activitieshash ---------------------------------------------------------------------------
 int activitieshash() {  /* count activities of all currently active gene species */
-    int i, j, ij, ij1, x, nspecies, nspeciesnow, popcnt0, popcnt1;
+    int i, j, ij, ij1, x, nspecies, nspeciesnow, cnt0, cnt1;
     int *gindices,*popln,*activities;
-    double act;
+    double act,pop;
     uint64_t *genes;
     uint64_t gene;
     const int maxact = 10000;
@@ -5320,12 +5346,14 @@ int activitieshash() {  /* count activities of all currently active gene species
             ij1 = ((ij+1)&Nmask)+((ij>>log2N)<<log2N);              // (i+1)%N+j*N;
             // if(ij1>=N2) fprintf(stderr,"error in scroll of acttrace\n");
             acttrace[ij]=acttrace[ij1];
+            poptrace[ij]=poptrace[ij1];
         }
         x=N-1;
     }
     else x=totdisp;
 
     for(i=0;i<N;i++) acttrace[x+i*N]=rootgene;                      // set column gray
+    for(i=0;i<N;i++) poptrace[x+i*N]=rootgene;                      // set column gray
     //for(i=ymax1=0;i<nspeciesnow;i++)                              // ymax1 is current maximum of activities
     //    ymax1 = (activities[i]>ymax1) ? activities[i] : ymax1;
     // if (ymax1>ymax) ymax = ymax*2;                               // autoscale of activities
@@ -5333,24 +5361,37 @@ int activitieshash() {  /* count activities of all currently active gene species
     for(j=0;j<nspeciesnow;j++) {
         // activities[j] = N-1 - (activities[j] * (N-1)) / ymax;    // linear scale, needs truncation if ymax superceded
         act = (double) activities[j];
+        pop = (double) popln[j];
         // activities[j] = (N-1) - (int) ((N-1)*log2(act)/log2ymax);// logarithmic scale, suffers from discrete steps at bottom
         activities[j] = (N-1) - (int) ((N-1)*act/(act+(double)ymax));
+        popln[j] = (N-1) - (int) ((N-1)*pop/(pop+(double)ymax/10.));
         gene = genes[j];
+        
         ij = (x&Nmask)+activities[j]*N;
-        // if(ij >= 0 && ij<N2)
         if(acttrace[ij]==rootgene)                                  // only one genotype to plot
             acttrace[ij] = gene;
         else {                                                      // plot species color with largest current population size if choice of multiple
             if((genedataptr = (genedata *) hashtable_find(&genetable, acttrace[ij])) != NULL)
-               popcnt0 = genedataptr->popcount;
-            else popcnt0 = 0;
+               cnt0 = genedataptr->popcount;
+            else cnt0 = 0;
             if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL)
-               popcnt1 = genedataptr->popcount;
-            else popcnt1 = 0;
-            if(popcnt1 >= popcnt0) acttrace[ij]=gene;
+               cnt1 = genedataptr->popcount;
+            else cnt1 = 0;
+            if(cnt1 >= cnt0) acttrace[ij]=gene;
         }
-        //else
-        //    fprintf(stderr,"error activity ij out of range activities[j] %d\n",activities[j]);
+        
+        ij = (x&Nmask)+popln[j]*N;
+        if(poptrace[ij]==rootgene)                                  // only one genotype to plot
+            poptrace[ij] = gene;
+        else {                                                      // plot species color with largest current activity if choice of multiple
+            if((genedataptr = (genedata *) hashtable_find(&genetable, poptrace[ij])) != NULL)
+               cnt0 = genedataptr->activity;
+            else cnt0 = 0;
+            if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL)
+               cnt1 = genedataptr->activity;
+            else cnt1 = 0;
+            if(cnt1 >= cnt0) poptrace[ij]=gene;
+        }
     }
 
     free(gindices);free(activities);free(genes);free(popln);
@@ -5613,7 +5654,7 @@ int genealogies() {  /* genealogies of all currently active species */
 
     for(ij=0;ij<N2;ij++) genealogytrace[ij]=rootgene;               // initialize genealogytrace to root gene before drawing part of it
 
-    if((colorfunction==6)||(colorfunction==7)) {                                          // time trace of genealogies
+    if(/* (colorfunction==6)||*/colorfunction==7) {                 // time trace of genealogies; formerly 6 or 7 now only 7
       for(i=0;i<nspeciesnow;i++) {
         for(j=0,j1=0;j<jmax;j++) {
             if(gorder[i]>=nspeciesnow) fprintf(stderr,"error in genealogies gorder at i=%d, order value %d out of range\n",i,gorder[i]);
@@ -5639,7 +5680,7 @@ int genealogies() {  /* genealogies of all currently active species */
       }
       // for(i=nspeciesnow;i<N;i++) for(j=0;j<N;j++) genealogytrace[gorder[i]+j*N]=rootgene;
     }
-    else {                                                          // species changes only trace (colorfunction == 5)
+    else {                                                          // species changes only trace (colorfunction == 6)
       for(i=0;i<nspeciesnow;i++) {
         for(j=0;j<jmax;j++) {
             ij=i+j*N;

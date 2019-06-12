@@ -119,7 +119,7 @@ survivalmask = runparams[4] = 0x06       # for selection=8-13 this is the GoL su
 birthmask = runparams[7] = 0x04          # for selection=8-13 this is the GoL birth mask
 ancselectmask = runparams[8] = 0xff      # bit mask for enabling gene-selective choice of ancestor for different birth rules
 colorfunction = runparams[5] = 0         # color function 0(hash), >=1(fnal), 2 nongulstate or color gol planes, 3 notgolrul yellow
-                                         # 4 activities 5 genealogy steps 6 genealogy temporal 7 activity scaled colors
+                                         # 4 activities 5 populations 6 genealogy steps 7 genealogy temporal with activity scaled colors
                                          # 8 glider detection 9 connected component labelling 10 connected component activities
 initfield = runparams[6] = 100           # 1 init via 32x32 genepat.dat, n>1 init via nxn rand array
 nlog2pmut = simparams[0] = 8             # log2 gene mutation probability (0 or >56 means no mutation)
