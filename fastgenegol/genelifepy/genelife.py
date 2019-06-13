@@ -697,7 +697,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
 
     if selection>=16 & selection<19:
         displayplanes = (0x1<<NbP)-1
-
+    
     event = sdl2.SDL_Event()
     while (gogo):
         # for event in sdl2.ext.get_events():
@@ -994,8 +994,8 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     colorfunction = (colorfunction - 1) % 11
                     genelife.set_colorfunction(colorfunction)
                     print('step',framenr,'colorfunction changed to',colorfunction)
-                elif event.key == sdl2.SDLK_PLUS or keystatus[sdl2.SDL_SCANCODE_KP_PLUS]:   # note virtual key SDLK_PLUS has no SCANCODE equivalent
-                    if colorfunction == 4:
+                elif event.key == sdl2.SDLK_PLUS or keystatus[sdl2.SDL_SCANCODE_KP_PLUS]:
+                    if (colorfunction == 4) or (colorfunction == 5):
                         ymax = ymax * 2
                         oldymax = genelife.setget_act_ymax(ymax)
                         print('step',framenr,'new ymax =',ymax)
@@ -1003,8 +1003,8 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                         ymaxq = ymaxq * 2
                         oldymaxq = genelife.setget_act_ymaxq(ymaxq)
                         print('step',framenr,'new ymaxq =',ymaxq)
-                elif keystatus[sdl2.SDL_SCANCODE_MINUS]:
-                    if colorfunction == 4:
+                elif event.key == sdl2.SDLK_MINUS or keystatus[sdl2.SDL_SCANCODE_KP_MINUS]:
+                    if (colorfunction == 4) or (colorfunction == 5):
                         ymax = ymax // 2
                         oldymax = genelife.setget_act_ymax(ymax)
                         print('step',framenr,'new ymax =',ymax)
@@ -1054,7 +1054,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                 elif keystatus[sdl2.SDL_SCANCODE_R]:
                     if   sdl2.SDL_GetModState() & sdl2.KMOD_LALT:
                         rbackground,randomsoup = eval(input("Enter rbackground [0-32768] and randomsoup (3 deletions only, 2 GoL gene, 1 random gene:"))
-                        print('step',framenr,"rbackground changed to ",rbackground,"with gene input",randomsoup,"(3 del,2 GoL,1 random)")
+                        print('step',framenr,"rbackground changed to ",rbackground,"with random mode ",randomsoup)
                         genelife.set_rbackground(rbackground,randomsoup)
                     elif   sdl2.SDL_GetModState() &  sdl2.KMOD_LSHIFT:
                         randomsoup = 2 if randomsoup !=2 else 0
