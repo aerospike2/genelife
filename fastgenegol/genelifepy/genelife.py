@@ -1053,11 +1053,15 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     genelife.set_quadrant(quadrants)
                 elif keystatus[sdl2.SDL_SCANCODE_R]:
                     if   sdl2.SDL_GetModState() & sdl2.KMOD_LALT:
-                        rbackground,randomsoup = eval(input("Enter rbackground [0-32768] and randomsoup (2 GoL gene, 1 random gene:"))
-                        print('step',framenr,"rbackground changed to ",rbackground,"with gene input",randomsoup,"(2 GoL,1 random)")
+                        rbackground,randomsoup = eval(input("Enter rbackground [0-32768] and randomsoup (3 deletions only, 2 GoL gene, 1 random gene:"))
+                        print('step',framenr,"rbackground changed to ",rbackground,"with gene input",randomsoup,"(3 del,2 GoL,1 random)")
                         genelife.set_rbackground(rbackground,randomsoup)
-                    elif   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT:
+                    elif   sdl2.SDL_GetModState() &  sdl2.KMOD_LSHIFT:
                         randomsoup = 2 if randomsoup !=2 else 0
+                        print('step',framenr,"randomsoup changed to ",randomsoup)
+                        genelife.set_randomsoup(randomsoup)
+                    elif   sdl2.SDL_GetModState() &  sdl2.KMOD_RSHIFT:
+                        randomsoup = 3 if randomsoup !=3 else 0
                         print('step',framenr,"randomsoup changed to ",randomsoup)
                         genelife.set_randomsoup(randomsoup)
                     else:
@@ -1256,7 +1260,9 @@ def parhelp():
     print("p           ","rotate activity_size_colormode 0,1,2,3 for (no,log2n,pixels,sqrt(pixels)) size display of activities in color function 10")
     print("q,Q         ","incr or decr quadrant parameter choice : -1 = no quadrants, 0-4 are first 5 bit pairs of repscheme, 5,6 surv and overwrite")
     print("r           ","toggle random soup domain on or off")
-    print("R           ","toggle intermittent feathered random soup domain on or off")
+    print("R leftshift ","toggle intermittent feathered random soup domain on or off")
+    print("R rightshift","toggle random deletion perturbation at rbackground rate on or off")
+    print("alt-r       ","input background rate of perturbation for random soup")
     print("s           ","save current image to file in image subdriectory")
     print("x,X y,Y t,T ","lower (lc) or raise (uc) the (dx,dy,dt) offsets for glider tracking (colorfn 8) (0,0,0)=(all 8 nnb dt=-1)")
     print("v           ","toggle vertical scroll tracking mode : following top most objects and losing lowest objects in contact with 0 row")

@@ -181,6 +181,7 @@ int quadrants=-1;                   // integer choice of bit pair from repscheme
 uint64_t displayplanes;             // mask for displaying planes in selection models 16+
 uint64_t displayoneplane;           // display one plane only if <64, all planes if 64
 int randomsoup=0;                   // 1,2 steady or intermittent random input of genes and gol states into the square central region defined by initfield
+                                    // 3 steady deletion of genes at random rate rbackground
 int rbackground=0;                  // integer background rate of random gene input per frame per site : rate is rbackground/32768 (nonzero overides soup)
                                     // the gene input depends on randomsoup value: 2 GoL 1 random
 int vscrolling=0;                   // whether to do vertical scrolling to track upwards growth (losing all states that fall off downward cliff)
@@ -2748,27 +2749,47 @@ void random_soup(uint64_t gol[],uint64_t golg[],uint64_t newgol[],uint64_t newgo
     unsigned int density;
 
     if(rbackground) {                                           // homogeneous random background at rate rbackground/32768 per site per frame
-        for(ij=0;ij<N2;ij++) {
-            if((rand()&rmask) < rbackground) {
-                if (!newgol[ij]) {                               // if live cell or multiplane, fill with game of life genome or random genome
-                    if(randomsoup!=2 || selection < 8) {            // random gene if randomsoup non zero
-                        RAND128P(randnr);
-                        newgolg[ij] = randnr;
-                        newgol[ij] = 1ull;
+        if(randomsoup<3) {                                      // only create new genes as perturbation if randomsoup<3
+            if(randomsoup < 2 || selection < 8) {               // random gene if randomsoup<2 or selection < 8
+                for(ij=0;ij<N2;ij++) {
+                    if((rand()&rmask) < rbackground) {          // random event
+                        if (!newgol[ij]) {                      // if not live, random genome
+                            newgol[ij] = 1ull;
+                            RAND128P(randnr);
+                            newgolg[ij] = randnr;
+                            hashaddgene(newgolg[ij],rootgene);
+                        }
                     }
-                    else {
-                        newgolg[ij] = genegol[selection-8];         // otherwise GoL gene
-                        newgol[ij] = 1ull;
+                }
+            }
+            else if(randomsoup==2) {                            // randomsoup==2 and selection>=8
+                for(ij=0;ij<N2;ij++) {
+                    if((rand()&rmask) < rbackground) {
+                        if (!newgol[ij]) {                      // if not live, fill with game of life genome
+                            newgol[ij] = 1ull;
+                            newgolg[ij] = genegol[selection-8]; // GoL gene for particular selection model coding
+                            hashaddgene(newgolg[ij],rootgene);
+                        }
                     }
-                    hashaddgene(newgolg[ij],rootgene);
+                }
+            }
+        }
+        else if (randomsoup==3) {                               // deletion perturbations only
+            for(ij=0;ij<N2;ij++) {
+                if((rand()&rmask) < rbackground) {              // random event
+                    if (newgol[ij]) {                           // if live cell, delete gene
+                        newgol[ij]=0ull;
+                        hashdeletegene(newgolg[ij],"error in randomsoup=3 hashdeletegene call for step %d with gene %llx\n");
+                        newgolg[ij]=gene0;
+                    }
                 }
             }
         }
         return;
     }
 
-    if(randomsoup==2)
-        if (totsteps & 0xf) return;                             // only execute once every 16 time steps
+    if(randomsoup>=2)
+        if ((totsteps & 0xf) || randomsoup == 3) return;        // only execute remaining code once every 16 time steps and if randomsoup!=3
 
     density = initial1density;
     mask=(NbG==64 ? ~0 :(1ull<<NbG)-1ull);
@@ -3070,7 +3091,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1;               // new order of nbs
         nb[4]=jp1+ip1; nb[5]=jp1+i; nb[6]=jp1+im1; nb[7]=j*N+im1;
         for (s=0,nb1i=0ull,k=0;k<8;k++) {                                       // packs non-zero nb indices in first up to 8*4 bits
-            gols=gol[nb[k]];                                                    // whether neighbor is alive
+            gols=gol[nb[k]];                                                    // whether neighbor is alive [**gol**]
             s += gols;                                                          // s is number of live nbs
             nb1i = (nb1i << (gols<<2)) + (gols*k);                              // nb1i is packed list of live neighbour indices
         }
@@ -3078,14 +3099,14 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
         birth = 0ull;
         if (s) {
             s2or3 = (s>>2) ? 0ull : (s>>1);                                     // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
-            gols = s2or3 ? (gol[ij] ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;   // GoL calculation next state for non-genetic gol plane
+            gols = s2or3 ? (gol[ij] ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;   // GoL calculation next state for non-genetic gol plane [**gol**]
             rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1);  // if rulemod bit 1 is on then split into half planes with/without mod
             if(rulemodij) {
                 overwrite = overwritemask&(0x1ull<<(s-1));
                 if (selection==9) {                                             // selection == 9
                     for (genecode=0ull,k=0;k<8;k++) {                           // decodes genes with variable length encoding
-                        if (gol[nb[k]]) {
-                            if (!survivalgene && gol[ij]) {
+                        if (gol[nb[k]]) {                                       // [**gol**]
+                            if (!survivalgene && gol[ij]) {                     // [**gol**]
                                 PATTERN4(golg[nb[k]], (s&0x7), found);          //survival?
                                 genecode |= found? 1ull << (s-1) : 0ull;
                             }
@@ -3095,7 +3116,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
                             }
                         }
                     }
-                    if (survivalgene && gol[ij]) {                              // survival determined by central gene in this case
+                    if (survivalgene && gol[ij]) {                              // survival determined by central gene in this case [**gol**]
                                 PATTERN4(golg[ij], (s&0x7), found);             // survival?
                                 genecode |= found? 1ull << (s-1) : 0ull;
                     }
@@ -3106,19 +3127,20 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
                 else {                                                          // selection == 8
                     if(repscheme&R_1_nb_OR_AND)
                         for (genecode=0ull,k=0;k<8;k++)                         // decodes genes with fixed length encoding by OR
-                            genecode |= (gol[nb[k]]?golg[nb[k]]:0ull);          // OR of live neighbours encodes birth rule & survival rule
+                            genecode |= (gol[nb[k]]?golg[nb[k]]:0ull);          // OR of live neighbours encodes birth rule & survival rule [**gol**]
                     else
                         for (genecode=allcoding,k=0;k<8;k++)                    // decodes genes with fixed length encoding by AND
-                            genecode &= (gol[nb[k]]?golg[nb[k]]:allcoding);     // AND of live neighbours encodes birth rule & survival rule
+                            genecode &= (gol[nb[k]]?golg[nb[k]]:allcoding);     // AND of live neighbours encodes birth rule & survival rule [**gol**]
                     if(survivalgene) genecode = (genecode&((8ull*ncoding-1ull)<<(ncoding*8))) | (golg[ij]&(8ull*ncoding-1ull));  // if central gene determines survival
                     survive=(((genecode>>((s-1)*ncoding)) & ncodingmask) == ncodingmask) && ((smask>>(s-1))&1ull) ? 1ull : 0ull;
-                    if (overwrite || !gol[ij]) birth=(((genecode>>((8+(s-1))*ncoding)) & ncodingmask) == ncodingmask) && ((bmask>>(s-1))&1ull) ? 1ull : 0ull;
+                    if (overwrite || !gol[ij])                                  // [**gol**]
+                        birth=(((genecode>>((8+(s-1))*ncoding)) & ncodingmask) == ncodingmask) && ((bmask>>(s-1))&1ull) ? 1ull : 0ull;
                     // if(s ==3 && genecode!=genegol[selection-8]) fprintf(stderr,"genecode %llx != genegol %llx at ij %d\n",genecode,genegol[selection-8],ij);
                 }
             }
             else {
                     survive = s2or3;
-                    birth = s2or3&s&0x1ull&~gol[ij];
+                    birth = s2or3&s&0x1ull&~gol[ij];                            // [**gol**]
             }
         }
         else survive = birth = s2or3 = gols = 0ull;
@@ -3157,28 +3179,28 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
                     newgene = newgene ^ (r2<<nmut);                         // introduce single mutation with probability pmut = probmut
                     statflag = statflag | F_mutation;
                 }
-                newgol[ij]  =  1ull;                                        // new game of life cell value: alive
+                newgol[ij]  =  1ull;                                        // new game of life cell value: alive  [**gol**]
                 newgolg[ij] =  newgene;                                     // if birth then newgene
-                if(gol[ij]) hashdeletegene(golg[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n");
+                if(gol[ij]) hashdeletegene(golg[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n"); // [**gol**]
                 hashaddgene(newgene,ancestor);
             }
         }
         if(!birth) {                                                       // need instead of else because if(birth) section may change value of birth
-            if(gol[ij]) {                                                  // death/survival
+            if(gol[ij]) {                                                  // death/survival  [**gol**]
                 if(survive) {                                              // survival coded
                     statflag |= F_survival;
-                    newgol[ij]  = gol[ij];                                 // new game of life cell value same as old
+                    newgol[ij]  = gol[ij];                                 // new game of life cell value same as old [**gol**]
                     newgolg[ij] = golg[ij];                                // gene stays same
                 }
                 else {                                                     // death
                     statflag |= F_death;
-                    newgol[ij]  = 0ull;                                    // new game of life cell value dead
+                    newgol[ij]  = 0ull;                                    // new game of life cell value dead [**gol**]
                     newgolg[ij] = 0ull;                                    // gene dies
                     hashdeletegene(golg[ij],"step %d hash delete error 2 in update, gene %llx not stored\n");
                 }
             }
             else {                                                         // empty and no birth, stays empty
-                newgol[ij] = gol[ij];
+                newgol[ij] = gol[ij];                                      // [**gol**]
                 newgolg[ij] = golg[ij];
             }
         }
@@ -3187,18 +3209,18 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
             statflag |= F_notgolrul;
             if(newgol[ij]) statflag |= F_nongolchg;
         }
-        if(gol[ij]) statflag |= F_golstate;                                 // this is the last gol state, not the new state
+        if(gol[ij]) statflag |= F_golstate;                                 // this is the last gol state, not the new state [**gol**]
         newgolgstats[ij] = statflag;
     }  // end for ij
 
-    if(randomsoup) random_soup(gol,golg,newgol,newgolg);
+    if(randomsoup) random_soup(gol,golg,newgol,newgolg);                    // [**gol**]
     if(vscrolling) v_scroll(newgol,newgolg);
     if (colorfunction==8) packandcompare(newgol,working,golmix);
     ncomponents=extract_components(newgol);
 
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
-        if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
-        if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
+        if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");     // [**gol**]
+        if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");   // [**gol**]
     }
     // qimage = quadimage(newgol,&patt,log2N); // quadtree hash of entire image
 }
