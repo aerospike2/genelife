@@ -86,7 +86,7 @@ maxPlane = 4
 offdx = offdy = offdt = 0
 quadrants = -1
 gcolor = 0
-
+ranseed = 1234
                                          # counter and toggle initialization
 
 cnt = 0
@@ -130,7 +130,6 @@ ncoding = simparams[3] = 0               # for selection 10, non zero value mean
                                          # otherwise (selection<10) no of bits used to encode valid connection functions 1-16
                                          # for selection==8, lut, ncoding 1,2,3 bits per lut entry : 0 implies 3.
 startgenechoice = simparams[4] = 8       # initialize genes to startgene number 0-8 : 8 is random choice of 0-7
-
 
                                          # offset initialization
 offsets = [[-1, 0,-1],
@@ -562,6 +561,7 @@ def set_params():
                                                  # otherwise (selection<10) no of bits used to encode valid connection functions 1-16
                                                  # for selection==8, lut, ncoding 1,2,3 bits per lut entry : 0 implies 3.
     simparams[4] = startgenechoice           # initialize genes to startgene number 0-8 : 8 is random choice of 0-7
+    
     pr_params()
     
 #-----------------------------------------------------------------------------------------------------------
@@ -577,8 +577,10 @@ def activity(N=1000,nquant=10,acttype="live", # all = all genes, live = live gen
         doact = genelife.get_all_activities
     elif acttype=="quad":
         doact = genelife.get_quad_activities
+    elif acttype=="small":
+        doact = genelife.get_small_activities
     else:
-        printf("unknown acttype:  ",acttype)
+        print("unknown acttype:  ",acttype)
 
     activities = np.zeros(maxnum,np.int32)
 
@@ -590,6 +592,7 @@ def activity(N=1000,nquant=10,acttype="live", # all = all genes, live = live gen
     if init:
         genelife.initialize_planes(npoffsets)
         genelife.initialize(runparams,simparams)
+        genelife.set_seed(ranseed)
     genelife.genelife_update(1,0,0)
     nspecies[0]=doact(data,activities)
 
@@ -599,11 +602,16 @@ def activity(N=1000,nquant=10,acttype="live", # all = all genes, live = live gen
         genelife.genelife_update(1,0,0)
         nspecies[j]=doact(data,activities)
 
-    for j in range(10):
-        foo = [qqq[i][j] for i in range(N)]
-        plt.semilogy(foo)
-    plt.show()
-    plt.plot(nspecies);
+    rtn = {}
+    rtn['quantiles']=qqq
+    rtn['nspecies'] = nspecies
+    return(rtn)
+
+    # for j in range(10):
+    #     foo = [qqq[i][j] for i in range(N)]
+    #     plt.semilogy(foo)
+    # plt.show()
+    # plt.plot(nspecies);
 
 
 #-----------------------------------------------------------------------------------------------------------
