@@ -87,6 +87,8 @@ libcd.get_all_activities.restype = c_int
 libcd.get_all_activities.argtypes = [uint64_array, int_array, c_int]
 libcd.get_quad_activities.restype = c_int
 libcd.get_quad_activities.argtypes = [uint64_array, int_array, c_int]
+libcd.get_small_activities.restype = c_int
+libcd.get_small_activities.argtypes = [uint64_array, int_array, c_int]
 libcd.get_acttrace.restype = None
 libcd.get_acttrace.argtypes = [uint64_array,c_int]
 libcd.get_genealogytrace.restype = None
@@ -145,6 +147,9 @@ libcd.set_activity_size_colormode.restype = None
 libcd.set_activity_size_colormode.argtypes = []
 libcd.set_gcolors.restype = None
 libcd.set_gcolors.argtypes = []
+libcd.set_seed.restype = None
+libcd.set_seed.argtypes = [c_int]
+
 
 def get_log2N():
     return libcd.get_log2N()
@@ -199,6 +204,9 @@ def get_all_activities(genes,activities):
 
 def get_quad_activities(quads,activities):
     return libcd.get_quad_activities(quads,activities,int(len(quads)))
+
+def get_small_activities(smalls,activities):
+    return libcd.get_small_activities(smalls,activities,int(len(smalls)))
 
 def get_acttrace(acttrace):
     return libcd.get_acttrace(acttrace, int(len(acttrace)))
@@ -286,3 +294,6 @@ def set_activity_size_colormode():
 
 def set_gcolors():
     return libcd.set_gcolors()
+
+def set_seed(seed):
+    return libcd.set_seed(seed)
