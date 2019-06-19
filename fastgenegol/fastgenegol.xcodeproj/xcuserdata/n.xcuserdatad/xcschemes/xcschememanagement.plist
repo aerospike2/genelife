@@ -11,15 +11,11 @@
 		</dict>
 		<key>cos_doubles.xcscheme</key>
 		<dict>
-			<key>isShown</key>
-			<false/>
 			<key>orderHint</key>
 			<integer>3</integer>
 		</dict>
 		<key>dispgenegol.xcscheme</key>
 		<dict>
-			<key>isShown</key>
-			<false/>
 			<key>orderHint</key>
 			<integer>4</integer>
 		</dict>
@@ -30,8 +26,6 @@
 		</dict>
 		<key>fastgenegol.xcscheme</key>
 		<dict>
-			<key>isShown</key>
-			<false/>
 			<key>orderHint</key>
 			<integer>2</integer>
 		</dict>
@@ -42,36 +36,26 @@
 		</dict>
 		<key>genelifed.xcscheme</key>
 		<dict>
-			<key>isShown</key>
-			<false/>
 			<key>orderHint</key>
 			<integer>0</integer>
 		</dict>
 		<key>ilog2test.xcscheme_^#shared#^_</key>
 		<dict>
-			<key>isShown</key>
-			<false/>
 			<key>orderHint</key>
 			<integer>7</integer>
 		</dict>
 		<key>libgene.xcscheme</key>
 		<dict>
-			<key>isShown</key>
-			<false/>
 			<key>orderHint</key>
 			<integer>6</integer>
 		</dict>
 		<key>lsb64.xcscheme_^#shared#^_</key>
 		<dict>
-			<key>isShown</key>
-			<false/>
 			<key>orderHint</key>
 			<integer>8</integer>
 		</dict>
 		<key>probtest.xcscheme</key>
 		<dict>
-			<key>isShown</key>
-			<false/>
 			<key>orderHint</key>
 			<integer>5</integer>
 		</dict>
@@ -124,11 +108,6 @@
 			<true/>
 		</dict>
 		<key>528F91911F2F9895008DD596</key>
-		<dict>
-			<key>primary</key>
-			<true/>
-		</dict>
-		<key>52F19B3521ADF3C900D33844</key>
 		<dict>
 			<key>primary</key>
 			<true/>
