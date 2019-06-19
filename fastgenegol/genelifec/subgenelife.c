@@ -206,7 +206,7 @@ uint64_t acttraceq[N2];             // scrolled trace of last N time points of a
 unsigned char acttraceqt[N2];       // type of entry in acttraceq : 1 quad, 0 smallpatt (<65536) i.e. corresponding to isnode
 uint64_t genealogytrace[N2];        // image trace of genealogies for N most frequently populated genes
 uint64_t working[N2];               // working space array for calculating genealogies and doing neighbour bit packing
-// int nlivespecies;                // number of gene species in current population
+int npopulation[N];                 // number of live sites (gol 1s) in last N time steps up to current population
 int nspeciesgene,nallspecies;       // number of gene species in current population, and that have ever existed
 int nspeciesquad,nallspeciesquad;   // number of quad species in current population, and that have ever existed
 int nspeciessmall,nallspeciessmall; // number of small pattern species now, and that have ever existed
@@ -518,6 +518,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // countspecies1        count genes with gene array specified as input parameters
 // countspecies         count different genes with genes specified at current time point
 // countspecieshash     count different genes in current population from record of all species that have existed
+// totalpoptrace        calculates and returns current population size and store in scrolling population trace array npopulation
 // activitieshash       calculate array of current gene activities and update acttrace array of genes in activity plot format
 // activitieshashquad   calculate array of current quad activities and update acttraceq array of patterns in activity plot format
 // genealogies          calculate and display genealogies
@@ -789,7 +790,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
             else cgolg[ij] = 0;
         }
     }
-    else if(colorfunction==4){                                  //activities
+    else if(colorfunction==4){                                  // activities
         int popmax = 100;                                       // need to bring this parameter up to python
         for (ij=0; ij<N2; ij++) {
             gene=acttrace[ij];
@@ -811,10 +812,11 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                     for(d=0,mask=0xff;d<3;d++) mask |= color[d]<<((d<<3)+8);
                 }
             }
+            if ((npopulation[ij&Nmask]>>log2N)==(ij>>log2N)) mask = 0xffffffff;  // overlay plot with trace of density in white (except if pop=N2)
             cgolg[ij]= (int) mask;
         }
     }
-    else if(colorfunction==5){                                  //activities
+    else if(colorfunction==5){                                  // populations
         int actmax = 0;                                         // need to bring this parameter up to python
         for (ij=0; ij<N2; ij++) {
             gene=poptrace[ij];
@@ -836,6 +838,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                     for(d=0,mask=0xff;d<3;d++) mask |= color[d]<<((d<<3)+8);
                 }
             }
+            if ((npopulation[ij&Nmask]>>log2N)==(ij>>log2N)) mask = 0xffffffff;  // overlay plot with trace of density in white (except if pop=N2)
             cgolg[ij]= (int) mask;
         }
     }
@@ -4404,8 +4407,9 @@ void update_gol2match(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_
 void genelife_update (int nsteps, int nhist, int nstat) {
     /* update GoL and gene arrays for toroidal field which has side length which is a binary power of 2 */
     /* encode as much as possible without if structures (use ? : instead) in update routines for optimal vector treatment */
-    int t;
+    int t,npop;
     uint64_t *newgol, *newgolg;
+    int totalpoptrace(uint64_t gol[]);                                        // calculate total current population and store in scrolling trace npopulation
     int activitieshash(void);                                                 // count activities of all currently active gene species
     int activitieshashquad(void);                                             // count activities of all currently active quad pattern species
     int genealogies(void);                                                    // genealogies of all currently active species
@@ -4446,12 +4450,14 @@ void genelife_update (int nsteps, int nhist, int nstat) {
         gol = planes[curPlane];                                               // get planes of gol,golg data
         golg = planesg[curPlane];
         golgstats = planesgs[curPlane];
-
+        
+        npop= totalpoptrace(gol);                                            // calculate total current population and store in scrolling trace npopulation
+        
         nspeciesgene=activitieshash();                                       // colors acttrace and sets current population arrays, need to run always for continuity
         if(nspeciesgene<0) fprintf(stderr,"error returned from activitieshash\n");
         nspeciesquad=activitieshashquad();                                   // colors acttraceq and sets current population arrays, need to run always for continuity
         if(nspeciesquad<0) fprintf(stderr,"error returned from activitieshashquad\n");
-        if(colorfunction>4 && colorfunction<8) {                             // genealogies
+        if(colorfunction==6 || colorfunction==7) {                           // genealogies
             ngenealogydeep=genealogies();                                    // colors genealogytrace
             if(ngenealogydeep<0) fprintf(stderr,"error returned from genealogies\n");
         }
@@ -4737,14 +4743,16 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     gol = planes[curPlane];
     golg = planesg[curPlane];
     golgstats = planesgs[curPlane];
+    
+    for (i=0;i<N;i++) npopulation[i]=0;                         // initialize scrolling total population trace
 
     if(notfirst) {
         hashtable_term(&genetable);
         hashtable_term(&quadtable);
         memset(smallpatts,0,sizeof(smallpatt)*65536);
     }
-    hashtable_init(&genetable,sizeof(genedata),N2<<2,0);         // initialize dictionary for genes
-    hashtable_init(&quadtable,sizeof(quadnode),N2<<2,0);         // initialize dictionary for quadtree patterns
+    hashtable_init(&genetable,sizeof(genedata),N2<<2,0);       // initialize dictionary for genes
+    hashtable_init(&quadtable,sizeof(quadnode),N2<<2,0);       // initialize dictionary for quadtree patterns
 
     for (ij=0;ij<65536;ij++) smallpatts[ij].activity = 0;      // initialize small pattern table to no patterns hit
     notfirst = 1;
@@ -5507,6 +5515,24 @@ void countspecieshash() {  /* counts numbers of all different species using qsor
     free(golgs);
     golgs = NULL;
 }
+//------------------------------------------------------------ totalpoptrace ---------------------------------------------------------------------------
+int totalpoptrace(uint64_t gol[]) {   /* calculates and returns current population size and store in scrolling population trace array npopulation */
+    int x, i, ij, npop;
+    
+    if (totdisp>=N) {                                               // 1 pixel to left scroll of population when full
+            for(i=0;i<N;i++) npopulation[i]=npopulation[(i+1)&Nmask];
+            x = N-1;
+    }
+    else x = totdisp;
+    
+    for(npop=ij=0;ij<N2;ij++) {                                     // calculate current population size
+        npop+=(gol[ij]&0x1L) ? 1 : 0;
+    }
+    npopulation[x]=npop;
+    
+    return npop;
+}
+
 //------------------------------------------------------------ activitieshash ---------------------------------------------------------------------------
 int activitieshash() {  /* count activities of all currently active gene species */
     int i, j, ij, ij1, x, nspecies, nspeciesnow, cnt0, cnt1;
