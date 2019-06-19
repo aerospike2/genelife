@@ -319,6 +319,7 @@ static uint64_t state[2];           // State for xorshift pseudorandom number ge
     uint64_t x = state[0]; uint64_t const y = state[1];                       \
 	state[0] = y;	x ^= x << 23;  state[1] = x ^ y ^ (x >> 17) ^ (y >> 26);  \
 	val = state[1] + y;}
+int ranseed = 1234;
 //.......................................................................................................................................................
 const uint64_t m1  = 0x5555555555555555; //binary: 0101...           Constants for Hamming distance macro POPCOUNT64C
 const uint64_t m2  = 0x3333333333333333; //binary: 00110011..
@@ -485,6 +486,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // set_noveltyfilter    set novelty filter for darkening already encountered components in connected component display (colorfunction 9)
 // set_activity_size_colormode set colormode by size for colorfunction 10 : 0 by ID  1 log2 enclosing square size 2 use #pixels 3 use sqrt(#pixels)
 // set_gcolors          set connected component colors as inherited colors from colliding connected components with random drift
+// set_seed             set random number seed
 //.......................................................................................................................................................
 // get_log2N            get the current log2N value from C to python
 // get_curgol           get current gol array from C to python
@@ -496,6 +498,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // get_activities       get the current activity statistics of genes from C to python
 // get_all_activities   get all activity statistics of genes (since t=0) from C to python
 // get_quad_activities  get all activity statistics of quads (since t=0) from C to python
+// get_small_activities  get all activity statistics of smallpats (since t=0) from C to python
 // get_components       get all current connected component data structures
 // get_smallpatts       get array of small pattern data structures including sizes and activities
 // get_quadnodes        get all hashed quadnodes including hashkey, sizes and activities
@@ -4365,7 +4368,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         fprintf(stderr,"test of patterns j %5d log2upper(j) %5d log2upper(sqrtupper(j)) %5d\n",j,log2upper(j),log2upper(sqrtupper(j)));
     }
     */
-    srand(1234567); // Range: rand returns numbers in the range of [0, RAND_MAX ), and RAND_MAX is specified with a minimum value of 32,767. i.e. 15 bit
+    srand(ranseed); // Range: rand returns numbers in the range of [0, RAND_MAX ), and RAND_MAX is specified with a minimum value of 32,767. i.e. 15 bit
     state[0] = rand();state[1] = rand();
     cnt = 0;
     totsteps = 0;
@@ -4808,6 +4811,10 @@ void set_activity_size_colormode() {
 void set_gcolors() {
     gcolors = (gcolors+1)%10;
 }
+//.......................................................................................................................................................
+void set_seed(int seed) {
+    ranseed = seed;
+}
 //------------------------------------------------------------------- get ... ---------------------------------------------------------------------------
 int get_log2N() {
     return(log2N);
@@ -4935,6 +4942,22 @@ int get_quad_activities(uint64_t quads[], int activities[], int narraysize) {
             activities[k] = q->activity;
         }
         else fprintf(stderr,"get_quad_activities error, no entry for quad %llx in hash table\n", quadkeys[k]);
+    }
+    return nspecies;
+}
+//.......................................................................................................................................................
+int get_small_activities(uint64_t smalls[], int activities[], int narraysize) {
+// get_quad_activities  get all activity statistics of quads (since t=0) from C to python
+    int k, nspecies;
+
+    if (narraysize<65536) {
+        fprintf(stderr,"Error in get_small_activities : called with insufficent smallpatt holding array size %d < %d\n",narraysize,65536);
+        return -1;
+    }
+    nspecies =0;
+    for (k=0; k<65536; k++) {
+        nspecies += smallpatts[k].activity ? 1 : 0;
+        activities[k] = smallpatts[k].activity;
     }
     return nspecies;
 }
