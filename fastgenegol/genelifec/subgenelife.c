@@ -674,7 +674,7 @@ extern inline float mixcolor( short unsigned int label,uint64_t rand) { // mix c
 //.......................................................................................................................................................
 void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2) {
     uint64_t gene, gdiff, g2c, mask, quad;
-    int ij,k,activity,popcount,labelxy;
+    int ij,k,nbeven,activity,popcount,labelxy;
     unsigned int d,d0,d1,d2;
     unsigned int color[3],colormax;
     double rescalecolor;
@@ -810,11 +810,15 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
             npopptr = &npopulation[0];
         }
         else {
-            traceptr = &acttrace1[N2*nbhist];
-            npopptr = &npopulation1[N*nbhist];
+            traceptr = &acttrace1[N2*(nbhist>>1)];
+            npopptr = &npopulation1[N*(nbhist>>1)];
         }
+        nbeven=(nbhist==-1)?1:1-(nbhist&0x1);
         for (ij=0; ij<N2; ij++) {
-            gene=traceptr[ij];
+            int i,i1;
+            i=ij&Nmask;
+            i1=nbeven?0:(i<(N>>1)?N>>1:N2-(N>>1));
+            gene=traceptr[ij+i1];
             if (gene == rootgene) mask = 0x3f3f3fff;            // grey color for background, all root genes
             else {
                 if (gene == 0ull) gene = 11778L;                // random color for gene==0
@@ -833,7 +837,9 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                     for(d=0,mask=0xff;d<3;d++) mask |= color[d]<<((d<<3)+8);
                 }
             }
-            if ((npopptr[ij&Nmask]>>log2N)==(N-1-(ij>>log2N))) mask = 0xffffffff;  // overlay plot with trace of density in white (except if pop=N2)
+            i1=nbeven?0:(i<(N>>1)?N>>1:N-(N>>1));
+            i=nbeven?0:(i<(N>>1)?0:N);
+            if ((npopptr[i+((ij+i1)&Nmask)]>>log2N)==(N-1-(ij>>log2N))) mask = 0xffffffff;  // overlay plot with trace of density in white (except if pop=N2)
             cgolg[ij]= (int) mask;
         }
     }
@@ -844,12 +850,15 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
             npopptr = &npopulation[0];
         }
         else {
-            traceptr = &poptrace1[N2*nbhist];
-            npopptr = &npopulation1[N*nbhist];
+            traceptr = &poptrace1[N2*(nbhist>>1)];
+            npopptr = &npopulation1[N*(nbhist>>1)];
         }
-
+        nbeven=(nbhist==-1)?1:1-(nbhist&0x1);
         for (ij=0; ij<N2; ij++) {
-            gene=traceptr[ij];
+            int i,i1;
+            i=ij&Nmask;
+            i1=nbeven?0:(i<(N>>1)?N>>1:N2-(N>>1));
+            gene=traceptr[ij+i1];
             if (gene == rootgene) mask = 0x3f3f3fff;            // grey color for background, all root genes
             else {
                 if (gene == 0ull) gene = 11778L;                // random color for gene==0
@@ -868,7 +877,9 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                     for(d=0,mask=0xff;d<3;d++) mask |= color[d]<<((d<<3)+8);
                 }
             }
-            if ((npopptr[ij&Nmask]>>log2N)==(N-1-(ij>>log2N))) mask = 0xffffffff;  // overlay plot with trace of density in white (except if pop=N2)
+            i1=nbeven?0:(i<(N>>1)?N>>1:N-(N>>1));
+            i=nbeven?0:(i<(N>>1)?0:N);
+            if ((npopptr[i+((ij+i1)&Nmask)]>>log2N)==(N-1-(ij>>log2N))) mask = 0xffffffff;  // overlay plot with trace of density in white (except if pop=N2)
             cgolg[ij]= (int) mask;
         }
     }
@@ -5094,8 +5105,8 @@ void set_seed(int seed) {
 }
 //.......................................................................................................................................................
 void set_nbhist(int nbhistin) {
-    if(nbhist<nNhist) nbhist=nbhistin;
-    else fprintf(stderr,"nbhist out of range %d > %d\n",nbhistin,nNhist-1);
+    if(nbhist<nNhist*2) nbhist=nbhistin;
+    else fprintf(stderr,"nbhist out of range %d > %d\n",nbhistin,nNhist*2-1);
 }
 //------------------------------------------------------------------- get ... ---------------------------------------------------------------------------
 int get_log2N() {

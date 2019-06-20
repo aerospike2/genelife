@@ -1023,9 +1023,9 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                         oldymaxq = genelife.setget_act_ymaxq(ymaxq)
                         print('step',framenr,'new ymaxq =',ymaxq)
                 elif keystatus[sdl2.SDL_SCANCODE_B]:
-                    nbhistmax=framenr//N
+                    nbhistmax=framenr//(N//2)
                     nbhistold = nbhist
-                    if nbhistmax >= nNhist: nbhistmax=nNhist-1;
+                    if nbhistmax >= nNhist*2-1: nbhistmax=nNhist*2-2;
                     if sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT:
                         nbhist = nbhist+1
                         if nbhist > nbhistmax:
@@ -1275,7 +1275,7 @@ def parhelp():
     print("left mouse  ","extract information about local state inside the array, or control buttons below")
     print("right mouse ","choose single plane for GoL display in colorfunction 2 for selection 16-19")
     print("<- , ->     ","decrement or increment the colorfunction analysis type mod 11")
-    print("b , B       ","decrement or increment the block for trace display: in range -1,0 to nNhist-1=19")
+    print("b , B       ","decrement or increment the half block for trace display: in range -1,0 to nNhist*2-2=38")
     print("f           ","print frame rate in fps (average of last 10 frames NYI")
     print("F           ","toggle to fullscreen NYI")
     print("g           ","toggle on/off inherited coloring of connected components from overlapping components")
