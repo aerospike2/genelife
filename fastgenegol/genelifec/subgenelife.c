@@ -804,7 +804,10 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
         }
     }
     else if(colorfunction==4){                                  // activities
-        int popmax = 100;                                       // need to bring this parameter up to python
+        const int colpopmax = 225;                                      // need to bring this parameter up to python
+        const double colpoplow = 50.0;
+        const double logcolpopmax= log(colpoplow+(double) colpopmax);
+
         if(nbhist==-1) {
             traceptr =&acttrace[0];
             npopptr = &npopulation[0];
@@ -825,14 +828,17 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 mask = gene * 11400714819323198549ul;
                 mask = mask >> (64 - 32);                       // hash with optimal prime multiplicator down to 32 bits
                 mask |= 0x080808ffull;                          // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
-                if(popmax) {
+                if(colpopmax) {
                     popcount=0;
                     if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) popcount = genedataptr->popcount;
                     else fprintf(stderr,"gene not found in colorfunction for activities\n");
-                    if(popcount>popmax) popcount=popmax;
+                    if(popcount>colpopmax) popcount=colpopmax;
                     colormax=0;
                     for(d=0;d<3;d++) if((color[d]=( (mask>>(8+(d<<3))) & 0xff))>colormax) colormax=color[d];
-                    rescalecolor=(log((double)popcount)/log((double)popmax))*((double)0xff/(double)colormax);
+                    if(popcount)
+                        rescalecolor=(log(colpoplow+(double)popcount)/logcolpopmax)*((double)0xff/(double)colormax);
+                    else
+                        rescalecolor=0.2;
                     for(d=0;d<3;d++) color[d]=(unsigned int) (((double) color[d])*rescalecolor);
                     for(d=0,mask=0xff;d<3;d++) mask |= color[d]<<((d<<3)+8);
                 }
