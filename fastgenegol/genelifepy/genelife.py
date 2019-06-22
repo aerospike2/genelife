@@ -613,6 +613,22 @@ def activity(N=1000,nquant=10,acttype="live", # all = all genes, live = live gen
     # plt.show()
     # plt.plot(nspecies);
 
+def plot_activity(dat):
+    qqq = dat['quantiles']
+    pop = dat['nspecies']
+    N = len(qqq)
+    nq = len(qqq[0])
+    for j in range(nq):
+        foo = [qqq[i][j] for i in range(N)]
+        plt.semilogy(foo)
+    plt.title("Activity quantiles")
+    plt.xlabel('time')
+    plt.ylabel('activity')
+    plt.show()
+    plt.plot(pop)
+    plt.title('Number of species')
+    plt.xlabel('time')
+
 
 #-----------------------------------------------------------------------------------------------------------
 
