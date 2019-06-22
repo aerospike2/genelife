@@ -507,8 +507,10 @@ const uint64_t r1 = 0x1111111111111111ull;
 // get_hist             get the histogram from C to python
 // get_activities       get the current activity statistics of genes from C to python
 // get_all_activities   get all activity statistics of genes (since t=0) from C to python
-// get_quad_activities  get all activity statistics of quads (since t=0) from C to python
-// get_small_activities  get all activity statistics of smallpats (since t=0) from C to python
+// get_quad_activities  get current activity statistics of quads (since t=0) from C to python
+// get_small_activities  get current activity statistics of smallpats (since t=0) from C to python
+// get_all_quad_activities  get all activity statistics of quads (since t=0) from C to python
+// get_all_small_activities  get all activity statistics of smallpats (since t=0) from C to python
 // get_components       get all current connected component data structures
 // get_smallpatts       get array of small pattern data structures including sizes and activities
 // get_quadnodes        get all hashed quadnodes including hashkey, sizes and activities
@@ -5222,7 +5224,41 @@ int get_all_activities(uint64_t genes[], int activities[], int narraysize) {
 }
 //.......................................................................................................................................................
 int get_quad_activities(uint64_t quads[], int activities[], int narraysize) {
-// get_quad_activities  get all activity statistics of quads (since t=0) from C to python
+// get_quad_activities  get *live* activity statistics of quads (since t=0) from C to python
+    int k, nspecies, livecnt;
+    quadnode *q;
+
+    nspecies = hashtable_count(&quadtable);
+    quadkeys = hashtable_keys(&quadtable);
+    quaditems = (quadnode *) hashtable_items( &genetable );
+
+    for (k=0,livecnt = 0; k<nspecies; k++)
+        if((q = (quadnode *) hashtable_find(&quadtable, quadkeys[k])) != NULL){
+            if(q->lasttime == totsteps) // test for currently live
+                livecnt++;
+        } else {
+            fprintf(stderr,"get_quad_activities error, no entry for quad %llx in hash table\n", quadkeys[k]);
+        }
+    // fprintf(stderr,"The number of different species that have ever existed is %d\n",nspecies);
+    if (livecnt > narraysize) {
+        fprintf(stderr,"Error: array size %d to small to hold all quad activities %d, increase it\n",narraysize,livecnt);
+        return livecnt;
+    }
+
+    for (k=0; k<nspecies; k++) {
+        if((q = (quadnode *) hashtable_find(&quadtable, quadkeys[k])) != NULL) {
+            if(q->lasttime == totsteps){ // test for currently live
+                quads[k] = quadkeys[k];
+                activities[k] = q->activity;
+            }
+        }
+        else fprintf(stderr,"get_quad_activities error, no entry for quad %llx in hash table\n", quadkeys[k]);
+    }
+    return nspecies;
+}
+//.......................................................................................................................................................
+int get_all_quad_activities(uint64_t quads[], int activities[], int narraysize) {
+// get_all_quad_activities  get all activity statistics of quads (since t=0) from C to python
     int k, nspecies;
     quadnode *q;
 
@@ -5246,7 +5282,25 @@ int get_quad_activities(uint64_t quads[], int activities[], int narraysize) {
 }
 //.......................................................................................................................................................
 int get_small_activities(uint64_t smalls[], int activities[], int narraysize) {
-// get_quad_activities  get all activity statistics of quads (since t=0) from C to python
+// get_small_activities  get *live only* activity statistics of smallpatts (since t=0) from C to python
+    int k, nspecies;
+
+    if (narraysize<65536) {
+        fprintf(stderr,"Error in get_small_activities : called with insufficent smallpatt holding array size %d < %d\n",narraysize,65536);
+        return -1;
+    }
+    nspecies =0;
+    for (k=0; k<65536; k++) {
+        if(smallpatts[k].lasttime == totsteps){
+            nspecies += smallpatts[k].activity ? 1 : 0;
+            activities[k] = smallpatts[k].activity;
+        }
+    }
+    return nspecies;
+}
+//.......................................................................................................................................................
+int get_all_small_activities(uint64_t smalls[], int activities[], int narraysize) {
+// get_all_small_activities  get all activity statistics of quads (since t=0) from C to python
     int k, nspecies;
 
     if (narraysize<65536) {

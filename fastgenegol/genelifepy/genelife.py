@@ -571,6 +571,69 @@ def set_params():
 # activity: run for N generations and plot the quantiles vs time (semilog)
 # assumes runparams, simparams are set
 
+def all_activity(N=1000,nquant=10,acttype="live", # all = all genes, live = live genes only,  quad = quad patterns, small = small patterns
+             maxnum=100000,init=False):        # for quads maxnum needs to be bumped up (e.g. > 2*10^6), which slows things down
+    if acttype=="live":
+        doact = genelife.get_activities
+        doquad = genelife.get_quad_activities
+        dosmall = genelife.get_small_activities
+    elif acttype=='all':
+        doact = genelife.get_all_activities
+        doquad = genelife.get_all_quad_activities
+        dosmall = genelife.get_all_small_activities
+    else:
+        print("unknown acttype:  ",acttype)
+
+    activities = np.zeros(maxnum,np.int32)
+    actsmall = np.zeros(65536,np.int32)
+    actquad = np.zeros(maxnum,np.int32)
+
+    actdata = np.zeros(maxnum,np.uint64)
+    smalldata = np.zeros(65536,np.uint64)
+    quaddata = np.zeros(maxnum,np.uint64)
+
+
+    qactivity = [[None]*nquant for _ in range(N)]
+    qsmall = [[None]*nquant for _ in range(N)]
+    qquad = [[None]*nquant for _ in range(N)]
+    qq = [x/nquant for x in range(nquant)] # same number of quantiles for all
+    nspecies = [None]*N
+    nquad = [None]*N
+    nsmall = [None]*N
+
+    if init:
+        genelife.initialize_planes(npoffsets)
+        genelife.initialize(runparams,simparams)
+        genelife.set_seed(ranseed)
+    genelife.genelife_update(1,0,0)
+    nspecies[0]=doact(actdata,activities)
+    nquad[0] = doquad(quaddata,actquad)
+    nsmall[0] = dosmall(smalldata,actsmall)
+
+    for j in range(1,N):
+        # stash the stats
+        ac = [activities[i] for i in range(len(activities)) if activities[i]>1]
+        qactivity[j] = np.quantile(ac,qq)
+        ac = [actquad[i] for i in range(len(activities)) if activities[i]>1]
+        qquad[j] = np.quantile(ac,qq)
+        ac = [actsmall[i] for i in range(len(activities)) if activities[i]>1]
+        qsmall[j] = np.quantile(ac,qq)
+        # iterate one time step
+        genelife.genelife_update(1,0,0)
+        # compute the stats
+        nspecies[j]=doact(actdata,activities)
+        nsmall[j] = dosmall(smalldata,actsmall)
+        nquad[j] = doquad(quaddata,actquad)
+
+    rtn = {}
+    rtn['actquantiles'] = qactivity
+    rtn['smallquantiles'] = qsmall
+    rtn['quadquantiles'] = qquad
+    rtn['nspecies'] = nspecies
+    rtn['nsmall'] = nsmall
+    rtn['nquad'] = nquad
+    return(rtn)
+
 def activity(N=1000,nquant=10,acttype="live", # all = all genes, live = live genes only,  quad = quad patterns, small = small patterns
              maxnum=100000,init=True):        # for quads maxnum needs to be bumped up (e.g. > 2*10^6), which slows things down
     if acttype=="live":
