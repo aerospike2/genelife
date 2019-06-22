@@ -104,6 +104,8 @@ simparams = np.zeros(5,np.int32)         # 5 parameters passed to C
 nrun=1; ndisp=1000; nskip=0; niter=1;    # simulation time stepping parameters: nrun CA updates per step, ndisp nr steps to display before skip,
                                          # nskip nr of CA updates to skip over display, niter nr of repeats of disp-skip cycle
 nhist = 0                                # set to n to turn on histogram configurations every nth step
+nbhist = -1                              # set block for display of traces of activity and population
+nNhist = 20                              # number of additional blocks for trace memory
 nstat = 0                                # set to n to turn on statistics trace every nth step
 rulemod = runparams[0] = 1               # 0,1 whether to allow GoL rule modifications
                                          # with rulemod 1 2-live-nb birth, 3-live-nb non-birth & non-survival possible
@@ -666,7 +668,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     global gol,golg,golgstats
     global connlabel,connlen,ncomponents
     global colorfunction,gcolor
-    global ymax,ymaxq,oldymax,oldymaxq
+    global ymax,ymaxq,oldymax,oldymaxq,nbhist,nNhist
     global updatesenabled
     global rulemod,repscheme,survivalmask,birthmask,overwritemask,ancselectmask,selection,ncoding,displayplanes
     global savecnt
@@ -1036,6 +1038,21 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                         ymaxq = ymaxq // 2
                         oldymaxq = genelife.setget_act_ymaxq(ymaxq)
                         print('step',framenr,'new ymaxq =',ymaxq)
+                elif keystatus[sdl2.SDL_SCANCODE_B]:
+                    nbhistmax=framenr//(N//2)
+                    nbhistold = nbhist
+                    if nbhistmax >= nNhist*2-1: nbhistmax=nNhist*2-2;
+                    if sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT:
+                        nbhist = nbhist+1
+                        if nbhist > nbhistmax:
+                            nbhist = -1
+                    else:
+                        nbhist = nbhist-1
+                        if nbhist < -1:
+                            nbhist=nbhistmax
+                    if nbhist!=nbhistold:
+                        print('step',framenr,"nbhist changed to ",nbhist)
+                        genelife.set_nbhist(nbhist)
                 elif keystatus[sdl2.SDL_SCANCODE_F]:
                     print("entering key F")
                     if   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT:
@@ -1274,6 +1291,7 @@ def parhelp():
     print("left mouse  ","extract information about local state inside the array, or control buttons below")
     print("right mouse ","choose single plane for GoL display in colorfunction 2 for selection 16-19")
     print("<- , ->     ","decrement or increment the colorfunction analysis type mod 11")
+    print("b , B       ","decrement or increment the half block for trace display: in range -1,0 to nNhist*2-2=38")
     print("f           ","print frame rate in fps (average of last 10 frames NYI")
     print("F           ","toggle to fullscreen NYI")
     print("g           ","toggle on/off inherited coloring of connected components from overlapping components")

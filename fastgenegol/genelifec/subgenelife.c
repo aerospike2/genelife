@@ -200,13 +200,20 @@ int *livesites = NULL;              // dynamic array pointer for statistics of n
 int *genestats = NULL;              // dynamic array pointer for statistics of number of 4 genotype classes over time
 int *stepstats = NULL;              // dynamic array pointer for statistics of site update types over time
 int *configstats = NULL;            // dynamic array pointer for statistics of gol site configurations (x,y,t) offsets
-uint64_t poptrace[N2];              // scrolled trace of last N time points of population of genes
-uint64_t acttrace[N2];              // scrolled trace of last N time points of activity of genes
-uint64_t acttraceq[N2];             // scrolled trace of last N time points of activity of quad patterns
+uint64_t poptrace[N2];              // scrolled trace of last N time points of population of N most frequent genes
+uint64_t acttrace[N2];              // scrolled trace of last N time points of activity of N most frequent genes
+uint64_t acttraceq[N2];             // scrolled trace of last N time points of activity of N most frequent quad patterns
 unsigned char acttraceqt[N2];       // type of entry in acttraceq : 1 quad, 0 smallpatt (<65536) i.e. corresponding to isnode
 uint64_t genealogytrace[N2];        // image trace of genealogies for N most frequently populated genes
+const int nNhist = 20;              // maximum number of older blocks for trace
+int nbhist=-1;                      // current block for trace
+uint64_t poptrace1[N2*nNhist];      // trace of first N*nNhist time points of population of N most frequent genes
+uint64_t acttrace1[N2*nNhist];      // trace of first N*nNhist time points of activity of N most frequent genes
+uint64_t acttraceq1[N2*nNhist];     // trace of first N*nNhist time points of activity of N most frequent quad patterns
+unsigned char acttraceqt1[N2*nNhist];// type of entry in acttraceq : 1 quad, 0 smallpatt (<65536) i.e. corresponding to isnode
 uint64_t working[N2];               // working space array for calculating genealogies and doing neighbour bit packing
 int npopulation[N];                 // number of live sites (gol 1s) in last N time steps up to current population
+int npopulation1[N*nNhist];         // number of live sites (gol 1s) in first N*nNhist time steps
 int nspeciesgene,nallspecies;       // number of gene species in current population, and that have ever existed
 int nspeciesquad,nallspeciesquad;   // number of quad species in current population, and that have ever existed
 int nspeciessmall,nallspeciessmall; // number of small pattern species now, and that have ever existed
@@ -489,6 +496,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // set_activity_size_colormode set colormode by size for colorfunction 10 : 0 by ID  1 log2 enclosing square size 2 use #pixels 3 use sqrt(#pixels)
 // set_gcolors          set connected component colors as inherited colors from colliding connected components with random drift
 // set_seed             set random number seed
+// set_nbhist            set nbhist N-block of time points for trace from GUI for use in activity and population display traces
 //.......................................................................................................................................................
 // get_log2N            get the current log2N value from C to python
 // get_curgol           get current gol array from C to python
@@ -666,10 +674,12 @@ extern inline float mixcolor( short unsigned int label,uint64_t rand) { // mix c
 //.......................................................................................................................................................
 void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2) {
     uint64_t gene, gdiff, g2c, mask, quad;
-    int ij,k,activity,popcount,labelxy;
+    int ij,k,nbeven,activity,popcount,labelxy;
     unsigned int d,d0,d1,d2;
     unsigned int color[3],colormax;
     double rescalecolor;
+    uint64_t * traceptr;
+    int *npopptr;
     quadnode *q;
     static int numones[16]={0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4};
     int labelimage(uint64_t hashkeypatt, short unsigned int labelimg[], short unsigned int label, int offset);
@@ -794,35 +804,67 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
         }
     }
     else if(colorfunction==4){                                  // activities
-        int popmax = 100;                                       // need to bring this parameter up to python
+        const int colpopmax = 225;                                      // need to bring this parameter up to python
+        const double colpoplow = 50.0;
+        const double logcolpopmax= log(colpoplow+(double) colpopmax);
+
+        if(nbhist==-1) {
+            traceptr =&acttrace[0];
+            npopptr = &npopulation[0];
+        }
+        else {
+            traceptr = &acttrace1[N2*(nbhist>>1)];
+            npopptr = &npopulation1[N*(nbhist>>1)];
+        }
+        nbeven=(nbhist==-1)?1:1-(nbhist&0x1);
         for (ij=0; ij<N2; ij++) {
-            gene=acttrace[ij];
+            int i,i1;
+            i=ij&Nmask;
+            i1=nbeven?0:(i<(N>>1)?N>>1:N2-(N>>1));
+            gene=traceptr[ij+i1];
             if (gene == rootgene) mask = 0x3f3f3fff;            // grey color for background, all root genes
             else {
                 if (gene == 0ull) gene = 11778L;                // random color for gene==0
                 mask = gene * 11400714819323198549ul;
                 mask = mask >> (64 - 32);                       // hash with optimal prime multiplicator down to 32 bits
                 mask |= 0x080808ffull;                          // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
-                if(popmax) {
+                if(colpopmax) {
                     popcount=0;
                     if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) popcount = genedataptr->popcount;
                     else fprintf(stderr,"gene not found in colorfunction for activities\n");
-                    if(popcount>popmax) popcount=popmax;
+                    if(popcount>colpopmax) popcount=colpopmax;
                     colormax=0;
                     for(d=0;d<3;d++) if((color[d]=( (mask>>(8+(d<<3))) & 0xff))>colormax) colormax=color[d];
-                    rescalecolor=(log((double)popcount)/log((double)popmax))*((double)0xff/(double)colormax);
+                    if(popcount)
+                        rescalecolor=(log(colpoplow+(double)popcount)/logcolpopmax)*((double)0xff/(double)colormax);
+                    else
+                        rescalecolor=0.2;
                     for(d=0;d<3;d++) color[d]=(unsigned int) (((double) color[d])*rescalecolor);
                     for(d=0,mask=0xff;d<3;d++) mask |= color[d]<<((d<<3)+8);
                 }
             }
-            if ((npopulation[ij&Nmask]>>log2N)==(N-1-(ij>>log2N))) mask = 0xffffffff;  // overlay plot with trace of density in white (except if pop=N2)
+            i1=nbeven?0:(i<(N>>1)?N>>1:N-(N>>1));
+            i=nbeven?0:(i<(N>>1)?0:N);
+            if ((npopptr[i+((ij+i1)&Nmask)]>>log2N)==(N-1-(ij>>log2N))) mask = 0xffffffff;  // overlay plot with trace of density in white (except if pop=N2)
             cgolg[ij]= (int) mask;
         }
     }
     else if(colorfunction==5){                                  // populations
         int actmax = 0;                                         // need to bring this parameter up to python
+        if(nbhist==-1) {
+            traceptr =&poptrace[0];
+            npopptr = &npopulation[0];
+        }
+        else {
+            traceptr = &poptrace1[N2*(nbhist>>1)];
+            npopptr = &npopulation1[N*(nbhist>>1)];
+        }
+        nbeven=(nbhist==-1)?1:1-(nbhist&0x1);
         for (ij=0; ij<N2; ij++) {
-            gene=poptrace[ij];
+            int i,i1;
+            i=ij&Nmask;
+            i1=nbeven?0:(i<(N>>1)?N>>1:N2-(N>>1));
+            gene=traceptr[ij+i1];
             if (gene == rootgene) mask = 0x3f3f3fff;            // grey color for background, all root genes
             else {
                 if (gene == 0ull) gene = 11778L;                // random color for gene==0
@@ -841,7 +883,9 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                     for(d=0,mask=0xff;d<3;d++) mask |= color[d]<<((d<<3)+8);
                 }
             }
-            if ((npopulation[ij&Nmask]>>log2N)==(N-1-(ij>>log2N))) mask = 0xffffffff;  // overlay plot with trace of density in white (except if pop=N2)
+            i1=nbeven?0:(i<(N>>1)?N>>1:N-(N>>1));
+            i=nbeven?0:(i<(N>>1)?0:N);
+            if ((npopptr[i+((ij+i1)&Nmask)]>>log2N)==(N-1-(ij>>log2N))) mask = 0xffffffff;  // overlay plot with trace of density in white (except if pop=N2)
             cgolg[ij]= (int) mask;
         }
     }
@@ -4748,8 +4792,6 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     golg = planesg[curPlane];
     golgstats = planesgs[curPlane];
     
-    for (i=0;i<N;i++) npopulation[i]=0;                         // initialize scrolling total population trace
-
     if(notfirst) {
         hashtable_term(&genetable);
         hashtable_term(&quadtable);
@@ -4818,12 +4860,21 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
             golg[ij] = g;
         }
     }
+    
+    for (i=0;i<N;i++) npopulation[i]=0;         // initialize scrolling total population trace
     for (ij=0; ij<N2; ij++) {
-        poptrace[ij]=rootgene;                 // initialize population traces to root gene
-        acttrace[ij]=rootgene;                 // initialize activity traces to root gene
-        acttraceq[ij]=rootgene;                // initialize activity traces of patterns to root gene
-        acttraceqt[ij]=0;
-        genealogytrace[ij] = rootgene;
+        poptrace[ij]=rootgene;                  // initialize population traces to root gene
+        acttrace[ij]=rootgene;                  // initialize activity traces to root gene
+        acttraceq[ij]=rootgene;                 // initialize activity traces of patterns to root gene
+        acttraceqt[ij]=0;                       // initialize activity traces of types of patterns to 0
+        genealogytrace[ij] = rootgene;          // initialize genealogy traces to root gene
+    }
+    for (i=0;i<N*nNhist;i++) npopulation1[i]=0; // initialize longer beginning total population trace
+    for (ij=0; ij<N2*nNhist; ij++) {
+        poptrace1[ij]=rootgene;                 // initialize long population traces to root gene
+        acttrace1[ij]=rootgene;                 // initialize long activity traces to root gene
+        acttraceq1[ij]=rootgene;                // initialize long activity traces of patterns to root gene
+        acttraceqt1[ij]=0;                      // initialize long activity traces of types of patterns to 0
     }
 
     for (ij=0; ij<N2; ij++) {
@@ -5057,6 +5108,11 @@ void set_gcolors() {
 //.......................................................................................................................................................
 void set_seed(int seed) {
     ranseed = seed;
+}
+//.......................................................................................................................................................
+void set_nbhist(int nbhistin) {
+    if(nbhist<nNhist*2) nbhist=nbhistin;
+    else fprintf(stderr,"nbhist out of range %d > %d\n",nbhistin,nNhist*2-1);
 }
 //------------------------------------------------------------------- get ... ---------------------------------------------------------------------------
 int get_log2N() {
@@ -5559,10 +5615,10 @@ int totalpoptrace(uint64_t gol[]) {   /* calculates and returns current populati
 
 //------------------------------------------------------------ activitieshash ---------------------------------------------------------------------------
 int activitieshash() {  /* count activities of all currently active gene species */
-    int i, j, ij, ij1, x, nspecies, nspeciesnow, cnt0, cnt1;
+    int i, j, ij, ij1, x, nchist, nrhist, nspecies, nspeciesnow, cnt0, cnt1;
     int *gindices,*popln,*activities;
     double act,pop;
-    uint64_t *genes;
+    uint64_t *genes, *traceptr;
     uint64_t gene;
     const int maxact = 10000;
 
@@ -5651,7 +5707,14 @@ int activitieshash() {  /* count activities of all currently active gene species
             if(cnt1 >= cnt0) poptrace[ij]=gene;
         }
     }
-
+    if(totdisp<N*nNhist) {
+        nchist=totdisp/N; nrhist=totdisp-nchist*N;
+        traceptr=&acttrace1[N2*nchist];
+        for(j=0;j<N;j++) traceptr[nrhist+j*N]=acttrace[x+j*N];
+        traceptr=&poptrace1[N2*nchist];
+        for(j=0;j<N;j++) traceptr[nrhist+j*N]=poptrace[x+j*N];
+        npopulation1[totdisp]=npopulation[x];
+    }
     free(gindices);free(activities);free(genes);free(popln);
     return(nspeciesnow);
 }
@@ -5808,6 +5871,10 @@ int activitieshashquad() {  /* count activities of all currently active quad ima
             }
         }
         free(activities);
+        if(totdisp<N*nNhist) {
+            for(i=0;i<N;i++) acttraceq1[totdisp+i*N]=acttraceq[x+i*N];
+            for(i=0;i<N;i++) acttraceqt1[totdisp+i*N]=acttraceqt[x+i*N];
+        }
     }
     
     return(nspeciesnow);
@@ -5947,7 +6014,6 @@ int genealogies() {  /* genealogies of all currently active species */
       }
     }
     free(gindices);free(activities);free(genes);free(popln);free(birthsteps);
-
     return(jmax);
 }
 //---------------------------------------------------------------------- misc ---------------------------------------------------------------------------

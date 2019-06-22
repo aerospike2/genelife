@@ -149,7 +149,8 @@ libcd.set_gcolors.restype = None
 libcd.set_gcolors.argtypes = []
 libcd.set_seed.restype = None
 libcd.set_seed.argtypes = [c_int]
-
+libcd.set_nbhist.restype = None
+libcd.set_nbhist.argtypes = [c_int]
 
 def get_log2N():
     return libcd.get_log2N()
@@ -297,3 +298,6 @@ def set_gcolors():
 
 def set_seed(seed):
     return libcd.set_seed(seed)
+
+def set_nbhist(nbhist):
+    return libcd.set_nbhist(nbhist)
