@@ -111,6 +111,7 @@ int colorfunction = 0;              // color function choice of 0: hash or 1: fu
 #define F_golchange 0x200           /* bit is 1 if state changed at last step */
 #define F_nongolchg 0x400           /* bit is 1 if state when produced (ie changed to) was made by a non GoL rule */
 #define F_3g_same   0x800           /* bit is 1 if exactly 3 live nbs and all 3 have same gene */
+#define F_survmut   0x1000          /* bit is 1 if mutation or survival from non-replicated mutant: mutation(t) or mutation(t-1)&survival(t) */
 #define F_3_livenbs 0xff0000        /* mask for storing configuration of 3 live neighbours : clockwise from top-left neighbour (NW) */
 //----------------------------------------------------------hash table implementation of python style dictionary---------------------------------------
 #define HASHTABLE_IMPLEMENTATION    /* uses Mattias Gustavsson's hashtable (github) for unsigned 64 bit key dictionary */
@@ -797,7 +798,8 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                     }
                 }
                 else if (colorfunction==3) {
-                    if(golgstats[ij]&F_notgolrul) mask = 0x00ffffff;  // color states for not GoL rule yellow
+                    if(golgstats[ij]&F_survmut) mask = 0xff00ffff;  // color states for surviving fresh mutants (non-replicated) purple/pink
+                    else if(golgstats[ij]&F_notgolrul) mask = 0x00ffffff;  // color states for not GoL rule yellow
                 }
 
                 cgolg[ij] = (int) mask;
@@ -3048,7 +3050,10 @@ void update_23(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgo
                     r2 = randprob(pmutmask,(unsigned int) randnr);
                     nmut = (randnr >> 56) & 0x3f;                               // choose mutation position for length 64 gene : from bits 56:61 of randnr
                     newgene = newgene ^ (r2<<nmut);                             // introduce single mutation with probability pmut = probmut
-                    statflag = statflag | F_mutation;
+                    if(r2) {
+                        statflag = statflag | F_mutation;
+                        statflag = statflag | F_survmut;
+                    }
                 }
 
                 if(gol[ij]) {                                               // central old gene present: overwritten
@@ -3065,7 +3070,10 @@ void update_23(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgo
                 // if ((survival&s&0x1ull)|((survival>>1)&(~s)&0x1ull)) {   // survival bit 0 and s==3, or (survival bit 1 and s==2)
                     newgol[ij]  = gol[ij];                                  // new game of life cell value same as old
                     newgolg[ij] = golg[ij];                                 // gene stays as before, live or not
-                    if(gol[ij]) statflag |= F_survival;
+                    if(gol[ij]) {
+                        statflag |= F_survival;
+                        if (golgstats[ij]&F_survmut) statflag |= F_survmut;
+                    }
                 }
                 else {
                     if(gol[ij]) {                                           // death : need to update hash table
@@ -3230,7 +3238,10 @@ void update_lut_sumx(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
                     r2 = randprob(pmutmask,(unsigned int) randnr);
                     nmut = (randnr >> 56) & 0x3f;                           // choose mutation position for length 64 gene : from bits 56:61 of randnr
                     newgene = newgene ^ (r2<<nmut);                         // introduce single mutation with probability pmut = probmut
-                    statflag = statflag | F_mutation;
+                    if(r2) {
+                        statflag = statflag | F_mutation;
+                        statflag = statflag | F_survmut;
+                    }
                 }
                 newgol[ij]  =  1ull;                                        // new game of life cell value: alive
                 newgolg[ij] =  newgene;                                     // if birth then newgene
@@ -3242,6 +3253,7 @@ void update_lut_sumx(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
             if(gol[ij]) {                                                  // death/survival
                 if(survive) {                                              // survival coded
                     statflag |= F_survival;
+                    if (golgstats[ij]&F_survmut) statflag |= F_survmut;    // gene is non-replicated mutant survivor
                     newgol[ij]  = gol[ij];                                 // new game of life cell value same as old
                     newgolg[ij] = golg[ij];                                // gene stays same
                 }
@@ -3416,8 +3428,10 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
                     r2 = randprob(pmutmask,(unsigned int) randnr);
                     nmut = (randnr >> 56) & 0x3f;                           // choose mutation position for length 64 gene : from bits 56:61 of randnr
                     newgene = newgene ^ (r2<<nmut);                         // introduce single mutation with probability pmut = probmut
-                    statflag = statflag | F_mutation;
-                }
+                    if(r2) {
+                        statflag = statflag | F_mutation;
+                        statflag = statflag | F_survmut;
+                    }                }
                 newgol[ij]  =  1ull;                                        // new game of life cell value: alive  [**gol** y]
                 newgolg[ij] =  newgene;                                     // if birth then newgene
                 if(golij) hashdeletegene(golg[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n"); // [**gol** y]
@@ -3428,6 +3442,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
             if(golij) {                                                    // death/survival  [**gol** y]
                 if(survive) {                                              // survival coded
                     statflag |= F_survival;
+                    if (golgstats[ij]&F_survmut) statflag |= F_survmut;    // gene is non-replicated mutant survivor
                     newgol[ij]  = golij;                                   // new game of life cell value same as old [**gol** y]
                     newgolg[ij] = golg[ij];                                // gene stays same
                 }
@@ -3591,7 +3606,10 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
                     r2 = randprob(pmutmask,(unsigned int) randnr);
                     nmut = (randnr >> 56) & 0x3f;                               // choose mutation position for length 64 gene : from bits 56:61 of randnr
                     newgene = newgene ^ (r2<<nmut);                             // introduce single mutation with probability pmut = probmut
-                    statflag = statflag | F_mutation;
+                    if(r2) {
+                        statflag = statflag | F_mutation;
+                        statflag = statflag | F_survmut;
+                    }
                 }
                 newgol[ij]  =  1ull;                                            // new game of life cell value: alive
                 newgolg[ij] =  newgene;                                         // if birth then newgene
@@ -3603,6 +3621,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
             if (gol[ij]) {                                                      // death/survival   (careful! genecode changed during this processing)
                 if(survive) {
                     statflag |= F_survival;
+                    if (golgstats[ij]&F_survmut) statflag |= F_survmut;         // gene is non-replicated mutant survivor
                     newgol[ij]  = gol[ij];                                      // new game of life cell value same as old
                     newgolg[ij] = golg[ij];                                     // gene stays same
                 }
@@ -3784,8 +3803,10 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
                     r2 = randprob(pmutmask,(unsigned int) randnr);
                     nmut = (randnr >> 56) & 0x3f;                               // choose mutation position for length 64 gene : from bits 56:61 of randnr
                     newgene = newgene ^ (r2<<nmut);                             // introduce single mutation with probability pmut = probmut
-                    statflag = statflag | F_mutation;
-                }
+                    if(r2) {
+                        statflag = statflag | F_mutation;
+                        statflag = statflag | F_survmut;
+                    }                }
                 newgol[ij]  = 1ull;
                 newgolg[ij] =  newgene;                                         // if birth then newgene
                 if(gol[ij]) hashdeletegene(golg[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n");
@@ -3796,6 +3817,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
             if(gol[ij]) {                                                       // death/survival   (careful! genecode changed during this processing)
                 if(survive) {
                     statflag |= F_survival;
+                    if (golgstats[ij]&F_survmut) statflag |= F_survmut;         // gene is non-replicated mutant survivor
                     newgol[ij]  = gol[ij];                                      // new game of life cell value same as old
                     newgolg[ij] = golg[ij];                                     // gene stays same
                 }
@@ -4001,8 +4023,10 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64
                     r2 = randprob(pmutmask,(unsigned int) randnr);
                     nmut = (randnr >> 56) & 0x3f;                              // choose mutation position for length 64 gene : from bits 56:61 of randnr
                     newgene = newgene ^ (r2<<nmut);                            // introduce single mutation with probability pmut = probmut
-                    statflag = statflag | F_mutation;
-                }
+                    if(r2) {
+                        statflag = statflag | F_mutation;
+                        statflag = statflag | F_survmut;
+                    }                }
                 newgol[ij]  = 1ull;
                 newgolg[ij] =  newgene;                                        // if birth then newgene
                 if(gol[ij]) hashdeletegene(golg[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n");
@@ -4017,6 +4041,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64
             if(gol[ij]) {                                                      // death/survival   (careful! genecode changed during this processing)
                 if(survive) {
                     statflag |= F_survival;
+                    if (golgstats[ij]&F_survmut) statflag |= F_survmut;        // gene is non-replicated mutant survivor
                     newgol[ij]  = gol[ij];                                     // new game of life cell value same as old
                     newgolg[ij] = golg[ij];                                    // gene stays same
                 }
@@ -4163,7 +4188,10 @@ void update_gol16(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
                 newgene = newgene ^ (rand2<<nmut);                           // introduce single mutation with probability pmut = probmut
                 newgolg[ij]=newgene;
                 statflag = statflag | F_birth;
-                if (rand2) statflag = statflag | F_mutation;
+                if (rand2) {
+                        statflag = statflag | F_mutation;
+                        statflag = statflag | F_survmut;
+                }
                 newgolgstats[ij] = statflag;
                 hashreplacegene(golg[ij],newgene,ancestor,"step %d hash storage error 1 in update_gol16, gene %llx not stored\n");
                 p=np;                                                        // break from loop at first birth
@@ -4346,7 +4374,10 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
             newgene = newgene ^ (rand2<<nmut);                                  // introduce single mutation with probability pmut = probmut
             newgolg[ij]=newgene;
             statflag = statflag | F_birth;
-            if (rand2) statflag = statflag | F_mutation;
+            if (rand2) {
+                statflag = statflag | F_mutation;
+                statflag = statflag | F_survmut;
+            }
             if(statflag&F_notgolrul) statflag |= F_nongolchg;
             if (golij) hashdeletegene(golgij,"step %d hash storage error 1 in update_gol64, gene %llx not stored\n"); // gene may be present because of live state on different plane
             hashaddgene(newgene,ancestor);
@@ -4354,6 +4385,7 @@ void update_gol64(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t ne
         else if (newgol[ij]) {                                                   // gene persistence if newgol non zero
             newgolg[ij]=golgij;
             statflag = statflag | F_survival;
+            if (golgstats[ij]&F_survmut) statflag |= F_survmut;                  // gene is non-replicated mutant survivor
         }
         else {                                                                   // gene death if was alive and death on all planes
             if(golij) {                                                          // site was alive, so it must have had a gene
@@ -4427,13 +4459,17 @@ void update_gol2match(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_
             newgene = newgene ^ (rand2<<nmut);                                  // introduce single mutation with probability pmut = probmut
             newgolg[ij]=newgene;
             statflag = statflag | F_birth;
-            if (rand2) statflag = statflag | F_mutation;
+            if (rand2) {
+                statflag = statflag | F_mutation;
+                statflag = statflag | F_survmut;
+            }
             if(statflag&F_notgolrul) statflag |= F_nongolchg;
             hashaddgene(newgene,ancestor);
         } //end if birth
         else if (newgol1) {                                                     // gene survival
             newgolg[ij]=golg[ij];
             statflag = statflag | F_survival;
+            if (golgstats[ij]&F_survmut) statflag |= F_survmut;                 // gene is non-replicated mutant survivor
         }
         else {                                                                  // gene death if alive
             if(gol1) {                                                          // site with gene
@@ -4824,11 +4860,11 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
                 else if (golgin[ij1]>='0' && golgin[ij1]<'8') golg[ij] = startgenes[golgin[ij1]-'0'];
                 else golg[ij] = startgenes[7];
                 cnt++;
-                golgstats[ij] = 0;
+                golgstats[ij] = 0ull;
             }
             else {
                 gol[ij] = gene0;
-                golgstats[ij] = 0;
+                golgstats[ij] = 0ull;
             }
             // if (golg[ij] == 0 && gol[ij] != 0) fprintf(stderr,"zero gene at %d\n",ij);
         }
@@ -4840,7 +4876,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         for (ij=0; ij<N2; ij++) {
             gol[ij] = 0ull;
             golg[ij] = gene0;
-            golgstats[ij] = 0;
+            golgstats[ij] = 0ull;
         }
         i0 = j0 = (N>>1)-(Nf>>1);
         for (i=0; i<Nf; i++) {
