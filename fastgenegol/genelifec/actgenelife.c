@@ -42,23 +42,30 @@ int cmp2 ( const void *pa, const void *pb )
 }
 
 
-void printspecies(uint64_t golg[]) {  /* counts numbers of all different species using qsort first */
-    int ij, k, ijlast, nspecies, counts[N2];
+void printspecies(uint64_t gol[], uint64_t golg[]) {  /* counts numbers of all different species using qsort first */
+    int ij, k, ijlast, ngenes, nspecies, counts[N2];
     uint64_t last, golgs[N2];
     uint64_t golgsc[N2][2];
     
 
     for (ij=0; ij<N2; ij++) { golgs[ij] = golg[ij];  counts[ij] = 0;}  // initialize sorted gene & count arrays to zero
 
-    qsort(golgs, N2, sizeof(uint64_t), cmp1);              // sort in increasing gene order
-    for (ij=0,k=0,ijlast=0,last=golgs[0]; ij<N2; ij++) {               // count each new species in sorted list
+
+    for (ij=ngenes=0; ij<N2; ij++) {
+        if(gol[ij]) golgs[ngenes++] = golg[ij];                   // only count active sites : correction, now as in subgenelife.c
+        counts[ngenes] = 0;}                                      // initialize sorted gene & count arrays to zero
+
+    qsort(golgs, ngenes, sizeof(uint64_t), cmpfunc);              // sort in increasing gene order
+    for (ij=0,k=0,ijlast=0,last=golgs[0]; ij<ngenes; ij++) {      // count each new species in sorted list
         if (golgs[ij] != last) {
             last = golgs[ij];
             counts[k++] = ij - ijlast;
             ijlast = ij;
         }
     }
-    nspecies = k;  // print excluding 0 since this is most likely an empty site not a true gene
+    counts[k++]=ngenes-ijlast;
+    nspecies = k;  // including genes with genotype 0
+  
     for (k=0,ij=0;k<nspecies;k++) {     // now condense array to give only different genes with counts
         // printf("species %4d with gene %x has counts %d\n",k, golgs[ij],counts[k]);
         golgs[k]=golgs[ij];
@@ -66,7 +73,8 @@ void printspecies(uint64_t golg[]) {  /* counts numbers of all different species
     }
     for (k=0; k<nspecies; k++) { golgsc[k][0] = golgs[k];  golgsc[k][1] = counts[k];}  // initialize joint gene & count array
     qsort(golgsc, nspecies, sizeof(golgsc[0]), cmp2);                   // sort in decreasing count order
-    for (k=0; k<nspecies; k++) {
+
+    for (k=0; k<nspecies-1; k++) {
         printf("%llx  %llu ",golgsc[k][0],golgsc[k][1]);
     }
     printf("\n");
@@ -139,7 +147,7 @@ int main (int argc, char *argv[]) {
     fprintf(stderr,"finished initialize.\n");
     for (i=0; i<nsteps; i++) {                  /* nsteps */
 	    golg = planesg[curPlane];
-	    printspecies(golg);
+	    printspecies(gol,golg);
 	    genelife_update(1,0,0);
     }    
 }
