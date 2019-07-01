@@ -161,6 +161,8 @@ libcd.set_seed.restype = None
 libcd.set_seed.argtypes = [c_int]
 libcd.set_nbhist.restype = None
 libcd.set_nbhist.argtypes = [c_int]
+libcd.set_genealogycoldepth.restype = None
+libcd.set_genealogycoldepth.argtypes = [c_int]
 
 def get_log2N():
     return libcd.get_log2N()
@@ -323,3 +325,6 @@ def set_seed(seed):
 
 def set_nbhist(nbhist):
     return libcd.set_nbhist(nbhist)
+
+def set_genealogycoldepth(genealogycoldepth):
+    return libcd.set_genealogycoldepth(genealogycoldepth)

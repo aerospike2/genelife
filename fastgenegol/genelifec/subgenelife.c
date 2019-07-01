@@ -62,7 +62,7 @@ int initfield = 0;                  // 0 input from random field of random or st
 int colorfunction = 0;              // color function choice of 0: hash or 1: functional (color classes depends on selection parameter)
                                     // 2: as in 1 but color sites where last step was non GoL rule yellow, 3: as in 2 but yellow if state produced by non GoL
                                     // 4: activities 5: populations 6: genealogies without time 7: genealogies with time brightness by activity 8: gliders
-                                    // 9: connected components 10 : connected component activities
+                                    // 9: connected components 10 : connected component activities 11: genealogy based individual colors
 #define ASCII_ESC 27                /* escape for printing terminal commands, such as cursor repositioning : only used in non-graphic version */
 //-----------------------------------------masks for named repscheme bits (selection 0-7) ----------------------------------------------------------------
 #define R_0_2sel_3live     0x1      /* 1: for 3-live-n birth, employ selection on two least different live neighbours for ancestor */
@@ -169,6 +169,7 @@ uint64_t codingmask;                // ncoding derived mask for ncoding bits
 int nhistG = 0;                     // interval for collecting config histogram data : 0 no collection, nstatG collection with time
 int nstatG = 0;                     // interval for collecting other statistical trace data : 0 no collection
 int genealogydepth = 0;             // depth of genealogies in current population
+int genealogycoldepth = 0;          // genes coloured by colour of ancestor at this depth in colorfunction=11
 //---------------------------------------------------------main arrays in simulation---------------------------------------------------------------------
 uint64_t *gol, *golg;               // pointers to gol and golg arrays at one of the plane cycle locations
 uint64_t *golgstats, *newgolgstats; // pointers to 64 bit masks for different events during processing at one of the plane cycle locations
@@ -498,6 +499,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // set_gcolors          set connected component colors as inherited colors from colliding connected components with random drift
 // set_seed             set random number seed
 // set_nbhist            set nbhist N-block of time points for trace from GUI for use in activity and population display traces
+// set_genealogycoldepth set genealogycoldepth for colorfunction=11 display
 //.......................................................................................................................................................
 // get_log2N            get the current log2N value from C to python
 // get_curgol           get current gol array from C to python
@@ -1042,6 +1044,30 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
             }
             if ((npopulation[ij&Nmask]>>log2N)==(ij>>log2N)) mask = 0xffffffff;  // overlay plot with trace of density in white (except if pop=N2)
             cgolg[ij]= (int) mask;
+        }
+    }
+    else if(colorfunction==11){                                     //genealogy based colours of ancestors ngen genealogical steps earlier
+        for (ij=0; ij<N2; ij++) {
+            if (gol[ij]) {
+                gene = golg[ij];
+                for (int j=1;j<genealogycoldepth;j++) {
+                    if(gene==rootgene) break;                               // reached root, exit j loop
+                    else {
+                        if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
+                            gene=genedataptr->firstancestor;
+                        }
+                        else fprintf(stderr,"ancestor not found in genealogies\n");
+                    }
+                }
+                if (gene == 0ull) gene = 11778ull; // random color for gene==0
+                // mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
+                // mask = (gene * 11400714819323198549ul) >> (64 - 32);  // hash with optimal prime multiplicator down to 32 bits
+                mask = gene * 11400714819323198549ull;
+                mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
+                mask |= 0x080808ffull; // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
+                cgolg[ij] = (int) mask;
+            }
+            else cgolg[ij] = 0;
         }
     }
     for (ij=0; ij<N2; ij++) {                 // convert BGRA format (pygame) to ARGB (PySDL2)
@@ -5020,7 +5046,7 @@ void get_stats(int outstats[], int outgtypes[], int outstepstats[], int outconfi
 }
 //-------------------------------------------------------------------- set ...---------------------------------------------------------------------------
 void set_colorfunction(int colorfunctionval) {
-    if(colorfunction>10) fprintf(stderr,"error colorfunction value passed %d too large\n",colorfunctionval);
+    if(colorfunction>11) fprintf(stderr,"error colorfunction value passed %d too large\n",colorfunctionval);
     else     colorfunction = colorfunctionval;
 }
 //.......................................................................................................................................................
@@ -5153,6 +5179,10 @@ void set_seed(int seed) {
 void set_nbhist(int nbhistin) {
     if(nbhist<nNhist*2) nbhist=nbhistin;
     else fprintf(stderr,"nbhist out of range %d > %d\n",nbhistin,nNhist*2-1);
+}
+//.......................................................................................................................................................
+void set_genealogycoldepth(int genealogycoldepthin) {
+    genealogycoldepth = genealogycoldepthin;
 }
 //------------------------------------------------------------------- get ... ---------------------------------------------------------------------------
 int get_log2N() {

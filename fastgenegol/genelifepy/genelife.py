@@ -106,6 +106,7 @@ nrun=1; ndisp=1000; nskip=0; niter=1;    # simulation time stepping parameters: 
 nhist = 0                                # set to n to turn on histogram configurations every nth step
 nbhist = -1                              # set block for display of traces of activity and population
 nNhist = 20                              # number of additional blocks for trace memory
+genealogycoldepth = 0                    # set depth of genealogical ancestor for gene display in colorfunction 11
 nstat = 0                                # set to n to turn on statistics trace every nth step
 rulemod = runparams[0] = 1               # 0,1 whether to allow GoL rule modifications
                                          # with rulemod 1 2-live-nb birth, 3-live-nb non-birth & non-survival possible
@@ -730,7 +731,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     global N,NbP
     global gol,golg,golgstats
     global connlabel,connlen,ncomponents
-    global colorfunction,gcolor
+    global colorfunction,gcolor,genealogycoldepth
     global ymax,ymaxq,oldymax,oldymaxq,nbhist,nNhist
     global updatesenabled
     global rulemod,repscheme,survivalmask,birthmask,overwritemask,ancselectmask,selection,ncoding,displayplanes
@@ -1076,11 +1077,11 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                 elif keystatus[sdl2.SDL_SCANCODE_SPACE]:
                     pause = 1-pause
                 elif keystatus[sdl2.SDL_SCANCODE_RIGHT]:
-                    colorfunction = (colorfunction + 1) % 11
+                    colorfunction = (colorfunction + 1) % 12
                     genelife.set_colorfunction(colorfunction)
                     print('step',framenr,'colorfunction changed to',colorfunction)
                 elif keystatus[sdl2.SDL_SCANCODE_LEFT]:
-                    colorfunction = (colorfunction - 1) % 11
+                    colorfunction = (colorfunction - 1) % 12
                     genelife.set_colorfunction(colorfunction)
                     print('step',framenr,'colorfunction changed to',colorfunction)
                 elif event.key == sdl2.SDLK_PLUS or keystatus[sdl2.SDL_SCANCODE_KP_PLUS]:
@@ -1092,6 +1093,10 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                         ymaxq = ymaxq * 2
                         oldymaxq = genelife.setget_act_ymaxq(ymaxq)
                         print('step',framenr,'new ymaxq =',ymaxq)
+                    elif colorfunction == 11:
+                        genealogycoldepth = genealogycoldepth + 1
+                        genelife.set_genealogycoldepth(genealogycoldepth)
+                        print('step',framenr,'new genealogycoldepth =',genealogycoldepth)
                 elif event.key == sdl2.SDLK_MINUS or keystatus[sdl2.SDL_SCANCODE_KP_MINUS]:
                     if (colorfunction == 4) or (colorfunction == 5):
                         ymax = ymax // 2
@@ -1101,6 +1106,11 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                         ymaxq = ymaxq // 2
                         oldymaxq = genelife.setget_act_ymaxq(ymaxq)
                         print('step',framenr,'new ymaxq =',ymaxq)
+                    elif colorfunction == 11:
+                        if genealogycoldepth > 0:
+                            genealogycoldepth = genealogycoldepth - 1
+                            genelife.set_genealogycoldepth(genealogycoldepth)
+                            print('step',framenr,'new genealogycoldepth =',genealogycoldepth)
                 elif keystatus[sdl2.SDL_SCANCODE_B]:
                     nbhistmax=framenr//(N//2)
                     nbhistold = nbhist
@@ -1222,6 +1232,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
             ncomponents=genelife.get_ncomponents()
             caption = caption + ("ncomponents %d " % (ncomponents))
         elif colorfunction == 10: caption = caption + ("ymaxq %d " % ymaxq)
+        elif colorfunction == 11: caption = caption + ("genealogy_cold %d " % genealogycoldepth)
         if pixeldat: caption = caption + pixeldat
         set_caption(window, caption)
         sdl2.ext.Window.refresh(window)                # copies the window to the display
@@ -1239,6 +1250,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                 message2 = factory2.from_surface(message)
                 grect.w = message.contents.w
                 grect.h = message.contents.h
+                set_caption(window2, caption)
                 sdl2.SDL_RenderCopy(sdlrenderer2, message2.texture, None, grect)
                 sdl2.SDL_RenderPresent(sdlrenderer2)
                 
@@ -1353,7 +1365,7 @@ def parhelp():
     print("middle mouse","stop simulation [data is retained for possible run() for run/analysis with updatesenabled=True/False]")
     print("left mouse  ","extract information about local state inside the array, or control buttons below")
     print("right mouse ","choose single plane for GoL display in colorfunction 2 for selection 16-19")
-    print("<- , ->     ","decrement or increment the colorfunction analysis type mod 11")
+    print("<- , ->     ","decrement or increment the colorfunction analysis type mod 12")
     print("b , B       ","decrement or increment the half block for trace display: in range -1,0 to nNhist*2-2=38")
     print("f           ","print frame rate in fps (average of last 10 frames NYI")
     print("F           ","toggle to fullscreen NYI")
@@ -1372,6 +1384,7 @@ def parhelp():
     print("x,X y,Y t,T ","lower (lc) or raise (uc) the (dx,dy,dt) offsets for glider tracking (colorfn 8) (0,0,0)=(all 8 nnb dt=-1)")
     print("v           ","toggle vertical scroll tracking mode : following top most objects and losing lowest objects in contact with 0 row")
     print("+,-         ","increase or decrease ymax or ymaxq for activity display scaled as act/(ymax+act) by a factor of 2")
+    print("+,-         ","increase or decrease genealogycoldepth if colorfunction==11 for gene ancestor display")
 #-----------------------------------------------------------------------------------------------------------
 
 if __name__ == '__main__':
