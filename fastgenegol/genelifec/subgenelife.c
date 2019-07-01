@@ -113,6 +113,8 @@ int colorfunction = 0;              // color function choice of 0: hash or 1: fu
 #define F_3g_same   0x800           /* bit is 1 if exactly 3 live nbs and all 3 have same gene */
 #define F_survmut   0x1000          /* bit is 1 if mutation or survival from non-replicated mutant: mutation(t) or mutation(t-1)&survival(t) */
 #define F_3_livenbs 0xff0000        /* mask for storing configuration of 3 live neighbours : clockwise from top-left neighbour (NW) */
+//---------------------------------------------------------- depth of genealogy data returned by get_genealogies()
+#define GDEPTH 64
 //----------------------------------------------------------hash table implementation of python style dictionary---------------------------------------
 #define HASHTABLE_IMPLEMENTATION    /* uses Mattias Gustavsson's hashtable (github) for unsigned 64 bit key dictionary */
 #define HASHTABLE_U64 uint64_t
@@ -503,8 +505,9 @@ const uint64_t r1 = 0x1111111111111111ull;
 // get_curgol           get current gol array from C to python
 // get_curgolg          get current golg array from C to python
 // get_acttrace         get current acttrace array C to python
-// get genealogy_trace  get current trace of genealogies to python
+// get genealogytrace   get current trace of genealogies to python
 // get_nspecies         get number of species from C to python
+// get_genealogydepth   get depth of genealogies returned by get_geneaologies()  (GDEPTH)
 // get_hist             get the histogram from C to python
 // get_activities       get the current activity statistics of genes from C to python
 // get_all_activities   get all activity statistics of genes (since t=0) from C to python
@@ -5202,6 +5205,14 @@ int get_nspecies() {
     return(nspeciesnow);
 }
 //.......................................................................................................................................................
+int get_genealogydepth() {
+    return(GDEPTH);
+}
+//.......................................................................................................................................................
+int get_curtime(){
+    return(totsteps);
+}
+//.......................................................................................................................................................
 void get_histo(int outhisto[],int numHistoC){
     int i;
     if(numHistoC != numHisto){
@@ -6105,6 +6116,105 @@ int genealogies() {  /* genealogies of all currently active species */
     }
     free(gindices);free(activities);free(genes);free(popln);free(birthsteps);
     return(jmax);
+}
+
+//----------------------------------------------------- ---------------------------------------------------------------------------
+// int get_genealogies() like genealogies, but return data for all geneaologies instead of filling out genealogytrace[]
+
+int get_genealogies(uint64_t genealogydat[], int narraysize) {  /* return genealogies of all currently active species */
+    int j, jmax, i, ij, k, nspecies, nspeciesnow, birthstep;
+    int activity;
+    uint64_t gene, ancgene;
+    int *gindices,*popln,*activities,*birthsteps;
+    uint64_t *genes,*curgen;
+
+    nspecies = hashtable_count(&genetable);
+    genotypes = hashtable_keys(&genetable);
+    geneitems = (genedata*) hashtable_items( &genetable );
+
+    for (i=nspeciesnow=0; i<nspecies; i++)
+        if(geneitems[i].popcount) nspeciesnow++;
+    if(narraysize < GDEPTH*nspeciesnow){
+        fprintf(stderr,"get_genealogies(): narraysize not large enough.  Must be at least %d\n",nspeciesnow*GDEPTH);
+        return(-1);
+    }
+
+    gindices = (int *) malloc(nspecies*sizeof(int));
+    for (i=j=0; i<nspecies; i++) {
+        if(geneitems[i].popcount) {
+            gindices[j]=i;
+            j++;
+        }
+        else gindices[nspeciesnow+i-j]=i;
+    }
+    // qsort(gindices, nspeciesnow, sizeof(int), cmpfunc4);// sort in increasing birthstep order
+    // qsort(gindices, nspeciesnow, sizeof(int), cmpfunc3);// sort in decreasing population size order
+
+    // for get_genealogies() get all nspeciesnow genes, not just N
+    // if (nspeciesnow>N) nspeciesnow=N;               // can only display at most N species, chose oldest
+
+    genes = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
+    popln = (int *) malloc(nspeciesnow*sizeof(int));
+    activities = (int *) malloc(nspeciesnow*sizeof(int));
+    birthsteps = (int *) malloc(nspeciesnow*sizeof(int));
+    curgen = (uint64_t *) calloc(GDEPTH,sizeof(uint64_t)); // current genealogy array
+
+    for (i=0; i<nspeciesnow; i++) {
+        genes[i]=genotypes[gindices[i]];
+        popln[i]=geneitems[gindices[i]].popcount;
+        activities[i]=geneitems[gindices[i]].activity;
+        birthsteps[i]=geneitems[gindices[i]].firsttime;
+    }
+
+    ancgene=rootgene;                                             // never really used, but included to avoid unitialized warning
+    birthstep=0;
+    activitymax=0;
+    for (i=jmax=ij=0; i<nspeciesnow; i++) {
+        //j1=0;
+        for (j=0;j<GDEPTH;j++) {  // go back at most GDEPTH links in genealogy
+            if(j) {
+                gene=ancgene;
+                if(gene==rootgene) {
+                    ancgene = rootgene;
+                    // birthstep = 0;  // not needed
+                    // activity = 0;   // not needed as does not affect max value
+                }
+                else {
+                    if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
+                        ancgene=genedataptr->firstancestor;
+                        // birthstep = genedataptr->firsttime; // not needed
+                        activity = genedataptr->activity;
+                        if(activity>activitymax) activitymax=activity;
+                    }
+                    else fprintf(stderr,"ancestor not found in genealogies\n");
+                }
+                curgen[j] = gene;
+            }
+            else  {             // j==0
+                gene=genes[i];
+                curgen[j] = gene;
+                ancgene=geneitems[gindices[i]].firstancestor;
+                // birthstep=geneitems[gindices[i]].firsttime; // not needed
+                activity=geneitems[gindices[i]].activity;
+                if(activity>activitymax) activitymax=activity;
+            }
+            if (gene == rootgene) break;                            // reached root, exit j loop
+        }
+        if (j>jmax) jmax=j;
+        
+        for(k=0; k<jmax; k++){
+            genealogydat[ij+k] = curgen[k];
+        }
+        for(k=jmax;k<GDEPTH;k++){
+            genealogydat[ij+k] = 0;
+        }
+        ij += GDEPTH;
+    }
+    free(gindices);free(activities);free(genes);free(popln);free(birthsteps); free(curgen);
+    genealogydepth = jmax;
+    if(genealogydepth==GDEPTH)
+        fprintf(stderr,"WARNING:  genologydepth==GDEPTH.  GDEPTH should be increased.");
+    return(genealogydepth);
 }
 //---------------------------------------------------------------------- misc ---------------------------------------------------------------------------
 void delay(int milliseconds) {

@@ -79,6 +79,10 @@ libcd.get_curgolgstats.restype = None
 libcd.get_curgolgstats.argtypes = [uint64_array,c_int]
 libcd.get_nspecies.argtypes = None
 libcd.get_nspecies.restype = c_int
+libcd.get_genealogydepth.argtypes = None
+libcd.get_genealogydepth.restype = c_int
+libcd.get_curtime.argtypes = None
+libcd.get_curtime.restype = c_int
 libcd.get_stats.restype = None
 libcd.get_stats.argtypes = [int_array, int_array, int_array, int_array, c_int]
 libcd.get_activities.restype = c_int
@@ -97,6 +101,8 @@ libcd.get_acttrace.restype = None
 libcd.get_acttrace.argtypes = [uint64_array,c_int]
 libcd.get_genealogytrace.restype = None
 libcd.get_genealogytrace.argtypes = [uint64_array,c_int]
+libcd.get_genealogies.restype = c_int
+libcd.get_genealogies.argtypes = [uint64_array,c_int]
 libcd.get_sorted_popln_act.restype = c_int
 libcd.get_sorted_popln_act.argtypes = [int_array, uint64_array, int_array, int_array]
 libcd.get_connected_comps.restype = c_int
@@ -174,6 +180,9 @@ def get_curgolgstats(golgstats):
 def get_nspecies():
     return libcd.get_nspecies()
 
+def get_curtime():
+    return libcd.get_curtime()
+
 def initialize(runparams,simparams):
     return libcd.initialize(runparams, len(runparams), simparams, len(simparams))
 
@@ -218,6 +227,15 @@ def get_acttrace(acttrace):
 
 def get_genealogytrace(genealogytrace):
     return libcd.get_genealogytrace(genealogytrace, int(len(genealogytrace)))
+
+def get_genealogies(genealogydat):
+    return libcd.get_genealogies(genealogydat, int(len(genealogydat)))
+
+def get_nspecies():
+    return libcd.get_nspecies()
+
+def get_genealogydepth():
+    return libcd.get_genealogydepth()
 
 def get_sorted_popln_act( gindices, genes, popcnts, activities):
     return libcd.get_sorted_popln_act(gindices, genes, popcnts, activities)
