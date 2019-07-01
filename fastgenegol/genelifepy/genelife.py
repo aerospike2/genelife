@@ -1084,7 +1084,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     colorfunction = (colorfunction - 1) % 12
                     genelife.set_colorfunction(colorfunction)
                     print('step',framenr,'colorfunction changed to',colorfunction)
-                elif event.key == sdl2.SDLK_PLUS or keystatus[sdl2.SDL_SCANCODE_KP_PLUS]:
+                elif keystatus[sdl2.SDL_SCANCODE_PLUS] or keystatus[sdl2.SDL_SCANCODE_KP_PLUS]:
                     if (colorfunction == 4) or (colorfunction == 5):
                         ymax = ymax * 2
                         oldymax = genelife.setget_act_ymax(ymax)
@@ -1097,7 +1097,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                         genealogycoldepth = genealogycoldepth + 1
                         genelife.set_genealogycoldepth(genealogycoldepth)
                         print('step',framenr,'new genealogycoldepth =',genealogycoldepth)
-                elif event.key == sdl2.SDLK_MINUS or keystatus[sdl2.SDL_SCANCODE_KP_MINUS]:
+                elif keystatus[sdl2.SDL_SCANCODE_MINUS] or keystatus[sdl2.SDL_SCANCODE_KP_MINUS]:
                     if (colorfunction == 4) or (colorfunction == 5):
                         ymax = ymax // 2
                         oldymax = genelife.setget_act_ymax(ymax)
