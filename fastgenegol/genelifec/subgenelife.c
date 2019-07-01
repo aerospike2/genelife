@@ -1065,6 +1065,8 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 mask = gene * 11400714819323198549ull;
                 mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
                 mask |= 0x080808ffull; // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
+                if (gene == rootgene) mask = 0x3f3f3fff;                 // grey color for root
+
                 cgolg[ij] = (int) mask;
             }
             else cgolg[ij] = 0;
