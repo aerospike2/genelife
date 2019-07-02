@@ -6284,7 +6284,7 @@ int get_genealogies(uint64_t genealogydat[], int narraysize) {  /* return geneal
             genealogydat[ij+k] = rootgene;
         }
 
-        ij += jmax;
+        ij += (jmax+1);
     }
     free(gindices);free(activities);free(genes);free(curgen);
     genealogydepth = jmax;
