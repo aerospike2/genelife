@@ -6259,7 +6259,7 @@ int get_genealogies(uint64_t genealogydat[], int narraysize) {  /* return geneal
     
     for (i=ij=0; i<nspeciesnow; i++) {
         gene=genes[i];
-        curgen[j] = gene;
+        curgen[0] = gene;
         ancgene=geneitems[gindices[i]].firstancestor;
         activity=geneitems[gindices[i]].activity;
         if(activity>activitymax) activitymax=activity;
