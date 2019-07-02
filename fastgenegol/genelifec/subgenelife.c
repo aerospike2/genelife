@@ -5283,9 +5283,9 @@ int get_genealogydepth() {
         }
         if (j>jmax) jmax=j;
     }
-    genealogydepth = jmax;
+    genealogydepth = jmax+1;
     free(genes); free(gindices);
-    return(jmax);
+    return(genealogydepth);
 }
 //.......................................................................................................................................................
 int get_curtime(){
@@ -6287,7 +6287,7 @@ int get_genealogies(uint64_t genealogydat[], int narraysize) {  /* return geneal
         ij += (jmax+1);
     }
     free(gindices);free(activities);free(genes);free(curgen);
-    genealogydepth = jmax;
+    genealogydepth = jmax+1;
 
     return(genealogydepth);   
 }
