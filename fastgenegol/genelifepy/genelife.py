@@ -1084,7 +1084,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     colorfunction = (colorfunction - 1) % 12
                     genelife.set_colorfunction(colorfunction)
                     print('step',framenr,'colorfunction changed to',colorfunction)
-                elif keystatus[sdl2.SDL_SCANCODE_PLUS] or keystatus[sdl2.SDL_SCANCODE_KP_PLUS]:
+                elif keystatus[sdl2.SDL_SCANCODE_EQUALS] or keystatus[sdl2.SDL_SCANCODE_KP_PLUS]:
                     if (colorfunction == 4) or (colorfunction == 5):
                         ymax = ymax * 2
                         oldymax = genelife.setget_act_ymax(ymax)

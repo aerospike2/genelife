@@ -1046,15 +1046,18 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
             cgolg[ij]= (int) mask;
         }
     }
-    else if(colorfunction==11){                                     //genealogy based colours of ancestors ngen genealogical steps earlier
+    else if(colorfunction==11){                                     //genealogy based colours of ancestors at genealogycoldepth
+        uint64_t ancestor;
         for (ij=0; ij<N2; ij++) {
             if (gol[ij]) {
                 gene = golg[ij];
-                for (int j=1;j<genealogycoldepth;j++) {
-                    if(gene==rootgene) break;                               // reached root, exit j loop
+                ancestor=gene;
+                for (int j=1;j<=genealogycoldepth;j++) {
+                    if(ancestor==rootgene) break;                               // reached root, exit j loop
                     else {
+                        gene = ancestor;
                         if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
-                            gene=genedataptr->firstancestor;
+                            ancestor=genedataptr->firstancestor;
                         }
                         else fprintf(stderr,"ancestor not found in genealogies\n");
                     }
