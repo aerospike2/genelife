@@ -5776,7 +5776,112 @@ int genealogies() {  /* genealogies of all currently active species */
 //----------------------------------------------------- ---------------------------------------------------------------------------
 // int get_genealogies() like genealogies, but return data for all geneaologies instead of filling out genealogytrace[]
 
-int get_genealogies(uint64_t genealogydat[], int narraysize) {  /* return genealogies of all currently active species */
+int get_genealogies(genedata genealogydat[], int narraysize) {  /* return genealogies of all currently active species */
+    int j, jmax, i, ij, k, nspecies, nspeciesnow;
+    int activity;
+    uint64_t gene, ancgene;
+    int *gindices,*activities;
+    uint64_t *genes,*curgen;
+    genedata genedummy;
+
+    nspecies = hashtable_count(&genetable);
+    genotypes = hashtable_keys(&genetable);
+    geneitems = (genedata*) hashtable_items( &genetable );
+
+    genedummy.popcount=0;
+    genedummy.firsttime=0;
+    genedummy.lasttime=0;
+    genedummy.lastextinctiontime=0;
+    genedummy.activity=0;
+    genedummy.nextinctions=0;
+    genedummy.gene=0xfedcba9876543210;
+    genedummy.firstancestor=0x0;
+
+
+    for (i=nspeciesnow=0; i<nspecies; i++)
+        if(geneitems[i].popcount) nspeciesnow++;
+
+    gindices = (int *) malloc(nspecies*sizeof(int));
+    for (i=j=0; i<nspecies; i++) {
+        if(geneitems[i].popcount) {
+            gindices[j]=i;
+            j++;
+        }
+        else gindices[nspeciesnow+i-j]=i;
+    }
+
+    genes = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
+    activities = (int *) malloc(nspeciesnow*sizeof(int));
+
+    for (i=0; i<nspeciesnow; i++) {
+        genes[i]=genotypes[gindices[i]];
+        activities[i]=geneitems[gindices[i]].activity;
+    }
+
+
+    
+    for (i=jmax=0; i<nspeciesnow; i++) {                            // calculate max depth in genealogy jmax
+        gene=genes[i];
+        ancgene=geneitems[gindices[i]].firstancestor;
+        for (j=1;;j++) {
+            gene=ancgene;
+            if(gene==rootgene) break;                               // reached root, exit j loop
+            else {
+                if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
+                    ancgene=genedataptr->firstancestor;
+                }
+                else fprintf(stderr,"ancestor not found in genealogies\n");
+            }
+        }
+        if (j>jmax) jmax=j;
+    }
+    
+    if(narraysize < (jmax+1)*nspeciesnow){
+        fprintf(stderr,"get_genealogies(): narraysize not large enough.  Must be at least %d\n",nspeciesnow*(jmax+1));
+        return(-1);
+    }
+    curgen = (uint64_t *) calloc(jmax,sizeof(uint64_t)); // current genealogy array
+    activitymax=0;
+    
+    for (i=ij=0; i<nspeciesnow; i++) {
+        gene=genes[i];
+        curgen[0] = gene;
+        ancgene=geneitems[gindices[i]].firstancestor;
+        activity=geneitems[gindices[i]].activity;
+        if(activity>activitymax) activitymax=activity;
+        for (j=1;j<=jmax;j++) {                     // go back at most jmax links in genealogy
+            gene=ancgene;
+            if(gene==rootgene) break;               // reached root, exit j loop
+            else {
+                    if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
+                        ancgene=genedataptr->firstancestor;
+                        activity = genedataptr->activity;
+                        if(activity>activitymax) activitymax=activity;
+                    }
+                    else fprintf(stderr,"ancestor not found in genealogies\n");
+            }
+            curgen[j] = gene;
+        }
+        
+        for(k=0; k<j; k++){
+            if((genedataptr = (genedata *) hashtable_find(&genetable, curgen[k])) != NULL) {
+                genealogydat[ij+k] = *genedataptr; // cf comment on shallow copy in get_genes()
+            }
+            else fprintf(stderr,"ancestor not found in genealogies\n");
+            
+        }
+        for(k=j; k<=jmax; k++){
+            genealogydat[ij+k] = genedummy;
+        }
+
+        ij += (jmax+1);
+    }
+    free(gindices);free(activities);free(genes);free(curgen);
+    genealogydepth = jmax+1;
+
+    return(genealogydepth);   
+}
+int get_genealogies_(uint64_t genealogydat[], int narraysize) {  /* return genealogies of all currently active species */
     int j, jmax, i, ij, k, nspecies, nspeciesnow;
     int activity;
     uint64_t gene, ancgene;
