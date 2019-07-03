@@ -5046,7 +5046,7 @@ int get_genes(genedata genelist[],int narraysize) {
         return -1;
     }
 
-    for (i=0;i<nallspeciesquad;i++) {
+    for (i=0;i<nallspecies;i++) {
         genelist[i]=geneitems[i];          /* shallow copy OK if no pointers being copied, otherwise the structures they point to will not be copied */
         /* genelist[i].popcount=geneitems[i].popcount;
         genelist[i].firsttime=geneitems[i].firsttime;
