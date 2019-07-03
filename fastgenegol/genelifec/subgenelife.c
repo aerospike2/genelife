@@ -2799,7 +2799,6 @@ short unsigned int extract_components(uint64_t gol[]) {
     if(!(totsteps % 10)) {
         fprintf(stderr,"histogram log2n ");for(i=0;i<=log2N;i++) fprintf(stderr," %5d",i);fprintf(stderr,"\n");
         fprintf(stderr,"conn cmpt counts");for(i=0;i<=log2N;i++) fprintf(stderr," %5d",histside[i]);fprintf(stderr,"\n");
-        fprintf(stderr,"------------------------------------\n");
     }
 
     return nlabel;
@@ -4139,6 +4138,7 @@ void genelife_update (int nsteps, int nhist, int nstat) {
     int genealogies(void);                                                    // genealogies of all currently active species
     void tracestats(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int NN2); // trace statistics based on gol,golg
     void countconfigs(void);
+    void countspecies1(uint64_t gol[], uint64_t golg[], int N2);              // count species
 
     nhistG = nhist;                                                           // intervals for collecting histograms
     nstatG = nstat;
@@ -4153,7 +4153,7 @@ void genelife_update (int nsteps, int nhist, int nstat) {
         if(!(totsteps%10)) {
             nallspecies = hashtable_count(&genetable);
             nallspeciesquad = hashtable_count(&quadtable);
-            fprintf(stderr,"step %6d\r",totsteps);
+            fprintf(stderr,"__________________________________________________________________________________________________________________________________________\n");
         }
 
         if (selection<8)        update_23(gol,golg,newgol,newgolg);           // calculate next iteration with detailed varyiants of version s=2-3
@@ -4182,6 +4182,7 @@ void genelife_update (int nsteps, int nhist, int nstat) {
             if(ngenealogydeep<0) fprintf(stderr,"error returned from genealogies\n");
         }
         if(!(totsteps%10)) {
+            countspecies1(gol, golg, N2);
             nallspecies = hashtable_count(&genetable);
             nallspeciesquad = hashtable_count(&quadtable);
             fprintf(stderr,"step %6d: genes %d/%d (extant/all), patterns %d/%d (extant/all)\n",totsteps,nspeciesgene,nallspecies,nspeciesquad+nspeciessmall,nallspeciesquad+nallspeciessmall);
@@ -4735,6 +4736,7 @@ int get_nspecies() {
 
     for (k=0,nspeciesnow=0; k<nspecies; k++)
         if(geneitems[k].popcount) nspeciesnow++;
+    
     return(nspeciesnow);
 }
 //.......................................................................................................................................................
@@ -5300,12 +5302,12 @@ void countspecies1(uint64_t gol[], uint64_t golg[], int N2) {     /* counts numb
 	        fitness = nones&0x3;                                            // fitness is species class
         }
 
-        fprintf(stderr,"count species %d with gene %llx has counts %llu and %d ones, fitness %llu\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
+        // fprintf(stderr,"count species %d with gene %llx has counts %llu and %d ones, fitness %llu\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
     }
-    fprintf(stderr,"rulemod\trepscheme\tselection\toverwritemask\tsurvival\n");
-    fprintf(stderr,"%d\t%d\t\t%d\t\t%d\t\t%d\n",rulemod,repscheme,selection,overwritemask,survivalmask);
-    fprintf(stderr,"pmutmask\tinit1\tinitr\tncoding\tstartchoice\n");
-    fprintf(stderr,"%x\t\t%d\t%d\t%d\t%d\n",pmutmask,initial1density,initialrdensity,ncoding,startgenechoice);
+    //fprintf(stderr,"rulemod\trepscheme\tselection\toverwritemask\tsurvival\n");
+    //fprintf(stderr,"%d\t%d\t\t%d\t\t%d\t\t%d\n",rulemod,repscheme,selection,overwritemask,survivalmask);
+    //fprintf(stderr,"pmutmask\tinit1\tinitr\tncoding\tstartchoice\n");
+    //fprintf(stderr,"%x\t\t%d\t%d\t%d\t%d\n",pmutmask,initial1density,initialrdensity,ncoding,startgenechoice);
 }
 //.......................................................................................................................................................
 void countspecies() {                                                       // counts current species without using hash tables
