@@ -116,7 +116,7 @@ repscheme = runparams[1] = 8             # repscheme bit 3 (val 0x8) determines 
                                          # 2 minimum number of ones # 3 maximum number of ones
                                          # 4 neutral selection # 5 neutral but different selection
                                          # 6 penalty function -1 for a survival rule -2 for a birth rule  # 7 not allowed
-selection = runparams[2] = 10            # fitness for 2 live neighbor rule : 0-6 see subgenelife.c code
+selection = runparams[2] = 10            # fitness for 2 live neighbor rule : 0-15 see subgenelife.c code
 overwritemask = runparams[3]= 0x3        # whether to overwrite existing genes and allow birth
 survivalmask = runparams[4] = 0x06       # for selection=8-13 this is the GoL survival mask
 birthmask = runparams[7] = 0x04          # for selection=8-13 this is the GoL birth mask
@@ -263,7 +263,6 @@ def init_button_arrays():
     ncanon.append([2,3,4,5,4,3,2,2,3,4,5,4,3,2,8])    # selection 10,11
     ncanon.append([4,7,10,7,4,4,7,10,7,4,8])          # selection 12,13
     ncanon.append([1,2,6,10,13,1,2,6,10,13,8])        # selection 14,15
-    ncanon.append([16,1,1,1,1,1])                     # selection 16-19
                                                       # colors [R,G,B] for different color regions for buttons, colorvals must be < 128
     cancolors.append([[0,100,0],[0,50,100],[0,80,80],[0,100,50],[100,100,0],[50,100,0],[0,0,127],[100,0,0]]) # selection 0-7
     cancolors.append([[0,0,127],[0,100,0],[100,0,0]]) # selection 8,9
@@ -271,14 +270,12 @@ def init_button_arrays():
                       [0,127,0],[50,127,0],[60,120,0],[100,120,0],[80,120,0],[50,120,0],[0,127,0],[100,0,0]]) # selection 10,11
     cancolors.append([[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[50,127,0],[80,120,0],[100,120,0],[80,120,0],[50,127,0],[100,0,0]])  # selection 12,13
     cancolors.append([[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[50,127,0],[80,120,0],[100,120,0],[80,120,0],[50,127,0],[100,0,0]])  # selection 14,15
-    cancolors.append([[100,0,0],[100,100,0],[0,80,80],[0,0,127],[0,100,0],[80,0,80]]) # selection 16-19
                                                      # lists of colors for individual buttons expanded from above, first initialize to zero
     cancol.append(np.zeros((18,3),np.int32))
     cancol.append(np.zeros((24,3),np.int32))
     cancol.append(np.zeros((54,3),np.int32))
     cancol.append(np.zeros((72,3),np.int32))
     cancol.append(np.zeros((72,3),np.int32))
-    cancol.append(np.zeros((21,3),np.int32))
     
     for l in range(len(ncanon)):                    # buttons for different selection schemes
         k=0
@@ -359,19 +356,6 @@ def init_buttons():    # initialize parameter buttons
         for k in range(len(ncanon[4])):
             draw_rect(surface,[200,200,200],[(j<<(log2N-6))-1 if j else 0,Height+4,sc,sc])
             j = j+ncanon[4][k]
-    elif selection>=16 and selection<=19:
-        NbP = (ncoding>>16)&0xf
-        displayplanes=(0x1<<NbP)-1
-        if not NbP:
-            NbP = 16
-        for k in range(21):
-            if k<NbP:
-                draw_rect(surface,cancol[4][k]*2,[k<<(log2N-6),Height+6,3*sc,3*sc])
-            elif k<16:
-                draw_rect(surface,[80,80,80],[k<<(log2N-6),Height+6,3*sc,3*sc]) // grey
-            elif k<21:
-                bit = (repscheme>>(k-16))&0x1
-                draw_rect(surface,cancol[4][k]*(1+bit),[k<<(log2N-6),Height+6,3*sc,3*sc])
     return(cancol)
 #-----------------------------------------------------------------------------------------------------------
 
@@ -896,18 +880,8 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                                         draw_rect(surface,cancol[4][k+32]*(1+((overwritemask>>(k-32))&0x1)),[k<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
                                 surviveover[0],surviveover[1],surviveover[2]= survivalmask,birthmask,overwritemask
                                 genelife.set_surviveover64(surviveover)
-                        elif selection < 20:
-                            if k<NbP:
-                                displayplanes = displayplanes ^ (1<<k)
-                                draw_rect(surface,cancol[4][k]*(1+((displayplanes>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
-                                genelife.set_displayplanes(displayplanes)
-                            elif k>=16 and k<21:
-                                repscheme = repscheme ^ (1<<(k-16))
-                                print(("step %d repscheme changed to %x" % (framenr,repscheme)))
-                                draw_rect(surface,cancol[4][k]*(1+((repscheme>>(k-16))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
-                                genelife.set_repscheme(repscheme)
                     else: # y<N
-                        if colorfunction < 4 or colorfunction == 8:
+                        if colorfunction < 4 or colorfunction == 8 or colorfunction == 11:
                             genelife.get_curgol(gol)    # get current gol,golg,golgstats arrays
                             genelife.get_curgolg(golg)
                             genelife.get_curgolgstats(golgstats)
@@ -989,11 +963,6 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     for k in range(64):
                         if k<32: draw_rect(surface,cancol[4][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                         else: draw_rect(surface,cancol[4][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
-                if selection>=20:
-                    displayoneplane=64
-                    genelife.set_displayoneplane(displayoneplane)
-                    if not updatesenabled:
-                        updatesenabled=True
                 if colorfunction==9 or colorfunction==10:
                     ncomponents=genelife.get_connected_comps(connlabel,connlen,-1,-1)
                     colorgrid()
