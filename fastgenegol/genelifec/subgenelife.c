@@ -133,6 +133,7 @@ genedata* geneitems;                // list of genedata structured items stored 
 hashtable_t quadtable;              // hash table for quad tree
 typedef struct quadnode {           // stored quadtree binary pattern nodes for population over time (currently only for analysis not computation)
     uint64_t hashkey;               // hash table look up key for node : enables tree exploration more directly than construction from nw,ne,sw,se including collision avoidance
+//    uint64_t firstancestor;         // pattern immediately preceding the generation of this pattern
     uint64_t nw, ne, sw, se;        // constant keys to hashed quadnodes or 64-bit patterns : we terminate one level higher than Gosper & golly
     unsigned short int isnode;      // 1 if this is a node not a pattern
     unsigned short int size;        // side length of square image corresponding to quadtree pattern
@@ -142,7 +143,7 @@ typedef struct quadnode {           // stored quadtree binary pattern nodes for 
     unsigned int lasttime;          // last time node was identified : used to determine if part of current timestep
     unsigned int topactivity;       // activity of pattern as top of connected component (last field : giving size of record an even number of 64bit words)
 } quadnode;
-quadnode quadinit = {0ull,0ull,0ull,0ull,0ull,0,0,1,0,0,0,0};
+quadnode quadinit = {0ull,/*rootgene,*/0ull,0ull,0ull,0ull,0,0,1,0,0,0,0};
 quadnode * qimage;
 int quadcollisions = 0;
 HASHTABLE_SIZE_T const* quadkeys;   // pointer to stored hash table keys (which are the quadkeys)
@@ -5643,17 +5644,16 @@ int genealogies() {  /* genealogies of all currently active species */
     int j1, j2, j3, activity, gorder[N];
     uint64_t gene, ancgene, nextgene;
     int *gindices,*popln,*activities,*birthsteps;
-    uint64_t *genes;
 
 
     nspecies = hashtable_count(&genetable);
     genotypes = hashtable_keys(&genetable);
     geneitems = (genedata*) hashtable_items( &genetable );
 
-    gindices = (int *) malloc(nspecies*sizeof(int));
     for (i=nspeciesnow=0; i<nspecies; i++)
         if(geneitems[i].popcount) nspeciesnow++;
 
+    gindices = (int *) malloc(nspecies*sizeof(int));
     for (i=j=0; i<nspecies; i++) {
         if(geneitems[i].popcount) {
             gindices[j]=i;
@@ -5661,55 +5661,41 @@ int genealogies() {  /* genealogies of all currently active species */
         }
         else gindices[nspeciesnow+i-j]=i;
     }
-    // qsort(gindices, nspeciesnow, sizeof(int), cmpfunc4);// sort in increasing birthstep order
+
     qsort(gindices, nspeciesnow, sizeof(int), cmpfunc3);// sort in decreasing population size order
+    // qsort(gindices, nspeciesnow, sizeof(int), cmpfunc4);// alternatively, sort in increasing birthstep order
 
-    if (nspeciesnow>N) nspeciesnow=N;               // can only display at most N species, chose oldest
+    if (nspeciesnow>N) nspeciesnow=N;                           // can only display at most N species, chose oldest
 
-    genes = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
     popln = (int *) malloc(nspeciesnow*sizeof(int));
     activities = (int *) malloc(nspeciesnow*sizeof(int));
     birthsteps = (int *) malloc(nspeciesnow*sizeof(int));
 
     for (i=0; i<nspeciesnow; i++) {
-        genes[i]=genotypes[gindices[i]];
         popln[i]=geneitems[gindices[i]].popcount;
         activities[i]=geneitems[gindices[i]].activity;
         birthsteps[i]=geneitems[gindices[i]].firsttime;
     }
 
-    for(ij=0;ij<N2;ij++) working[ij]=rootgene;              // set field to rootgene black
-    ancgene=rootgene;                                             // never really used, but included to avoid unitialized warning
-    birthstep=0;
+    for(ij=0;ij<N2;ij++) working[ij]=rootgene;                  // set field to rootgene as background
     activitymax=0;
     for (i=jmax=0; i<nspeciesnow; i++) {
-        //j1=0;
-        for (j=0;j<N;j++) {  // go back at most N links in genealogy
-            if(j) {
-                gene=ancgene;
-                if(gene==rootgene) {
-                    ancgene = rootgene;
-                    // birthstep = 0;  // not needed
-                    // activity = 0;   // not needed as does not affect max value
+        gene=genotypes[gindices[i]];                            // do not need to copy array to genes since only needed here
+        ancgene=geneitems[gindices[i]].firstancestor;
+        activity=geneitems[gindices[i]].activity;
+        if(activity>activitymax) activitymax=activity;
+        working[i]=gene;                                        // ij = i for j=0
+        for (j=1;j<N;j++) {                                     // go back at most N links in genealogy
+            gene=ancgene;
+            if(gene==rootgene) break;                           // reached root, exit j loop
+            else {
+                if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
+                    ancgene=genedataptr->firstancestor;
+                    activity = genedataptr->activity;
+                    if(activity>activitymax) activitymax=activity;
                 }
-                else {
-                    if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
-                        ancgene=genedataptr->firstancestor;
-                        // birthstep = genedataptr->firsttime; // not needed
-                        activity = genedataptr->activity;
-                        if(activity>activitymax) activitymax=activity;
-                    }
-                    else fprintf(stderr,"ancestor not found in genealogies\n");
-                }
+                else fprintf(stderr,"ancestor not found in genealogies\n");
             }
-            else  {
-                gene=genes[i];
-                ancgene=geneitems[gindices[i]].firstancestor;
-                // birthstep=geneitems[gindices[i]].firsttime; // not needed
-                activity=geneitems[gindices[i]].activity;
-                if(activity>activitymax) activitymax=activity;
-            }
-            if (gene == rootgene) break;                            // reached root, exit j loop
             ij = i+j*N;
             working[ij]=gene;
         }
@@ -5717,7 +5703,7 @@ int genealogies() {  /* genealogies of all currently active species */
     }
     genealogydepth = jmax;
 
-                                                                    //reverse ancestries to allow comparison at same number of speciations
+                                                                //reverse ancestries to allow comparison at same number of speciations
     for (i=0; i<nspeciesnow; i++) {
         for(j=0;j<N;j++) {
             if (working[i+j*N]==rootgene) break;
@@ -5729,15 +5715,16 @@ int genealogies() {  /* genealogies of all currently active species */
         }
     }
     for (i=0; i<N; i++) gorder[i]=i;
-    qsort(gorder, nspeciesnow, sizeof(int), cmpfunc5);              // sort according to ancestral lines - use cmpfunc5 to sorting genes laterally via gene value
-    //qsort(gorder, nspeciesnow, sizeof(int), cmpfunc6);            // sort according to ancestral lines - use cmpfunc6 to sorting genes laterally via activity
-    //qsort(gorder, nspeciesnow, sizeof(int), cmpfunc7);            // sort according to ancestral lines - use cmpfunc7 to sort genes laterally via population size
+    qsort(gorder, nspeciesnow, sizeof(int), cmpfunc5);          // sort according to ancestral lines - use cmpfunc5 to sorting genes laterally via gene value
+    //qsort(gorder, nspeciesnow, sizeof(int), cmpfunc6);        // sort according to ancestral lines - use cmpfunc6 to sorting genes laterally via activity
+    //qsort(gorder, nspeciesnow, sizeof(int), cmpfunc7);        // sort according to ancestral lines - use cmpfunc7 to sort genes laterally via population size
 
     for (i=0;i<N;i++) if((gorder[i]<0)||(gorder[i]>=N)) fprintf(stderr,"step %d error in gorder out of bounds at i = %d with value %d\n",totsteps,i,gorder[i]);
 
-    for(ij=0;ij<N2;ij++) genealogytrace[ij]=rootgene;               // initialize genealogytrace to root gene before drawing part of it
+    for(ij=0;ij<N2;ij++) genealogytrace[ij]=rootgene;           // initialize genealogytrace to root gene before drawing part of it
 
-    if(/* (colorfunction==6)||*/colorfunction==7) {                 // time trace of genealogies; formerly 6 or 7 now only 7
+    if(colorfunction==7) {                                      // time trace of genealogies
+      birthstep=0;
       for(i=0;i<nspeciesnow;i++) {
         for(j=0,j1=0;j<jmax;j++) {
             if(gorder[i]>=nspeciesnow) fprintf(stderr,"error in genealogies gorder at i=%d, order value %d out of range\n",i,gorder[i]);
@@ -5763,7 +5750,7 @@ int genealogies() {  /* genealogies of all currently active species */
       }
       // for(i=nspeciesnow;i<N;i++) for(j=0;j<N;j++) genealogytrace[gorder[i]+j*N]=rootgene;
     }
-    else {                                                          // species changes only trace (colorfunction == 6)
+    else {                                                      // species changes only trace (colorfunction == 6)
       for(i=0;i<nspeciesnow;i++) {
         for(j=0;j<jmax;j++) {
             ij=i+j*N;
@@ -5771,10 +5758,132 @@ int genealogies() {  /* genealogies of all currently active species */
         }
       }
     }
-    free(gindices);free(activities);free(genes);free(popln);free(birthsteps);
+    free(gindices);free(activities);free(popln);free(birthsteps);
     return(jmax);
 }
+//--------------------------------------------------------------- genealogies ---------------------------------------------------------------------------
+int genealogies_quad() {  /* pattern genealogies of all currently active patterns NYC */
+    int j, jmax, i, ij, nspecies, nspeciesnow, birthstep;
+    int j1, j2, j3, activity, gorder[N];
+    uint64_t gene, ancgene, nextgene;
+    int *gindices,*popln,*activities,*birthsteps;
 
+
+    nspecies = hashtable_count(&genetable);
+    genotypes = hashtable_keys(&genetable);
+    geneitems = (genedata*) hashtable_items( &genetable );
+
+    for (i=nspeciesnow=0; i<nspecies; i++)
+        if(geneitems[i].popcount) nspeciesnow++;
+
+    gindices = (int *) malloc(nspecies*sizeof(int));
+    for (i=j=0; i<nspecies; i++) {
+        if(geneitems[i].popcount) {
+            gindices[j]=i;
+            j++;
+        }
+        else gindices[nspeciesnow+i-j]=i;
+    }
+
+    qsort(gindices, nspeciesnow, sizeof(int), cmpfunc3);// sort in decreasing population size order
+    // qsort(gindices, nspeciesnow, sizeof(int), cmpfunc4);// alternatively, sort in increasing birthstep order
+
+    if (nspeciesnow>N) nspeciesnow=N;                           // can only display at most N species, chose oldest
+
+    popln = (int *) malloc(nspeciesnow*sizeof(int));
+    activities = (int *) malloc(nspeciesnow*sizeof(int));
+    birthsteps = (int *) malloc(nspeciesnow*sizeof(int));
+
+    for (i=0; i<nspeciesnow; i++) {
+        popln[i]=geneitems[gindices[i]].popcount;
+        activities[i]=geneitems[gindices[i]].activity;
+        birthsteps[i]=geneitems[gindices[i]].firsttime;
+    }
+
+    for(ij=0;ij<N2;ij++) working[ij]=rootgene;                  // set field to rootgene as background
+    activitymax=0;
+    for (i=jmax=0; i<nspeciesnow; i++) {
+        gene=genotypes[gindices[i]];                            // do not need to copy array to genes since only needed here
+        ancgene=geneitems[gindices[i]].firstancestor;
+        activity=geneitems[gindices[i]].activity;
+        if(activity>activitymax) activitymax=activity;
+        working[i]=gene;                                        // ij = i for j=0
+        for (j=1;j<N;j++) {                                     // go back at most N links in genealogy
+            gene=ancgene;
+            if(gene==rootgene) break;                           // reached root, exit j loop
+            else {
+                if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
+                    ancgene=genedataptr->firstancestor;
+                    activity = genedataptr->activity;
+                    if(activity>activitymax) activitymax=activity;
+                }
+                else fprintf(stderr,"ancestor not found in genealogies\n");
+            }
+            ij = i+j*N;
+            working[ij]=gene;
+        }
+        if (j>jmax) jmax=j;
+    }
+    genealogydepth = jmax;
+
+                                                                //reverse ancestries to allow comparison at same number of speciations
+    for (i=0; i<nspeciesnow; i++) {
+        for(j=0;j<N;j++) {
+            if (working[i+j*N]==rootgene) break;
+        }
+        for(j1=0;j1<(j>>1);j1++) {
+            gene=working[i+(j-j1-1)*N];
+            working[i+(j-j1-1)*N]=working[i+j1*N];
+            working[i+j1*N]=gene;
+        }
+    }
+    for (i=0; i<N; i++) gorder[i]=i;
+    qsort(gorder, nspeciesnow, sizeof(int), cmpfunc5);          // sort according to ancestral lines - use cmpfunc5 to sorting genes laterally via gene value
+    //qsort(gorder, nspeciesnow, sizeof(int), cmpfunc6);        // sort according to ancestral lines - use cmpfunc6 to sorting genes laterally via activity
+    //qsort(gorder, nspeciesnow, sizeof(int), cmpfunc7);        // sort according to ancestral lines - use cmpfunc7 to sort genes laterally via population size
+
+    for (i=0;i<N;i++) if((gorder[i]<0)||(gorder[i]>=N)) fprintf(stderr,"step %d error in gorder out of bounds at i = %d with value %d\n",totsteps,i,gorder[i]);
+
+    for(ij=0;ij<N2;ij++) genealogytrace[ij]=rootgene;           // initialize genealogytrace to root gene before drawing part of it
+
+    if(colorfunction==7) {                                      // time trace of genealogies
+      birthstep=0;
+      for(i=0;i<nspeciesnow;i++) {
+        for(j=0,j1=0;j<jmax;j++) {
+            if(gorder[i]>=nspeciesnow) fprintf(stderr,"error in genealogies gorder at i=%d, order value %d out of range\n",i,gorder[i]);
+            ij = gorder[i]+j*N;
+            gene = working[ij];
+            ij+=N;
+            if(ij<N2) {
+                nextgene = working[ij];
+                if(nextgene==rootgene) birthstep=totsteps;
+                else {
+                    if((genedataptr = (genedata *) hashtable_find(&genetable, nextgene)) != NULL) birthstep = genedataptr->firsttime;
+                    else fprintf(stderr,"ancestor %llx not found at (%d,%d) in genealogies during birthstep extraction\n",nextgene,ij&Nmask,ij>>log2N);
+                }
+            }
+            else birthstep=totsteps;
+            j2 = birthstep*N/totsteps;
+            for (j3=j1;j3<j2;j3++) {
+                ij = i+j3*N;
+                genealogytrace[ij]=gene;
+            }
+            j1 = j2;
+        }
+      }
+      // for(i=nspeciesnow;i<N;i++) for(j=0;j<N;j++) genealogytrace[gorder[i]+j*N]=rootgene;
+    }
+    else {                                                      // species changes only trace (colorfunction == 6)
+      for(i=0;i<nspeciesnow;i++) {
+        for(j=0;j<jmax;j++) {
+            ij=i+j*N;
+            genealogytrace[ij]=working[gorder[i]+j*N];
+        }
+      }
+    }
+    free(gindices);free(activities);free(popln);free(birthsteps);
+    return(jmax);
+}
 //----------------------------------------------------- ---------------------------------------------------------------------------
 // int get_genealogies() like genealogies, but return data for all geneaologies instead of filling out genealogytrace[]
 
@@ -5784,21 +5893,22 @@ int get_genealogies(genedata genealogydat[], int narraysize) {  /* return geneal
     uint64_t gene, ancgene;
     int *gindices,*activities;
     uint64_t *genes,*curgen;
-    genedata genedummy;
+    genedata genedummy = {0,0,0,0,0,0,0ull,rootgene};  // default data structure for gene data: note I put 4th member lastextinction -1 which is not a valid timestep
 
     nspecies = hashtable_count(&genetable);
     genotypes = hashtable_keys(&genetable);
     geneitems = (genedata*) hashtable_items( &genetable );
 
+    /*
     genedummy.popcount=0;
     genedummy.firsttime=0;
     genedummy.lasttime=0;
-    genedummy.lastextinctiontime=0;
+    genedummy.lastextinctiontime=0;  // better -1
     genedummy.activity=0;
     genedummy.nextinctions=0;
-    genedummy.gene=0xfedcba9876543210;
-    genedummy.firstancestor=0x0;
-
+    genedummy.gene=0xfedcba9876543210ull;  // use rootgene, other wise code cannot change this centrally
+    genedummy.firstancestor=0x0ull;   // use long unsigned constant
+    */
 
     for (i=nspeciesnow=0; i<nspecies; i++)
         if(geneitems[i].popcount) nspeciesnow++;
