@@ -129,6 +129,7 @@ typedef struct genedata {           // value of keys stored for each gene encoun
     uint64_t recentancestor;        // this is the most recently observed ancestor for this genotype (initialized to rootgene)
 } genedata;
 const uint64_t rootgene = 0xfedcba9876543210; // initial special gene as root for genealogies
+const uint64_t generepeat = 0x0123456789abcdef; // special gene sequence to denote repeated genes found in genealogy
 genedata ginitdata = {1,0,0,0,-1,0,0,0,0ull,rootgene,rootgene};  // initialization data structure for gene data
 genedata *genedataptr;              // pointer to a genedata instance
 HASHTABLE_SIZE_T const* genotypes;  // pointer to stored hash table keys (which are the genotypes)
@@ -214,6 +215,8 @@ uint64_t acttraceq1[N2*nNhist];     // trace of first N*nNhist time points of ac
 unsigned char acttraceqt1[N2*nNhist];// type of entry in acttraceq : 1 quad, 0 smallpatt (<65536) i.e. corresponding to isnode
 uint64_t working[N2];               // working space array for calculating genealogies and doing neighbour bit packing
 int npopulation[N];                 // number of live sites (gol 1s) in last N time steps up to current population
+uint64_t fullgenealogies[N2*N];     // genes in individual genealogies for all live cells
+short unsigned int fgtimes[N2*N];   // times at which birth of next different progeny took place
 int npopulation1[N*nNhist];         // number of live sites (gol 1s) in first N*nNhist time steps
 int nspeciesgene,nallspecies;       // number of gene species in current population, and that have ever existed
 int nspeciesquad,nallspeciesquad;   // number of quad species in current population, and that have ever existed
@@ -925,17 +928,14 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
         }
     }
     else if(colorfunction==6 || colorfunction == 7){                //genealogies
-        if(colorfunction==6) k=2;
-        else k=0;
+        if(colorfunction==6) k=2; else k=0;
         for (ij=0; ij<N2; ij++) {
-            if(ancestorfirst0recent1) gene=genealogytrace[ij];
-            else {
-                int i=ij&Nmask; int j=ij>>(log2N+2);
-                gene=genealogytrace[i+(j<<log2N)];                  // double row for each ancestral step to make display more readable in colorfunction 6 mode
-            }
+            int i=ij&Nmask; int j=ij>>(log2N+k);
+            gene=genealogytrace[i+(j<<log2N)];                  // double row for each ancestral step to make display more readable in colorfunction 6 mode
             activity = 0;
-            if (gene == selectedgene) mask = 0xffffffff; else
-            if (gene == rootgene) mask = 0x000000ff;                // black color for root
+            if (gene == selectedgene)    mask = 0xffffffff;         // white color for selected gene
+            else if (gene == rootgene)   mask = 0x000000ff;         // black color for root
+            else if (gene == generepeat) mask = 0x3f3f3fff;         // grey color for repeated gene
             else {
                 if (gene == 0ull) gene = 11778L;                    // random color for gene==0
                 mask = gene * 11400714819323198549ul;
@@ -5669,10 +5669,10 @@ int activitieshashquad() {  /* count activities of all currently active quad ima
 }
 //--------------------------------------------------------------- genealogies ---------------------------------------------------------------------------
 int genealogies() {  /* genealogies of all currently active species */
-    int j, jmax, i, ij, nspecies, nspeciesnow;
+    int j, jmax, i, ij, k, nspecies, nspeciesnow;
     unsigned int birthstep;
     int j1, j2, j3, activity, gorder[N];
-    uint64_t gene, ancgene, nextgene;
+    uint64_t gene, ancgene, nextgene, genealogy1[N];
     int *gindices,*popln,*activities;
 
     nspecies = hashtable_count(&genetable);
@@ -5712,11 +5712,13 @@ int genealogies() {  /* genealogies of all currently active species */
         else                      ancgene=geneitems[gindices[i]].firstancestor;
         activity=geneitems[gindices[i]].activity;
         if(activity>activitymax) activitymax=activity;
-        working[i]=gene;                                        // ij = i for j=0
-        for (j=1;j<N;j++) {                                     // go back at most N links in genealogy
+        working[i]=genealogy1[0]=gene;                                        // ij = i for j=0
+        for (j=k=1;j<N;j++) {                                   // go back at most N links in genealogy
             gene=ancgene;
             if(gene==rootgene) break;                           // reached root, exit j loop
             else {
+                for (k=0;k<j;k++) if (gene==genealogy1[k]) {gene=generepeat;break;};  // if gene already in ancestry, break with generepeat
+                if(gene==generepeat) { working[i+j*N]=gene;j=j+1;break;}
                 if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
                     if(ancestorfirst0recent1) ancgene=genedataptr->recentancestor;
                     else ancgene=genedataptr->firstancestor;
@@ -5726,7 +5728,7 @@ int genealogies() {  /* genealogies of all currently active species */
                 else fprintf(stderr,"ancestor not found in genealogies\n");
             }
             ij = i+j*N;
-            working[ij]=gene;
+            working[ij]=genealogy1[j]=gene;
         }
         if (j>jmax) jmax=j;
     }
@@ -5735,7 +5737,7 @@ int genealogies() {  /* genealogies of all currently active species */
                                                                 //reverse ancestries to allow comparison at same number of speciations
     for (i=0; i<nspeciesnow; i++) {
         for(j=0;j<N;j++) {
-            if (working[i+j*N]==rootgene) break;
+            if (working[i+j*N]==rootgene ) break;  // || working[i+j*N]==generepeat
         }
         for(j1=0;j1<(j>>1);j1++) {
             gene=working[i+(j-j1-1)*N];
@@ -5794,7 +5796,7 @@ int genealogies() {  /* genealogies of all currently active species */
     return(jmax);
 }
 //--------------------------------------------------------------- genealogies ---------------------------------------------------------------------------
-int genealogies_quad() {  /* pattern genealogies of all currently active patterns NYC !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+int genealogies_full() {  /* full genealogies of all individuals */
     int j, jmax, i, ij, nspecies, nspeciesnow, birthstep;
     int j1, j2, j3, activity, gorder[N];
     uint64_t gene, ancgene, nextgene;
