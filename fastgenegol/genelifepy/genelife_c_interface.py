@@ -10,6 +10,7 @@ Wrapping a C library function that does update of long unsigned int arrays gol, 
 import numpy as np
 import numpy.ctypeslib as npct
 from ctypes import c_int
+from ctypes import c_int16
 from ctypes import c_uint64
 from ctypes import c_uint32
 from ctypes import c_uint16
@@ -28,8 +29,8 @@ int_array = npct.ndpointer(dtype=np.int32, ndim=1, flags='CONTIGUOUS')
 #                ('label',c_uint16),('log2n',c_uint16),('patt',c_uint16),('quad',c_uint64),('pixels',c_uint32),('reserve',c_uint32)]
 
 # genedata type to retrieve hashed genes from C using numpy and ctypes
-genedtype=[('popcount',c_uint32),('firsttime',c_uint32),('lasttime',c_uint32),('lastextinctiontime',c_int),     #    3 unsigned 1 signed int 32 bits
-           ('activity',c_uint32),('nextinctions',c_uint32),('gene',c_uint64),('firstancestor',c_uint64)]        #    2 unsigned 32 bit and 2 unsigned 64 bit int
+genedtype=[('popcount',c_uint32),('firsttime',c_uint16),('recenttime',c_uint16),('lasttime',c_uint16),('lastextinctiontime',c_int16),#    1 unsigned, 3 short unsigned, 1 short signed int
+           ('activity',c_uint32),('nextinctions',c_uint32),('dummy',c_uint32),('gene',c_uint64),('firstancestor',c_uint64),('recentancestor',c_uint64)] #    2 unsigned 32 bit and 3 unsigned 64 bit int
 gene_array = npct.ndpointer(dtype=genedtype, ndim=1, flags=['CONTIGUOUS','ALIGNED'])
 
 # component type to retrieve connected components from C using numpy and ctypes
@@ -163,6 +164,8 @@ libcd.set_nbhist.restype = None
 libcd.set_nbhist.argtypes = [c_int]
 libcd.set_genealogycoldepth.restype = None
 libcd.set_genealogycoldepth.argtypes = [c_int]
+libcd.set_ancestorfirst0recent1.restype = None
+libcd.set_ancestorfirst0recent1.argtypes = [c_int]
 
 def get_log2N():
     return libcd.get_log2N()
@@ -328,3 +331,6 @@ def set_nbhist(nbhist):
 
 def set_genealogycoldepth(genealogycoldepth):
     return libcd.set_genealogycoldepth(genealogycoldepth)
+
+def set_ancestorfirst0recent1(ancestorfirst0recent1):
+    return libcd.set_ancestorfirst0recent1(ancestorfirst0recent1)

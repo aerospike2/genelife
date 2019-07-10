@@ -98,6 +98,7 @@ randomsoup = 0
 vscrolling = 0
 noveltyfilter = 0
 activity_size_colormode = 0
+ancestorfirst0recent1 = 0
                                          # parameter initialization
 runparams = np.zeros(9,np.int32)         # 9 parameters passed to C
 simparams = np.zeros(5,np.int32)         # 5 parameters passed to C
@@ -715,7 +716,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     global N,NbP
     global gol,golg,golgstats
     global connlabel,connlen,ncomponents
-    global colorfunction,gcolor,genealogycoldepth
+    global colorfunction,gcolor,genealogycoldepth,ancestorfirst0recent1
     global ymax,ymaxq,oldymax,oldymaxq,nbhist,nNhist
     global updatesenabled
     global rulemod,repscheme,survivalmask,birthmask,overwritemask,ancselectmask,selection,ncoding,displayplanes
@@ -1116,6 +1117,13 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                         gcolor = (gcolor+1)%10;
                         genelife.set_gcolors()
                         print('step',framenr,'new gcolor =',gcolor)
+                    elif colorfunction == 6 or colorfunction == 7 or colorfunction == 11:
+                        ancestorfirst0recent1= 1 - ancestorfirst0recent1
+                        genelife.set_ancestorfirst0recent1(ancestorfirst0recent1)
+                        if ancestorfirst0recent1:
+                            print('step',framenr,'new ancestor choice recent')
+                        else:
+                            print('step',framenr,'new ancestor choice first')
                 elif keystatus[sdl2.SDL_SCANCODE_N]:
                     noveltyfilter=1-noveltyfilter
                     print('step',framenr,"noveltyfilter changed to ",noveltyfilter)
@@ -1338,7 +1346,7 @@ def parhelp():
     print("b , B       ","decrement or increment the half block for trace display: in range -1,0 to nNhist*2-2=38")
     print("f           ","print frame rate in fps (average of last 10 frames NYI")
     print("F           ","toggle to fullscreen NYI")
-    print("g           ","toggle on/off inherited coloring of connected components from overlapping components")
+    print("g           ","toggle on/off inherited coloring of connected components from overlapping components (colfn 9) or first/recent ancestors (6,7,11)")
     print("h           ","print this help")
     print("H           ","toggle horizon mode on or off: upper half of array obeys unmodified GoL rule")
     print("<space>     ","pause simulation, allowing ongoing display control")

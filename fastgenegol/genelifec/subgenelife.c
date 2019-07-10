@@ -63,7 +63,8 @@ int colorfunction = 0;              // color function choice of 0: hash or 1: fu
                                     // 2: as in 1 but color sites where last step was non GoL rule yellow, 3: as in 2 but yellow if state produced by non GoL
                                     // 4: activities 5: populations 6: genealogies without time 7: genealogies with time brightness by activity 8: gliders
                                     // 9: connected components 10 : connected component activities 11: genealogy based individual colors
-#define ASCII_ESC 27                /* escape for printing terminal commands, such as cursor repositioning : only used in non-graphic version */
+int ancestorfirst0recent1 = 0;      // whether to display and return genealogies via first or most recent ancestor
+#define ASCII_ESC 27                // escape for printing terminal commands, such as cursor repositioning : only used in non-graphic version
 //-----------------------------------------masks for named repscheme bits (selection 0-7) ----------------------------------------------------------------
 #define R_0_2sel_3live     0x1      /* 1: for 3-live-n birth, employ selection on two least different live neighbours for ancestor */
 #define R_1_2sel_2live     0x2      /* 1: allow 2-live-n birth, employ selection on 2 live neighbours for ancestor */
@@ -116,16 +117,19 @@ int colorfunction = 0;              // color function choice of 0: hash or 1: fu
 hashtable_t genetable;
 typedef struct genedata {           // value of keys stored for each gene encountered in simulation
     unsigned int popcount;          // initialized to 1
-    unsigned int firsttime;         // initialized to 0
-    unsigned int lasttime;          // last time this gene was seen : enables genes to be mapped to their last epoch (including present)
-    int lastextinctiontime;         // this is initialized to -1, meaning no extinctions yet
+    short unsigned int firsttime;   // first time the gene was created from ancestor: initialized to 0
+    short unsigned int recenttime;  // most recent time the gene was created by mutation from ancestor or randomly generated : initialized to 0
+    short unsigned int lasttime;    // last time this gene was seen : enables genes to be mapped to their last epoch (including present)
+    short int lastextinctiontime;   // this is initialized to -1, meaning no extinctions yet
     unsigned int activity;          // initialized to 0
     unsigned int nextinctions;      // initialized to 0
+    unsigned int dummy;             // pad to 64 bit word boundary
     uint64_t gene;                  // stored gene : note that two difft 64-bit genes may be stored at same location, so need check
     uint64_t firstancestor;         // this is initialized to a special gene seq (rootgene) not likely ever to occur for starting genes
+    uint64_t recentancestor;        // this is the most recently observed ancestor for this genotype (initialized to rootgene)
 } genedata;
 const uint64_t rootgene = 0xfedcba9876543210; // initial special gene as root for genealogies
-genedata ginitdata = {1,0,0,-1,0,0,0ull,rootgene};  // initialization data structure for gene data
+genedata ginitdata = {1,0,0,0,-1,0,0,0,0ull,rootgene,rootgene};  // initialization data structure for gene data
 genedata *genedataptr;              // pointer to a genedata instance
 HASHTABLE_SIZE_T const* genotypes;  // pointer to stored hash table keys (which are the genotypes)
 genedata* geneitems;                // list of genedata structured items stored in hash table
@@ -492,8 +496,9 @@ const uint64_t r1 = 0x1111111111111111ull;
 // set_activity_size_colormode set colormode by size for colorfunction 10 : 0 by ID  1 log2 enclosing square size 2 use #pixels 3 use sqrt(#pixels)
 // set_gcolors          set connected component colors as inherited colors from colliding connected components with random drift
 // set_seed             set random number seed
-// set_nbhist            set nbhist N-block of time points for trace from GUI for use in activity and population display traces
+// set_nbhist           set nbhist N-block of time points for trace from GUI for use in activity and population display traces
 // set_genealogycoldepth set genealogycoldepth for colorfunction=11 display
+// set_ancestorfirst0recent1 set ancestorfirst0recent1 for display and return of first (0) or most recent (1) ancestors in genealogies
 //..........................................................  get to python driver  .....................................................................
 // get_log2N            get the current log2N value from C to python
 // get_curgol           get current gol array from C to python
@@ -919,9 +924,15 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
             cgolg[ij]= (int) mask;
         }
     }
-    else if(colorfunction<8){                                       //genealogies
+    else if(colorfunction==6 || colorfunction == 7){                //genealogies
+        if(colorfunction==6) k=2;
+        else k=0;
         for (ij=0; ij<N2; ij++) {
-            gene=genealogytrace[ij];
+            if(ancestorfirst0recent1) gene=genealogytrace[ij];
+            else {
+                int i=ij&Nmask; int j=ij>>(log2N+2);
+                gene=genealogytrace[i+(j<<log2N)];                  // double row for each ancestral step to make display more readable in colorfunction 6 mode
+            }
             activity = 0;
             if (gene == selectedgene) mask = 0xffffffff; else
             if (gene == rootgene) mask = 0x000000ff;                // black color for root
@@ -1079,7 +1090,8 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                     else {
                         gene = ancestor;
                         if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
-                            ancestor=genedataptr->firstancestor;
+                            if(ancestorfirst0recent1) ancestor=genedataptr->recentancestor;
+                            else                      ancestor=genedataptr->firstancestor;
                         }
                         else fprintf(stderr,"ancestor not found in genealogies\n");
                     }
@@ -1646,17 +1658,22 @@ extern inline uint64_t disambiguate(unsigned int kch, uint64_t nb1i, int nb[], u
     }
 }
 //------------------------------------------------------------ hash gene inline fns ---------------------------------------------------------------------
-extern inline void hashaddgene(uint64_t gene,uint64_t ancestor) {
+extern inline void hashaddgene(uint64_t gene,uint64_t ancestor,uint64_t mutation) {
     genedata gdata;
     if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
-        genedataptr->popcount++;
         genedataptr->lasttime = totsteps;
+        if(mutation) {
+            genedataptr->recentancestor = ancestor;
+            genedataptr->recenttime = (short unsigned int) totsteps;
+        }
+        genedataptr->popcount++;
     }
     else {
         gdata=ginitdata;
         gdata.gene = gene;
-        gdata.firsttime = gdata.lasttime = totsteps;
+        gdata.firsttime = gdata.recenttime = gdata.lasttime = (short unsigned int) totsteps;
         gdata.firstancestor = ancestor;
+        gdata.recentancestor = ancestor;
         hashtable_insert(&genetable, gene,(genedata *) &gdata);
     }
     if(ancestor != rootgene)
@@ -1669,19 +1686,24 @@ extern inline void hashdeletegene(uint64_t gene,const char errorformat[]) {
         else fprintf(stderr,errorformat,totsteps,gene);     // errorformat must contain %d and %llx format codes in this order
 }
 //.......................................................................................................................................................
-extern inline void hashreplacegene(uint64_t gene1,uint64_t gene2,uint64_t ancestor,const char errorformat[]) {
+extern inline void hashreplacegene(uint64_t gene1,uint64_t gene2,uint64_t ancestor,const char errorformat[], uint64_t mutation) { /* currently not used */
     genedata gdata;
     if((genedataptr = (genedata *) hashtable_find(&genetable, gene1)) != NULL) genedataptr->popcount--;
     else fprintf(stderr,errorformat,totsteps,gene1);
     if((genedataptr = (genedata *) hashtable_find(&genetable, gene2)) != NULL) {
         genedataptr->popcount++;
         genedataptr->lasttime = totsteps;
+        if(mutation || genedataptr->popcount == 0) {
+            genedataptr->recentancestor = ancestor;
+            genedataptr->recenttime = (short unsigned int) totsteps;
+        }
     }
     else {
         gdata=ginitdata;
         gdata.gene = gene2;
-        gdata.firsttime = gdata.lasttime = totsteps;
+        gdata.firsttime = gdata.recenttime = gdata.lasttime = (short unsigned int) totsteps;
         gdata.firstancestor = ancestor;
+        gdata.recentancestor = ancestor;
         hashtable_insert(&genetable, gene2,(genedata *) &gdata);
     }
     if(ancestor != rootgene)
@@ -1692,7 +1714,7 @@ extern inline void hashreplacegene(uint64_t gene1,uint64_t gene2,uint64_t ancest
 extern inline void hashgeneextinction(uint64_t gene,const char errorformat[]) {
     if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
         if(genedataptr->popcount == 0) {
-            genedataptr->lastextinctiontime = totsteps;
+            genedataptr->lastextinctiontime = (short int) totsteps;
             genedataptr->nextinctions++;
         }
     }
@@ -2862,7 +2884,7 @@ void random_soup(uint64_t gol[],uint64_t golg[],uint64_t newgol[],uint64_t newgo
                             newgol[ij] = 1ull;
                             RAND128P(randnr);
                             newgolg[ij] = randnr;
-                            hashaddgene(newgolg[ij],rootgene);
+                            hashaddgene(newgolg[ij],rootgene,0x1ull);
                         }
                     }
                 }
@@ -2873,7 +2895,7 @@ void random_soup(uint64_t gol[],uint64_t golg[],uint64_t newgol[],uint64_t newgo
                         if (!newgol[ij]) {                      // if not live, fill with game of life genome
                             newgol[ij] = 1ull;
                             newgolg[ij] = genegol[selection-8]; // GoL gene for particular selection model coding
-                            hashaddgene(newgolg[ij],rootgene);
+                            hashaddgene(newgolg[ij],rootgene,0x1ull);
                         }
                     }
                 }
@@ -2916,7 +2938,7 @@ void random_soup(uint64_t gol[],uint64_t golg[],uint64_t newgol[],uint64_t newgo
                 else if(selection>=16 && selection<=19) for (k=0;k<NbP;k++) newgol[ij] |= ((rand() & rmask) < density)?(1ull<<(k<<2)):0ull;
                 else for (k=0;k<NbP;k++) newgol[ij] |= ((rand() & rmask) < density)?(1ull<<k):0ull;
 
-                if (newgol[ij]) {                               // if live cell or multiplane, fill with game of life genome or random genome
+                if (newgol[ij]) {                               // if live cell, fill with game of life genome or random genome
                     if (selection<8) {
                         RAND128P(randnr);
                         newgolg[ij] = gene0^(randnr&mask);
@@ -2924,7 +2946,7 @@ void random_soup(uint64_t gol[],uint64_t golg[],uint64_t newgol[],uint64_t newgo
                     else {
                         newgolg[ij] = genegol[selection-8];
                     }
-                    hashaddgene(newgolg[ij],rootgene);
+                    hashaddgene(newgolg[ij],rootgene,0x1ull);
                 }
             }
         }
@@ -3109,7 +3131,7 @@ void update_23(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t newgo
                 if(gol[ij]) {                                               // central old gene present: overwritten
                     hashdeletegene(golg[ij],"step %d hash delete error 1 in update, gene %llx not stored\n");
                 }
-                hashaddgene(newgene,ancestor);
+                hashaddgene(newgene,ancestor,statflag & F_mutation);
 
                 newgol[ij]  =  1ull;                                        // new game of life cell value: alive
                 newgolg[ij] =  newgene;                                     // if birth then newgene
@@ -3296,7 +3318,7 @@ void update_lut_sumx(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
                 newgol[ij]  =  1ull;                                        // new game of life cell value: alive
                 newgolg[ij] =  newgene;                                     // if birth then newgene
                 if(gol[ij]) hashdeletegene(golg[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n");
-                hashaddgene(newgene,ancestor);
+                hashaddgene(newgene,ancestor,statflag & F_mutation);
             }
         }
         if(!birth) {                                                       // need instead of else because if(birth) section may change value of birth
@@ -3485,7 +3507,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t 
                 newgol[ij]  =  1ull;                                        // new game of life cell value: alive  [**gol** y]
                 newgolg[ij] =  newgene;                                     // if birth then newgene
                 if(golij) hashdeletegene(golg[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n"); // [**gol** y]
-                hashaddgene(newgene,ancestor);
+                hashaddgene(newgene,ancestor,statflag & F_mutation);
             }
         }
         if(!birth) {                                                       // need instead of else because if(birth) section may change value of birth
@@ -3664,7 +3686,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64_t
                 newgol[ij]  =  1ull;                                            // new game of life cell value: alive
                 newgolg[ij] =  newgene;                                         // if birth then newgene
                 if(gol[ij]) hashdeletegene(golg[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n");
-                hashaddgene(newgene,ancestor);
+                hashaddgene(newgene,ancestor,statflag & F_mutation);
             }
         }
         if (!birth) {                                                           // need instead of else because if(birth) section may change value of birth
@@ -3860,7 +3882,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uin
                 newgol[ij]  = 1ull;
                 newgolg[ij] =  newgene;                                         // if birth then newgene
                 if(gol[ij]) hashdeletegene(golg[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n");
-                hashaddgene(newgene,ancestor);
+                hashaddgene(newgene,ancestor,statflag & F_mutation);
             }
         }
         if (!birth) {                                                           // need instead of else because if(birth) section may change value of birth
@@ -4080,7 +4102,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[],uint64_t newgol[], uint64
                 newgol[ij]  = 1ull;
                 newgolg[ij] =  newgene;                                        // if birth then newgene
                 if(gol[ij]) hashdeletegene(golg[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n");
-                    hashaddgene(newgene,ancestor);
+                    hashaddgene(newgene,ancestor,statflag & F_mutation);
             }
             else {                                                             // no birth, stays empty
                 newgol[ij] = gol[ij];
@@ -4526,8 +4548,8 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     }
 
     for (ij=0; ij<N2; ij++) {
-        if((gol[ij] && ((selection<16)||(selection>=20)))||((selection>=16)&&(selection<=19))||((gol[ij]>>1)&&(selection==24 || selection==25))) {
-            hashaddgene(golg[ij],rootgene);
+        if(gol[ij]) {
+            hashaddgene(golg[ij],rootgene,0x1ull);
         }
     }
     // it is possible to enumerate keys and values
@@ -4678,6 +4700,10 @@ void set_nbhist(int nbhistin) {
 void set_genealogycoldepth(int genealogycoldepthin) {
     genealogycoldepth = genealogycoldepthin;
 }
+//.......................................................................................................................................................
+void set_ancestorfirst0recent1(int ancestorfirst0recent1in) {
+    ancestorfirst0recent1 = ancestorfirst0recent1in;
+}
 //------------------------------------------------------------------- get ... ---------------------------------------------------------------------------
 int get_log2N() {
     return(log2N);
@@ -4772,13 +4798,15 @@ int get_genealogydepth() {
     
     for (i=jmax=0; i<nspeciesnow; i++) {                            // calculate max depth in genealogy jmax
         gene=genes[i];
-        ancgene=geneitems[gindices[i]].firstancestor;
+        if(ancestorfirst0recent1) ancgene=geneitems[gindices[i]].recentancestor;
+        else ancgene=geneitems[gindices[i]].firstancestor;
         for (j=1;;j++) {
             gene=ancgene;
             if(gene==rootgene) break;                               // reached root, exit j loop
             else {
                 if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
-                    ancgene=genedataptr->firstancestor;
+                    if(ancestorfirst0recent1) ancgene=genedataptr->recentancestor;
+                    else ancgene=genedataptr->firstancestor;
                 }
                 else fprintf(stderr,"ancestor not found in genealogies\n");
             }
@@ -5058,7 +5086,8 @@ int get_genes(genedata genelist[],int narraysize) {
         genelist[i].activity=geneitems[i].activity;
         genelist[i].nextinctions=geneitems[i].nextinctions;
         genelist[i].gene=geneitems[i].gene;
-        genelist[i].firstancestor=geneitems[i].firstancestor;*/
+        genelist[i].firstancestor=geneitems[i].firstancestor;
+        genelist[i].recentancestor=geneitems[i].recentancestor;*/
     }
 
     return nallspecies;
@@ -5640,11 +5669,11 @@ int activitieshashquad() {  /* count activities of all currently active quad ima
 }
 //--------------------------------------------------------------- genealogies ---------------------------------------------------------------------------
 int genealogies() {  /* genealogies of all currently active species */
-    int j, jmax, i, ij, nspecies, nspeciesnow, birthstep;
+    int j, jmax, i, ij, nspecies, nspeciesnow;
+    unsigned int birthstep;
     int j1, j2, j3, activity, gorder[N];
     uint64_t gene, ancgene, nextgene;
-    int *gindices,*popln,*activities,*birthsteps;
-
+    int *gindices,*popln,*activities;
 
     nspecies = hashtable_count(&genetable);
     genotypes = hashtable_keys(&genetable);
@@ -5669,19 +5698,18 @@ int genealogies() {  /* genealogies of all currently active species */
 
     popln = (int *) malloc(nspeciesnow*sizeof(int));
     activities = (int *) malloc(nspeciesnow*sizeof(int));
-    birthsteps = (int *) malloc(nspeciesnow*sizeof(int));
 
     for (i=0; i<nspeciesnow; i++) {
         popln[i]=geneitems[gindices[i]].popcount;
         activities[i]=geneitems[gindices[i]].activity;
-        birthsteps[i]=geneitems[gindices[i]].firsttime;
     }
 
     for(ij=0;ij<N2;ij++) working[ij]=rootgene;                  // set field to rootgene as background
     activitymax=0;
     for (i=jmax=0; i<nspeciesnow; i++) {
         gene=genotypes[gindices[i]];                            // do not need to copy array to genes since only needed here
-        ancgene=geneitems[gindices[i]].firstancestor;
+        if(ancestorfirst0recent1) ancgene=geneitems[gindices[i]].recentancestor;
+        else                      ancgene=geneitems[gindices[i]].firstancestor;
         activity=geneitems[gindices[i]].activity;
         if(activity>activitymax) activitymax=activity;
         working[i]=gene;                                        // ij = i for j=0
@@ -5690,7 +5718,8 @@ int genealogies() {  /* genealogies of all currently active species */
             if(gene==rootgene) break;                           // reached root, exit j loop
             else {
                 if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
-                    ancgene=genedataptr->firstancestor;
+                    if(ancestorfirst0recent1) ancgene=genedataptr->recentancestor;
+                    else ancgene=genedataptr->firstancestor;
                     activity = genedataptr->activity;
                     if(activity>activitymax) activitymax=activity;
                 }
@@ -5735,7 +5764,10 @@ int genealogies() {  /* genealogies of all currently active species */
                 nextgene = working[ij];
                 if(nextgene==rootgene) birthstep=totsteps;
                 else {
-                    if((genedataptr = (genedata *) hashtable_find(&genetable, nextgene)) != NULL) birthstep = genedataptr->firsttime;
+                    if((genedataptr = (genedata *) hashtable_find(&genetable, nextgene)) != NULL) {
+                        if(ancestorfirst0recent1) birthstep = (unsigned int) genedataptr->recenttime;
+                        else birthstep = (unsigned int) genedataptr->firsttime;
+                    }
                     else fprintf(stderr,"ancestor %llx not found at (%d,%d) in genealogies during birthstep extraction\n",nextgene,ij&Nmask,ij>>log2N);
                 }
             }
@@ -5758,11 +5790,11 @@ int genealogies() {  /* genealogies of all currently active species */
         }
       }
     }
-    free(gindices);free(activities);free(popln);free(birthsteps);
+    free(gindices);free(activities);free(popln);
     return(jmax);
 }
 //--------------------------------------------------------------- genealogies ---------------------------------------------------------------------------
-int genealogies_quad() {  /* pattern genealogies of all currently active patterns NYC */
+int genealogies_quad() {  /* pattern genealogies of all currently active patterns NYC !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
     int j, jmax, i, ij, nspecies, nspeciesnow, birthstep;
     int j1, j2, j3, activity, gorder[N];
     uint64_t gene, ancgene, nextgene;
@@ -5804,7 +5836,8 @@ int genealogies_quad() {  /* pattern genealogies of all currently active pattern
     activitymax=0;
     for (i=jmax=0; i<nspeciesnow; i++) {
         gene=genotypes[gindices[i]];                            // do not need to copy array to genes since only needed here
-        ancgene=geneitems[gindices[i]].firstancestor;
+        if(ancestorfirst0recent1) ancgene=geneitems[gindices[i]].recentancestor;
+        else                      ancgene=geneitems[gindices[i]].firstancestor;
         activity=geneitems[gindices[i]].activity;
         if(activity>activitymax) activitymax=activity;
         working[i]=gene;                                        // ij = i for j=0
@@ -5813,7 +5846,8 @@ int genealogies_quad() {  /* pattern genealogies of all currently active pattern
             if(gene==rootgene) break;                           // reached root, exit j loop
             else {
                 if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
-                    ancgene=genedataptr->firstancestor;
+                    if(ancestorfirst0recent1) ancgene=genedataptr->recentancestor;
+                    else ancgene=genedataptr->firstancestor;
                     activity = genedataptr->activity;
                     if(activity>activitymax) activitymax=activity;
                 }
@@ -5893,7 +5927,7 @@ int get_genealogies(genedata genealogydat[], int narraysize) {  /* return geneal
     uint64_t gene, ancgene;
     int *gindices,*activities;
     uint64_t *genes,*curgen;
-    genedata genedummy = {0,0,0,0,0,0,0ull,rootgene};  // default data structure for gene data: note I put 4th member lastextinction -1 which is not a valid timestep
+    genedata genedummy = {0,0,0,0,0,0,0,0ull,rootgene,rootgene};  // default data structure for gene data: note I put 4th member lastextinction -1 which is not a valid timestep
 
     nspecies = hashtable_count(&genetable);
     genotypes = hashtable_keys(&genetable);
@@ -5902,12 +5936,15 @@ int get_genealogies(genedata genealogydat[], int narraysize) {  /* return geneal
     /*
     genedummy.popcount=0;
     genedummy.firsttime=0;
+    genedummy.recenttime=0;
     genedummy.lasttime=0;
-    genedummy.lastextinctiontime=0;  // better -1
+    genedummy.lastextinctiontime=-1;
     genedummy.activity=0;
     genedummy.nextinctions=0;
-    genedummy.gene=0xfedcba9876543210ull;  // use rootgene, other wise code cannot change this centrally
-    genedummy.firstancestor=0x0ull;   // use long unsigned constant
+    genedummy.dummy=0;
+    genedummy.gene=0ull;
+    genedummy.firstancestor=0x0ull;   // use rootgene, other wise code cannot change this centrally
+    genedummy.recentancestor=0x0ull;   // use rootgene, other wise code cannot change this centrally
     */
 
     for (i=nspeciesnow=0; i<nspecies; i++)
@@ -5934,13 +5971,15 @@ int get_genealogies(genedata genealogydat[], int narraysize) {  /* return geneal
     
     for (i=jmax=0; i<nspeciesnow; i++) {                            // calculate max depth in genealogy jmax
         gene=genes[i];
-        ancgene=geneitems[gindices[i]].firstancestor;
+        if(ancestorfirst0recent1) ancgene=geneitems[gindices[i]].recentancestor;
+        else                      ancgene=geneitems[gindices[i]].firstancestor;
         for (j=1;;j++) {
             gene=ancgene;
             if(gene==rootgene) break;                               // reached root, exit j loop
             else {
                 if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
-                    ancgene=genedataptr->firstancestor;
+                    if(ancestorfirst0recent1) ancgene=genedataptr->recentancestor;
+                    else ancgene=genedataptr->firstancestor;
                 }
                 else fprintf(stderr,"ancestor not found in genealogies\n");
             }
@@ -5958,7 +5997,8 @@ int get_genealogies(genedata genealogydat[], int narraysize) {  /* return geneal
     for (i=ij=0; i<nspeciesnow; i++) {
         gene=genes[i];
         curgen[0] = gene;
-        ancgene=geneitems[gindices[i]].firstancestor;
+        if(ancestorfirst0recent1) ancgene=geneitems[gindices[i]].recentancestor;
+        else                      ancgene=geneitems[gindices[i]].firstancestor;
         activity=geneitems[gindices[i]].activity;
         if(activity>activitymax) activitymax=activity;
         for (j=1;j<=jmax;j++) {                     // go back at most jmax links in genealogy
@@ -5966,7 +6006,8 @@ int get_genealogies(genedata genealogydat[], int narraysize) {  /* return geneal
             if(gene==rootgene) break;               // reached root, exit j loop
             else {
                     if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
-                        ancgene=genedataptr->firstancestor;
+                        if(ancestorfirst0recent1) ancgene=genedataptr->recentancestor;
+                        else ancgene=genedataptr->firstancestor;
                         activity = genedataptr->activity;
                         if(activity>activitymax) activitymax=activity;
                     }
@@ -6029,13 +6070,15 @@ int get_genealogies_(uint64_t genealogydat[], int narraysize) {  /* return genea
     
     for (i=jmax=0; i<nspeciesnow; i++) {                            // calculate max depth in genealogy jmax
         gene=genes[i];
-        ancgene=geneitems[gindices[i]].firstancestor;
+        if(ancestorfirst0recent1) ancgene=geneitems[gindices[i]].recentancestor;
+        else                      ancgene=geneitems[gindices[i]].firstancestor;
         for (j=1;;j++) {
             gene=ancgene;
             if(gene==rootgene) break;                               // reached root, exit j loop
             else {
                 if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
-                    ancgene=genedataptr->firstancestor;
+                    if(ancestorfirst0recent1) ancgene=genedataptr->recentancestor;
+                    else ancgene=genedataptr->firstancestor;
                 }
                 else fprintf(stderr,"ancestor not found in genealogies\n");
             }
@@ -6053,7 +6096,8 @@ int get_genealogies_(uint64_t genealogydat[], int narraysize) {  /* return genea
     for (i=ij=0; i<nspeciesnow; i++) {
         gene=genes[i];
         curgen[0] = gene;
-        ancgene=geneitems[gindices[i]].firstancestor;
+        if(ancestorfirst0recent1) ancgene=geneitems[gindices[i]].recentancestor;
+        else                      ancgene=geneitems[gindices[i]].firstancestor;
         activity=geneitems[gindices[i]].activity;
         if(activity>activitymax) activitymax=activity;
         for (j=1;j<=jmax;j++) {                     // go back at most jmax links in genealogy
@@ -6061,6 +6105,8 @@ int get_genealogies_(uint64_t genealogydat[], int narraysize) {  /* return genea
             if(gene==rootgene) break;               // reached root, exit j loop
             else {
                     if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
+                        if(ancestorfirst0recent1) ancgene=genedataptr->recentancestor;
+                        else ancgene=genedataptr->firstancestor;
                         ancgene=genedataptr->firstancestor;
                         activity = genedataptr->activity;
                         if(activity>activitymax) activitymax=activity;
