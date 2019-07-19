@@ -49,20 +49,19 @@ int ncoding = 1;                    // byte 0 of python ncoding : number of codi
 int ncoding2 = 0;                   // byte 1 of python ncoding: number of coding bits per gene function for masks in connection with repscheme add2ndmask1st R_6,7
 unsigned int pmutmask;              // binary mask so that prob of choosing zero is pmut = pmutmask/2^32. If value<32 interpret as integer -log2(prob).
 //...........................................................diagnostic control..........................................................................
-unsigned int diagnostics = 0;               // bit mask for diagnostics 2^x: 0:hash genes 1: hash patterns 2: hash clones 3: activities
-                                            // 4: simple genealogies 5: clone genealogies 6: component labels 7: statistics 8: ...
-unsigned int diag_hash_genes = 0x1;         // enable hash storage of all genes encountered in simulation
-unsigned int diag_hash_patterns = 0x2;      // enable hash storage of all patterns encountered in simulation
-unsigned int diag_hash_clones = 0x4;        // enable hash storage of all clones encountered in simulation
-unsigned int diag_activities = 0x8;         // enable activity statistics recording for genes and patterns
-unsigned int diag_simp_genealogies = 0x10;
-unsigned int diag_clone_genealogies = 0x20;
-unsigned int diag_component_labels = 0x40;
-unsigned int diag_offset_statistics = 0x80; // enable collection of offset histogram statistics: histo,numHisto,offsets,Noff
-unsigned int diag_scrolling_trace = 0x100;  // enable scrolling time tracing of activities for genes and patterns,populations,genealogies
-unsigned int diag_longtime_trace = 0x200;   // enable longer time tracing of activities for genes and patterns,populations (poss.genealogies)
-unsigned int diag_general_statistics = 0x400;// enable collection of general statistics: livesites,genestats,stepstats,configstats
-unsigned int diag_all = 0xffff;
+const unsigned int diag_all = 0xffff;             // all diagnostics active
+unsigned int diagnostics = diag_all;              // bit mask for diagnostics as defined by following constants
+const unsigned int diag_hash_genes = 0x1;         // enable hash storage of all genes encountered in simulation
+const unsigned int diag_hash_patterns = 0x2;      // enable hash storage of all patterns encountered in simulation
+const unsigned int diag_hash_clones = 0x4;        // enable hash storage of all clones encountered in simulation
+const unsigned int diag_activities = 0x8;         // enable activity statistics recording for genes and patterns
+const unsigned int diag_simp_genealogies = 0x10;  // enable simple genealogies with first or most recent ancestor
+const unsigned int diag_clone_genealogies = 0x20; // enable genealogies by hashed clones
+const unsigned int diag_component_labels = 0x40;  // enable spatial connected component labelling, mapping and coloring
+const unsigned int diag_offset_statistics = 0x80; // enable collection of offset histogram statistics: histo,numHisto,offsets,Noff
+const unsigned int diag_scrolling_trace = 0x100;  // enable scrolling time tracing of activities for genes and patterns,populations,genealogies
+const unsigned int diag_longtime_trace = 0x200;   // enable longer time tracing of activities for genes and patterns,populations (poss.genealogies)
+const unsigned int diag_general_statistics = 0x400;// enable collection of general statistics: livesites,genestats,stepstats,configstats
 //-----------------------------------------------------------initialization and color parameters---------------------------------------------------------
 int initial1density = (1<<15)>>1;   // initial density of ones in gol as integer value, divide by 2^15 for true density
 int initialrdensity = (1<<15)>>1;   // initial density of random genes in live sites, divide by 2^15 for true density
