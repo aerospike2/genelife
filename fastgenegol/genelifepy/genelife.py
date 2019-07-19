@@ -25,7 +25,6 @@ N2 = N*N
 Nmask = N-1
 Width = N
 Height = N
-NbP = 1
 
 gol = np.zeros(N2,np.uint64)
 golg = np.zeros(N2,np.uint64)
@@ -68,8 +67,6 @@ grect.w = Width//2
 grect.h = 20
 
 updatesenabled = True
-displayplanes=0xffff
-displayoneplane=64
 mat = []
 
 gogo = True
@@ -288,10 +285,10 @@ def init_button_arrays():
 #-----------------------------------------------------------------------------------------------------------
 
 def init_buttons():    # initialize parameter buttons
-    global repscheme,survivalmask,birthmask,overwritemask,ancselectmask,selection,ncoding,displayplanes
+    global repscheme,survivalmask,birthmask,overwritemask,ancselectmask,selection,ncoding
     global surface,scalex2
     global Height,Width
-    global log2N,NbP
+    global log2N
     global ncanon
 
     if scalex2:
@@ -713,13 +710,13 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     global mstime,framenr,framerate
     global surface, window, scalex2, caption, dispinit
     global surface2, window2, caption2, dispinit2, grect, render2, renderer2, factory2, image2, message2, font2, textColor2, windowID2
-    global N,NbP
+    global N
     global gol,golg,golgstats
     global connlabel,connlen,ncomponents
     global colorfunction,gcolor,genealogycoldepth,ancestorfirst0recent1
     global ymax,ymaxq,oldymax,oldymaxq,nbhist,nNhist
     global updatesenabled
-    global rulemod,repscheme,survivalmask,birthmask,overwritemask,ancselectmask,selection,ncoding,displayplanes
+    global rulemod,repscheme,survivalmask,birthmask,overwritemask,ancselectmask,selection,ncoding
     global savecnt
     global cancol
     global Height,Width
@@ -767,11 +764,8 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     quadrants = -1
     oldymax = genelife.setget_act_ymax(ymax)
     oldymaxq = genelife.setget_act_ymaxq(ymaxq)
-    displayoneplane=64
-    gcolor=0
 
-    if selection>=16 & selection<19:
-        displayplanes = (0x1<<NbP)-1
+    gcolor=0
     
     event = sdl2.SDL_Event()
     while (gogo):

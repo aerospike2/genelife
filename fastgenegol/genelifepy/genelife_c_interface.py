@@ -144,10 +144,6 @@ libcd.set_repscheme.restype = None
 libcd.set_repscheme.argtypes = [c_uint32]
 libcd.set_rulemod.restype = None
 libcd.set_rulemod.argtypes = [c_uint32]
-libcd.set_displayoneplane.restype = None
-libcd.set_displayoneplane.argtypes = [c_uint32]
-libcd.set_displayplanes.restype = None
-libcd.set_displayplanes.argtypes = [c_uint32]
 libcd.set_surviveover64.restype = None
 libcd.set_surviveover64.argtypes = [uint_array, c_int]
 libcd.set_vscrolling.restype = None
@@ -301,12 +297,6 @@ def set_repscheme(repscheme):
 
 def set_rulemod(rulemod):
     return libcd.set_rulemod(rulemod)
-
-def set_displayoneplane(displayoneplane):
-    return libcd.set_displayoneplane(displayoneplane)
-
-def set_displayplanes(displayplanes):
-    return libcd.set_displayplanes(displayplanes)
 
 def set_surviveover64(surviveover):
     return libcd.set_surviveover64( surviveover, len(surviveover))
