@@ -198,7 +198,9 @@ int ngenealogydeep;                 // depth of genealogy
 //---------------------------------------------------------main arrays in simulation---------------------------------------------------------------------
 uint64_t *gol, *golg, *golb;        // pointers to gol, golg and golb arrays at one of the plane cycle locations: live/dead, gene, cloneid (birth t,x,y)
 uint64_t *golgstats;                // pointer to 64 bit masks for different events during processing at one of the plane cycle locations
-uint64_t golmix[N2];                // array for packing configs or initializing gol from python
+uint64_t stashgol[N2];              // for stashing state and recovering with initfield = -1
+uint64_t stashgolg[N2];             // for stashing state and recovering with initfield = -1
+uint64_t golmix[N2];                // array for packing configs
 uint64_t gene0;                     // uncoupled planes background gene, non zero for selection==16,17
 uint64_t selectedgene;              // gene currently selected interactively in graphics window
 uint64_t genegol[16];               // genes encoding for GoL in various LUT selection models indexed as selection-8
@@ -236,7 +238,7 @@ uint64_t poptrace1[N2*nNhist];      // trace of first N*nNhist time points of po
 uint64_t acttrace1[N2*nNhist];      // trace of first N*nNhist time points of activity of N most frequent genes
 uint64_t acttraceq1[N2*nNhist];     // trace of first N*nNhist time points of activity of N most frequent quad patterns
 unsigned char acttraceqt1[N2*nNhist];// type of entry in acttraceq : 1 quad, 0 smallpatt (<65536) i.e. corresponding to isnode
-uint64_t working[N2];               // working space array for calculating genealogies and doing neighbour bit packing, and golg init from python
+uint64_t working[N2];               // working space array for calculating genealogies and doing neighbour bit packing
 int npopulation[N];                 // number of live sites (gol 1s) in last N time steps up to current population
 int npopulation1[N*nNhist];         // number of live sites (gol 1s) in first N*nNhist time steps
 int nspeciesgene,nallspecies;       // number of gene species in current population, and that have ever existed
@@ -532,7 +534,9 @@ const uint64_t r1 = 0x1111111111111111ull;
 // set_nbhist           set nbhist N-block of time points for trace from GUI for use in activity and population display traces
 // set_genealogycoldepth set genealogycoldepth for colorfunction=11 display
 // set_ancestorfirst0recent1 set ancestorfirst0recent1 for display and return of first (0) or most recent (1) ancestors in genealogies
+// set_stash            stash current gol,golg in stashgol, stshgolg
 //..........................................................  get to python driver  .....................................................................
+// get_stash            retrieve current gol,golg from stashed values
 // get_log2N            get the current log2N value from C to python
 // get_curgol           get current gol array from C to python
 // get_curgolg          get current golg array from C to python
@@ -4526,10 +4530,10 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
             golb[ij] = N2bit + ij;
         }
     }
-    else {                                          // initfield < 0, use array values from python
+    else {                                          // initfield < 0, use array values from stashed
         for (ij=0; ij<N2; ij++) {
-            gol[ij] = golmix[ij];                   // intermediate storage from set_curgol
-            golg[ij] = working[ij];                 // intermediate storage from set_curgolg
+            gol[ij] = stashgol[ij];
+            golg[ij] = stashgolg[ij];
             golgstats[ij] = 0ull;
             golb[ij] = N2bit + ij;
         }
@@ -4704,9 +4708,26 @@ void set_genealogycoldepth(int genealogycoldepthin) {
 void set_ancestorfirst0recent1(int ancestorfirst0recent1in) {
     ancestorfirst0recent1 = ancestorfirst0recent1in;
 }
+//.......................................................................................................................................................
+void set_stash(){               // stash current gol,golg
+    int ij;
+    for (ij=0; ij<N2; ij++) {
+        stashgol[ij] = planes[curPlane][ij];
+        stashgolg[ij] = planesg[curPlane][ij];
+    }
+}
+
 //------------------------------------------------------------------- get ... ---------------------------------------------------------------------------
 int get_log2N() {
     return(log2N);
+}
+//.......................................................................................................................................................
+void get_stash(){               // retrieve current gol,golg from stashed values
+    int ij;
+    for (ij=0; ij<N2; ij++) {
+        planes[curPlane][ij] = stashgol[ij];
+        planesg[curPlane][ij] = stashgolg[ij];
+    }
 }
 //.......................................................................................................................................................
 void get_curgol(uint64_t outgol[], int NN) {
@@ -4770,6 +4791,12 @@ int get_nspecies() {
         if(geneitems[k].popcount) nspeciesnow++;
     
     return(nspeciesnow);
+}
+//.......................................................................................................................................................
+int get_nlive() {
+    int ij,nlive;
+    for(nlive=0,ij=0;ij<N2;ij++) nlive+= (gol[ij]>0) ? 1 : 0;
+    return(nlive);
 }
 //.......................................................................................................................................................
 int get_genealogydepth() {

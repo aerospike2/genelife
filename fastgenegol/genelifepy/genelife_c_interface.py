@@ -78,8 +78,14 @@ libcd.get_curgolg.restype = None
 libcd.get_curgolg.argtypes = [uint64_array,c_int]
 libcd.get_curgolgstats.restype = None
 libcd.get_curgolgstats.argtypes = [uint64_array,c_int]
+libcd.set_stash.restype = None
+libcd.set_stash.argtypes = None
+libcd.get_stash.restype = None
+libcd.get_stash.argtypes = None
 libcd.get_nspecies.argtypes = None
 libcd.get_nspecies.restype = c_int
+libcd.get_nlive.argtypes = None
+libcd.get_nlive.restype = c_int
 libcd.get_genealogydepth.argtypes = None
 libcd.get_genealogydepth.restype = c_int
 libcd.get_curtime.argtypes = None
@@ -324,3 +330,12 @@ def set_genealogycoldepth(genealogycoldepth):
 
 def set_ancestorfirst0recent1(ancestorfirst0recent1):
     return libcd.set_ancestorfirst0recent1(ancestorfirst0recent1)
+
+def set_stash():
+    return libcd.set_stash();
+
+def get_stash():
+    return libcd.get_stash();
+
+def get_nlive():
+    return libcd.get_nlive();
