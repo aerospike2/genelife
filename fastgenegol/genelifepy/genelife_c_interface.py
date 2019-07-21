@@ -166,8 +166,8 @@ libcd.set_nbhist.restype = None
 libcd.set_nbhist.argtypes = [c_int]
 libcd.set_genealogycoldepth.restype = None
 libcd.set_genealogycoldepth.argtypes = [c_int]
-libcd.set_ancestorfirst0recent1.restype = None
-libcd.set_ancestorfirst0recent1.argtypes = [c_int]
+libcd.set_ancestortype.restype = None
+libcd.set_ancestortype.argtypes = [c_int]
 
 def get_log2N():
     return libcd.get_log2N()
@@ -328,8 +328,8 @@ def set_nbhist(nbhist):
 def set_genealogycoldepth(genealogycoldepth):
     return libcd.set_genealogycoldepth(genealogycoldepth)
 
-def set_ancestorfirst0recent1(ancestorfirst0recent1):
-    return libcd.set_ancestorfirst0recent1(ancestorfirst0recent1)
+def set_ancestortype(ancestortype):
+    return libcd.set_ancestortype(ancestortype)
 
 def set_stash():
     return libcd.set_stash();

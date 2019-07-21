@@ -83,7 +83,6 @@ maxPlane = 4
 offdx = offdy = offdt = 0
 quadrants = -1
 gcolor = 0
-ranseed = 1234
                                          # counter and toggle initialization
 
 cnt = 0
@@ -95,10 +94,10 @@ randomsoup = 0
 vscrolling = 0
 noveltyfilter = 0
 activity_size_colormode = 0
-ancestorfirst0recent1 = 0
+ancestortype = 0
                                          # parameter initialization
 runparams = np.zeros(9,np.int32)         # 9 parameters passed to C
-simparams = np.zeros(5,np.int32)         # 5 parameters passed to C
+simparams = np.zeros(6,np.int32)         # 6 parameters passed to C
 nrun=1; ndisp=1000; nskip=0; niter=1;    # simulation time stepping parameters: nrun CA updates per step, ndisp nr steps to display before skip,
                                          # nskip nr of CA updates to skip over display, niter nr of repeats of disp-skip cycle
 nhist = 0                                # set to n to turn on histogram configurations every nth step
@@ -131,6 +130,7 @@ ncoding = simparams[3] = 0               # for selection 10, non zero value mean
                                          # otherwise (selection<10) no of bits used to encode valid connection functions 1-16
                                          # for selection==8, lut, ncoding 1,2,3 bits per lut entry : 0 implies 3.
 startgenechoice = simparams[4] = 8       # initialize genes to startgene number 0-8 : 8 is random choice of 0-7
+ranseed = simparams[5] = 1234            # initial seed for random number generator
 
                                          # offset initialization
 offsets = [[-1, 0,-1],
@@ -713,7 +713,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     global N
     global gol,golg,golgstats
     global connlabel,connlen,ncomponents
-    global colorfunction,gcolor,genealogycoldepth,ancestorfirst0recent1
+    global colorfunction,gcolor,genealogycoldepth,ancestortype
     global ymax,ymaxq,oldymax,oldymaxq,nbhist,nNhist
     global updatesenabled
     global rulemod,repscheme,survivalmask,birthmask,overwritemask,ancselectmask,selection,ncoding
@@ -1112,9 +1112,13 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                         genelife.set_gcolors()
                         print('step',framenr,'new gcolor =',gcolor)
                     elif colorfunction == 6 or colorfunction == 7 or colorfunction == 11:
-                        ancestorfirst0recent1= 1 - ancestorfirst0recent1
-                        genelife.set_ancestorfirst0recent1(ancestorfirst0recent1)
-                        if ancestorfirst0recent1:
+                        ancestortype= ancestortype + 1
+                        if ancestortype > 2:
+                            ancestortype = 0
+                        genelife.set_ancestortype(ancestortype)
+                        if ancestortype == 2:
+                            print('step',framenr,'new ancestor choice clonal')
+                        elif ancestortype == 1:
                             print('step',framenr,'new ancestor choice recent')
                         else:
                             print('step',framenr,'new ancestor choice first')
