@@ -49,8 +49,8 @@ int ncoding = 1;                    // byte 0 of python ncoding : number of codi
 int ncoding2 = 0;                   // byte 1 of python ncoding: number of coding bits per gene function for masks in connection with repscheme add2ndmask1st R_6,7
 unsigned int pmutmask;              // binary mask so that prob of choosing zero is pmut = pmutmask/2^32. If value<32 interpret as integer -log2(prob).
 //...........................................................diagnostic control..........................................................................
-const unsigned int diag_all = 0xffff;             // all diagnostics active
-// const unsigned int diag_all = 0xffdb;             // all diagnostics active except clones
+//const unsigned int diag_all = 0xffff;             // all diagnostics active
+const unsigned int diag_all = 0xffdb;             // all diagnostics active except clones
 unsigned int diagnostics = diag_all;              // bit mask for diagnostics as defined by following constants
 const unsigned int diag_hash_genes = 0x1;         // enable hash storage of all genes encountered in simulation
 const unsigned int diag_hash_patterns = 0x2;      // enable hash storage of all patterns encountered in simulation
@@ -220,6 +220,7 @@ int activitymax;                    // max of activity in genealogical record of
 int noveltyfilter = 0;              // novelty filter for colorfunction 9 : if on (key "n"), darkens non-novel components (activity>1) in display
 int activity_size_colormode = 0;    // color by size for colorfunction 10 : if on (key "p")  1 log2 enclosing square size 2 use #pixels 3 use sqrt(#pixels)
 int xdisplay,ydisplay = -1;         // display x and y coordinates selected by mouse in python
+int shist[9];
 //------------------------------------------------ arrays for time tracing, activity and genealogies ----------------------------------------------------
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
@@ -2982,9 +2983,39 @@ void random_influx(uint64_t gol[],uint64_t golg[],uint64_t golb[],uint64_t newgo
                 if((rand()&rmask) < rbackground) {              // random event
                     if (newgol[ij]) {                           // if live cell, delete gene
                         newgol[ij]=0ull;
-                        if(diagnostics & diag_hash_genes) hashdeletegene(golg[ij],golb[ij],"error in randominflux=3 hashdeletegene call for step %d with gene %llx\n");
+                        if(diagnostics & diag_hash_genes) hashdeletegene(newgolg[ij],newgolb[ij],"error in randominflux=3 hashdeletegene call for step %d with gene %llx\n");
                         newgolg[ij]=gene0;
                         newgolb[ij]=0ull;
+                    }
+                }
+            }
+        }
+        else if (randominflux==4) {                             // deletion perturbations s-dependent
+            int s, se, k;
+            int nb[8], ij, i, j, jp1, jm1, ip1, im1;
+            uint64_t gols, nb1i;
+            for(ij=0;ij<N2;ij++) {
+                if((rand()&rmask) < rbackground) {              // random event
+                    if (newgol[ij]) {                           // if live cell, delete gene
+                        // compute s
+                        i = ij & Nmask;  j = ij >> log2N;                                          // row & column
+                        jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                          // toroidal (j+1)*N and (j-1)*N
+                        ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                                // toroidal i+1, i-1
+                        nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1;                  // new order of nbs
+                        nb[4]=jp1+ip1; nb[5]=jp1+i; nb[6]=jp1+im1; nb[7]=j*N+im1;
+                        for (s=se=0,nb1i=0ull,k=0;k<8;k++) {                                       // packs non-zero nb indices in first up to 8*4 bits
+                            gols=gol[nb[k]];                                                       // whether neighbor is alive
+                            s += gols;                                                             // s is number of live nbs
+                            se += k&0x1&gols;                                                      // se is number of edge-centred live neighbours (odd k)
+                            nb1i = (nb1i << (gols<<2)) + (gols*k);                                 // nb1i is packed list of live neighbour indices
+                        }
+                        // compute s done
+                        if(s>1){
+                            newgol[ij]=0ull;
+                            if(diagnostics & diag_hash_genes) hashdeletegene(newgolg[ij],newgolb[ij],"error in randominflux=4 hashdeletegene call for step %d with gene %llx\n");
+                            newgolg[ij]=gene0;
+                            newgolb[ij]=0ull;
+                        }
                     }
                 }
             }
@@ -3503,6 +3534,9 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
     smask = (uint64_t) survivalmask;                                               // convert to 64 bit mask for efficient usage here
     bmask = (uint64_t) birthmask;
 
+    for (i=0; i<9; i++)
+        shist[i]=0;
+
     for (ij=0; ij<N2; ij++) {                                                      // loop over all sites of 2D torus with side length N
         i = ij & Nmask;  j = ij >> log2N;                                          // row & column
         jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                          // toroidal (j+1)*N and (j-1)*N
@@ -3515,6 +3549,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
             se += k&0x1&gols;                                                      // se is number of edge-centred live neighbours (odd k)
             nb1i = (nb1i << (gols<<2)) + (gols*k);                                 // nb1i is packed list of live neighbour indices
         }
+        shist[s]++;
 
         statflag = newgene = survive = birth = 0ull;
         if (s>0 && s<8) {
@@ -3571,7 +3606,9 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
                 survive = s2or3;
                 birth = s2or3&s&0x1&~gol[ij];
             }
+            // if(s>2)  survive=0ull;
         }
+
         else survive = birth = s2or3 = gols = 0ull;
 
         if(birth) {
@@ -3650,14 +3687,33 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
             }
         }
         
+
+/***
+        // enforced death ============================
+        if(s>3){
+            if(gol[ij]){
+                statflag |= F_death;
+                newgol[ij]  = 0ull;                                         // new game of life cell value dead
+                newgolg[ij] = 0ull;                                         // gene dies
+                newgolb[ij] = 0ull;
+                if(diagnostics & diag_hash_genes)
+                    hashdeletegene(golg[ij],golb[ij],"step %d hash delete error 2 in update, gene %llx not stored\n");
+            }
+        }
+        // enforced death ============================
+
         if(newgol[ij]!=gols) {
             statflag |= F_notgolrul;
             if(newgol[ij]) statflag |= F_nongolchg;
         }
-
+***/
         if(gol[ij]) statflag |= F_golstate;                                    // this is the last gol state, not the new state
         newgolgstats[ij] = statflag;
+
     }  // end for ij
+
+        
+        
 
     if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);
     if(vscrolling) v_scroll(newgol,newgolg,newgolb);
@@ -4712,6 +4768,12 @@ void set_stash(){               // stash current gol,golg
 }
 
 //------------------------------------------------------------------- get ... ---------------------------------------------------------------------------
+void  get_shist(int outshist[]){
+    int i;
+    for(i=0;i<9;i++)
+        outshist[i] = shist[i];
+}        
+//.......................................................................................................................................................
 int get_log2N() {
     return(log2N);
 }
@@ -6169,4 +6231,6 @@ int get_genealogies_(uint64_t genealogydat[], int narraysize) {  /* return genea
 
     return(genealogydepth);   
 }
+
+
 //-------------------------------------------------------------------------------------------------------------------------------------------------------
