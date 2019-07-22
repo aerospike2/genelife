@@ -140,8 +140,8 @@ libcd.set_offsets.restype = None
 libcd.set_offsets.argtypes = [c_int,c_int,c_int]
 libcd.set_quadrant.restype = None
 libcd.set_quadrant.argtypes = [c_int]
-libcd.set_randomsoup.restype = None
-libcd.set_randomsoup.argtypes = [c_int]
+libcd.set_randominflux.restype = None
+libcd.set_randominflux.argtypes = [c_int]
 libcd.set_rbackground.restype = None
 libcd.set_rbackground.argtypes = [c_int,c_int]
 libcd.set_repscheme_bits.restype = c_uint32
@@ -289,11 +289,11 @@ def set_offsets(dx,dy,dt):
 def set_quadrant(quadrant):
     return libcd.set_quadrant(quadrant)
 
-def set_randomsoup(randomsoup):
-    return libcd.set_randomsoup(randomsoup)
+def set_randominflux(randominflux):
+    return libcd.set_randominflux(randominflux)
 
-def set_rbackground(rbackground,randomsoup):
-    return libcd.set_rbackground(rbackground,randomsoup)
+def set_rbackground(rbackground,randominflux):
+    return libcd.set_rbackground(rbackground,randominflux)
 
 def set_repscheme_bits(quadrant, x, y, surviveover):
     return libcd.set_repscheme_bits(quadrant, x, y, surviveover)

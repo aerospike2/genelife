@@ -49,7 +49,8 @@ int ncoding = 1;                    // byte 0 of python ncoding : number of codi
 int ncoding2 = 0;                   // byte 1 of python ncoding: number of coding bits per gene function for masks in connection with repscheme add2ndmask1st R_6,7
 unsigned int pmutmask;              // binary mask so that prob of choosing zero is pmut = pmutmask/2^32. If value<32 interpret as integer -log2(prob).
 //...........................................................diagnostic control..........................................................................
-const unsigned int diag_all = 0xffdb;             // all diagnostics active except clonal stuff
+const unsigned int diag_all = 0xffff;             // all diagnostics active
+// const unsigned int diag_all = 0xffdb;             // all diagnostics active except clones
 unsigned int diagnostics = diag_all;              // bit mask for diagnostics as defined by following constants
 const unsigned int diag_hash_genes = 0x1;         // enable hash storage of all genes encountered in simulation
 const unsigned int diag_hash_patterns = 0x2;      // enable hash storage of all patterns encountered in simulation
@@ -174,7 +175,7 @@ smallpatt smallpatts[65536];
 //.......................................................................................................................................................
 hashtable_t clonetable;             // hash table for clone ancestry
 typedef struct clonedata {
-    uint64_t birthid;               // birth time and place of clone (upper 32 bits: time, lower 32 bits: place ij)
+    uint64_t birthid;               // birth time and place of clone (upper 32 bits: time, lower 32 bits: place ij) plus 1 bit (N2) 0: ancesotr 1: no ancestor
     uint64_t ancestorid;            // ancestor's id : i.e. birth time and place (upper 32 bits: time, lower 32 bits: place ij)
     uint64_t gene;                  // gene of this individual
     unsigned int progeny;           // number of progeny which are alive or have live descendents of this clone (32 bit)
@@ -206,10 +207,10 @@ uint64_t genegol[16];               // genes encoding for GoL in various LUT sel
 //---------------------------------------------------------additional variables set in simulation--------------------------------------------------------
 unsigned int canonical;             // current value of choice of canonical position repscheme bit 2 : needed globally in ...difft2-6 routines
 int quadrants=-1;                   // integer choice of bit pair from repscheme/survivalmask/overwritemask for quadrant division of array (-1 none)
-int randomsoup=0;                   // 1,2 steady or intermittent random input of genes and gol states into the square central region defined by initfield
+int randominflux=0;                 // 1,2 steady or intermittent random input of genes and gol states into the square central region defined by initfield
                                     // 3 steady deletion of genes at random rate rbackground
-int rbackground=0;                  // integer background rate of random gene input per frame per site : rate is rbackground/32768 (nonzero overides soup)
-                                    // the gene input depends on randomsoup value: 2 GoL 1 random
+int rbackground=0;                  // integer background rate of random gene input per frame per site : rate is rbackground/32768 (nonzero overides influx)
+                                    // the gene input depends on randominflux value: 2 GoL 1 random
 int vscrolling=0;                   // whether to do vertical scrolling to track upwards growth (losing all states that fall off downward cliff)
 int last_scrolled = 0;              // whether vscrolling applied on last time step (needed for correct glider detection)
 int ymax = 2000;                    // gene activity scale max for plotting : will be adjusted dynamically or by keys
@@ -241,6 +242,7 @@ uint64_t working[N2];               // working space array for calculating genea
 int npopulation[N];                 // number of live sites (gol 1s) in last N time steps up to current population
 int npopulation1[N*nNhist];         // number of live sites (gol 1s) in first N*nNhist time steps
 int nspeciesgene,nallspecies;       // number of gene species in current population, and that have ever existed
+int nallclones;                     // number of clones stored in hash table
 int nspeciesquad,nallspeciesquad;   // number of quad species in current population, and that have ever existed
 int nspeciessmall,nallspeciessmall; // number of small pattern species now, and that have ever existed
 int histcumlogpattsize[log2N+1];    // histogram of patterns binned on log scale according to power of two side enclosing square
@@ -519,7 +521,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // set_selectedgene     set selected gene for highlighting from current mouse selection in graphics window
 // set_offsets          set offsets for detection of glider structures in display for color function 8
 // set_quadrant         set the pair of bits in repscheme (or survivalmask or overwritemask) used for quadrant variation 0-6
-// set_randomsoup       change the randomsoup activation for rbackground if nonzero or continual updating of init field with random states and genes : 2,1,0
+// set_randominflux     change the randominflux activation for rbackground if nonzero or continual updating of init field with random states and genes : 2,1,0
 // set_rbackground      set the backround random live gene input rate per frame and site to rbackground/32768
 // set_repscheme_bits   set the two of the repscheme (or survivalmask or overwritemask) bits corresponding to the selected quadrant
 // set_repscheme        set repscheme from python
@@ -1693,9 +1695,7 @@ extern inline uint64_t disambiguate(unsigned int kch, uint64_t nb1i, int nb[], u
 extern inline void hashaddgene(int ij,uint64_t gene,uint64_t ancestor,uint64_t *golb,uint64_t ancestorid,uint64_t mutation) {
     genedata gdata;
     uint64_t birthid;
-    extern inline void hashaddclone(uint64_t birthid, uint64_t ancestorid, uint64_t gene, uint64_t mutation);
-
-    birthid = ((uint64_t) totsteps)<<32;
+    extern inline void hashaddclone(uint64_t birthid, uint64_t ancestorid, uint64_t gene, uint64_t updateancestryonly);
     
     if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
         genedataptr->lasttime = totsteps;
@@ -1718,10 +1718,14 @@ extern inline void hashaddgene(int ij,uint64_t gene,uint64_t ancestor,uint64_t *
             fprintf(stderr,"error in hashaddgene, the ancestor %llx of gene %llx to be stored is not stored\n",ancestor,gene);
     }
     if(diagnostics & diag_hash_clones) {
-        birthid += ij;
-        if(ancestor==rootgene) birthid += N2bit;
-        *golb = birthid;
-        hashaddclone(birthid,gene,ancestor,mutation);
+        if (mutation) {
+            birthid = ((uint64_t) totsteps)<<32;
+            birthid |= ij;
+            if(ancestor==rootgene) birthid |= N2bit;
+            hashaddclone(birthid,ancestorid,gene,0ull);
+            *golb = birthid;
+        }
+        else *golb = ancestorid;
     }
 }
 //.......................................................................................................................................................
@@ -1731,7 +1735,7 @@ extern inline void hashdeletegene(uint64_t gene,uint64_t birthid,const char erro
     if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {genedataptr->popcount--;}
     else fprintf(stderr,errorformat,totsteps,gene);     // errorformat must contain %d and %llx format codes in this order
     
-    if(diagnostics & diag_hash_clones) hashdeleteclone(birthid);
+    // if(diagnostics & diag_hash_clones) hashdeleteclone(birthid);
 }
 //.......................................................................................................................................................
 extern inline void hashgeneextinction(uint64_t gene,const char errorformat[]) {
@@ -1749,26 +1753,27 @@ extern inline void hashgeneactivity(uint64_t gene, const char errorformat[]) {
         else fprintf(stderr,errorformat,4,totsteps,gene);
 }
 //------------------------------------------------------------ hash clone inline fns --------------------------------------------------------------------
-extern inline void hashaddclone(uint64_t birthid, uint64_t ancestorid, uint64_t gene, uint64_t mutation) {
+extern inline void hashaddclone(uint64_t birthid, uint64_t ancestorid, uint64_t gene, uint64_t updateancestryonly) {
     clonedata cdata;
 
-    if(mutation) { } // HERE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    if((clonedataptr = (clonedata *) hashtable_find(&clonetable, birthid)) != NULL) {
-        fprintf(stderr,"error in hashaddclone, %llx already present\n",birthid);
-    }
-    else {
-        cdata=cinitdata;
-        cdata.birthid=birthid;
-        cdata.ancestorid=ancestorid;
-        cdata.gene = gene;
-        hashtable_insert(&clonetable, birthid,(clonedata *) &cdata);
-    }
-    if(!(ancestorid&N2bit)) {             // inidividuals ancestor is not a rootgene progeny (i.e. initialization)
-        if((clonedataptr = (clonedata *) hashtable_find(&clonetable, ancestorid)) == NULL)
-            fprintf(stderr,"error in hashaddclone, the ancestorid %llx of clone %llx to be stored is not stored\n",ancestorid,birthid);
-        else {
-            clonedataptr->progeny++;
+    if(!updateancestryonly) {
+        if((clonedataptr = (clonedata *) hashtable_find(&clonetable, birthid)) != NULL) {
+            fprintf(stderr,"error in hashaddclone, %llx already present\n",birthid);
         }
+        else {
+            cdata=cinitdata;
+            cdata.birthid=birthid;
+            cdata.ancestorid=ancestorid;
+            cdata.gene = gene;
+            hashtable_insert(&clonetable, birthid,(clonedata *) &cdata);
+        }
+    }
+    if(!(ancestorid&N2bit)) {             // clone's ancestor is not a rootgene progeny (i.e. not arising from initialization or external input)
+        if((clonedataptr = (clonedata *) hashtable_find(&clonetable, ancestorid)) != NULL) {
+            clonedataptr->progeny++;
+            hashaddclone(ancestorid,clonedataptr->ancestorid,clonedataptr->gene,1ull);
+        }
+        else fprintf(stderr,"error in hashaddclone, the ancestorid %llx of clone %llx to be stored is not stored\n",ancestorid,birthid);
     }
 }
 //.......................................................................................................................................................
@@ -2894,7 +2899,7 @@ void v_scroll(uint64_t newgol[],uint64_t newgolg[],uint64_t newgolb[]) {
     int ij,scroll_needed;
 
     scroll_needed = 0;
-    for (ij=N2-N;ij<N2;ij++) {                              // clear top row
+    for (ij=N2-N;ij<N2;ij++) {                              // clear top row only if needed
         if(newgol[ij]) {
             scroll_needed = 1;
             break;
@@ -2939,7 +2944,7 @@ void v_scroll(uint64_t newgol[],uint64_t newgolg[],uint64_t newgolb[]) {
     }
 }
 //.......................................................................................................................................................
-void random_soup(uint64_t gol[],uint64_t golg[],uint64_t golb[],uint64_t newgol[],uint64_t newgolg[],uint64_t newgolb[]) {
+void random_influx(uint64_t gol[],uint64_t golg[],uint64_t golb[],uint64_t newgol[],uint64_t newgolg[],uint64_t newgolb[]) {
     int Nf,i,j,ij,i0,j0,i1,j1,d;
     uint64_t randnr,mask,parentid;
     static unsigned int rmask = (1 << 15) - 1;
@@ -2947,8 +2952,8 @@ void random_soup(uint64_t gol[],uint64_t golg[],uint64_t golb[],uint64_t newgol[
     parentid = ((uint64_t) totsteps)<<32;
     
     if(rbackground) {                                           // homogeneous random background at rate rbackground/32768 per site per frame
-        if(randomsoup<3) {                                      // only create new genes as perturbation if randomsoup<3
-            if(randomsoup < 2 || selection < 8) {               // random gene if randomsoup<2 or selection < 8
+        if(randominflux<3) {                                    // only create new genes as perturbation if randominflux<3
+            if(randominflux < 2 || selection < 8) {             // random gene if randominflux<2 or selection < 8
                 for(ij=0;ij<N2;ij++) {
                     if((rand()&rmask) < rbackground) {          // random event
                         if (!newgol[ij]) {                      // if not live, random genome
@@ -2960,7 +2965,7 @@ void random_soup(uint64_t gol[],uint64_t golg[],uint64_t golb[],uint64_t newgol[
                     }
                 }
             }
-            else if(randomsoup==2) {                            // randomsoup==2 and selection>=8
+            else if(randominflux==2) {                          // randominflux==2 and selection>=8
                 for(ij=0;ij<N2;ij++) {
                     if((rand()&rmask) < rbackground) {
                         if (!newgol[ij]) {                      // if not live, fill with game of life genome
@@ -2972,12 +2977,12 @@ void random_soup(uint64_t gol[],uint64_t golg[],uint64_t golb[],uint64_t newgol[
                 }
             }
         }
-        else if (randomsoup==3) {                               // deletion perturbations only
+        else if (randominflux==3) {                             // deletion perturbations only
             for(ij=0;ij<N2;ij++) {
                 if((rand()&rmask) < rbackground) {              // random event
                     if (newgol[ij]) {                           // if live cell, delete gene
                         newgol[ij]=0ull;
-                        if(diagnostics & diag_hash_genes) hashdeletegene(golg[ij],golb[ij],"error in randomsoup=3 hashdeletegene call for step %d with gene %llx\n");
+                        if(diagnostics & diag_hash_genes) hashdeletegene(golg[ij],golb[ij],"error in randominflux=3 hashdeletegene call for step %d with gene %llx\n");
                         newgolg[ij]=gene0;
                         newgolb[ij]=0ull;
                     }
@@ -2987,8 +2992,8 @@ void random_soup(uint64_t gol[],uint64_t golg[],uint64_t golb[],uint64_t newgol[
         return;
     }
 
-    if(randomsoup>=2)
-        if ((totsteps & 0xf) || randomsoup == 3) return;        // only execute remaining code once every 16 time steps and if randomsoup!=3
+    if(randominflux>=2)
+        if ((totsteps & 0xf) || randominflux == 3) return;      // only execute remaining code once every 16 time steps and if randominflux!=3
 
     density = initial1density;
     mask = ~0ull;
@@ -2999,7 +3004,7 @@ void random_soup(uint64_t gol[],uint64_t golg[],uint64_t golb[],uint64_t newgol[
     for (i=0; i<Nf; i++) {
         for (j=0; j<Nf; j++) {
             ij=i0+i+N*(j0+j);
-            if(randomsoup==2) {                                 // border feathering as well as intermittent every 16 steps
+            if(randominflux==2) {                                 // border feathering as well as intermittent every 16 steps
                 i1 = i<j ? i : j;                               // swap so that i1<=j1
                 j1 = i<j ? j : i;
                 d= j1< (Nf>>1) ? i1 : (i1 < Nf-j1 ? i1 : Nf-j1);// find Manhatten distance to border ij1
@@ -3258,7 +3263,7 @@ void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t g
         newgolgstats[ij] = statflag;
     }  // end for ij
 
-    if(randomsoup) random_soup(gol,golg,golb,newgol,newgolg,newgolb);
+    if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);
     if(vscrolling) v_scroll(newgol,newgolg,newgolb);
     if (colorfunction==8) packandcompare(newgol,working,golmix);
     if(diagnostics & diag_component_labels) ncomponents=extract_components(newgol);
@@ -3460,7 +3465,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
         newgolgstats[ij] = statflag;
     }  // end for ij
 
-    if(randomsoup) random_soup(gol,golg,golb,newgol,newgolg,newgolb);                    // [**gol** ??]
+    if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);                    // [**gol** ??]
     if(vscrolling) v_scroll(newgol,newgolg,newgolb);
     if (colorfunction==8) packandcompare(newgol,working,golmix);
     if(diagnostics & diag_component_labels) ncomponents=extract_components(newgol);
@@ -3573,7 +3578,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
             if (repscheme & R_7_random_resln) {
                 RAND128P(randnr);                                               // inline exp so compiler recognizes auto-vec,
                 kch = ((randnr>>32)&0xffff) % s;                                // choose random in this option only
-                newgene = golg[(nb[(nb1i>>(kch<<2))&0x7])];
+                newgene  = golg[(nb[(nb1i>>(kch<<2))&0x7])];
                 parentid = golb[(nb[(nb1i>>(kch<<2))&0x7])];
             }
             else {
@@ -3586,7 +3591,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
                     
                     for (nbmask=0ull,k=0;k<s;k++) nbmask |= 0x1ull<<((nb1i>>(k<<2))&0x7);
                     if (nbest<=1) {
-                        newgene = golg[nb[nb1i&0x7]];                 // for s==1 we define newgene ancestor immediately (s==0 does not reach here)
+                        newgene  = golg[nb[nb1i&0x7]];                          // for s==1 we define newgene ancestor immediately (s==0 does not reach here)
                         parentid = golb[nb[nb1i&0x7]];
                     }
                 }
@@ -3654,7 +3659,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
         newgolgstats[ij] = statflag;
     }  // end for ij
 
-    if(randomsoup) random_soup(gol,golg,golb,newgol,newgolg,newgolb);
+    if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);
     if(vscrolling) v_scroll(newgol,newgolg,newgolb);
     if (colorfunction==8) packandcompare(newgol,working,golmix);
     if (diagnostics & diag_component_labels) ncomponents=extract_components(newgol);
@@ -3864,7 +3869,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
         newgolgstats[ij] = statflag;
     }  // end for ij
 
-    if(randomsoup) random_soup(gol,golg,golb,newgol,newgolg,newgolb);
+    if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);
     if(vscrolling) v_scroll(newgol,newgolg,newgolb);
     if (colorfunction==8) packandcompare(newgol,working,golmix);
     if (diagnostics & diag_component_labels) ncomponents=extract_components(newgol);
@@ -4104,7 +4109,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
         newgolgstats[ij] = statflag;
     }  // end for ij
 
-    if(randomsoup) random_soup(gol,golg,golb,newgol,newgolg,newgolb);
+    if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);
     if(vscrolling) v_scroll(newgol,newgolg,newgolb);
     if (colorfunction==8) packandcompare(newgol,working,golmix);
     if(diagnostics & diag_component_labels) ncomponents=extract_components(newgol);
@@ -4142,11 +4147,6 @@ void genelife_update (int nsteps, int nhist, int nstat) {
         
         totsteps++;                                                           // simulation step counter
         totdisp++;                                                            // currently every step is counted for display in activities
-        if(!(totsteps%10)) {
-            if (diagnostics & diag_hash_genes)    nallspecies     = hashtable_count(&genetable);
-            if (diagnostics & diag_hash_patterns) nallspeciesquad = hashtable_count(&quadtable);
-        fprintf(stderr,"__________________________________________________________________________________________________________________________________________\n");
-        }
 
         if (selection<8)        update_23(gol,golg,golgstats,golb,newgol,newgolg,newgolgstats,newgolb);           // calculate next iteration with detailed variants of version s=2-3
         else if (selection<10)  update_lut_sum(gol,golg,golgstats,golb,newgol,newgolg,newgolgstats,newgolb);      // calculate next iteration for lut sum (gene coded)   version s=1-8
@@ -4179,17 +4179,23 @@ void genelife_update (int nsteps, int nhist, int nstat) {
             if(ngenealogydeep<0) fprintf(stderr,"error returned from genealogies\n");
         }
         if(!(totsteps%10)) {
+            if (diagnostics & diag_hash_genes)    nallspecies     = hashtable_count(&genetable);
+            if (diagnostics & diag_hash_patterns) nallspeciesquad = hashtable_count(&quadtable);
+            if (diagnostics & diag_hash_clones)   nallclones = hashtable_count(&clonetable);
+            // fprintf(stderr,"__________________________________________________________________________________________________________________________________________\n");
             fprintf(stderr,"step %6d:",totsteps);
             if(diagnostics & diag_hash_genes) {
                 countspecies1(gol, golg, N2);
-                nallspecies = hashtable_count(&genetable);
                 fprintf(stderr," genes %d/%d (extant/all)",nspeciesgene,nallspecies);
             }
             if(diagnostics & diag_hash_patterns) {
-                nallspeciesquad = hashtable_count(&quadtable);
-                fprintf(stderr," patterns %d/%d (extant/all)\n",nspeciesquad+nspeciessmall,nallspeciesquad+nallspeciessmall);
+                fprintf(stderr," patterns %d/%d (extant/all)",nspeciesquad+nspeciessmall,nallspeciesquad+nallspeciessmall);
+            }
+            if (diagnostics & diag_hash_clones) {
+                fprintf(stderr," clones %d (all)",nallclones);
             }
             fprintf(stderr,"\n");
+            fprintf(stderr,"__________________________________________________________________________________________________________________________________________\n");
         }
 
     }
@@ -4360,7 +4366,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     birthmask=runparams[7];
     ancselectmask=runparams[8];
 
-    randomsoup = 0;
+    randominflux = 0;
     vscrolling = last_scrolled = 0;
     quadrants = -1;
 
@@ -4368,27 +4374,22 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     if(pmutmask<32) pmutmask = (0x1 << (32-pmutmask)) - 0x1ull;                  // NB if pmut==0, pmutmask==zero, no mutation.
     initial1density = simparams[1];
     initialrdensity = simparams[2];
+    
     ncodingin = simparams[3];                                               // used in selection  4,5,6,8,
     ncoding = ncodingin & 0xff;
     ncoding2 = (ncodingin>>8) & 0xff;
-    if (ncoding > 64) {
-        fprintf(stderr,"value %d of ncoding is out of range\n",ncoding);
-        ncoding = 64;
-    }
+    if (ncoding > 64) { fprintf(stderr,"value %d of ncoding is out of range\n",ncoding);ncoding = 64;}
     if (selection==8 || selection == 9) if (ncoding<1 || ncoding>4) ncoding = 4; // ncoding range restriction for selection = 8 ie 16*ncoding bits of gene used
-
-    if (selection<8)
-        codingmask = (1ull<<ncoding2)-1ull;                                 // bit mask corresponding to ncoding2 bits, only used in connection with add2ndmask1st
-    else if (selection<10)
-        codingmask = (1ull<<ncoding)-1ull;                                  // coding mask used to encode number of bits per LUT (1-4)
+    if (selection<8) codingmask = (1ull<<ncoding2)-1ull;                         // bit mask corresponding to ncoding2 bits, only used in connection with add2ndmask1st
+    else if (selection<10) codingmask = (1ull<<ncoding)-1ull;                    // coding mask used to encode number of bits per LUT (1-4)
+    
     startgenechoice = simparams[4];
     if(nsimparams > 5) ranseed = simparams[5];
 
     fprintf(stderr,"___________________________________________________________________________________________\n");
     fprintf(stderr,"_________________________________ genelife simulation _____________________________________\n");
     fprintf(stderr,"runparams %d %d %d %d %d %d %d %d %d\n",runparams[0],runparams[1],runparams[2],
-                                         runparams[3],runparams[4],runparams[5],runparams[6],
-                                         runparams[7],runparams[8]);
+                    runparams[3],runparams[4],runparams[5],runparams[6],runparams[7],runparams[8]);
     fprintf(stderr,"simparams %d %d %d %d %d %d\n",simparams[0],simparams[1],simparams[2],simparams[3],simparams[4],ranseed);
     fprintf(stderr,"pmutmask %x (NB 0 means no mutation)\n",pmutmask);
 
@@ -4405,7 +4406,8 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         case 6:
         case 7:  for (k=0;k<8;k++) startgenes[k]=(0x1ull<<(4+k*8))-1ull; break;
 
-        case 8:  if (((repscheme>>4)&0x7)==7) genegol[selection-8] = (codingmask<<((8+3-1)*ncoding))|(codingmask<<((8+2-1)*ncoding))|(codingmask<<((2-1)*ncoding))|(codingmask<<((3-1)*ncoding));
+        case 8:  if (((repscheme>>4)&0x7)==7)
+                      genegol[selection-8] = (codingmask<<((8+3-1)*ncoding))|(codingmask<<((8+2-1)*ncoding))|(codingmask<<((2-1)*ncoding))|(codingmask<<((3-1)*ncoding));
                  else genegol[selection-8] = (codingmask<<((8+3-1)*ncoding))|(codingmask<<((2-1)*ncoding))|(codingmask<<((3-1)*ncoding));
                  for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;    // put up to 3 extra bits at top to ensure all nr 1s values occupied
         case 9:  genegol[selection-8] = 0xb32ull;                                 //GoL rule for survival in totalistic LUT case, variable length encoding
@@ -4426,23 +4428,11 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         default: for (k=0;k<8;k++) startgenes[k]=(0x1ull<<(4+k*8))-1ull;
     }
     
-    if (diagnostics & diag_general_statistics) {    // general statistics
-        if (livesites !=NULL) {
-            free(livesites);
-            livesites = NULL;
-        }
-        if (genestats !=NULL) {
-            free(genestats);
-            genestats = NULL;
-        }
-        if (stepstats !=NULL) {
-            free(stepstats);
-            stepstats = NULL;
-        }
-        if ( configstats != NULL) {
-            free(configstats);
-            configstats = NULL;
-        }
+    if (diagnostics & diag_general_statistics) {                                  // general statistics
+        if (livesites !=NULL) {free(livesites);livesites = NULL;}
+        if (genestats !=NULL) {free(genestats);genestats = NULL;}
+        if (stepstats !=NULL) {free(stepstats);stepstats = NULL;}
+        if (configstats != NULL) {free(configstats);configstats = NULL;}
     
         arraysize = startarraysize;
         livesites = (int *) malloc(arraysize * sizeof(int));
@@ -4451,7 +4441,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         if (nhistG==nstatG) configstats = (int *) malloc(arraysize * Noff * sizeof(int));
     }
     
-    curPlane = 0;                                           // if we rerun initialize, we want to restart plane cycling from zero
+    curPlane = 0;                                                                 // if we rerun initialize, we want to restart plane cycling from zero
     newPlane = 1;
     gol = planes[curPlane];
     golg = planesg[curPlane];
@@ -4463,16 +4453,17 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         if(diagnostics & diag_hash_patterns) {
             hashtable_term(&quadtable);
             memset(smallpatts,0,sizeof(smallpatt)*65536);
-            // for (ij=0;ij<65536;ij++) smallpatts[ij].activity = 0;      // initialize small pattern table to no patterns hit, already done
+            // for (ij=0;ij<65536;ij++) smallpatts[ij].activity = 0;              // initialize small pattern table to no patterns hit, already done
         }
         if(diagnostics & diag_hash_clones) hashtable_term(&clonetable);
     }
+    
     if(diagnostics & diag_hash_genes) hashtable_init(&genetable,sizeof(genedata),N2<<2,0);   // initialize dictionary for genes
     if(diagnostics & diag_hash_patterns) hashtable_init(&quadtable,sizeof(quadnode),N2<<2,0);// initialize dictionary for quadtree patterns
     if(diagnostics & diag_hash_clones) hashtable_init(&clonetable,sizeof(clonedata),N2<<4,0);// initialize dictionary for clones
     
     notfirst = 1;
-    if (initfield==1) {           // input from file genepat.dat with max size of 32*32 characters
+    if (initfield==1) {                              // input from file genepat.dat with max size of 32*32 characters
         golgin = (char *) malloc(32* 32 * sizeof(char));
         icf=readFile(golgin, "genepat.dat");
         if (icf != 32*32) {
@@ -4488,20 +4479,20 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         for (ij1=0; ij1<32*32; ij1++) {
             if(N<32) {fprintf(stderr,"Error, array dim %d too small for file array dim %d\n",N,32);break;}
             ij=(N>>1)-16+(ij1&0x1f)+ N*((N>>1)-16+(ij1>>5));
-            if (golgin[ij1] > 0)    {                           // if live cell
+            if (golgin[ij1] > 0)    {                // if live cell
                 gol[ij] = 1ull;
                 if(golgin[ij1] <= 8 ) golg[ij] = startgenes[golgin[ij1]-1];
                 else if (golgin[ij1]>='0' && golgin[ij1]<'8') golg[ij] = startgenes[golgin[ij1]-'0'];
                 else golg[ij] = startgenes[7];
                 cnt++;
                 golgstats[ij] = 0ull;
-                golb[ij] = N2bit + ij;                          // initialize clone to new clone
+                golb[ij] = N2bit + ij;               // initialize clone to new clone
             }
             // if (golg[ij] == 0 && gol[ij] != 0) fprintf(stderr,"zero gene at %d\n",ij);
         }
 
     }
-    else if (initfield>0) {  // initfield gives linear size of random block for initialization (0 => full frame, as before)
+    else if (initfield>=0) {                         // initfield gives linear size of random block for initialization (0 => full frame, as before)
         Nf = initfield;
         if (Nf==0 || Nf>N) Nf=N;
         for (ij=0; ij<N2; ij++) {
@@ -4519,7 +4510,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         }
         for (ij=0; ij<N2; ij++) {
             g = 0ull;
-            if (gol[ij]) {      //  fill with random genome g or randomly chosen startgene depending on initialrdensity
+            if (gol[ij]) {                          //  fill with random genome g or randomly chosen startgene depending on initialrdensity
                 if (((unsigned) rand() & rmask) < initialrdensity) {for (k=0; k<64; k++) g = (g << 1) | (rand() & 0x1);g=gene0^g;}
                 else if (startgenechoice == nstartgenes) g = startgenes[0xf & rand() & (nstartgenes-1)];
                 else if (startgenechoice > nstartgenes) fprintf(stderr,"startgenechoice %d out of range\n",startgenechoice);
@@ -4566,7 +4557,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
                 hashaddgene(ij,golg[ij],rootgene,golb+ij,N2bit+ij,0x1ull);   // totsteps=0 so parentid is spatial ij + flag N2bit for rootgene
             }
         }
-                                                // enumerate hash keys and values
+                                                // enumerate gene hash keys and values
         hcnt=hashtable_count(&genetable);
         genotypes = hashtable_keys( &genetable );
         fprintf(stderr,"population size %d with %d different genes\n",cnt,hcnt);
@@ -4622,14 +4613,14 @@ void set_quadrant(int quadrant) {
     }
 }
 //.......................................................................................................................................................
-void set_randomsoup(int randomsoupin) {
-    randomsoup=randomsoupin;
+void set_randominflux(int randominfluxin) {
+    randominflux=randominfluxin;
 }
 //.......................................................................................................................................................
-void set_rbackground(int rbackgroundin, int randomsoupin) {
+void set_rbackground(int rbackgroundin, int randominfluxin) {
     rbackground=rbackgroundin;
-    randomsoup=randomsoupin;
-    if(!rbackground) randomsoup=0;   // do not leave patch randomsoup variable active when turning off random background
+    randominflux=randominfluxin;
+    if(!rbackground) randominflux=0;   // do not leave patch randominflux variable active when turning off random background
 }
 //.......................................................................................................................................................
 unsigned int set_repscheme_bits(int quadrant, int x, int y, unsigned int surviveover[]) {
@@ -5754,7 +5745,7 @@ int genealogies() {  /* genealogies of all currently active species */
     for (i=jmax=0; i<nspeciesnow; i++) {
         gene=genotypes[gindices[i]];                            // do not need to copy array to genes since only needed here
         if(ancestortype) ancgene=geneitems[gindices[i]].recentancestor;
-        else                      ancgene=geneitems[gindices[i]].firstancestor;
+        else             ancgene=geneitems[gindices[i]].firstancestor;
         activity=geneitems[gindices[i]].activity;
         if(activity>activitymax) activitymax=activity;
         working[i]=genealogy1[0]=gene;                                        // ij = i for j=0

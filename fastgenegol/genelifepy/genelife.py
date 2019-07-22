@@ -90,7 +90,7 @@ framenr = 0
 mstime = 0
 framerate=0.0
 savecnt = 0                              # counter for saved images
-randomsoup = 0
+randominflux = 0
 vscrolling = 0
 noveltyfilter = 0
 activity_size_colormode = 0
@@ -516,7 +516,8 @@ def pr_params():
     print("simparams[1] = initial1density = ",initial1density)          
     print("simparams[2] = initialrdensity = ",initialrdensity)          
     print("simparams[3] = ncoding = ",ncoding)                  
-    print("simparams[4] = startgenechoice = ",startgenechoice)          
+    print("simparams[4] = startgenechoice = ",startgenechoice)
+    print("simparams[5] = ranseed = ",ranseed)
     
 #-----------------------------------------------------------------------------------------------------------
 
@@ -546,6 +547,7 @@ def set_params():
                                                  # otherwise (selection<10) no of bits used to encode valid connection functions 1-16
                                                  # for selection==8, lut, ncoding 1,2,3 bits per lut entry : 0 implies 3.
     simparams[4] = startgenechoice           # initialize genes to startgene number 0-8 : 8 is random choice of 0-7
+    simparams[5] = ranseed                   # initialize ranseed
     
     pr_params()
     
@@ -706,7 +708,7 @@ def step(count=True):
 # +/- keys reserved for activity ymax : actually the crossover value in N* act/(ymax+act)
 # keys lower case - decrement, upper case - increment, alt - input value: y,Y ymax q,Q quadrant
 # misc. keys save image
-def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
+def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
     global mstime,framenr,framerate
     global surface, window, scalex2, caption, dispinit
     global surface2, window2, caption2, dispinit2, grect, render2, renderer2, factory2, image2, message2, font2, textColor2, windowID2
@@ -720,7 +722,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     global savecnt
     global cancol
     global Height,Width
-    global randomsoup,vscrolling,noveltyfilter,activity_size_colormode
+    global randominflux,vscrolling,noveltyfilter,activity_size_colormode
     global gogo,pause,mouseclicked,mouseclicked2,pixeldat,paramdat
     global maxPlane,offdx,offdy,offdt,quadrants,displayoneplane
     global parhelp
@@ -1142,21 +1144,21 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     genelife.set_quadrant(quadrants)
                 elif keystatus[sdl2.SDL_SCANCODE_R]:
                     if   sdl2.SDL_GetModState() & sdl2.KMOD_LALT:
-                        rbackground,randomsoup = eval(input("Enter rbackground [0-32768] and randomsoup (3 deletions only, 2 GoL gene, 1 random gene:"))
-                        print('step',framenr,"rbackground changed to ",rbackground,"with random mode ",randomsoup)
-                        genelife.set_rbackground(rbackground,randomsoup)
+                        rbackground,randominflux = eval(input("Enter rbackground [0-32768] and randominflux (3 deletions only, 2 GoL gene, 1 random gene:"))
+                        print('step',framenr,"rbackground changed to ",rbackground,"with random mode ",randominflux)
+                        genelife.set_rbackground(rbackground,randominflux)
                     elif   sdl2.SDL_GetModState() &  sdl2.KMOD_LSHIFT:
-                        randomsoup = 2 if randomsoup !=2 else 0
-                        print('step',framenr,"randomsoup changed to ",randomsoup)
-                        genelife.set_randomsoup(randomsoup)
+                        randominflux = 2 if randominflux !=2 else 0
+                        print('step',framenr,"randominflux changed to ",randominflux)
+                        genelife.set_randominflux(randominflux)
                     elif   sdl2.SDL_GetModState() &  sdl2.KMOD_RSHIFT:
-                        randomsoup = 3 if randomsoup !=3 else 0
-                        print('step',framenr,"randomsoup changed to ",randomsoup)
-                        genelife.set_randomsoup(randomsoup)
+                        randominflux = 3 if randominflux !=3 else 0
+                        print('step',framenr,"randominflux changed to ",randominflux)
+                        genelife.set_randominflux(randominflux)
                     else:
-                        randomsoup = 1 if randomsoup !=1 else 0
-                        print('step',framenr,"randomsoup changed to ",randomsoup)
-                        genelife.set_randomsoup(randomsoup)
+                        randominflux = 1 if randominflux !=1 else 0
+                        print('step',framenr,"randominflux changed to ",randominflux)
+                        genelife.set_randominflux(randominflux)
                 elif keystatus[sdl2.SDL_SCANCODE_S]:
                     fname = "images/genelife_sel%02d_t%03d_r%08x_s%03d.jpeg" % (selection,framenr,repscheme,savecnt)
                     err = sdl2.surface.SDL_SaveBMP(window, fname)
@@ -1186,7 +1188,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
                     print('step',framenr,"offset dy changed to ",offdy)
                     genelife.set_offsets(offdx,offdy,offdt)
         if (not mouseclicked):
-            if updatesenabled and not pause:
+            if updatesenabled and not pause and (framenr < maxsteps):
                 update_sim(nrun, ndisp, nskip, niter, nhist, nstat, count)
             else:
                 colorgrid()
@@ -1351,10 +1353,10 @@ def parhelp():
     print("n           ","toggle novelty filter on/off for connected component color function 9")
     print("p           ","rotate activity_size_colormode 0,1,2,3 for (no,log2n,pixels,sqrt(pixels)) size display of activities in color function 10")
     print("q,Q         ","incr or decr quadrant parameter choice : -1 = no quadrants, 0-4 are first 5 bit pairs of repscheme, 5,6 surv and overwrite")
-    print("r           ","toggle random soup domain on or off")
-    print("R leftshift ","toggle intermittent feathered random soup domain on or off")
+    print("r           ","toggle random influx domain on or off")
+    print("R leftshift ","toggle intermittent feathered random influx domain on or off")
     print("R rightshift","toggle random deletion perturbation at rbackground rate on or off")
-    print("alt-r       ","input background rate of perturbation for random soup")
+    print("alt-r       ","input background rate of perturbation for random influx")
     print("s           ","save current image to file in image subdriectory")
     print("x,X y,Y t,T ","lower (lc) or raise (uc) the (dx,dy,dt) offsets for glider tracking (colorfn 8) (0,0,0)=(all 8 nnb dt=-1)")
     print("v           ","toggle vertical scroll tracking mode : following top most objects and losing lowest objects in contact with 0 row")
@@ -1371,5 +1373,5 @@ if __name__ == '__main__':
     cnt=0
     show0()
     # step()
-    run(nrun, ndisp, nskip, niter, nhist, nstat, cnt)
+    run(nrun, ndisp, nskip, niter, nhist, nstat, cnt, 1000)
     
