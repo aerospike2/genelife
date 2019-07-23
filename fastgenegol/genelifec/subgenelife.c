@@ -223,7 +223,7 @@ int activity_size_colormode = 0;    // color by size for colorfunction 10 : if o
 int xdisplay,ydisplay = -1;         // display x and y coordinates selected by mouse in python
 int shist[9];
 int info_transfer_h = 0;            // whether to display histogram on glider information transfer counts
-int gliderinfo[408];                // histogram of counts for glider detection by match quality in eight directions
+uint64_t gliderinfo[408];             // histogram of counts for glider detection by match quality in eight directions
 //------------------------------------------------ arrays for time tracing, activity and genealogies ----------------------------------------------------
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
@@ -763,6 +763,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
     static int numones[16]={0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4};
     int labelimage(uint64_t hashkeypatt, short unsigned int labelimg[], short unsigned int label, int offset);
     extern inline int log2size(const short unsigned int golpw);
+    void get_gliderinfo(uint64_t outgliderinfo[], int narraysize);
 
     if(colorfunction==0) { // colorfunction based on multiplicative hash
         // see https://stackoverflow.com/questions/6943493/hash-table-with-64-bit-values-as-key/33871291
@@ -996,12 +997,15 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 cgolg[ij] = (int) mask;
         }
         if(info_transfer_h) {
-            int maxval = 0;
+            get_gliderinfo(gliderinfo, 408);
+            uint64_t maxval = 0ull;
             for (int i=0; i<408; i++)
                 maxval = (gliderinfo[i]>maxval) ? gliderinfo[i] : maxval;
+            for (ij=N2>>1;ij<N2;ij++) cgolg[ij] = 0;
             for (int i=0; i<408; i++)
                 for (int jmax,j=jmax=0;j<gliderinfo[i]*(N>>1)/maxval;j++)
-                    cgolg[(j<<log2N)+i] = 0xff0000ff;
+                    cgolg[((N-j)<<log2N)+i] = 0xff0000ff;
+            
         }
     }
     else if(colorfunction==9) {                                     // colorfunction based on unique labelling of separate components in image
