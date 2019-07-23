@@ -170,6 +170,8 @@ libcd.set_genealogycoldepth.restype = None
 libcd.set_genealogycoldepth.argtypes = [c_int]
 libcd.set_ancestortype.restype = None
 libcd.set_ancestortype.argtypes = [c_int]
+libcd.set_info_transfer_h.restype = None
+libcd.set_info_transfer_h.argtypes = [c_int]
 
 def get_log2N():
     return libcd.get_log2N()
@@ -270,6 +272,12 @@ def get_quadnodes(quadnodes):
 def get_genes(genelist):
     return libcd.get_genes(genelist, int(len(genelist)))
 
+def get_stash():
+    return libcd.get_stash();
+
+def get_nlive():
+    return libcd.get_nlive();
+
 def colorgenes1(gol, golg, golgstats, cgolg):
     return libcd.colorgenes1( gol, golg, golgstats, cgolg, len(gol))
 
@@ -339,10 +347,6 @@ def set_ancestortype(ancestortype):
 def set_stash():
     return libcd.set_stash();
 
-def get_stash():
-    return libcd.get_stash();
-
-def get_nlive():
-    return libcd.get_nlive();
-
+def set_info_transfer_h(info_transfer_h):
+    return libcd.set_info_transfer_h(info_transfer_h);
     

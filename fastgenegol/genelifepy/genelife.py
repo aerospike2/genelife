@@ -95,6 +95,7 @@ vscrolling = 0
 noveltyfilter = 0
 activity_size_colormode = 0
 ancestortype = 0
+info_transfer_h = 0
                                          # parameter initialization
 runparams = np.zeros(9,np.int32)         # 9 parameters passed to C
 simparams = np.zeros(6,np.int32)         # 6 parameters passed to C
@@ -722,7 +723,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
     global savecnt
     global cancol
     global Height,Width
-    global randominflux,vscrolling,noveltyfilter,activity_size_colormode
+    global randominflux,vscrolling,noveltyfilter,activity_size_colormode,info_transfer_h
     global gogo,pause,mouseclicked,mouseclicked2,pixeldat,paramdat
     global maxPlane,offdx,offdy,offdt,quadrants,displayoneplane
     global parhelp
@@ -1124,6 +1125,10 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                             print('step',framenr,'new ancestor choice recent')
                         else:
                             print('step',framenr,'new ancestor choice first')
+                elif keystatus[sdl2.SDL_SCANCODE_I]:
+                    info_transfer_h = 1-info_transfer_h;
+                    genelife.set_info_transfer_h(info_transfer_h)
+                    print('step',framenr,'info_transfer_h =',info_transfer_h)
                 elif keystatus[sdl2.SDL_SCANCODE_N]:
                     noveltyfilter=1-noveltyfilter
                     print('step',framenr,"noveltyfilter changed to ",noveltyfilter)
@@ -1339,6 +1344,7 @@ def parhelp():
     print("")
     print("Other controls:")
     print("_______________")
+    print("<space>     ","pause simulation, allowing ongoing display control")
     print("middle mouse","stop simulation [data is retained for possible run() for run/analysis with updatesenabled=True/False]")
     print("left mouse  ","extract information about local state inside the array, or control buttons below")
     print("right mouse ","choose single plane for GoL display in colorfunction 2 for selection 16-19")
@@ -1349,7 +1355,7 @@ def parhelp():
     print("g           ","toggle on/off inherited coloring of connected components from overlapping components (colfn 9) or first/recent ancestors (6,7,11)")
     print("h           ","print this help")
     print("H           ","toggle horizon mode on or off: upper half of array obeys unmodified GoL rule")
-    print("<space>     ","pause simulation, allowing ongoing display control")
+    print("i           ","toggle display and calculation of info_transfer_histogram on/off")
     print("n           ","toggle novelty filter on/off for connected component color function 9")
     print("p           ","rotate activity_size_colormode 0,1,2,3 for (no,log2n,pixels,sqrt(pixels)) size display of activities in color function 10")
     print("q,Q         ","incr or decr quadrant parameter choice : -1 = no quadrants, 0-4 are first 5 bit pairs of repscheme, 5,6 surv and overwrite")

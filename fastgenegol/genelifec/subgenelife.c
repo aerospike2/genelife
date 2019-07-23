@@ -63,6 +63,7 @@ const unsigned int diag_offset_statistics = 0x80; // enable collection of offset
 const unsigned int diag_scrolling_trace = 0x100;  // enable scrolling time tracing of activities for genes and patterns,populations,genealogies
 const unsigned int diag_longtime_trace = 0x200;   // enable longer time tracing of activities for genes and patterns,populations (poss.genealogies)
 const unsigned int diag_general_statistics = 0x400;// enable collection of general statistics: livesites,genestats,stepstats,configstats
+const unsigned int diag_info_transfer_hist = 0x800;// enable collection of general statistics: livesites,genestats,stepstats,configstats
 //-----------------------------------------------------------initialization and color parameters---------------------------------------------------------
 int initial1density = (1<<15)>>1;   // initial density of ones in gol as integer value, divide by 2^15 for true density
 int initialrdensity = (1<<15)>>1;   // initial density of random genes in live sites, divide by 2^15 for true density
@@ -221,6 +222,8 @@ int noveltyfilter = 0;              // novelty filter for colorfunction 9 : if o
 int activity_size_colormode = 0;    // color by size for colorfunction 10 : if on (key "p")  1 log2 enclosing square size 2 use #pixels 3 use sqrt(#pixels)
 int xdisplay,ydisplay = -1;         // display x and y coordinates selected by mouse in python
 int shist[9];
+int info_transfer_h = 0;            // whether to display histogram on glider information transfer counts
+int gliderinfo[408];                // histogram of counts for glider detection by match quality in eight directions
 //------------------------------------------------ arrays for time tracing, activity and genealogies ----------------------------------------------------
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
@@ -539,6 +542,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // set_genealogycoldepth set genealogycoldepth for colorfunction=11 display
 // set_ancestortype set ancestortype for display and return of first (0) or most recent (1) ancestors in genealogies
 // set_stash            stash current gol,golg in stashgol, stshgolg
+// set_info_transfer_h  set information transfer histogram display value (0,1) from python
 //..........................................................  get to python driver  .....................................................................
 // get_stash            retrieve current gol,golg from stashed values
 // get_log2N            get the current log2N value from C to python
@@ -990,6 +994,14 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 }
 
                 cgolg[ij] = (int) mask;
+        }
+        if(info_transfer_h) {
+            int maxval = 0;
+            for (int i=0; i<408; i++)
+                maxval = (gliderinfo[i]>maxval) ? gliderinfo[i] : maxval;
+            for (int i=0; i<408; i++)
+                for (int jmax,j=jmax=0;j<gliderinfo[i]*(N>>1)/maxval;j++)
+                    cgolg[(j<<log2N)+i] = 0xff0000ff;
         }
     }
     else if(colorfunction==9) {                                     // colorfunction based on unique labelling of separate components in image
@@ -4784,7 +4796,10 @@ void set_stash(){               // stash current gol,golg
         stashgolg[ij] = planesg[curPlane][ij];
     }
 }
-
+//.......................................................................................................................................................
+void set_info_transfer_h(int info_transfer_h_in) {
+    info_transfer_h = info_transfer_h_in;
+}
 //------------------------------------------------------------------- get ... ---------------------------------------------------------------------------
 void  get_shist(int outshist[]){
     int i;
