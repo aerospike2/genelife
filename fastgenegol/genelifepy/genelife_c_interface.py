@@ -78,6 +78,8 @@ libcd.get_curgolg.restype = None
 libcd.get_curgolg.argtypes = [uint64_array,c_int]
 libcd.get_curgolgstats.restype = None
 libcd.get_curgolgstats.argtypes = [uint64_array,c_int]
+libcd.get_gliderinfo.restype = None
+libcd.get_gliderinfo.argtypes = [uint64_array,c_int]
 libcd.set_stash.restype = None
 libcd.set_stash.argtypes = None
 libcd.get_stash.restype = None
@@ -185,6 +187,9 @@ def get_curgolg(golg):
 
 def get_curgolgstats(golgstats):
     return libcd.get_curgolgstats(golgstats, int(len(golgstats)))
+
+def get_gliderinfo(gliderinfo):
+    return libcd.get_gliderinfo(gliderinfo, int(len(gliderinfo)))
 
 def get_nspecies():
     return libcd.get_nspecies()
