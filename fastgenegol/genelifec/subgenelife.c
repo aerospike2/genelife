@@ -63,7 +63,7 @@ const unsigned int diag_offset_statistics = 0x80; // enable collection of offset
 const unsigned int diag_scrolling_trace = 0x100;  // enable scrolling time tracing of activities for genes and patterns,populations,genealogies
 const unsigned int diag_longtime_trace = 0x200;   // enable longer time tracing of activities for genes and patterns,populations (poss.genealogies)
 const unsigned int diag_general_statistics = 0x400;// enable collection of general statistics: livesites,genestats,stepstats,configstats
-const unsigned int diag_info_transfer_hist = 0x800;// enable collection of general statistics: livesites,genestats,stepstats,configstats
+const unsigned int diag_info_transfer_hist = 0x800;// enable collection of glider information transfer histogram in 8 directions  N E S W NE SE SW NW
 //-----------------------------------------------------------initialization and color parameters---------------------------------------------------------
 int initial1density = (1<<15)>>1;   // initial density of ones in gol as integer value, divide by 2^15 for true density
 int initialrdensity = (1<<15)>>1;   // initial density of random genes in live sites, divide by 2^15 for true density
@@ -223,7 +223,7 @@ int activity_size_colormode = 0;    // color by size for colorfunction 10 : if o
 int xdisplay,ydisplay = -1;         // display x and y coordinates selected by mouse in python
 int shist[9];
 int info_transfer_h = 0;            // whether to display histogram on glider information transfer counts
-uint64_t gliderinfo[408];             // histogram of counts for glider detection by match quality in eight directions
+uint64_t gliderinfo[408];             // histogram of counts for glider detection by match quality in eight directions N E S W NE SE SW NW
 //------------------------------------------------ arrays for time tracing, activity and genealogies ----------------------------------------------------
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
@@ -996,15 +996,17 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
 
                 cgolg[ij] = (int) mask;
         }
-        if(info_transfer_h) {
+        if(info_transfer_h) {                                       // display histograms of glider matching in eight directions N E S W NE SE SW NW
             get_gliderinfo(gliderinfo, 408);
             uint64_t maxval = 0ull;
-            for (int i=0; i<408; i++)
+            for (int i=0; i<408; i++) {
+                if(i%51==50) gliderinfo[i]=0;
                 maxval = (gliderinfo[i]>maxval) ? gliderinfo[i] : maxval;
+            }
             for (ij=N2>>1;ij<N2;ij++) cgolg[ij] = 0;
             for (int i=0; i<408; i++)
                 for (int jmax,j=jmax=0;j<gliderinfo[i]*(N>>1)/maxval;j++)
-                    cgolg[((N-j)<<log2N)+i] = 0xff0000ff;
+                    cgolg[((N-j)<<log2N)+i] = 0xff1f1fff;
             
         }
     }
@@ -2193,7 +2195,7 @@ extern inline void pack49neighbors(uint64_t gol[],uint64_t golp[]) {            
     for (ij=0;ij<N2;ij++) golp[ij] = gol[ij];                                     // copy 1 bit gol to golp
     for(k=0;k<6;k++)                                                              // hierarchical bit copy and swap
         for (ij=0;ij<N2;ij++)
-             golp[ij] |= gol[deltaxy(ij,nbx[k],nby[k])]<<(1<<k);                  // 8x8 packed arrays
+             golp[ij] |= golp[deltaxy(ij,nbx[k],nby[k])]<<(1<<k);                  // 8x8 packed arrays
     for (ij=0;ij<N2;ij++) golp[ij] = golp[ij]&0xfac8ffccfafaffffull;              // masks out 15 values in top row and left column to give 7x7 neighbourhoods
                                                                                   // mask removes bit numbers 16,18,24,26,32,33,36,37,48,49,50,52,53,56,58
 }
@@ -2290,16 +2292,21 @@ extern inline void compare_all_neighbors(uint64_t a[],uint64_t b[]) {  // routin
 
     if (last_scrolled) scrollN = N;
     else scrollN = 0;
-
+    
+    d=0;
     for (ij=0;ij<N2;ij++) {
         ijs=(ij-scrollN)&N2mask;
         aij = a[ij];
         for (a[ij]=0ull,k=0;k<8;k++) {
             bijk=b[deltaxy(ijs,nbx[k],nby[k])];
             POPCOUNT64C((aij^bijk),d);
+            // POPCOUNT64C(aij,d);
             d = (aij&&bijk) ? d : 0xff;
+            if((k==2)&&((ij>>log2N) == (N>>1)) && ((ij&Nmask)<64)) fprintf(stderr,"difference d=%d at i=%d for aij %llx bijk %llx\n",d,ij&Nmask,aij,bijk);
             a[ij]|=((uint64_t) d)<<(k<<3);
         }
+        // if(d>8 && d<64) fprintf(stderr,"difference %d is greater than 8 at ij %d\n",d,ij);
+    
     }
 }
 //.......................................................................................................................................................
@@ -6271,23 +6278,24 @@ int get_genealogies_(uint64_t genealogydat[], int narraysize) {  /* return genea
 
 void get_gliderinfo(uint64_t outgliderinfo[], int narraysize){               // put 7x7 pattern averaged match counts into outgliderinfo array
     uint64_t *gitmp, gene;
-    int ij,k,d1;
+    int ij,k;
+    unsigned int d1;
     if(narraysize!=408){
         fprintf(stderr,"get_gliderinfo():  wrong data size (should be array of 408)\n");
     }
     for (ij=0; ij<N2; ij++) {
         gene = golmix[ij];
-        for (k=0;k<8;k++) {                      // each direction: N E S W NE SE SW NW
+        for (k=0;k<8;k++) {                             // each direction: N E S W NE SE SW NW
             gitmp = outgliderinfo + k*51;
-            d1 = (gene>>(k<<3))&0xff;                   // differences for this direction
+            d1 = (int) ((gene>>(k<<3))&0xffull);        // differences for this direction
             if(d1==0xff)
                 gitmp[50]++;
             else{
-                d1 = 49-d1;                             // change to matches
                 if(d1<0 || d1>49){
-                    fprintf(stderr, "get_gliderinfo:  bad match count value:  %d.", d1);
+                    fprintf(stderr, "get_gliderinfo:  bad difference count value:  %d.", d1);
                     return;
                 }
+                d1 = 49-d1;                             // change to matches
                 gitmp[d1]++;
             }
         }
