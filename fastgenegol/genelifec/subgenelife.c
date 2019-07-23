@@ -441,6 +441,8 @@ const uint64_t r1 = 0x1111111111111111ull;
         c+=tttt*cccc;                          /* the right zero counter is incremented by the length of the current interval cccc if a one was not under mask */ \
     }                                          /* note that Anderson's algorithm was incorrect, see also profile comparison in standalone lsb64.c */ \
 }                                              /* this macro calculates the LSB 1 (ie from the bottom) not the MSB 1 (ie from the top) that the integer log function finds. */
+//.......................................................................................................................................................
+#define membrane (((ij>>log2N)==((N>>1)-(initfield>>1)-1) || ((ij>>log2N)==((N>>1)-(initfield>>1)-2))) && (ij & 0x1) ? 2 : 1) /* formula for membrane of death */
 //----------------------------------------------------- list of subroutines -----------------------------------------------------------------------------
 //......................................................  fast integer processing   .....................................................................
 // integerSqrt          direct bit processing algorithm to implement integer sqrt (largest integer smaller than sqrt) : but floating point sqrt is faster
@@ -3364,7 +3366,8 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
             s2or3 = (s>>2) ? 0ull : (s>>1);                                     // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
             gols = s2or3 ? (golij ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;     // GoL calculation next state for non-genetic gol plane
             rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1);  // if rulemod bit 1 is on then split into half planes with/without mod
-            if(rulemodij) {
+            rulemodij = (rulemod&0x4) ? membrane : (rulemod&0x1);                   // if rulemod bit 2 then activate membrane of death
+            if(rulemodij==1) {
                 overwrite = overwritemask&(0x1ull<<(s-1));
                 if (selection==9) {                                             // selection == 9
                     for (genecode=0ull,k=0;k<8;k++) {                           // decodes genes with variable length encoding
@@ -3400,6 +3403,10 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                         birth=(((genecode>>((8+(s-1))*ncoding)) & ncodingmask) == ncodingmask) && ((bmask>>(s-1))&1ull) ? 1ull : 0ull;
                     // if(s ==3 && genecode!=genegol[selection-8]) fprintf(stderr,"genecode %llx != genegol %llx at ij %d\n",genecode,genegol[selection-8],ij);
                 }
+            }
+            else if (rulemodij==2){                                                 // hard death on alternating site membrane at j=N/2+initfield/2
+                survive = 0ull;
+                birth = 0ull;
             }
             else {
                     survive = s2or3;
@@ -3553,7 +3560,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
             s2or3 = (s>>2) ? 0ull : (s>>1);                                        // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
             gols = s2or3 ? (gol[ij] ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;      // GoL calculation next state for non-genetic gol plane
             rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1);     // if rulemod bit 1 is on then split into half planes with/without mod
-            rulemodij = (rulemod&0x4) ? (((ij>>log2N)==((N>>1)-(initfield>>1)-1) || ((ij>>log2N)==((N>>1)-(initfield>>1)-2))) && (ij & 0x1) ? 2 : 1) : (rulemod&0x1); // if rulemod bit 2 is on then do death on alternating squares on top initial square line
+            rulemodij = (rulemod&0x4) ? membrane : (rulemod&0x1);                   // if rulemod bit 2 then activate membrane of death
             if (rulemodij==1) {                // NB need to put gene calculation outside that we cna do genetic propagation with GoL rulemod off
                 overwrite = overwritemask&(0x1ull<<s1);
                 overwrite = (overwrite || !gol[ij]) ? 1ull : 0ull;
@@ -3770,7 +3777,8 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
             s2or3 = (s>>2) ? 0ull : (s>>1);                                         // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
             gols = s2or3 ? (gol[ij] ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;       // GoL calculation next state for non-genetic gol plane
             rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1);      // if rulemod bit 1 is on then split into half planes with/without mod
-            if (rulemodij) {
+            rulemodij = (rulemod&0x4) ? membrane : (rulemod&0x1);                   // if rulemod bit 2 then activate membrane of death
+            if(rulemodij==1) {
                 overwrite = s ? (overwritemask>>(s-1))&0x1ull : 0ull;               // allow birth to overwrite occupied cell = survival in GoL
                 overwrite = overwrite | (~gol[ij] & 0x1ull);                        // either central cell is empty or overwrite bit set is required for birth
                 if (gol[ij]) survive = (smask>>sumoffs[s2])&summasks[s2] ? 1ull : 0ull;
@@ -3835,6 +3843,10 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
                         }
                     }
                 }
+            }
+            else if (rulemodij==2){                                                 // hard death on alternating site membrane at j=N/2+initfield/2
+                survive = 0ull;
+                birth = 0ull;
             }
             else {
                 survive = s2or3;
@@ -4008,7 +4020,8 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
             s2or3 = (s>>2) ? 0ull : (s>>1);                                    // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
             gols = s2or3 ? (gol[ij] ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;  // GoL calculation next state for non-genetic gol plane
             rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1); // if rulemod bit 1 is on then split into half planes with/without mod
-            if (rulemodij) {
+            rulemodij = (rulemod&0x4) ? membrane : (rulemod&0x1);              // if rulemod bit 2 then activate membrane of death
+            if(rulemodij==1) {
                 overwrite = s ? overwritemask&(0x1ull<<(s-1)) : 0;
                 overwrite = (overwrite || !gol[ij]) ? 1ull : 0ull;
                 if (gol[ij]) survive = (smask>>sumoffs[s])&summasks[s] ? 1ull : 0ull;
@@ -4069,6 +4082,10 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
                         }
                     }
                 }
+            }
+            else if (rulemodij==2){                                                 // hard death on alternating site membrane at j=N/2+initfield/2
+                survive = 0ull;
+                birth = 0ull;
             }
             else {
                 survive = s2or3;
