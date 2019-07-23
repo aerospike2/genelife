@@ -760,7 +760,6 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
 
     if(colorfunction==0) { // colorfunction based on multiplicative hash
         // see https://stackoverflow.com/questions/6943493/hash-table-with-64-bit-values-as-key/33871291
-        fprintf(stderr,"\nrulemod is %d at step %d\n\n",rulemod,totsteps);
         for (ij=0; ij<N2; ij++) {
             if (gol[ij]) {
                 gene = golg[ij];
@@ -769,16 +768,12 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 // mask = (gene * 11400714819323198549ul) >> (64 - 32);  // hash with optimal prime multiplicator down to 32 bits
                 mask = gene * 11400714819323198549ull;
                 mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
-                if(rulemod & 0x4) mask = ((((ij>>log2N)==((N>>1)-(initfield>>1))) && (ij & 0x1)) ? 0x00ffffffull : mask);
-                //if(rulemod & 0x4) mask = ((ij>>log2N)>(N>>1)) ? 0x00ffffffull : mask;
-                //if(rulemod & 0x4) mask = 0x00ffffffull;
+                if(rulemod & 0x4) mask = (((ij>>log2N)==((N>>1)-(initfield>>1)-1) || ((ij>>log2N)==((N>>1)-(initfield>>1)-2))) && (ij & 0x1) ? 0x00ffffffull : mask);
                 mask |= 0x080808ffull; // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
                 cgolg[ij] = (int) mask;
             }
             else {
-                if(rulemod & 0x4) mask = ((((ij>>log2N)==((N>>1)-(initfield>>1))) && (ij & 0x1)) ? 0x00ffffffull : 0ull);
-                //if(rulemod & 0x4) mask = ((ij>>log2N)>(N>>1)) ? 0x00ffffffull : 0ull;
-                //if(rulemod & 0x4) mask = 0x00ffffffull;
+                if(rulemod & 0x4) mask = (((ij>>log2N)==((N>>1)-(initfield>>1)-1) || ((ij>>log2N)==((N>>1)-(initfield>>1)-2))) && (ij & 0x1) ? 0x00ffffffull : 0ull);
                 else mask = 0ull;
                 cgolg[ij] = (int) mask;
             }
@@ -3313,7 +3308,7 @@ void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t g
     if(diagnostics & diag_component_labels) ncomponents=extract_components(newgol);
 
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
-        if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
+        if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error %d in update at step %d, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
     }
     // if(diagnostics & diag_hash_patterns) qimage = quadimage(newgol,&patt,log2N); // quadtree hash of entire image
@@ -3357,35 +3352,23 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
         ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                             // toroidal i+1, i-1
         nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1;               // new order of nbs
         nb[4]=jp1+ip1; nb[5]=jp1+i; nb[6]=jp1+im1; nb[7]=j*N+im1;
-        for (s=0,k=0;k<8;k++) {                                                 // computes s
-            s += gol[nb[k]];                                                    // s is number of live nbs
-        }
-        if(s>2) gol[ij]|=0x2L;
-    }
-    
-    for (ij=0; ij<N2; ij++) {                                                   // loop over all sites of 2D torus with side length N
-        i = ij & Nmask;  j = ij >> log2N;                                       // row & column
-        jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                       // toroidal (j+1)*N and (j-1)*N
-        ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                             // toroidal i+1, i-1
-        nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1;               // new order of nbs
-        nb[4]=jp1+ip1; nb[5]=jp1+i; nb[6]=jp1+im1; nb[7]=j*N+im1;
         for (s=0,nb1i=0ull,k=0;k<8;k++) {                                       // packs non-zero nb indices in first up to 8*4 bits
-            gols=gol[nb[k]]&0x1L;                                               // whether neighbor is alive [**gol** y]
+            gols=gol[nb[k]];                                                    // whether neighbor is alive
             s += gols;                                                          // s is number of live nbs
             nb1i = (nb1i << (gols<<2)) + (gols*k);                              // nb1i is packed list of live neighbour indices
         }
         statflag = 0ull;
         birth = 0ull;
-        golij=gol[ij]&0x1L;                                                     // to be compatible with storing other information in higher bits of gol
+        golij=gol[ij]&1ull;                                                     // to be compatible with storing other information in higher bits of gol
         if (s) {
             s2or3 = (s>>2) ? 0ull : (s>>1);                                     // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
-            gols = s2or3 ? (golij ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;     // GoL calculation next state for non-genetic gol plane [**gol** y]
+            gols = s2or3 ? (golij ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;     // GoL calculation next state for non-genetic gol plane
             rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1);  // if rulemod bit 1 is on then split into half planes with/without mod
             if(rulemodij) {
                 overwrite = overwritemask&(0x1ull<<(s-1));
                 if (selection==9) {                                             // selection == 9
                     for (genecode=0ull,k=0;k<8;k++) {                           // decodes genes with variable length encoding
-                        if (gol[nb[k]]&0x1L) {                                  // [**gol** y]
+                        if (gol[nb[k]]&1ull) {                                  // [**gol** y]
                             if (!survivalgene && golij) {                       // [**gol** y]
                                 PATTERN4(golg[nb[k]], (s&0x7), found);          //survival?
                                 genecode |= found? 1ull << (s-1) : 0ull;
@@ -3515,7 +3498,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
     if(diagnostics & diag_component_labels) ncomponents=extract_components(newgol);
     if(diagnostics & diag_hash_genes) {
         for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
-            if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");     // [**gol**]
+            if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error %d in update at step %d, gene %llx not stored\n");     // [**gol**]
             if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");   // [**gol**]
         }
     }
@@ -3570,7 +3553,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
             s2or3 = (s>>2) ? 0ull : (s>>1);                                        // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
             gols = s2or3 ? (gol[ij] ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;      // GoL calculation next state for non-genetic gol plane
             rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1);     // if rulemod bit 1 is on then split into half planes with/without mod
-            rulemodij = (rulemod&0x4) ? (((ij>>log2N)==(N>>1)-(initfield>>1)-1 || ((ij>>log2N)==(N>>1)-(initfield>>1)-2)) && (ij & 0x1) ? 2 : 1) : (rulemod&0x1); // if rulemod bit 2 is on then do death on alternating squares on top initial square line
+            rulemodij = (rulemod&0x4) ? (((ij>>log2N)==((N>>1)-(initfield>>1)-1) || ((ij>>log2N)==((N>>1)-(initfield>>1)-2))) && (ij & 0x1) ? 2 : 1) : (rulemod&0x1); // if rulemod bit 2 is on then do death on alternating squares on top initial square line
             if (rulemodij==1) {                // NB need to put gene calculation outside that we cna do genetic propagation with GoL rulemod off
                 overwrite = overwritemask&(0x1ull<<s1);
                 overwrite = (overwrite || !gol[ij]) ? 1ull : 0ull;
@@ -3740,7 +3723,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
 
     if(diagnostics & diag_hash_genes) {
         for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
-            if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
+            if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error %d in update at step %d, gene %llx not stored\n");
             if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
         }
     }
@@ -3950,7 +3933,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
 
     if(diagnostics & diag_hash_genes) {
         for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
-            if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
+            if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error %d in update at step %d, gene %llx not stored\n");
             if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
         }
     }
@@ -4190,7 +4173,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
 
     if(diagnostics & diag_hash_genes) {
         for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
-            if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error in update, gene %llx not stored\n");
+            if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error %d in update at step %d, gene %llx not stored\n");
             if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
         }
     }
