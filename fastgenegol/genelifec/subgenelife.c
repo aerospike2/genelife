@@ -2301,11 +2301,11 @@ extern inline void compare_all_neighbors(uint64_t a[],uint64_t b[]) {  // routin
 //.......................................................................................................................................................
 extern inline void packandcompare(uint64_t newgol[],uint64_t working[],uint64_t golmix[]) {
     if (colorfunction==8) {
-        pack49neighbors(newgol,working);
+        pack49neighbors(newgol,working); // 7x7 packed newgol values in working
         if(offdx==0 && offdy==0 && offdt==0) {
-            pack49neighbors(gol,golmix);
-            compare_all_neighbors(golmix,working);  // compare all 8 directions N E S W NE SE SW NW
-        }
+            pack49neighbors(gol,golmix); // 7x7 packed gol values in golmix
+            compare_all_neighbors(golmix,working);  // compare all 8 directions N E S W NE SE SW NW; 
+        }                                           // output=golmix will contain packed numbers of 7x7 differences for all 8 directions
         else {
             if (offdt<=-maxPlane) offdt=-maxPlane;
             if(offdt>0) offdt = 0;
@@ -6265,5 +6265,29 @@ int get_genealogies_(uint64_t genealogydat[], int narraysize) {  /* return genea
     return(genealogydepth);   
 }
 
+void get_gliderinfo(uint64_t outgliderinfo[], int narraysize){               // put 7x7 pattern averaged match counts into outgliderinfo array
+    uint64_t *gitmp, gene;
+    int ij,k,d1;
+    if(narraysize!=408){
+        fprintf(stderr,"get_gliderinfo():  wrong data size (should be array of 408)\n");
+    }
+    for (ij=0; ij<N2; ij++) {
+        gene = golmix[ij];
+        for (k=0;k<8;k++) {                      // each direction: N E S W NE SE SW NW
+            gitmp = outgliderinfo + k*51;
+            d1 = (gene>>(k<<3))&0xff;                   // differences for this direction
+            if(d1==0xff)
+                gitmp[50]++;
+            else{
+                d1 = 49-d1;                             // change to matches
+                if(d1<0 || d1>49){
+                    fprintf(stderr, "get_gliderinfo:  bad match count value:  %d.", d1);
+                    return;
+                }
+                gitmp[d1]++;
+            }
+        }
+    }
+}
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------
