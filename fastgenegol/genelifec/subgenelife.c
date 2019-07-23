@@ -760,6 +760,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
 
     if(colorfunction==0) { // colorfunction based on multiplicative hash
         // see https://stackoverflow.com/questions/6943493/hash-table-with-64-bit-values-as-key/33871291
+        fprintf(stderr,"\nrulemod is %d at step %d\n\n",rulemod,totsteps);
         for (ij=0; ij<N2; ij++) {
             if (gol[ij]) {
                 gene = golg[ij];
@@ -768,10 +769,19 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 // mask = (gene * 11400714819323198549ul) >> (64 - 32);  // hash with optimal prime multiplicator down to 32 bits
                 mask = gene * 11400714819323198549ull;
                 mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
+                if(rulemod & 0x4) mask = ((((ij>>log2N)==((N>>1)-(initfield>>1))) && (ij & 0x1)) ? 0x00ffffffull : mask);
+                //if(rulemod & 0x4) mask = ((ij>>log2N)>(N>>1)) ? 0x00ffffffull : mask;
+                //if(rulemod & 0x4) mask = 0x00ffffffull;
                 mask |= 0x080808ffull; // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
                 cgolg[ij] = (int) mask;
             }
-            else cgolg[ij] = 0;
+            else {
+                if(rulemod & 0x4) mask = ((((ij>>log2N)==((N>>1)-(initfield>>1))) && (ij & 0x1)) ? 0x00ffffffull : 0ull);
+                //if(rulemod & 0x4) mask = ((ij>>log2N)>(N>>1)) ? 0x00ffffffull : 0ull;
+                //if(rulemod & 0x4) mask = 0x00ffffffull;
+                else mask = 0ull;
+                cgolg[ij] = (int) mask;
+            }
         }
     }
     else if(colorfunction<4){
@@ -1660,8 +1670,11 @@ extern inline uint64_t disambiguate(unsigned int kch, uint64_t nb1i, int nb[], u
 
     switch ((repscheme>>8)&0x7) {
         case 0:  kch += ((nsame-1)&(randnr>>32))<< (nsame ==4 ? 1 : 2);                  // random choice
-                 kch &=0x7; return( golg[*birthid += nb[(nb1i>>(kch<<2))&0x7]]);
-        case 1:  return( golg[*birthid += nb[(nb1i>>(kch<<2))&0x7]]);                    // ignore asymmetry issue, continue regardless;
+                 kch &=0x7;
+                 *birthid += nb[(nb1i>>(kch<<2))&0x7];
+                 return( golg[nb[(nb1i>>(kch<<2))&0x7]]);
+        case 1:  *birthid += nb[(nb1i>>(kch<<2))&0x7];
+                 return( golg[nb[(nb1i>>(kch<<2))&0x7]]);                                // ignore asymmetry issue, continue regardless;
         case 2:  *birth = 0; return(0ull);                                               // abandom birth attempt
         case 3:  for (newgene=~0ull,newijanc=0,k=0;k<nsame;k++) {                        // choose minimum value gene
                      kch+=k*(nsame==4 ? 2 : 4);
@@ -3557,7 +3570,8 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
             s2or3 = (s>>2) ? 0ull : (s>>1);                                        // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
             gols = s2or3 ? (gol[ij] ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;      // GoL calculation next state for non-genetic gol plane
             rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1);     // if rulemod bit 1 is on then split into half planes with/without mod
-            if (rulemodij) {                // NB need to put gene calculation outside that we cna do genetic propagation with GoL rulemod off
+            rulemodij = (rulemod&0x4) ? (((ij>>log2N)==(N>>1)-(initfield>>1)-1 || ((ij>>log2N)==(N>>1)-(initfield>>1)-2)) && (ij & 0x1) ? 2 : 1) : (rulemod&0x1); // if rulemod bit 2 is on then do death on alternating squares on top initial square line
+            if (rulemodij==1) {                // NB need to put gene calculation outside that we cna do genetic propagation with GoL rulemod off
                 overwrite = overwritemask&(0x1ull<<s1);
                 overwrite = (overwrite || !gol[ij]) ? 1ull : 0ull;
                 if (gol[ij]) survive = (smask>>sumoffs[s1])&summasks[s1] ? 1ull : 0ull;
@@ -3602,7 +3616,11 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
                     }
                 }
             }
-            else {
+            else if (rulemodij==2){                                                 // hard death on alternating site membrane at j=N/2+initfield/2
+                survive = 0ull;
+                birth = 0ull;
+            }
+            else {                                                                  // GOL rule
                 survive = s2or3;
                 birth = s2or3&s&0x1&~gol[ij];
             }
