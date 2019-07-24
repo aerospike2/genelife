@@ -490,7 +490,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 //......................................................  neighborhood processing  ......................................................................
 // pack012neighbors     pack all up to 2nd neighbours in single word
 // pack0123neighbors    pack all up to 3rd neighbours in single word
-// pack49neighbors      fast routine to pack all up to 3rd neighbours in single word : oder of bits dictated by hiearchical assembly
+// pack49neighbors      fast routine to pack all up to 1st,2nd,3rd neighbours in single word : order of bits dictated by hierarchical assembly
 // pack16neighbors      pack 4x4 blocks in single uint64_t word using 16 bits
 // unpack16neighbors    unpack 16 bit word to 4x4 block at offset in full array of labels, marking with chosen label
 // log2size             return log2 of linear size of pattern in integer power of 2 for small patterns 0-65535
@@ -2187,7 +2187,7 @@ extern inline void pack0123neighbors(uint64_t gol[],uint64_t golp[]) {          
     }
 }
 //.......................................................................................................................................................
-extern inline void pack49neighbors(uint64_t gol[],uint64_t golp[]) {              // routine to pack all up to 3rd neighbours in single word
+extern inline void pack49neighbors(uint64_t gol[],uint64_t golp[], int nbhood) {              // routine to pack all up to 3rd neighbours in single word
     unsigned int ij,k;
     int nbx[6] = {1,0,2,0,-4,-4};
     int nby[6] = {0,1,0,2,0,-4};
@@ -2195,9 +2195,14 @@ extern inline void pack49neighbors(uint64_t gol[],uint64_t golp[]) {            
     for (ij=0;ij<N2;ij++) golp[ij] = gol[ij];                                     // copy 1 bit gol to golp
     for(k=0;k<6;k++)                                                              // hierarchical bit copy and swap
         for (ij=0;ij<N2;ij++)
-             golp[ij] |= golp[deltaxy(ij,nbx[k],nby[k])]<<(1<<k);                  // 8x8 packed arrays
-    for (ij=0;ij<N2;ij++) golp[ij] = golp[ij]&0xfac8ffccfafaffffull;              // masks out 15 values in top row and left column to give 7x7 neighbourhoods
-                                                                                  // mask removes bit numbers 16,18,24,26,32,33,36,37,48,49,50,52,53,56,58
+             golp[ij] |= golp[deltaxy(ij,nbx[k],nby[k])]<<(1<<k);                 // 8x8 packed arrays
+    if(nbhood == 7)                                                               // masks out 15 values in top row and left column to give 7x7 neighbourhoods
+        for (ij=0;ij<N2;ij++) golp[ij] = golp[ij]&0xfac8ffccfafaffffull;          // mask removes bit numbers 16,18,24,26,32,33,36,37,48,49,50,52,53,56,58
+    else if (nbhood == 5)                                                         // masks in 25 values to give 5x5 neighbourhoods
+        for (ij=0;ij<N2;ij++) golp[ij] = golp[ij]&0xf0005f0030f0135full;          // mask in bit nrs 0,1,2,3,4,6,8,9,12,20,21,22,23,28,29,40,41,42,43,44,46,60,61,62,63
+    else                                                                          // masks in 9 values to give 3x3 neighbourhoods
+        for (ij=0;ij<N2;ij++) golp[ij] = golp[ij]&0x80000c0000a0000full;          // mask in bit nrs 0,1,2,3,21,23,42,43,63
+
 }
 //.......................................................................................................................................................
 extern inline short unsigned int pack16neighbors(uint64_t wgol[], int log2n) {    // routine to pack up to 4x4 subarray of binary square array wgol (nxn) into single word
@@ -2311,17 +2316,18 @@ extern inline void compare_all_neighbors(uint64_t a[],uint64_t b[]) {  // routin
 }
 //.......................................................................................................................................................
 extern inline void packandcompare(uint64_t newgol[],uint64_t working[],uint64_t golmix[]) {
+    int nbhood = 7;                                                     // 3,5 or 7 values for 3x3,5x5 or 7x7 neighborhoods
     if (colorfunction==8) {
-        pack49neighbors(newgol,working); // 7x7 packed newgol values in working
+        pack49neighbors(newgol,working,nbhood);                         // 3x3,5x5 or 7x7 packed newgol values in working
         if(offdx==0 && offdy==0 && offdt==0) {
-            pack49neighbors(gol,golmix); // 7x7 packed gol values in golmix
-            compare_all_neighbors(golmix,working);  // compare all 8 directions N E S W NE SE SW NW; 
-        }                                           // output=golmix will contain packed numbers of 7x7 differences for all 8 directions
+            pack49neighbors(gol,golmix,nbhood);                         // 3x3,5x5 or 7x7 packed gol values in golmix
+            compare_all_neighbors(golmix,working);                      // compare all 8 directions N E S W NE SE SW NW;
+        }                                                               // output=golmix will contain packed numbers of 7x7 differences for all 8 directions
         else {
             if (offdt<=-maxPlane) offdt=-maxPlane;
             if(offdt>0) offdt = 0;
-            pack49neighbors(planesg[(newPlane-offdt)%maxPlane],golmix);
-            compare_neighbors(golmix,working,offdx,offdy);                 // compare with a single direction (north) for gliders
+            pack49neighbors(planesg[(newPlane-offdt)%maxPlane],golmix,nbhood);
+            compare_neighbors(golmix,working,offdx,offdy);              // compare with a single direction (north) for gliders
         }
     }
 }
