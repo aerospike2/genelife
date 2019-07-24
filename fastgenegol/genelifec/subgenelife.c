@@ -997,6 +997,11 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 cgolg[ij] = (int) mask;
         }
         if(info_transfer_h) {                                       // display histograms of glider matching in eight directions N E S W NE SE SW NW
+            uint64_t binomial9[10] = {1, 9, 36, 84, 126, 126, 84, 36, 9, 1};;
+            uint64_t binomial25[26] = {1, 25, 300, 2300, 12650, 53130, 177100, 480700, 1081575, 2042975, 3268760, 4457400, 5200300, 5200300, 4457400, 3268760, 2042975, 1081575, 480700, 177100, 53130, 12650, 2300, 300, 25, 1};
+            uint64_t binomial49[50] = {1, 49, 1176, 18424, 211876, 1906884, 13983816, 85900584, 450978066, 2054455634, 8217822536, 29135916264, 92263734836, 262596783764, 675248872536, 1575580702584, 3348108992991, 6499270398159, 11554258485616, 18851684897584, 28277527346376, 39049918716424, 49699896548176, 58343356817424, 63205303218876, 63205303218876, 58343356817424, 49699896548176, 39049918716424, 28277527346376, 18851684897584, 11554258485616, 6499270398159, 3348108992991, 1575580702584, 675248872536, 262596783764, 92263734836, 29135916264, 8217822536, 2054455634, 450978066, 85900584, 13983816, 1906884, 211876, 18424, 1176, 49, 1};
+            
+
             get_gliderinfo(gliderinfo, 408);
             uint64_t maxval = 0ull;
             for (int i=0; i<408; i++) {
@@ -2317,18 +2322,16 @@ extern inline void compare_all_neighbors(uint64_t a[],uint64_t b[]) {  // routin
 //.......................................................................................................................................................
 extern inline void packandcompare(uint64_t newgol[],uint64_t working[],uint64_t golmix[]) {
     int nbhood = 7;                                                     // 3,5 or 7 values for 3x3,5x5 or 7x7 neighborhoods
-    if (colorfunction==8) {
-        pack49neighbors(newgol,working,nbhood);                         // 3x3,5x5 or 7x7 packed newgol values in working
-        if(offdx==0 && offdy==0 && offdt==0) {
-            pack49neighbors(gol,golmix,nbhood);                         // 3x3,5x5 or 7x7 packed gol values in golmix
-            compare_all_neighbors(golmix,working);                      // compare all 8 directions N E S W NE SE SW NW;
-        }                                                               // output=golmix will contain packed numbers of 7x7 differences for all 8 directions
-        else {
-            if (offdt<=-maxPlane) offdt=-maxPlane;
-            if(offdt>0) offdt = 0;
-            pack49neighbors(planesg[(newPlane-offdt)%maxPlane],golmix,nbhood);
-            compare_neighbors(golmix,working,offdx,offdy);              // compare with a single direction (north) for gliders
-        }
+    pack49neighbors(newgol,working,nbhood);                         // 3x3,5x5 or 7x7 packed newgol values in working
+    if(offdx==0 && offdy==0 && offdt==0) {
+        pack49neighbors(gol,golmix,nbhood);                         // 3x3,5x5 or 7x7 packed gol values in golmix
+        compare_all_neighbors(golmix,working);                      // compare all 8 directions N E S W NE SE SW NW;
+    }                                                               // output=golmix will contain packed numbers of 7x7 differences for all 8 directions
+    else {
+        if (offdt<=-maxPlane) offdt=-maxPlane;
+        if(offdt>0) offdt = 0;
+        pack49neighbors(planesg[(newPlane-offdt)%maxPlane],golmix,nbhood);
+        compare_neighbors(golmix,working,offdx,offdy);              // compare with a single direction (north) for gliders
     }
 }
 //----------------------------------------------------------- connected component labelling -------------------------------------------------------------
@@ -6284,24 +6287,25 @@ int get_genealogies_(uint64_t genealogydat[], int narraysize) {  /* return genea
 
 void get_gliderinfo(uint64_t outgliderinfo[], int narraysize){               // put 7x7 pattern averaged match counts into outgliderinfo array
     uint64_t *gitmp, gene;
-    int ij,k;
+    int ij,k,nbhood;
     unsigned int d1;
-    if(narraysize!=408){
-        fprintf(stderr,"get_gliderinfo():  wrong data size (should be array of 408)\n");
+    if(narraysize!=51*8 && narraysize!=27*8 && narraysize!=11*8){
+        fprintf(stderr,"get_gliderinfo():  wrong data size (should be array of 8*11,8*27 or 8*51)\n");
     }
+    nbhood=narraysize>>3;                               // divide by eight
     for (ij=0; ij<N2; ij++) {
         gene = golmix[ij];
         for (k=0;k<8;k++) {                             // each direction: N E S W NE SE SW NW
-            gitmp = outgliderinfo + k*51;
+            gitmp = outgliderinfo + k*nbhood;
             d1 = (int) ((gene>>(k<<3))&0xffull);        // differences for this direction
             if(d1==0xff)
-                gitmp[50]++;
+                gitmp[nbhood-1]++;
             else{
-                if(d1<0 || d1>49){
+                if(d1<0 || d1>nbhood-2){
                     fprintf(stderr, "get_gliderinfo:  bad difference count value:  %d.", d1);
                     return;
                 }
-                d1 = 49-d1;                             // change to matches
+                d1 = nbhood-2-d1;                             // change to matches
                 gitmp[d1]++;
             }
         }
