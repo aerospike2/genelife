@@ -222,7 +222,8 @@ int noveltyfilter = 0;              // novelty filter for colorfunction 9 : if o
 int activity_size_colormode = 0;    // color by size for colorfunction 10 : if on (key "p")  1 log2 enclosing square size 2 use #pixels 3 use sqrt(#pixels)
 int xdisplay,ydisplay = -1;         // display x and y coordinates selected by mouse in python
 int shist[9];                       // histogram of counts for s (nr of neighbor 1s) values over the entire lattice
-int info_transfer_h = 0;            // whether to display histogram on glider information transfer counts (non zero) 
+int info_transfer_h = 0;            // whether to display histogram on glider information transfer counts (non zero)
+int it_nbhood = 7;                  // size of neighborhood for collecting glider characterization histogram : default 7x7 nbhood
 uint64_t gliderinfo[408];           // histogram of counts for glider detection by match quality in eight directions N E S W NE SE SW NW
 //------------------------------------------------ arrays for time tracing, activity and genealogies ----------------------------------------------------
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
@@ -973,13 +974,15 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
         }
     }
     else if(colorfunction==8) {         // colorfunction based on packed bit pattern with multiplicative hash, compare with offset
+        int it_nbhood2;
+        it_nbhood2 = it_nbhood*it_nbhood+2;
         for (ij=0; ij<N2; ij++) {
                 gene = golmix[ij];
                 if(offdx==0 && offdy==0 && offdt==0) {
                     for (mask=0,k=0;k<8;k++) {
-                        d1 = (gene>>(k<<3))&0xff;
-                        d1 = (d1 > 63) ? 0 : (63-d1);
-                        d1 = (d1 < 48) ? 0 : d1-48;                 // 0 to 15 : perfect match is 15  (4 bits)
+                        d1 = (gene>>(k<<3))&0xff;                   // no of mismatches : 0:0 black space perfect match is coded as 0xff=255
+                        d1 = (d1 >= it_nbhood2-1) ? 0 : (it_nbhood2-1-d1);               // no of matches : 0:0 match set to 0 (no match) here
+                        d1 = (d1 < it_nbhood2-1-15) ? 0 : d1-(it_nbhood2-1-15);          // 0 to 15 : perfect match is 15  (4 bits)
                         d1 = (d1==0xf) ? 0x1f : d1;                 // perfect match separated to value 31 (5 bits) for better contrast
                         if(k<3) mask+=d1<<(3+(k<<3));               // perfect match has full intensity colour
                         else if (k==3 && d1==0x1f) mask = (d1<<3)+(d1<<11)+(d1<<19); // the fourth channel has white colour : no others shown
@@ -989,7 +992,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                     mask = (mask<<8)+0xff;
                 }
                 else {
-                   POPCOUNT64C(gene,d);                             // assigns number of ones in gene to d. These 3 lines version for one offset comparison
+                    POPCOUNT64C(gene,d);                            // assigns number of ones in gene to d. This 3 line version for one offset comparison
                     d=(d==64)?0:63-d;
                     mask = (d==63) ? 0xffffffff : ((((d&3)<<22)+(((d>>2)&3)<<14)+(((d>>4)&3)<<6))<<8) + 0xff;
                 }
@@ -997,21 +1000,50 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 cgolg[ij] = (int) mask;
         }
         if(info_transfer_h) {                                       // display histograms of glider matching in eight directions N E S W NE SE SW NW
-            uint64_t binomial9[10] = {1, 9, 36, 84, 126, 126, 84, 36, 9, 1};;
-            uint64_t binomial25[26] = {1, 25, 300, 2300, 12650, 53130, 177100, 480700, 1081575, 2042975, 3268760, 4457400, 5200300, 5200300, 4457400, 3268760, 2042975, 1081575, 480700, 177100, 53130, 12650, 2300, 300, 25, 1};
-            uint64_t binomial49[50] = {1, 49, 1176, 18424, 211876, 1906884, 13983816, 85900584, 450978066, 2054455634, 8217822536, 29135916264, 92263734836, 262596783764, 675248872536, 1575580702584, 3348108992991, 6499270398159, 11554258485616, 18851684897584, 28277527346376, 39049918716424, 49699896548176, 58343356817424, 63205303218876, 63205303218876, 58343356817424, 49699896548176, 39049918716424, 28277527346376, 18851684897584, 11554258485616, 6499270398159, 3348108992991, 1575580702584, 675248872536, 262596783764, 92263734836, 29135916264, 8217822536, 2054455634, 450978066, 85900584, 13983816, 1906884, 211876, 18424, 1176, 49, 1};
             
+            uint64_t *binomialp;
+            uint64_t binomial9[11] = {1, 9, 36, 84, 126, 126, 84, 36, 9, 1, 1};
+            uint64_t binomial25[27] = {1, 25, 300, 2300, 12650, 53130, 177100, 480700, 1081575, 2042975, 3268760, 4457400, 5200300, 5200300, 4457400, 3268760, 2042975, 1081575, 480700, 177100, 53130, 12650, 2300, 300, 25, 1, 1};
+            uint64_t binomial49[51] = {1, 49, 1176, 18424, 211876, 1906884, 13983816, 85900584, 450978066, 2054455634, 8217822536, 29135916264, 92263734836, 262596783764, 675248872536, 1575580702584, 3348108992991, 6499270398159, 11554258485616, 18851684897584, 28277527346376, 39049918716424, 49699896548176, 58343356817424, 63205303218876, 63205303218876, 58343356817424, 49699896548176, 39049918716424, 28277527346376, 18851684897584, 11554258485616, 6499270398159, 3348108992991, 1575580702584, 675248872536, 262596783764, 92263734836, 29135916264, 8217822536, 2054455634, 450978066, 85900584, 13983816, 1906884, 211876, 18424, 1176, 49, 1, 1};
+            double ratiomax=0.,ratio;
 
-            get_gliderinfo(gliderinfo, 408);
-            uint64_t maxval = 0ull;
-            for (int i=0; i<408; i++) {
-                if(i%51==50) gliderinfo[i]=0;
-                maxval = (gliderinfo[i]>maxval) ? gliderinfo[i] : maxval;
+            if(it_nbhood == 3) {
+                binomialp = binomial9;
             }
+            else if (it_nbhood == 5) {
+                binomialp=binomial25;
+            }
+            else {
+                binomialp=binomial49;
+            }
+
+            get_gliderinfo(gliderinfo, it_nbhood2*8);
+
+            for (int i=0; i<it_nbhood2*8; i++) {
+                if((i%it_nbhood2) == it_nbhood2-1) {
+                    gliderinfo[i]=0;
+                    ratio = 0.;
+                }
+                else ratio = (double) gliderinfo[i] / (double) binomialp[i%it_nbhood2];
+                if(ratio > ratiomax) {
+                    ratiomax = ratio;
+                }
+            }
+            
+            // fprintf(stderr,"ratiomax %g\n",ratiomax);
+            
             for (ij=N2>>1;ij<N2;ij++) cgolg[ij] = 0;
-            for (int i=0; i<408; i++)
-                for (int jmax,j=jmax=0;j<gliderinfo[i]*(N>>1)/maxval;j++)
-                    cgolg[((N-j)<<log2N)+i] = 0xff1f1fff;
+            for (int i=0; i<it_nbhood2*8; i++) {
+                ratio = (double) gliderinfo[i] / (double) binomialp[i%it_nbhood2];
+                if((i%it_nbhood2) == it_nbhood2-1) {
+                    for (int j=0;j< (N>>1);j++)
+                        cgolg[((N-j)<<log2N)+i] = 0x7f7f7fff;
+                }
+                else {
+                    for (int j=0;  j< (int) ((ratio*(double)(N>>1))/ratiomax)  ;j++)
+                        cgolg[((N-j)<<log2N)+i] = 0xff00ff + (((i*0x1f/it_nbhood2))<<24)-(((i*0x1f/it_nbhood2))<<16);
+                }
+            }
             
         }
     }
@@ -2310,24 +2342,22 @@ extern inline void compare_all_neighbors(uint64_t a[],uint64_t b[]) {  // routin
         for (a[ij]=0ull,k=0;k<8;k++) {
             bijk=b[deltaxy(ijs,nbx[k],nby[k])];
             POPCOUNT64C((aij^bijk),d);
-            d = (aij&&bijk) ? d : 0x3f;
-            // if((k==2)&&((ij>>log2N) == (N>>1)) && ((ij&Nmask)<64)) fprintf(stderr,"difference d=%d at i=%d for aij %llx bijk %llx\n",d,ij&Nmask,aij,bijk);
+            d = (aij&&bijk) ? d : 0xff;
             a[ij]|=((uint64_t) d)<<(k<<3);
         }
     }
 }
 //.......................................................................................................................................................
 extern inline void packandcompare(uint64_t newgol[],uint64_t working[],uint64_t golmix[]) {
-    int nbhood = 7;                                                     // 3,5 or 7 values for 3x3,5x5 or 7x7 neighborhoods
-    pack49neighbors(newgol,working,nbhood);                         // 3x3,5x5 or 7x7 packed newgol values in working
+    pack49neighbors(newgol,working,it_nbhood);                      // 3x3,5x5 or 7x7 packed newgol values in working
     if(offdx==0 && offdy==0 && offdt==0) {
-        pack49neighbors(gol,golmix,nbhood);                         // 3x3,5x5 or 7x7 packed gol values in golmix
+        pack49neighbors(gol,golmix,it_nbhood);                      // 3x3,5x5 or 7x7 packed gol values in golmix
         compare_all_neighbors(golmix,working);                      // compare all 8 directions N E S W NE SE SW NW;
     }                                                               // output=golmix will contain packed numbers of 7x7 differences for all 8 directions
     else {
         if (offdt<=-maxPlane) offdt=-maxPlane;
         if(offdt>0) offdt = 0;
-        pack49neighbors(planesg[(newPlane-offdt)%maxPlane],golmix,nbhood);
+        pack49neighbors(planesg[(newPlane-offdt)%maxPlane],golmix,it_nbhood);
         compare_neighbors(golmix,working,offdx,offdy);              // compare with a single direction (north) for gliders
     }
 }
@@ -4814,8 +4844,11 @@ void set_stash(){               // stash current gol,golg
     }
 }
 //.......................................................................................................................................................
-void set_info_transfer_h(int info_transfer_h_in) {
-    info_transfer_h = info_transfer_h_in;
+void set_info_transfer_h(int do_info_transfer, int nbhood) {
+    info_transfer_h = do_info_transfer;
+    if(nbhood == 3 || nbhood == 5 || nbhood == 7)
+        it_nbhood = nbhood;
+    else fprintf(stderr,"error in nbhood value %d, allowed values are 3,5,7\n",nbhood);
 }
 //------------------------------------------------------------------- get ... ---------------------------------------------------------------------------
 void  get_shist(int outshist[]){
@@ -6284,18 +6317,22 @@ int get_genealogies_(uint64_t genealogydat[], int narraysize) {  /* return genea
 
 void get_gliderinfo(uint64_t outgliderinfo[], int narraysize){               // put 7x7 pattern averaged match counts into outgliderinfo array
     uint64_t *gitmp, gene;
-    int ij,k,nbhood;
+    int ij,k,nbhood,sum=0;
     unsigned int d1;
     if(narraysize!=51*8 && narraysize!=27*8 && narraysize!=11*8){
         fprintf(stderr,"get_gliderinfo():  wrong data size (should be array of 8*11,8*27 or 8*51)\n");
     }
-    nbhood=narraysize>>3;                               // divide by eight
+    nbhood=narraysize>>3;                                     // divide by eight
+    if (nbhood != it_nbhood*it_nbhood+2) {
+        fprintf(stderr,"error: mismatch between C value of it_nbhood %d and python expectation %d\n",it_nbhood,nbhood);
+        return;
+    }
     for (ij=0; ij<N2; ij++) {
         gene = golmix[ij];
-        for (k=0;k<8;k++) {                             // each direction: N E S W NE SE SW NW
+        for (k=0;k<8;k++) {                                   // each direction: N E S W NE SE SW NW
             gitmp = outgliderinfo + k*nbhood;
-            d1 = (int) ((gene>>(k<<3))&0xffull);        // differences for this direction
-            if(d1==0x3f)
+            d1 = (int) ((gene>>(k<<3))&0xffull);              // differences for this direction
+            if(d1==0xff)
                 gitmp[nbhood-1]++;
             else{
                 if(d1<0 || d1>nbhood-2){
@@ -6307,6 +6344,8 @@ void get_gliderinfo(uint64_t outgliderinfo[], int narraysize){               // 
             }
         }
     }
+    for(d1=0;d1<narraysize;d1++) sum += gitmp[d1];
+    // fprintf(stderr,"in get_gliderinfo sum is %d\n",sum);
 }
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------

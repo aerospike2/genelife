@@ -1126,8 +1126,12 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                         else:
                             print('step',framenr,'new ancestor choice first')
                 elif keystatus[sdl2.SDL_SCANCODE_I]:
-                    info_transfer_h = 1-info_transfer_h;
-                    genelife.set_info_transfer_h(info_transfer_h)
+                    nbhoods=[7,3,5,7]
+                    info_transfer_h = info_transfer_h + 1;
+                    if (info_transfer_h == 4):  info_transfer_h = 0;
+                    if (info_transfer_h != 0): do_info_transfer = 1;
+                    else: do_info_transfer = 0;
+                    genelife.set_info_transfer_h(do_info_transfer,nbhoods[info_transfer_h])
                     print('step',framenr,'info_transfer_h =',info_transfer_h)
                 elif keystatus[sdl2.SDL_SCANCODE_N]:
                     noveltyfilter=1-noveltyfilter
