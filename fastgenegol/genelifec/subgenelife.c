@@ -221,9 +221,9 @@ int activitymax;                    // max of activity in genealogical record of
 int noveltyfilter = 0;              // novelty filter for colorfunction 9 : if on (key "n"), darkens non-novel components (activity>1) in display
 int activity_size_colormode = 0;    // color by size for colorfunction 10 : if on (key "p")  1 log2 enclosing square size 2 use #pixels 3 use sqrt(#pixels)
 int xdisplay,ydisplay = -1;         // display x and y coordinates selected by mouse in python
-int shist[9];
-int info_transfer_h = 0;            // whether to display histogram on glider information transfer counts
-uint64_t gliderinfo[408];             // histogram of counts for glider detection by match quality in eight directions N E S W NE SE SW NW
+int shist[9];                       // histogram of counts for s (nr of neighbor 1s) values over the entire lattice
+int info_transfer_h = 0;            // whether to display histogram on glider information transfer counts (non zero) 
+uint64_t gliderinfo[408];           // histogram of counts for glider detection by match quality in eight directions N E S W NE SE SW NW
 //------------------------------------------------ arrays for time tracing, activity and genealogies ----------------------------------------------------
 const int startarraysize = 1024;    // starting array size (used when initializing second run)
 int arraysize = startarraysize;     // size of trace array (grows dynamically)
@@ -2310,13 +2310,10 @@ extern inline void compare_all_neighbors(uint64_t a[],uint64_t b[]) {  // routin
         for (a[ij]=0ull,k=0;k<8;k++) {
             bijk=b[deltaxy(ijs,nbx[k],nby[k])];
             POPCOUNT64C((aij^bijk),d);
-            // POPCOUNT64C(aij,d);
-            d = (aij&&bijk) ? d : 0xff;
-            if((k==2)&&((ij>>log2N) == (N>>1)) && ((ij&Nmask)<64)) fprintf(stderr,"difference d=%d at i=%d for aij %llx bijk %llx\n",d,ij&Nmask,aij,bijk);
+            d = (aij&&bijk) ? d : 0x3f;
+            // if((k==2)&&((ij>>log2N) == (N>>1)) && ((ij&Nmask)<64)) fprintf(stderr,"difference d=%d at i=%d for aij %llx bijk %llx\n",d,ij&Nmask,aij,bijk);
             a[ij]|=((uint64_t) d)<<(k<<3);
         }
-        // if(d>8 && d<64) fprintf(stderr,"difference %d is greater than 8 at ij %d\n",d,ij);
-    
     }
 }
 //.......................................................................................................................................................
@@ -6298,7 +6295,7 @@ void get_gliderinfo(uint64_t outgliderinfo[], int narraysize){               // 
         for (k=0;k<8;k++) {                             // each direction: N E S W NE SE SW NW
             gitmp = outgliderinfo + k*nbhood;
             d1 = (int) ((gene>>(k<<3))&0xffull);        // differences for this direction
-            if(d1==0xff)
+            if(d1==0x3f)
                 gitmp[nbhood-1]++;
             else{
                 if(d1<0 || d1>nbhood-2){
