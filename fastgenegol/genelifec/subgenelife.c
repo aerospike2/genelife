@@ -220,7 +220,7 @@ int ymax = 2000;                    // gene activity scale max for plotting : wi
 int ymaxq = 2000;                   // quad pattern activity scale max for plotting : will be adjusted dynamically or by keys
 // double log2ymax = 25.0;          // activity scale max 2^25 = 33.5 * 10^6 : suffers from discrete steps at bottom, not used
 int activitymax;                    // max of activity in genealogical record of current population
-int activityfnlut = 1;              // whether to lump activities of genes which have the same sequence at functionally masked in active positions of LUT
+int activityfnlut = 0;              // whether to lump activities of genes which have the same sequence at functionally masked in active positions of LUT
 int noveltyfilter = 0;              // novelty filter for colorfunction 9 : if on (key "n"), darkens non-novel components (activity>1) in display
 int activity_size_colormode = 0;    // color by size for colorfunction 10 : if on (key "p")  1 log2 enclosing square size 2 use #pixels 3 use sqrt(#pixels)
 int xdisplay,ydisplay = -1;         // display x and y coordinates selected by mouse in python
@@ -5659,7 +5659,7 @@ int activitieshash() {  /* count activities of all currently active gene species
     memset(activities,0,sizeof(int)*nspeciesnow);
     
     if(activityfnlut) {
-        memset(genefnindices,0,sizeof(unsigned int)*2^24);
+        memset(genefnindices,0,sizeof(int)*2^24);
         genes = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
         for (i=0,jmax=1; i<nspeciesnow; i++) {
             k=genefnindex( genotypes[gindices[i]], sbmask, indexoff);
@@ -5701,7 +5701,6 @@ int activitieshash() {  /* count activities of all currently active gene species
     // if (ymax1>ymax) ymax = ymax*2;                               // autoscale of activities
     // if (ymax1<ymax/2) ymax = ymax/2;                             // autoscale of activities
     for(j=0;j<nspeciesnow;j++) {
-
         gene = genes[j];
         ij = (x&Nmask)+activities[j]*N;
         if(acttrace[ij]==rootgene)                                  // only one genotype to plot
