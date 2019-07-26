@@ -96,6 +96,7 @@ noveltyfilter = 0
 activity_size_colormode = 0
 ancestortype = 0
 info_transfer_h = 0
+activityfnlut = 0
                                          # parameter initialization
 runparams = np.zeros(9,np.int32)         # 9 parameters passed to C
 simparams = np.zeros(6,np.int32)         # 6 parameters passed to C
@@ -723,7 +724,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
     global savecnt
     global cancol
     global Height,Width
-    global randominflux,vscrolling,noveltyfilter,activity_size_colormode,info_transfer_h
+    global randominflux,vscrolling,noveltyfilter,activity_size_colormode,info_transfer_h,activityfnlut
     global gogo,pause,mouseclicked,mouseclicked2,pixeldat,paramdat
     global maxPlane,offdx,offdy,offdt,quadrants,displayoneplane
     global parhelp
@@ -1133,6 +1134,10 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                     else: do_info_transfer = 0;
                     genelife.set_info_transfer_h(do_info_transfer,nbhoods[info_transfer_h])
                     print('step',framenr,'info_transfer_h =',info_transfer_h)
+                elif keystatus[sdl2.SDL_SCANCODE_L]:
+                    activityfnlut = 1 - activityfnlut
+                    genelife.set_activityfnlut(activityfnlut)
+                    print('step',framenr,'activityfnlut =',activityfnlut)
                 elif keystatus[sdl2.SDL_SCANCODE_N]:
                     noveltyfilter=1-noveltyfilter
                     print('step',framenr,"noveltyfilter changed to ",noveltyfilter)
@@ -1360,6 +1365,7 @@ def parhelp():
     print("h           ","print this help")
     print("H           ","toggle horizon mode on or off: upper half of array obeys unmodified GoL rule")
     print("i           ","toggle display and calculation of info_transfer_histogram on/off")
+    print("l           ","toggle activity of aggregate functional genes activityfnlut on/off")
     print("n           ","toggle novelty filter on/off for connected component color function 9")
     print("p           ","rotate activity_size_colormode 0,1,2,3 for (no,log2n,pixels,sqrt(pixels)) size display of activities in color function 10")
     print("q,Q         ","incr or decr quadrant parameter choice : -1 = no quadrants, 0-4 are first 5 bit pairs of repscheme, 5,6 surv and overwrite")

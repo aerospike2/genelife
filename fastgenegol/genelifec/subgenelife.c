@@ -75,6 +75,7 @@ int colorfunction = 0;              // color function choice of 0: hash or 1: fu
                                     // 2: as in 1 but color sites where last step was non GoL rule yellow, 3: as in 2 but yellow if state produced by non GoL
                                     // 4: activities 5: populations 6: genealogies without time 7: genealogies with time brightness by activity 8: gliders
                                     // 9: connected components 10 : connected component activities 11: genealogy based individual colors
+int colorfunction2 = -1;            // colorfunction for second window: as above, but -1 means same value as colorfunction
 int ancestortype = 0;      // whether to display and return genealogies via first or most recent ancestor
 #define ASCII_ESC 27                // escape for printing terminal commands, such as cursor repositioning : only used in non-graphic version
 //-----------------------------------------masks for named repscheme bits (selection 0-7) ----------------------------------------------------------------
@@ -146,6 +147,7 @@ genedata ginitdata = {1,0,0,0,-1,0,0,0,0ull,rootgene,rootgene};  // initializati
 genedata *genedataptr;              // pointer to a genedata instance
 HASHTABLE_SIZE_T const* genotypes;  // pointer to stored hash table keys (which are the genotypes)
 genedata* geneitems;                // list of genedata structured items stored in hash table
+int genefnindices[2^24];            // table of activities for functional gene indices calculated by genefnindex
 //.......................................................................................................................................................
 hashtable_t quadtable;              // hash table for quad tree
 typedef struct quadnode {           // stored quadtree binary pattern nodes for population over time (currently only for analysis not computation)
@@ -218,6 +220,7 @@ int ymax = 2000;                    // gene activity scale max for plotting : wi
 int ymaxq = 2000;                   // quad pattern activity scale max for plotting : will be adjusted dynamically or by keys
 // double log2ymax = 25.0;          // activity scale max 2^25 = 33.5 * 10^6 : suffers from discrete steps at bottom, not used
 int activitymax;                    // max of activity in genealogical record of current population
+int activityfnlut = 1;              // whether to lump activities of genes which have the same sequence at functionally masked in active positions of LUT
 int noveltyfilter = 0;              // novelty filter for colorfunction 9 : if on (key "n"), darkens non-novel components (activity>1) in display
 int activity_size_colormode = 0;    // color by size for colorfunction 10 : if on (key "p")  1 log2 enclosing square size 2 use #pixels 3 use sqrt(#pixels)
 int xdisplay,ydisplay = -1;         // display x and y coordinates selected by mouse in python
@@ -544,6 +547,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // set_ancestortype set ancestortype for display and return of first (0) or most recent (1) ancestors in genealogies
 // set_stash            stash current gol,golg in stashgol, stshgolg
 // set_info_transfer_h  set information transfer histogram display value (0,1) from python
+// set_activityfnlut    set collection of functional activity statistics corresponding to functional aggregate of genes by non-neutral bits
 //..........................................................  get to python driver  .....................................................................
 // get_stash            retrieve current gol,golg from stashed values
 // get_log2N            get the current log2N value from C to python
@@ -586,6 +590,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // countspecies         count different genes with genes specified at current time point
 // countspecieshash     count different genes in current population from record of all species that have existed
 // totalpoptrace        calculates and returns current population size and store in scrolling population trace array npopulation
+// genefnindex          calculate index based on bits masked in from survival and birth masks only
 // activitieshash       calculate array of current gene activities and update acttrace array of genes in activity plot format
 // activitieshashquad   calculate array of current quad activities and update acttraceq array of patterns in activity plot format
 // genealogies          calculate and display genealogies
@@ -2228,6 +2233,14 @@ extern inline void pack49neighbors(uint64_t gol[],uint64_t golp[], int nbhood) {
     unsigned int ij,k;
     int nbx[6] = {1,0,2,0,-4,-4};
     int nby[6] = {0,1,0,2,0,-4};
+    /* 48 49 52 53 32 33 36 37                                                   // indexing order of bits in packed 64-bit word for neighborhoods around 0 bit
+       50 51 54 55 34 35 38 39                                                   // unused bits are masked out after six step recursive packing
+       56 57 60 61 40 41 44 45
+       58 59 62 63 42 43 46 47
+       16 17 20 21  0  1  4  5
+       18 19 22 23  2  3  6  7
+       24 25 28 29  8  9 12 13
+       26 27 30 31 10 11 14 15 */
 
     for (ij=0;ij<N2;ij++) golp[ij] = gol[ij];                                     // copy 1 bit gol to golp
     for(k=0;k<6;k++)                                                              // hierarchical bit copy and swap
@@ -4850,6 +4863,10 @@ void set_info_transfer_h(int do_info_transfer, int nbhood) {
         it_nbhood = nbhood;
     else fprintf(stderr,"error in nbhood value %d, allowed values are 3,5,7\n",nbhood);
 }
+//.......................................................................................................................................................
+void set_activityfnlut(int activityfnlutin) {
+    activityfnlut = activityfnlutin;
+}
 //------------------------------------------------------------------- get ... ---------------------------------------------------------------------------
 void  get_shist(int outshist[]){
     int i;
@@ -5583,13 +5600,37 @@ int totalpoptrace(uint64_t gol[]) {   /* calculates and returns current populati
 }
 
 //------------------------------------------------------------ activitieshash ---------------------------------------------------------------------------
+unsigned int genefnindex( uint64_t gene, uint64_t mask, int indexoff[]) {
+    int j,k,d;
+    uint64_t g,gf;
+    uint64_t indexmask = 0xffffff;
+    POPCOUNT64C(mask, d)
+    if (d > 24) d=24;                                           // max of first 24 of active lut sites in mask allowed into genefnactivities array
+    g = gene&mask;
+    gf = 0ull;
+    for (j=k=0;k<64;k++) {
+        gf |= (g&mask&0x1ull);
+        gf <<= mask&0x1;
+        g >>= 1; mask >>= 1;
+    }
+    gf &= indexmask;
+    return((unsigned int) gf);
+}
+//.......................................................................................................................................................
 int activitieshash() {  /* count activities of all currently active gene species */
-    int i, j, ij, ij1, x, nchist, nrhist, nspecies, nspeciesnow, cnt0, cnt1;
+    int i, j, jmax, k, ij, ij1, x, nchist, nrhist, nspecies, nspeciesnow, cnt0, cnt1;
     int *gindices,*popln,*activities;
     double act,pop;
     uint64_t *genes, *traceptr;
-    uint64_t gene;
+    uint64_t gene,sbmask;
     const int maxact = 10000;
+    int indexoff[24];
+    
+    sbmask = (((uint64_t) birthmask) << 32) | (uint64_t) survivalmask;
+    for (j=k=0;k<64;k++) {
+        if (j>=24) break;
+        if (sbmask&0x1ull) indexoff[j++]=k;
+    }
 
     nspecies = hashtable_count(&genetable);
     genotypes = hashtable_keys(&genetable);
@@ -5609,19 +5650,37 @@ int activitieshash() {  /* count activities of all currently active gene species
         //gindices[j]=(geneitems[i].popcount) ? i : gindices[j--];   // if col is 0 then the array gindices must be passed with sufficient length
         //j++;
     }
-    if (nspeciesnow > maxact) {                                      //sort with in order of decreasing population
-        qsort(gindices, nspeciesnow, sizeof(int), cmpfunc3);         // sort in decreasing count order
-    }
-    if (nspeciesnow > maxact) nspeciesnow = maxact;
-
+    
     genes = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
     popln = (int *) malloc(nspeciesnow*sizeof(int));
     activities = (int *) malloc(nspeciesnow*sizeof(int));
-
-    for (i=0; i<nspeciesnow; i++) {
-        genes[i]=genotypes[gindices[i]];
-        popln[i]=geneitems[gindices[i]].popcount;
-        activities[i]=geneitems[gindices[i]].activity;
+    memset(genes,0,sizeof(uint64_t)*nspeciesnow);
+    memset(popln,0,sizeof(int)*nspeciesnow);
+    memset(activities,0,sizeof(int)*nspeciesnow);
+    
+    if(activityfnlut) {
+        memset(genefnindices,0,sizeof(unsigned int)*2^24);
+        genes = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
+        for (i=0,jmax=1; i<nspeciesnow; i++) {
+            k=genefnindex( genotypes[gindices[i]], sbmask, indexoff);
+            j=genefnindices[k];
+            if(!j) j=genefnindices[k]=jmax++;
+            genes[j-1]=genotypes[gindices[i]]&sbmask;
+            popln[j-1]+=geneitems[gindices[i]].popcount;
+            activities[j-1]+=geneitems[gindices[i]].activity;
+        }
+        nspeciesnow = jmax-1;
+    }
+    else {
+        if (nspeciesnow > maxact) {                                      //sort in order of decreasing population
+            qsort(gindices, nspeciesnow, sizeof(int), cmpfunc3);         // sort in decreasing count order
+        }
+        if (nspeciesnow > maxact) nspeciesnow = maxact;
+        for (i=0; i<nspeciesnow; i++) {
+            genes[i]=genotypes[gindices[i]];
+            popln[i]=geneitems[gindices[i]].popcount;
+            activities[i]=geneitems[gindices[i]].activity;
+        }
     }
 
     if (totdisp>=N) {                                               // 1 pixel to left scroll when full
@@ -5642,38 +5701,53 @@ int activitieshash() {  /* count activities of all currently active gene species
     // if (ymax1>ymax) ymax = ymax*2;                               // autoscale of activities
     // if (ymax1<ymax/2) ymax = ymax/2;                             // autoscale of activities
     for(j=0;j<nspeciesnow;j++) {
-        // activities[j] = N-1 - (activities[j] * (N-1)) / ymax;    // linear scale, needs truncation if ymax superceded
-        act = (double) activities[j];
-        pop = (double) popln[j];
-        // activities[j] = (N-1) - (int) ((N-1)*log2(act)/log2ymax);// logarithmic scale, suffers from discrete steps at bottom
-        activities[j] = (N-1) - (int) ((N-1)*act/(act+(double)ymax));
-        popln[j] = (N-1) - (int) ((N-1)*pop/(pop+(double)ymax/10.));
+
         gene = genes[j];
-        
         ij = (x&Nmask)+activities[j]*N;
         if(acttrace[ij]==rootgene)                                  // only one genotype to plot
             acttrace[ij] = gene;
         else {                                                      // plot species color with largest current population size if choice of multiple
-            if((genedataptr = (genedata *) hashtable_find(&genetable, acttrace[ij])) != NULL)
-               cnt0 = genedataptr->popcount;
-            else cnt0 = 0;
-            if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL)
-               cnt1 = genedataptr->popcount;
-            else cnt1 = 0;
-            if(cnt1 >= cnt0) acttrace[ij]=gene;
+            if(activityfnlut) {
+                if((k=genefnindices[genefnindex( acttrace[ij], sbmask, indexoff)])) cnt0 = popln[k-1];
+                else cnt0 = 0;
+                cnt1 = popln[j];
+                if(cnt1 >= cnt0) acttrace[ij]=gene;
+            }
+            else {
+                if((genedataptr = (genedata *) hashtable_find(&genetable, acttrace[ij])) != NULL) cnt0 = genedataptr->popcount;
+                else cnt0 = 0;
+                if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) cnt1 = genedataptr->popcount;
+                else cnt1 = 0;
+                if(cnt1 >= cnt0) acttrace[ij]=gene;
+            }
         }
+                                                                    // rescale populations and activities with saturation
+        act = (double) activities[j];
+        pop = (double) popln[j];
+        // activities[j] = N-1 - (activities[j] * (N-1)) / ymax;    // linear scale, needs truncation if ymax superceded
+        // activities[j] = (N-1) - (int) ((N-1)*log2(act)/log2ymax);// logarithmic scale, suffers from discrete steps at bottom
+        activities[j] = (N-1) - (int) ((N-1)*act/(act+(double)ymax));
+        popln[j] = (N-1) - (int) ((N-1)*pop/(pop+(double)ymax/10.));
         
         ij = (x&Nmask)+popln[j]*N;
         if(poptrace[ij]==rootgene)                                  // only one genotype to plot
             poptrace[ij] = gene;
         else {                                                      // plot species color with largest current activity if choice of multiple
-            if((genedataptr = (genedata *) hashtable_find(&genetable, poptrace[ij])) != NULL)
-               cnt0 = genedataptr->activity;
-            else cnt0 = 0;
-            if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL)
-               cnt1 = genedataptr->activity;
-            else cnt1 = 0;
-            if(cnt1 >= cnt0) poptrace[ij]=gene;
+            if(activityfnlut) {
+                if((k=genefnindices[genefnindex( acttrace[ij], sbmask, indexoff)])) cnt0 = activities[k-1];
+                else cnt0 = 0;
+                cnt1 = activities[j];
+                if(cnt1 >= cnt0) acttrace[ij]=gene;
+            }
+            else {
+                if((genedataptr = (genedata *) hashtable_find(&genetable, poptrace[ij])) != NULL)
+                   cnt0 = genedataptr->activity;
+                else cnt0 = 0;
+                if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL)
+                   cnt1 = genedataptr->activity;
+                else cnt1 = 0;
+                if(cnt1 >= cnt0) poptrace[ij]=gene;
+            }
         }
     }
     if(totdisp<N*nNhist) {
@@ -6327,6 +6401,7 @@ void get_gliderinfo(uint64_t outgliderinfo[], int narraysize){               // 
         fprintf(stderr,"error: mismatch between C value of it_nbhood %d and python expectation %d\n",it_nbhood,nbhood);
         return;
     }
+    gitmp=outgliderinfo;
     for (ij=0; ij<N2; ij++) {
         gene = golmix[ij];
         for (k=0;k<8;k++) {                                   // each direction: N E S W NE SE SW NW
