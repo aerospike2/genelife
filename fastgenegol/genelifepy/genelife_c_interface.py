@@ -175,7 +175,7 @@ libcd.set_ancestortype.argtypes = [c_int]
 libcd.set_info_transfer_h.restype = None
 libcd.set_info_transfer_h.argtypes = [c_int,c_int]
 libcd.set_activityfnlut.restype = None
-libcd.set_activityfnlut.argtypes = [c_int,c_int]
+libcd.set_activityfnlut.argtypes = [c_int]
 
 def get_log2N():
     return libcd.get_log2N()
@@ -357,5 +357,5 @@ def set_stash():
 def set_info_transfer_h(do_info_transfer,nbhood):
     return libcd.set_info_transfer_h(do_info_transfer,nbhood);
     
-def set_activityfnlut(actvityfnlut):
+def set_activityfnlut(activityfnlut):
     return libcd.set_activityfnlut(activityfnlut)

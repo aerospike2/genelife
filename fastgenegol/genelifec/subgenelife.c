@@ -5601,17 +5601,16 @@ int totalpoptrace(uint64_t gol[]) {   /* calculates and returns current populati
 
 //------------------------------------------------------------ activitieshash ---------------------------------------------------------------------------
 unsigned int genefnindex( uint64_t gene, uint64_t mask, int indexoff[]) {
-    int j,k,d;
+    int k,d;
     uint64_t g,gf;
     uint64_t indexmask = 0xffffff;
     POPCOUNT64C(mask, d)
     if (d > 24) d=24;                                           // max of first 24 of active lut sites in mask allowed into genefnactivities array
     g = gene&mask;
     gf = 0ull;
-    for (j=k=0;k<64;k++) {
-        gf |= (g&mask&0x1ull);
-        gf <<= mask&0x1;
-        g >>= 1; mask >>= 1;
+    for (k=d;k>=0;k--) {
+        gf |= (g>>indexoff[k])&0x1ull;
+        gf <<= 1;
     }
     gf &= indexmask;
     return((unsigned int) gf);
@@ -5626,12 +5625,15 @@ int activitieshash() {  /* count activities of all currently active gene species
     const int maxact = 10000;
     int indexoff[24];
     
-    sbmask = (((uint64_t) birthmask) << 32) | (uint64_t) survivalmask;
-    for (j=k=0;k<64;k++) {
-        if (j>=24) break;
-        if (sbmask&0x1ull) indexoff[j++]=k;
+    sbmask = 0ull;
+    if (activityfnlut) {
+        for (j=0;j<24;j++) indexoff[j] = 0;
+        sbmask = (((uint64_t) birthmask) << 32) | (uint64_t) survivalmask;
+        for (j=k=0;k<64;k++) {
+            if (j>=24) break;
+            if (sbmask&0x1ull) indexoff[j++]=k;
+        }
     }
-
     nspecies = hashtable_count(&genetable);
     genotypes = hashtable_keys(&genetable);
     geneitems = (genedata*) hashtable_items( &genetable );
@@ -5650,15 +5652,13 @@ int activitieshash() {  /* count activities of all currently active gene species
         //gindices[j]=(geneitems[i].popcount) ? i : gindices[j--];   // if col is 0 then the array gindices must be passed with sufficient length
         //j++;
     }
-    
-    genes = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
-    popln = (int *) malloc(nspeciesnow*sizeof(int));
-    activities = (int *) malloc(nspeciesnow*sizeof(int));
-    memset(genes,0,sizeof(uint64_t)*nspeciesnow);
-    memset(popln,0,sizeof(int)*nspeciesnow);
-    memset(activities,0,sizeof(int)*nspeciesnow);
-    
+
     if(activityfnlut) {
+        genes = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
+        popln = (int *) malloc(nspeciesnow*sizeof(int));
+        activities = (int *) malloc(nspeciesnow*sizeof(int));
+        memset(popln,0,sizeof(int)*nspeciesnow);
+        memset(activities,0,sizeof(int)*nspeciesnow);
         memset(genefnindices,0,sizeof(int)*2^24);
         genes = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
         for (i=0,jmax=1; i<nspeciesnow; i++) {
@@ -5674,8 +5674,11 @@ int activitieshash() {  /* count activities of all currently active gene species
     else {
         if (nspeciesnow > maxact) {                                      //sort in order of decreasing population
             qsort(gindices, nspeciesnow, sizeof(int), cmpfunc3);         // sort in decreasing count order
+            nspeciesnow = maxact;
         }
-        if (nspeciesnow > maxact) nspeciesnow = maxact;
+        genes = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
+        popln = (int *) malloc(nspeciesnow*sizeof(int));
+        activities = (int *) malloc(nspeciesnow*sizeof(int));
         for (i=0; i<nspeciesnow; i++) {
             genes[i]=genotypes[gindices[i]];
             popln[i]=geneitems[gindices[i]].popcount;
@@ -5702,6 +5705,14 @@ int activitieshash() {  /* count activities of all currently active gene species
     // if (ymax1<ymax/2) ymax = ymax/2;                             // autoscale of activities
     for(j=0;j<nspeciesnow;j++) {
         gene = genes[j];
+                                                                            // rescale populations and activities with saturation
+        act = (double) activities[j];
+        pop = (double) popln[j];
+        // activities[j] = N-1 - (activities[j] * (N-1)) / ymax;    // linear scale, needs truncation if ymax superceded
+        // activities[j] = (N-1) - (int) ((N-1)*log2(act)/log2ymax);// logarithmic scale, suffers from discrete steps at bottom
+        activities[j] = (N-1) - (int) ((N-1)*act/(act+(double)ymax));
+        popln[j] = (N-1) - (int) ((N-1)*pop/(pop+(double)ymax/10.));
+        
         ij = (x&Nmask)+activities[j]*N;
         if(acttrace[ij]==rootgene)                                  // only one genotype to plot
             acttrace[ij] = gene;
@@ -5720,13 +5731,6 @@ int activitieshash() {  /* count activities of all currently active gene species
                 if(cnt1 >= cnt0) acttrace[ij]=gene;
             }
         }
-                                                                    // rescale populations and activities with saturation
-        act = (double) activities[j];
-        pop = (double) popln[j];
-        // activities[j] = N-1 - (activities[j] * (N-1)) / ymax;    // linear scale, needs truncation if ymax superceded
-        // activities[j] = (N-1) - (int) ((N-1)*log2(act)/log2ymax);// logarithmic scale, suffers from discrete steps at bottom
-        activities[j] = (N-1) - (int) ((N-1)*act/(act+(double)ymax));
-        popln[j] = (N-1) - (int) ((N-1)*pop/(pop+(double)ymax/10.));
         
         ij = (x&Nmask)+popln[j]*N;
         if(poptrace[ij]==rootgene)                                  // only one genotype to plot
