@@ -48,7 +48,11 @@ smallpattdtype=[('topactivity',c_uint32),('activity',c_uint32),('firsttime',c_ui
 smallpatt_array = npct.ndpointer(dtype=smallpattdtype, ndim=1, flags=['CONTIGUOUS','ALIGNED'])
 
 # load the library, using numpy mechanisms
-libcd = npct.load_library("libgenelife", ".")
+try:
+    libcd = npct.load_library("libgenelife", ".")
+except:
+    libcd = npct.load_library("libgenelife", "..")
+
 
 
 # setup the return types and argument types
