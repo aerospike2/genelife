@@ -3411,6 +3411,9 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
     uint64_t newgene, ancestor, parentid;
     uint64_t  survive, birth, overwrite, survivalgene, smask, bmask, statflag, ncodingmask, allcoding;
 
+    for (i=0; i<9; i++)
+        shist[i]=0;
+
     canonical = repscheme & R_2_canonical_nb;                                   // set global choice of canonical rotation bit choice for selectdifftx
     survivalgene = repscheme & R_0_survivalgene;                                // gene determining survival is 1: central gene 2: determined by neighbours
     smask = (uint64_t) survivalmask;                                            // convert to 64 bit mask for efficient usage here
@@ -3431,6 +3434,8 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
             s += gols;                                                          // s is number of live nbs
             nb1i = (nb1i << (gols<<2)) + (gols*k);                              // nb1i is packed list of live neighbour indices
         }
+        shist[s]++;
+
         statflag = 0ull;
         birth = 0ull;
         golij=gol[ij]&1ull;                                                     // to be compatible with storing other information in higher bits of gol
