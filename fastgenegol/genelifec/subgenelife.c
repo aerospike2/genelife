@@ -147,7 +147,7 @@ genedata ginitdata = {1,0,0,0,-1,0,0,0,0ull,rootgene,rootgene};  // initializati
 genedata *genedataptr;              // pointer to a genedata instance
 HASHTABLE_SIZE_T const* genotypes;  // pointer to stored hash table keys (which are the genotypes)
 genedata* geneitems;                // list of genedata structured items stored in hash table
-int genefnindices[2^24];            // table of activities for functional gene indices calculated by genefnindex
+int genefnindices[1<<24];           // table of activities for functional gene indices calculated by genefnindex
 //.......................................................................................................................................................
 hashtable_t quadtable;              // hash table for quad tree
 typedef struct quadnode {           // stored quadtree binary pattern nodes for population over time (currently only for analysis not computation)
@@ -934,7 +934,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 if(actmax && (diagnostics & diag_hash_genes)) {
                     popcount=0;
                     if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) popcount = genedataptr->popcount;
-                    else fprintf(stderr,"gene not found in colorfunction for activities\n");
+                    else fprintf(stderr,"gene not found in colorfunction for population\n");
                     if(popcount>actmax) popcount=actmax;
                     colormax=0;
                     for(d=0;d<3;d++) if((color[d]=( (mask>>(8+(d<<3))) & 0xff))>colormax) colormax=color[d];
@@ -5600,7 +5600,7 @@ int totalpoptrace(uint64_t gol[]) {   /* calculates and returns current populati
 }
 
 //------------------------------------------------------------ activitieshash ---------------------------------------------------------------------------
-unsigned int genefnindex( uint64_t gene, uint64_t mask, int indexoff[]) {
+extern inline unsigned int genefnindex( uint64_t gene, uint64_t mask, int indexoff[]) {
     int k,d;
     uint64_t g,gf;
     uint64_t indexmask = 0xffffff;
@@ -5631,9 +5631,11 @@ int activitieshash() {  /* count activities of all currently active gene species
         sbmask = (((uint64_t) birthmask) << 32) | (uint64_t) survivalmask;
         for (j=k=0;k<64;k++) {
             if (j>=24) break;
-            if (sbmask&0x1ull) indexoff[j++]=k;
+            if ((sbmask>>k)&0x1ull) indexoff[j++]=k;
         }
+        // fprintf(stderr,"indexoff:");for (j=0;j<24;j++) fprintf(stderr," %4d",indexoff[j]);fprintf(stderr,"\n");
     }
+
     nspecies = hashtable_count(&genetable);
     genotypes = hashtable_keys(&genetable);
     geneitems = (genedata*) hashtable_items( &genetable );
@@ -5659,13 +5661,14 @@ int activitieshash() {  /* count activities of all currently active gene species
         activities = (int *) malloc(nspeciesnow*sizeof(int));
         memset(popln,0,sizeof(int)*nspeciesnow);
         memset(activities,0,sizeof(int)*nspeciesnow);
-        memset(genefnindices,0,sizeof(int)*2^24);
+        memset(genefnindices,0,sizeof(int)*(1<<24));
         genes = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
         for (i=0,jmax=1; i<nspeciesnow; i++) {
             k=genefnindex( genotypes[gindices[i]], sbmask, indexoff);
             j=genefnindices[k];
             if(!j) j=genefnindices[k]=jmax++;
-            genes[j-1]=genotypes[gindices[i]]&sbmask;
+            // genes[j-1]=genotypes[gindices[i]]&sbmask;
+            genes[j-1]=genotypes[gindices[i]];
             popln[j-1]+=geneitems[gindices[i]].popcount;
             activities[j-1]+=geneitems[gindices[i]].activity;
         }

@@ -129,7 +129,6 @@
 		529A8B7E21F64D2A00A316DB /* maxmatch.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = maxmatch.c; sourceTree = "<group>"; };
 		52A14B3E2177387E000E2ED4 /* hashtable.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hashtable.h; sourceTree = "<group>"; };
 		52ADC4832244044900F9B46A /* genelife.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; path = genelife.py; sourceTree = "<group>"; };
-		52EAA87622EAF4AC00EC2725 /* subgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = subgenelife.c; path = ../../../../Desktop/subgenelife.c; sourceTree = "<group>"; };
 		52F19B3021ABE7F900D33844 /* sumtest.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = sumtest.c; sourceTree = "<group>"; };
 		52F19B3621ADF3C900D33844 /* lsb64 */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = lsb64; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -227,7 +226,6 @@
 				52F19B3021ABE7F900D33844 /* sumtest.c */,
 				52A14B3E2177387E000E2ED4 /* hashtable.h */,
 				529A8B7E21F64D2A00A316DB /* maxmatch.c */,
-				52EAA87622EAF4AC00EC2725 /* subgenelife.c */,
 				529A8B6D21EE297800A316DB /* subgenelife.c */,
 			);
 			path = genelifec;
