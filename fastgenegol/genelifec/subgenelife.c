@@ -3451,11 +3451,17 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                         if (gol[nb[k]]&1ull) {                                  // [**gol** y]
                             if (!survivalgene && golij) {                       // [**gol** y]
                                 PATTERN4(golg[nb[k]], (s&0x7), found);          //survival?
-                                genecode |= found? 1ull << (s-1) : 0ull;
+                                if(repscheme&R_1_nb_OR_AND)
+                                    genecode |= found? 1ull << (s-1) : 0ull;
+                                else
+                                    genecode &= found? 1ull << (s-1) : 0ull;
                             }
                             if (overwrite || !golij) {                          // [**gol** y]
                                 PATTERN4(golg[nb[k]], (s|0x8), found);          //birth?
-                                genecode |= found? 1ull << (s-1+8) : 0ull;
+                                if(repscheme&R_1_nb_OR_AND)
+                                    genecode |= found? 1ull << (s-1+8) : 0ull;
+                                else
+                                    genecode &= found? 1ull << (s-1+8) : 0ull;
                             }
                         }
                     }
@@ -3656,10 +3662,22 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
                                     if (!survivalgene && gol[ij]) {                 // coding is 8 bits [(b/s) (s1 2 1 0) (se subset mask 3 2 1 0)]  (exception case s==4,se==4 is x0000001)
                                         PATTERN8(gene, (s==4 && se==4) ? 0x01 : ((s<<4)|(1ull<<(se-s0))), found); //survival rule found? final decision for survival
                                         survive |= found? 1ull : 0ull;                                                   // special case codes for 5th case se==4 for s==4
+/*
+                                        if(repscheme&R_1_nb_OR_AND)
+                                            survive |= found? 1ull : 0ull;                                                   // special case codes for 5th case se==4 for s==4
+                                        else
+                                            survive &= found? 1ull : 0ull;                                                   // special case codes for 5th case se==4 for s==4
+*/
                                     }
                                     if (overwrite) {
                                         PATTERN8(gene, (s==4ull && se==4ull) ? 0x81 :(((8|s)<<4)|(1ull<<(se-s0))), found); //birth rule found? final decision for birth
                                         birth |= found? 1ull : 0ull;
+/*
+                                        if(repscheme&R_1_nb_OR_AND)
+                                            birth |= found? 1ull : 0ull;
+                                        else
+                                            birth &= found? 1ull : 0ull;
+*/
                                     }
                                 }
                             }
@@ -3885,11 +3903,17 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
                                     }
                                     if (~survivalgene & gol[ij]) {
                                         PATTERN8(genecode, pat, found);
-                                        survive |= found? 1ull : 0ull;              //final decision for survival?
+                                        if(repscheme&R_1_nb_OR_AND)
+                                            survive |= found? 1ull : 0ull;              //final decision for survival?
+                                        else
+                                            survive &= found? 1ull : 0ull;              //final decision for survival?
                                     }
                                     if (overwrite) {
                                         PATTERN8(genecode, (0x80|pat), found);
-                                        birth |= found? 1ull : 0ull;                //final decision for birth?
+                                        if(repscheme&R_1_nb_OR_AND)
+                                            birth |= found? 1ull : 0ull;                //final decision for birth?
+                                        else
+                                            birth &= found? 1ull : 0ull;                //final decision for birth?
                                     }
                                 }
                             }
@@ -4127,11 +4151,17 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
                                     }
                                     if (!survivalgene && gol[ij]) {
                                         PATTERN8(genecode, pat, found); //final decision for survival?  NB all 0 seq encodes survival with 0 live nbs
-                                        survive |= found? 1ull : 0ull;
+                                        if(repscheme&R_1_nb_OR_AND)
+                                            survive |= found? 1ull : 0ull;
+                                        else
+                                            survive &= found? 1ull : 0ull;
                                     }
                                     if (overwrite) {
                                         PATTERN8(genecode, (0x80|pat), found); //final decision for birth?
-                                        birth |= found? 1ull : 0ull;
+                                        if(repscheme&R_1_nb_OR_AND)
+                                            birth |= found? 1ull : 0ull;
+                                        else
+                                            birth &= found? 1ull : 0ull;
                                     }
                                 }
                             }
