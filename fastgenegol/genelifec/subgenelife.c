@@ -3660,17 +3660,17 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
                                 if (gol[nb[k]]) {                                   // combine information from genes of all live neighbours
                                     gene = golg[nb[k]] & (0xf0f0f0f0f0f0f0f0ull | (0x0101010101010101ull<<(se-s0))); // focus gene down to specific required se bit for exact matching
                                     if (!survivalgene && gol[ij]) {                 // coding is 8 bits [(b/s) (s1 2 1 0) (se subset mask 3 2 1 0)]  (exception case s==4,se==4 is x0000001)
-                                        PATTERN8(gene, (s==4 && se==4) ? 0x01 : ((s<<4)|(1ull<<(se-s0))), found); //survival rule found? final decision for survival
-                                        survive |= found? 1ull : 0ull;                                                   // special case codes for 5th case se==4 for s==4
+                                        PATTERN8(gene, (s==4 && se==4) ? 0x01 : ((s<<4)|(1<<(se-s0))), found);    //survival rule found? final decision for survival
+                                        survive |= found? 1ull : 0ull;                                               // incl. special case codes for 5th case se==4 for s==4
 /*
                                         if(repscheme&R_1_nb_OR_AND)
-                                            survive |= found? 1ull : 0ull;                                                   // special case codes for 5th case se==4 for s==4
+                                            survive |= found? 1ull : 0ull;                                           // incl. special case codes for 5th case se==4 for s==4
                                         else
-                                            survive &= found? 1ull : 0ull;                                                   // special case codes for 5th case se==4 for s==4
+                                            survive &= found? 1ull : 0ull;                                           // incl. special case codes for 5th case se==4 for s==4
 */
                                     }
                                     if (overwrite) {
-                                        PATTERN8(gene, (s==4ull && se==4ull) ? 0x81 :(((8|s)<<4)|(1ull<<(se-s0))), found); //birth rule found? final decision for birth
+                                        PATTERN8(gene, (s==4 && se==4) ? 0x81 :(((8|s)<<4)|(1<<(se-s0))), found); //birth rule found? final decision for birth
                                         birth |= found? 1ull : 0ull;
 /*
                                         if(repscheme&R_1_nb_OR_AND)
@@ -3682,12 +3682,12 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
                                 }
                             }
                             if (survivalgene && gol[ij]) {                                                           // survival determined by central gene in this case
-                                    PATTERN8(golg[ij], (s==4 && se==4) ? 0x01 : ((s<<4)|(1ull<<(se-s0))), found);    //survival rule found? final decision for survival
+                                    PATTERN8(golg[ij], (s==4 && se==4) ? 0x01 : ((s<<4)|(1ull<<(se-s0))), found);    // survival rule found? final decision for survival
                                     survive |= found? 1ull : 0ull;                                                   // special case codes for 5th case se==4 for s==4
                             }
                         }
                         else {                                                      // selection == 10
-                            if(repscheme&R_1_nb_OR_AND)
+                            if(repscheme & R_1_nb_OR_AND)
                                 for (genecode=0ull,k=0;k<8;k++)                     // decodes genes with fixed length encoding by OR
                                     genecode |= (gol[nb[k]]?golg[nb[k]]:0ull);      // OR of live neighbours encodes birth rule & survival rule
                             else
