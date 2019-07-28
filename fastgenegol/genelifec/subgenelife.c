@@ -198,8 +198,13 @@ int nstatG = 0;                     // interval for collecting other statistical
 int genealogydepth = 0;             // depth of genealogies in current population
 int genealogycoldepth = 0;          // genes coloured by colour of ancestor at this depth in colorfunction=11
 int ngenealogydeep;                 // depth of genealogy
+//.........................................................resource management...........................................................................
+                                    // prepared but not yet fully implemented or activated
+int rmax = 1;                       // max number of resources per cell : 0 also turns off resource processing
+int rthresh = 3;                    // minimum resource number per neighborhood to allow birth process
+int rbirth = 2;                     // minimum resource number per neighborhood to allow birth replenishment
 //---------------------------------------------------------main arrays in simulation---------------------------------------------------------------------
-uint64_t *gol, *golg, *golb;        // pointers to gol, golg and golb arrays at one of the plane cycle locations: live/dead, gene, cloneid (birth t,x,y)
+uint64_t *gol, *golg, *golb, *golr; // pointers to one plane of gol, golg, golb & golr arrays: live/dead, gene, cloneid (birth t,x,y), resource
 uint64_t *golgstats;                // pointer to 64 bit masks for different events during processing at one of the plane cycle locations
 uint64_t stashgol[N2];              // for stashing state and recovering with initfield = -1
 uint64_t stashgolg[N2];             // for stashing state and recovering with initfield = -1
@@ -327,7 +332,8 @@ int numPlane = maxPlane;            // number of planes must be power of 2 to al
 uint64_t *planes[maxPlane];         // ring buffer planes of gol array states
 uint64_t *planesg[maxPlane];        // ring buffer planes of golg genes
 uint64_t *planesgs[maxPlane];       // ring buffer planes of golgstatus bits
-uint64_t *planesb[maxPlane];        // ring buffer planes of birth id for individuals
+uint64_t *planesb[maxPlane];        // ring buffer planes of birth id for clone ids
+uint64_t *planesr[maxPlane];        // ring buffer planes of birth id for resources
 uint64_t plane0[N2];                // gol   0
 uint64_t plane1[N2];                // gol   1
 uint64_t planeg0[N2];               // golg  0
@@ -336,6 +342,8 @@ uint64_t planegs0[N2];              // golgs 0
 uint64_t planegs1[N2];              // golgs 1
 uint64_t planeb0[N2];               // golb  0
 uint64_t planeb1[N2];               // golb  1
+uint64_t planer0[N2];               // golr  0
+uint64_t planer1[N2];               // golr  1
 #if maxPlane > 2
 uint64_t plane2[N2];                // gol   2
 uint64_t plane3[N2];                // gol   3
@@ -345,6 +353,8 @@ uint64_t planegs2[N2];              // golgs 2
 uint64_t planegs3[N2];              // golgs 3
 uint64_t planeb2[N2];               // golb  2
 uint64_t planeb3[N2];               // golb  3
+uint64_t planer2[N2];               // golr  2
+uint64_t planer3[N2];               // golr  3
 #endif
 #if maxPlane > 4
 uint64_t plane4[N2];                // gol   4
@@ -363,6 +373,10 @@ uint64_t planeb4[N2];               // golb  4
 uint64_t planeb5[N2];               // golb  5
 uint64_t planeb6[N2];               // golb  6
 uint64_t planeb7[N2];               // golb  7
+uint64_t planer4[N2];               // golr  4
+uint64_t planer5[N2];               // golr  5
+uint64_t planer6[N2];               // golr  6
+uint64_t planer7[N2];               // golr  7
 #endif
 //------------------------------------------------------- fast macros for pattern counting and random number generator ---------------------------------
                                     // Wikipedia "Xorshift" rewritten here as inline macro &
@@ -3141,7 +3155,7 @@ void random_influx(uint64_t gol[],uint64_t golg[],uint64_t golb[],uint64_t newgo
     }
 }
 //---------------------------------------------------------------- update_23 ----------------------------------------------------------------------------
-void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t newgol[], uint64_t newgolg[], uint64_t newgolgstats[], uint64_t newgolb[]){
+void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t golr[],uint64_t newgol[], uint64_t newgolg[], uint64_t newgolgstats[], uint64_t newgolb[],uint64_t newgolr[]){
     // update for dissection of genetic rule variants within nearest neighbor sum s=2 or 3 only for survival and birth
     // update GoL for toroidal field which has side length which is a binary power of 2
     // encode without if structures for optimal vector treatment
@@ -3388,7 +3402,7 @@ void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t g
     // if(diagnostics & diag_hash_patterns) qimage = quadimage(newgol,&patt,log2N); // quadtree hash of entire image
 }
 //---------------------------------------------------------------- update_lut_sum -----------------------------------------------------------------------
-void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t newgol[], uint64_t newgolg[], uint64_t newgolgstats[], uint64_t newgolb[]){    // selection models 8,9
+void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t golr[],uint64_t newgol[], uint64_t newgolg[], uint64_t newgolgstats[], uint64_t newgolb[],uint64_t newgolr[]){    // selection models 8,9
 // this version should work even if extra information is packed in the higher bits of gol: previous version relabelled to update_lut_sumx
 // update GoL for toroidal field which has side length which is a binary power of 2
 // encode without if structures for optimal vector treatment
@@ -3584,7 +3598,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
     // if(diagnostics & diag_hash_patterns) qimage = quadimage(newgol,&patt,log2N); // quadtree hash of entire image
 }
 //---------------------------------------------------------------- update_lut_dist ----------------------------------------------------------------------
-void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t newgol[], uint64_t newgolg[], uint64_t newgolgstats[], uint64_t newgolb[]) {     // selection models 10,11
+void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t golr[],uint64_t newgol[], uint64_t newgolg[], uint64_t newgolgstats[], uint64_t newgolb[],uint64_t newgolr[]) {     // selection models 10,11
 // update GoL for toroidal field which has side length which is a binary power of 2
 // encode without if structures for optimal vector treatment
 /*
@@ -3809,7 +3823,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
     // if(diagnostics & diag_hash_patterns) qimage = quadimage(newgol,&patt,log2N); // quadtree hash of entire image
 }
 //---------------------------------------------------------------- update_lut_canon_rot -----------------------------------------------------------------
-void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t newgol[], uint64_t newgolg[], uint64_t newgolgstats[], uint64_t newgolb[]) {     // selection models 12,13
+void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t golr[],uint64_t newgol[], uint64_t newgolg[], uint64_t newgolgstats[], uint64_t newgolb[],uint64_t newgolr[]) {     // selection models 12,13
 /*
     configurations are distinguished by number of ones and the canonical rotation of the 8-bit live neighbour pattern
     the canonical rotation is the rotation with the minimum numerical value as 8-bit number (bits are numbered clockwise from 0-7)
@@ -4024,7 +4038,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
     // if(diagnostics & diag_hash_patterns) qimage = quadimage(newgol,&patt,log2N); // quadtree hash of entire image
 }
 //---------------------------------------------------------------- update_lut_2Dsym ---------------------------------------------------------------------
-void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t newgol[], uint64_t newgolg[], uint64_t newgolgstats[], uint64_t newgolb[]) {     // selection models 14,15
+void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t golr[],uint64_t newgol[], uint64_t newgolg[], uint64_t newgolgstats[], uint64_t newgolb[],uint64_t newgolr[]) {     // selection models 14,15
 /*
     all different configurations under the standard 2D 4-rotation and 4-reflection symmetries are distinguished
     i.e. by number of ones and edge-corner differences and additional distinctions in arrangement
@@ -4273,7 +4287,7 @@ void genelife_update (int nsteps, int nhist, int nstat) {
     /* update GoL and gene arrays for toroidal field which has side length which is a binary power of 2 */
     /* encode as much as possible without if structures (use ? : instead) in update routines for optimal vector treatment */
     int t,npop;
-    uint64_t *newgol, *newgolg, *newgolgstats, *newgolb;
+    uint64_t *newgol, *newgolg, *newgolgstats, *newgolb, *newgolr;
     int totalpoptrace(uint64_t gol[]);                                        // calculate total current population and store in scrolling trace npopulation
     int activitieshash(void);                                                 // count activities of all currently active gene species
     int activitieshashquad(void);                                             // count activities of all currently active quad pattern species
@@ -4290,15 +4304,16 @@ void genelife_update (int nsteps, int nhist, int nstat) {
         newgolg = planesg[newPlane];
         newgolgstats = planesgs[newPlane];
         newgolb = planesb[newPlane];
+        newgolr = planesr[newPlane];
         
         totsteps++;                                                           // simulation step counter
         totdisp++;                                                            // currently every step is counted for display in activities
 
-        if (selection<8)        update_23(gol,golg,golgstats,golb,newgol,newgolg,newgolgstats,newgolb);           // calculate next iteration with detailed variants of version s=2-3
-        else if (selection<10)  update_lut_sum(gol,golg,golgstats,golb,newgol,newgolg,newgolgstats,newgolb);      // calculate next iteration for lut sum (gene coded)   version s=1-8
-        else if (selection<12)  update_lut_dist(gol,golg,golgstats,golb,newgol,newgolg,newgolgstats,newgolb);     // calculate next iteration for lut dist (corner/edge) version s=1-7
-        else if (selection<14)  update_lut_canon_rot(gol,golg,golgstats,golb,newgol,newgolg,newgolgstats,newgolb);// calculate next iteration for lut canonical rotation version s=2-6
-        else if (selection<16)  update_lut_2D_sym(gol,golg,golgstats,golb,newgol,newgolg,newgolgstats,newgolb);   // calculate next iteration for lut fully 2D symmetric version s=0-4
+        if (selection<8)        update_23(gol,golg,golgstats,golb,golr,newgol,newgolg,newgolgstats,newgolb,newgolr);           // calculate next iteration with detailed variants of version s=2-3
+        else if (selection<10)  update_lut_sum(gol,golg,golgstats,golb,golr,newgol,newgolg,newgolgstats,newgolb,newgolr);      // calculate next iteration for lut sum (gene coded)   version s=1-8
+        else if (selection<12)  update_lut_dist(gol,golg,golgstats,golb,golr,newgol,newgolg,newgolgstats,newgolb,newgolr);     // calculate next iteration for lut dist (corner/edge) version s=1-7
+        else if (selection<14)  update_lut_canon_rot(gol,golg,golgstats,golb,golr,newgol,newgolg,newgolgstats,newgolb,newgolr);// calculate next iteration for lut canonical rotation version s=2-6
+        else if (selection<16)  update_lut_2D_sym(gol,golg,golgstats,golb,golr,newgol,newgolg,newgolgstats,newgolb,newgolr);   // calculate next iteration for lut fully 2D symmetric version s=0-4
 
         if((diagnostics & diag_offset_statistics) && nhist && (totsteps%nhist == 0)) countconfigs(); // count configurations
         if((diagnostics & diag_general_statistics) && nstat && (totsteps%nstat == 0)) tracestats(gol,golg,golgstats,N2); // time trace point
@@ -4309,6 +4324,7 @@ void genelife_update (int nsteps, int nhist, int nstat) {
         golg = planesg[curPlane];
         golgstats = planesgs[curPlane];
         golb = planesb[curPlane];
+        golr = planesr[curPlane];
         
         if (diagnostics & diag_scrolling_trace) npop= totalpoptrace(gol);     // calculate total current population and store in scrolling trace npopulation
         
@@ -4360,17 +4376,20 @@ void initialize_planes(int offs[],  int Noffsets) {
     planesg[0] = planeg0; planesg[1] = planeg1;
     planesgs[0] = planegs0; planesgs[1] = planegs1;
     planesb[0]  = planeb0;  planesb[1]  = planeb1;
+    planesr[0]  = planer0;  planesr[1]  = planer1;
 #if maxPlane > 2
     planes[2]  = plane2;  planes[3]  = plane3;
     planesg[2] = planeg2; planesg[3] = planeg3;
     planesgs[2] = planegs2; planesgs[3] = planegs3;
     planesb[2]  = planeb2;  planesb[3]  = planeb3;
+    planesr[2]  = planer2;  planesr[3]  = planer3;
 #endif
 #if maxPlane > 4
     planes[4]  = plane4;  planes[5]  = plane5;  planes[6]  = plane6;  planes[7]  = plane7;
     planesg[4] = planeg4; planesg[5] = planeg5; planesg[6] = planeg6; planesg[7] = planeg7;
     planesgs[4] = planegs4; planesgs[5] = planegs5; planesgs[6] = planegs6; planesgs[7] = planegs7;
     planesb[4]  = planeb4;  planesb[5]  = planeb5;  planesb[6]  = planeb6;  planesb[7]  = planeb7;
+    planesr[4]  = planer4;  planesr[5]  = planer5;  planesr[6]  = planer6;  planesr[7]  = planer7;
 #endif
 
     if (!(diagnostics & diag_offset_statistics)) return;
