@@ -76,7 +76,8 @@ int colorfunction = 0;              // color function choice of 0: hash or 1: fu
                                     // 4: activities 5: populations 6: genealogies without time 7: genealogies with time brightness by activity 8: gliders
                                     // 9: connected components 10 : connected component activities 11: genealogy based individual colors
 int colorfunction2 = -1;            // colorfunction for second window: as above, but -1 means same value as colorfunction
-int ancestortype = 0;      // whether to display and return genealogies via first or most recent ancestor
+int colorupdate1 = 1;               // flag to enable routine print statements to terminal during run : linked to colorfunction display in python
+int ancestortype = 0;               // whether to display and return genealogies via first or most recent ancestor
 #define ASCII_ESC 27                // escape for printing terminal commands, such as cursor repositioning : only used in non-graphic version
 //-----------------------------------------masks for named repscheme bits (selection 0-7) ----------------------------------------------------------------
 #define R_0_2sel_3live     0x1      /* 1: for 3-live-n birth, employ selection on two least different live neighbours for ancestor */
@@ -2819,7 +2820,7 @@ short unsigned int label_components(uint64_t gol[]) {
     for(nunique=0,i=1;i<=oldnlabel;i++) if (connpref[connpreff[i]] == i) nunique++;
     for(nzconnect=0,i=1;i<=oldnlabel;i++) if (!connlistsf[i]) nzconnect++;
     for(nremconnect=0,i=1;i<=oldnlabel;i++) if (iilap[i]==iilap[i-1]) nremconnect++;       // this includes those components with all connections removed by nunique pairs
-    if(!(totsteps % 10)) {
+    if(!(totsteps % 10) && colorupdate1) {
         fprintf(stderr,"connected cpts:  %d(%d) matched(unique) & %d(%d) with no-residual(no) connections i.e. %d out of %d(%d) old(new) components\n",
                         nmatched,nunique,nremconnect,nzconnect,nmatched+nremconnect,oldnlabel,nlabel);
     }
@@ -2984,7 +2985,7 @@ short unsigned int extract_components(uint64_t gol[]) {
     }
 
     // fprintf(stderr,"step %d histogram of component log2n\n",totsteps);
-    if(!(totsteps % 10)) {
+    if(!(totsteps % 10) && colorupdate1) {
         fprintf(stderr,"histogram log2n ");for(i=0;i<=log2N;i++) fprintf(stderr," %5d",i);fprintf(stderr,"\n");
         fprintf(stderr,"conn cmpt counts");for(i=0;i<=log2N;i++) fprintf(stderr," %5d",histside[i]);fprintf(stderr,"\n");
     }
@@ -4373,7 +4374,7 @@ void genelife_update (int nsteps, int nhist, int nstat) {
             ngenealogydeep=genealogies();                                     // colors genealogytrace
             if(ngenealogydeep<0) fprintf(stderr,"error returned from genealogies\n");
         }
-        if(!(totsteps%10)) {
+        if(!(totsteps%10) && colorupdate1) {
             if (diagnostics & diag_hash_genes)    nallspecies     = hashtable_count(&genetable);
             if (diagnostics & diag_hash_patterns) nallspeciesquad = hashtable_count(&quadtable);
             if (diagnostics & diag_hash_clones)   nallclones = hashtable_count(&clonetable);
@@ -4918,6 +4919,10 @@ void set_info_transfer_h(int do_info_transfer, int nbhood) {
 //.......................................................................................................................................................
 void set_activityfnlut(int activityfnlutin) {
     activityfnlut = activityfnlutin;
+}
+//.......................................................................................................................................................
+void set_colorupdate(int update1) {
+    colorupdate1 = update1;
 }
 //------------------------------------------------------------------- get ... ---------------------------------------------------------------------------
 void  get_shist(int outshist[]){

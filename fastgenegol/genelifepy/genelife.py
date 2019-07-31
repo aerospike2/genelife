@@ -39,6 +39,7 @@ cgolg =np.zeros(N2,np.int32)
 colorfunction = 0
 surface = None
 window = None
+update1 = True
 scalex2 = False
 rescale = False
 ncanon=[]
@@ -52,6 +53,7 @@ surface2 = None
 caption2 = ""
 dispinit2 = False
 render2 = True                            # whether to use renderer on surface 2 : NB frees surface2 after defining texture2
+update2 = True
 renderer2 = None
 texture2 = None
 image2 = None
@@ -398,7 +400,6 @@ def display_init2():
     window2 = sdl2.ext.Window(caption2,(2*Width, 2*(Height+16)),(800,360))     # opens sdl2 window
     windowID2 = sdl2.SDL_GetWindowID(window2.window)
     window2.show()
-    
     if render2:                                  # see this tutorial https://dev.to/noah11012/using-sdl2-2d-accelerated-renderering-1kcb
         # renderer2 = sdl2.ext.Renderer(window2)
         # renderer2 = sdl2.SDL_CreateRenderer( window2.window, -1, sdl2.SDL_RENDERER_ACCELERATED | sdl2.SDL_RENDERER_PRESENTVSYNC );
@@ -491,6 +492,7 @@ def update_sim(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
     global log2N
     global runparams
     global cnt,framenr
+    global update1
 
     cnt = cnt+nrun
     if cnt % ndisp == 0 and nrun:  # insert the non-displayed iterations & count species : NB nrun must divide ndisp
@@ -499,7 +501,7 @@ def update_sim(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
         if(count): genelife.countspecieshash()
     genelife.genelife_update(nrun, nhist, nstat)
     framenr = framenr+nrun
-    colorgrid()  # sets  cgrid
+    if update1: colorgrid()  # sets  cgrid
     return
 
 #-----------------------------------------------------------------------------------------------------------
@@ -712,8 +714,8 @@ def step(count=True):
 # misc. keys save image
 def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
     global mstime,framenr,framerate
-    global surface, window, scalex2, caption, dispinit
-    global surface2, window2, caption2, dispinit2, grect, render2, renderer2, factory2, image2, message2, font2, textColor2, windowID2
+    global surface, window, scalex2, caption, dispinit, update1
+    global surface2, window2, caption2, dispinit2, grect, render2, update2, renderer2, factory2, image2, message2, font2, textColor2, windowID2
     global N
     global gol,golg,golgstats
     global connlabel,connlen,ncomponents
@@ -779,7 +781,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                 mouseclicked = False
                 gogo = False
                 # sdl2.ext.quit()                  # check that quitting SDL here is OK
-            if event.type == sdl2.SDL_MOUSEBUTTONDOWN:
+            if event.type == sdl2.SDL_MOUSEBUTTONDOWN and update1:
                 if   (sdl2.SDL_GetModState() & sdl2.KMOD_ALT) | (event.button.button == sdl2.SDL_BUTTON_MIDDLE): # quit event loop on middle mouse button (option-click)
                     mouseclicked = False
                     gogo = False
@@ -808,7 +810,6 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                                     overwritemask = overwritemask ^ (1<<(k-16))
                                     bit = (overwritemask>>(k-16))&0x1
                                     print(("step %d overwritemask changed to %x" % (framenr,overwritemask)))
-                                survivalmask
                                 draw_rect(surface,cancol[0][k]*(1+bit),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 surviveover[0],surviveover[1]= survivalmask,overwritemask      # 2nd elt only picked up in C as overwrite for selection<8
                                 genelife.set_surviveover64(surviveover)
@@ -1079,6 +1080,15 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                             genealogycoldepth = genealogycoldepth - 1
                             genelife.set_genealogycoldepth(genealogycoldepth)
                             print('step',framenr,'new genealogycoldepth =',genealogycoldepth)
+                elif keystatus[sdl2.SDL_SCANCODE_1]:
+                    update1=1-update1
+                    genelife.set_colorupdate(update1)
+                    if update1: print('step',framenr,'first window updates turned on')
+                    else:       print('step',framenr,'first window updates turned off')
+                elif keystatus[sdl2.SDL_SCANCODE_2]:
+                    update2=1-update2
+                    if update2: print('step',framenr,'second window updates turned on')
+                    else:       print('step',framenr,'second window updates turned off')
                 elif keystatus[sdl2.SDL_SCANCODE_B]:
                     nbhistmax=framenr//(N//2)
                     nbhistold = nbhist
@@ -1204,7 +1214,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
         if (not mouseclicked):
             if updatesenabled and not pause and (framenr < maxsteps):
                 update_sim(nrun, ndisp, nskip, niter, nhist, nstat, count)
-            else:
+            elif update1:
                 colorgrid()
         nspecies=genelife.get_nspecies()
         caption = "Gene Life at step %d coloring %d nspecies %d " % (framenr,colorfunction,nspecies)
@@ -1225,51 +1235,55 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
         elif colorfunction == 10: caption = caption + ("ymaxq %d " % ymaxq)
         elif colorfunction == 11: caption = caption + ("genealogy_cold %d " % genealogycoldepth)
         if pixeldat: caption = caption + pixeldat
-        set_caption(window, caption)
-        sdl2.ext.Window.refresh(window)                # copies the window to the display
         
-        if render2:
-                sdlrenderer2 = renderer2.sdlrenderer
-                # sdl2.SDL_SetRenderDrawColor( sdlrenderer2, 0xFF, 0xFF, 0xFF, 0xFF )
-                sdl2.SDL_SetRenderDrawColor( sdlrenderer2, 0x00, 0x00, 0x00, 0x00 )
-                sdl2.SDL_RenderClear( sdlrenderer2 )
-                sdl2.ext.fill(surface2.contents, 0)
+        if update1:                                         # window 1 updates switched on
+            set_caption(window, caption)                    # sets the window caption with current status data
+            sdl2.ext.Window.refresh(window)                 # copies the window to the display
+        elif framenr % 10 == 0: set_caption(window, caption)# only less frequent caption update and no graphics update of window 1
+
+        if update2:                                         # if update of 2nd window on
+            if render2:
+                    sdlrenderer2 = renderer2.sdlrenderer
+                    # sdl2.SDL_SetRenderDrawColor( sdlrenderer2, 0xFF, 0xFF, 0xFF, 0xFF )
+                    sdl2.SDL_SetRenderDrawColor( sdlrenderer2, 0x00, 0x00, 0x00, 0x00 )
+                    sdl2.SDL_RenderClear( sdlrenderer2 )
+                    sdl2.ext.fill(surface2.contents, 0)
+                    sdl2.SDL_BlitScaled(surface,None,surface2,None)
+                    image2=factory2.from_surface(surface2)
+                    sdl2.SDL_RenderCopy(sdlrenderer2, image2.texture, None, None)  # last two parameters are source and dest rect (e.g. grect)
+                    message = sdl2.sdlttf.TTF_RenderText_Solid( font2, str.encode("Genelife frame %5d" % cnt), textColor2 )
+                    message2 = factory2.from_surface(message)
+                    grect.w = message.contents.w
+                    grect.h = message.contents.h
+                    set_caption(window2, caption)
+                    sdl2.SDL_RenderCopy(sdlrenderer2, message2.texture, None, grect)
+                    sdl2.SDL_RenderPresent(sdlrenderer2)
+                    
+                    """
+                    rect = sdl2.SDL_Rect()
+                    rect.x = 0
+                    rect.y = 0
+                    rect.w = Width
+                    rect.h = Height+16
+                    # https://stackoverflow.com/questions/21651976/how-to-pass-sdl-surface-to-sdl-locktexture-with-pysdl2
+                    sdl2.SDL_LockTexture(texture2, rect, ctypes.byref(ctypes.c_void_p(surface2.contents.pixels)), ctypes.byref(ctypes.c_int(surface2.contents.pitch)))
+                    # https://stackoverflow.com/questions/4355524/getting-data-from-ctypes-array-into-numpy
+                    # buffer = np.core.multiarray.int_asbuffer(surface2.contents.pixels, 8*Width*Height)  # at runtime says xxx not implemented
+                    buffer_from_memory = ctypes.pythonapi.PyMemoryView_FromObject
+                    buffer_from_memory.restype = ctypes.py_object
+                    #buffer = buffer_from_memory(ctypes.c_void_p(surface2.contents.pixels), 8*Width*Height)
+                    buffer = buffer_from_memory(surface2.contents.pixels, 8*Width*Height)
+                    # nppixels = typeslib.as_array((ctypes.c_uint32 * (Height*Width)).from_address(ctypes.c_void_p(surface2.contents.pixels)))
+                    nppixels = np.frombuffer(buffer, ctypes.c_uint32)
+                    nppixels[:] = cgolg[:]
+                    sdl2.SDL_UnlockTexture(texture2)
+                    sdl2.SDL_RenderCopy( renderer2, texture2, rect, None);
+                    sdl2.SDL_RenderPresent( renderer2 )
+                    """
+            else:
+                sdl2.ext.fill(surface2, 0)
                 sdl2.SDL_BlitScaled(surface,None,surface2,None)
-                image2=factory2.from_surface(surface2)
-                sdl2.SDL_RenderCopy(sdlrenderer2, image2.texture, None, None)  # last two parameters are source and dest rect (e.g. grect)
-                message = sdl2.sdlttf.TTF_RenderText_Solid( font2, str.encode("Genelife frame %5d" % cnt), textColor2 )
-                message2 = factory2.from_surface(message)
-                grect.w = message.contents.w
-                grect.h = message.contents.h
-                set_caption(window2, caption)
-                sdl2.SDL_RenderCopy(sdlrenderer2, message2.texture, None, grect)
-                sdl2.SDL_RenderPresent(sdlrenderer2)
-                
-                """
-                rect = sdl2.SDL_Rect()
-                rect.x = 0
-                rect.y = 0
-                rect.w = Width
-                rect.h = Height+16
-                # https://stackoverflow.com/questions/21651976/how-to-pass-sdl-surface-to-sdl-locktexture-with-pysdl2
-                sdl2.SDL_LockTexture(texture2, rect, ctypes.byref(ctypes.c_void_p(surface2.contents.pixels)), ctypes.byref(ctypes.c_int(surface2.contents.pitch)))
-                # https://stackoverflow.com/questions/4355524/getting-data-from-ctypes-array-into-numpy
-                # buffer = np.core.multiarray.int_asbuffer(surface2.contents.pixels, 8*Width*Height)  # at runtime says xxx not implemented
-                buffer_from_memory = ctypes.pythonapi.PyMemoryView_FromObject
-                buffer_from_memory.restype = ctypes.py_object
-                #buffer = buffer_from_memory(ctypes.c_void_p(surface2.contents.pixels), 8*Width*Height)
-                buffer = buffer_from_memory(surface2.contents.pixels, 8*Width*Height)
-                # nppixels = typeslib.as_array((ctypes.c_uint32 * (Height*Width)).from_address(ctypes.c_void_p(surface2.contents.pixels)))
-                nppixels = np.frombuffer(buffer, ctypes.c_uint32)
-                nppixels[:] = cgolg[:]
-                sdl2.SDL_UnlockTexture(texture2)
-                sdl2.SDL_RenderCopy( renderer2, texture2, rect, None);
-                sdl2.SDL_RenderPresent( renderer2 )
-                """
-        else:
-            sdl2.ext.fill(surface2, 0)
-            sdl2.SDL_BlitScaled(surface,None,surface2,None)
-            sdl2.ext.Window.refresh(window2)                # copies the 2nd window to the display
+                sdl2.ext.Window.refresh(window2)                # copies the 2nd window to the display
         
         if framenr % 10 == 0:
             mslasttime = mstime
@@ -1358,6 +1372,7 @@ def parhelp():
     print("left mouse  ","extract information about local state inside the array, or control buttons below")
     print("right mouse ","choose single plane for GoL display in colorfunction 2 for selection 16-19")
     print("<- , ->     ","decrement or increment the colorfunction analysis type mod 12")
+    print("2           ","toggle second window updates off/on")
     print("b , B       ","decrement or increment the half block for trace display: in range -1,0 to nNhist*2-2=38")
     print("f           ","print frame rate in fps (average of last 10 frames NYI")
     print("F           ","toggle to fullscreen NYI")
