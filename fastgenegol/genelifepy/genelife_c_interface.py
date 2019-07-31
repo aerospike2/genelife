@@ -133,9 +133,9 @@ libcd.get_genes.argtypes = [gene_array, c_int]
 libcd.get_genealogies.restype = c_int
 libcd.get_genealogies.argtypes = [gene_array,c_int]
 libcd.colorgenes1.restype = None
-libcd.colorgenes1.argtypes = [uint64_array, uint64_array, uint64_array, int_array, c_int, c_int]
+libcd.colorgenes1.argtypes = [uint64_array, uint64_array, uint64_array, int_array, c_int]
 libcd.colorgenes.restype = None
-libcd.colorgenes.argtypes = [int_array, c_int, c_int]
+libcd.colorgenes.argtypes = [int_array, c_int]
 libcd.set_colorfunction.restype = None
 libcd.set_colorfunction.argtypes = [c_int]
 libcd.setget_act_ymax.restype = c_int
@@ -182,8 +182,6 @@ libcd.set_activityfnlut.restype = None
 libcd.set_activityfnlut.argtypes = [c_int]
 libcd.set_colorupdate.restype = None
 libcd.set_colorupdate.argtypes = [c_int]
-libcd.set_colorfunction2.restype = None
-libcd.set_colorfunction2.argtypes = [c_int]
 
 def get_log2N():
     return libcd.get_log2N()
@@ -293,11 +291,11 @@ def get_stash():
 def get_nlive():
     return libcd.get_nlive();
 
-def colorgenes1(gol, golg, golgstats, cgolg, colorfunction):
-    return libcd.colorgenes1( gol, golg, golgstats, cgolg, len(gol), colorfunction)
+def colorgenes1(gol, golg, golgstats, cgolg):
+    return libcd.colorgenes1( gol, golg, golgstats, cgolg, len(gol))
 
-def colorgenes(cgolg,colorfunction):
-    return libcd.colorgenes( cgolg, len(cgolg),colorfunction)
+def colorgenes(cgolg):
+    return libcd.colorgenes( cgolg, len(cgolg))
 
 def set_colorfunction(colorfunctionval):
     return libcd.set_colorfunction(colorfunctionval)
@@ -370,6 +368,3 @@ def set_activityfnlut(activityfnlut):
 
 def set_colorupdate(update1):
     return libcd.set_colorupdate(update1)
-
-def set_colorfunction2(colorfunction2):
-    return libcd.set_colorfunction2(colorfunction2)
