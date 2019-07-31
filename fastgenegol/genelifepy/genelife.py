@@ -35,7 +35,9 @@ connlabel = np.zeros(N2,np.uint32)
 connlen = np.zeros(N2//4,np.uint32)
                                             # graphics
 cgrid = np.zeros((N,N),np.int32)
+cgrid2 = np.zeros((N,N),np.int32)
 cgolg =np.zeros(N2,np.int32)
+cgolg2 =np.zeros(N2,np.int32)
 colorfunction = 0
 surface = None
 window = None
@@ -47,7 +49,7 @@ cancol=[]
 caption = ""
 dispinit = False
 
-cgrid2 = np.zeros((N,N),np.int32)
+cgridt = np.zeros((N,N),np.int32)
 window2 = None
 surface2 = None
 caption2 = ""
@@ -145,6 +147,7 @@ numHis = len(offsets)
 histo=np.zeros(numHis,np.uint64)
 flatoff =  [x for sublist in offsets for x in sublist]
 npoffsets = np.array(flatoff,np.int32)
+colorfunction2 = -1
 
 # setup of color map : black for 0, colors for 1 to LEN+1 or 257 for colormethod 0 or 1
 #-----------------------------------------------------------------------------------------------------------
@@ -219,12 +222,12 @@ def rand_cmap(nlabels, type='bright', first_color_black=True, last_color_black=F
     return random_colormap
 #-----------------------------------------------------------------------------------------------------------
 
-def colorgrid():
+def colorgrid(colorfunction,cgolg,cgrid):
     """ colors array according to grid and genegrid using colormethod"""
-    global cgrid,cgolg,crid2,N
-    genelife.colorgenes(cgolg)
-    cgrid2=np.reshape(cgolg,(N,N)).T
-    cgrid[:,0:N] = cgrid2   # is there a faster version of this copy that moves the data?
+    global N,cgridt
+    genelife.colorgenes(cgolg,colorfunction)
+    cgridt=np.reshape(cgolg,(N,N)).T
+    cgrid[:,0:N] = cgridt   # is there a faster version of this copy that moves the data?
     return
 #-----------------------------------------------------------------------------------------------------------
 
@@ -465,7 +468,7 @@ def display_init2():
 def show0(count=True):
 # display initial population and count species
     global framenr
-    global surface, window, scalex2, caption, dispinit
+    global surface, window, scalex2, caption, dispinit,colorfunction
     global surface2, window2, caption2, dispinit2
     # global repscheme,survivalmask,overwritemask,ancselectmask,selection
     global cancol
@@ -478,7 +481,7 @@ def show0(count=True):
 
     cancol=init_buttons()                           # initialize parameter buttons
     
-    colorgrid()
+    colorgrid(colorfunction)
 
     sdl2.ext.Window.refresh(window)
     
@@ -487,12 +490,12 @@ def show0(count=True):
 #-----------------------------------------------------------------------------------------------------------
 
 def update_sim(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
-    global gol, cgrid
+    global gol, cgrid, colorfunction,colorfunction2
     global golg
     global log2N
     global runparams
     global cnt,framenr
-    global update1
+    global update1,update2
 
     cnt = cnt+nrun
     if cnt % ndisp == 0 and nrun:  # insert the non-displayed iterations & count species : NB nrun must divide ndisp
@@ -501,7 +504,10 @@ def update_sim(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
         if(count): genelife.countspecieshash()
     genelife.genelife_update(nrun, nhist, nstat)
     framenr = framenr+nrun
-    if update1: colorgrid()  # sets  cgrid
+    if update1: colorgrid(colorfunction)  # sets  cgrid
+    if update2:
+        if colorfunction2 == -1: colorgrid(colorfunction)  # sets  cgrid
+        else: colorgrid(colorfunction2)
     return
 
 #-----------------------------------------------------------------------------------------------------------
@@ -918,11 +924,11 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                             print(("step %d pixel data %s" % (framenr,pixeldat)))
                         elif colorfunction == 9:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
-                            colorgrid()
+                            colorgrid(colorfunction)
                             pixeldat = "(%d,%d) label %4d nrconn %d" % (x,y,connlabel[y*N+x],connlen[connlabel[y*N+x]])
                         elif colorfunction == 10:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
-                            colorgrid()
+                            colorgrid(colorfunction)
                             pixeldat = "(%d,%d)" % (x,y)
                 elif event.button.button ==  sdl2.SDL_BUTTON_RIGHT:          # info on button or single plane choice (selection>=20) right mouse button (-click)
                     if scalex2 or event.window.windowID == windowID2:
@@ -965,7 +971,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                         else: draw_rect(surface,cancol[4][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                 if colorfunction==9 or colorfunction==10:
                     ncomponents=genelife.get_connected_comps(connlabel,connlen,-1,-1)
-                    colorgrid()
+                    colorgrid(colorfunction)
                 pixeldat = ""
             elif event.type==sdl2.SDL_MOUSEMOTION:
                 if mouseclicked:
@@ -1002,11 +1008,11 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                             genelife.set_selectedgene(golg[x+y*N])
                         elif colorfunction == 9:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
-                            colorgrid()
+                            colorgrid(colorfunction)
                             pixeldat = "(%d,%d) label %4d nr.conn %d" % (x,y,connlabel[y*N+x],connlen[connlabel[y*N+x]])
                         elif colorfunction == 10:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
-                            colorgrid()
+                            colorgrid(colorfunction)
                             pixeldat = "(%d,%d)" % (x,y)
                 elif mouseclicked2:
                     if colorfunction == 2:
@@ -1214,8 +1220,15 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
         if (not mouseclicked):
             if updatesenabled and not pause and (framenr < maxsteps):
                 update_sim(nrun, ndisp, nskip, niter, nhist, nstat, count)
-            elif update1:
-                colorgrid()
+            else:
+                if update1:
+                    colorgrid(colorfunction)
+                if update2:
+                    if colorfunction2 == -1:
+                        colorgrid(colorfunction)
+                    else:
+                        colorgrid(colorfunction2)
+
         nspecies=genelife.get_nspecies()
         caption = "Gene Life at step %d coloring %d nspecies %d " % (framenr,colorfunction,nspecies)
         if selection < 8:
