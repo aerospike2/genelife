@@ -30,16 +30,18 @@ gol = np.zeros(N2,np.uint64)
 golg = np.zeros(N2,np.uint64)
 golgstats = np.zeros(N2,np.uint64)
 
+nspecies = 0
 ncomponents = 0
 connlabel = np.zeros(N2,np.uint32)
 connlen = np.zeros(N2//4,np.uint32)
                                             # graphics
 cgrid = np.zeros((N,N),np.int32)
-cgrid2 = np.zeros((N,N),np.int32)
+cgridt = np.zeros((N,N),np.int32)
 cgolg =np.zeros(N2,np.int32)
-cgolg2 =np.zeros(N2,np.int32)
 colorfunction = 0
 surface = None
+surfacex1 = None
+surfacex2 = None
 window = None
 update1 = True
 scalex2 = False
@@ -48,13 +50,19 @@ ncanon=[]
 cancol=[]
 caption = ""
 dispinit = False
+display = [window,surface,cgrid,caption,dispinit]
 
-cgridt = np.zeros((N,N),np.int32)
+cgrid2 = np.zeros((N,N),np.int32)
+cgolg2 =np.zeros(N2,np.int32)
 window2 = None
 surface2 = None
+surface2x1 = None
+surface2x2 = None
 caption2 = ""
 dispinit2 = False
-render2 = True                            # whether to use renderer on surface 2 : NB frees surface2 after defining texture2
+display2 = [window2,surface2,cgrid2,caption2,dispinit2]
+
+render2 = False                            # whether to use renderer on surface 2 : NB frees surface2 after defining texture2
 update2 = True
 renderer2 = None
 texture2 = None
@@ -63,6 +71,7 @@ message2 = None
 font2 = None
 textColor2 = None
 windowID2 = None
+
 
 grect = sdl2.SDL_Rect()
 grect.x = Width//2
@@ -363,24 +372,29 @@ def init_buttons():    # initialize parameter buttons
             j = j+ncanon[4][k]
     return(cancol)
 #-----------------------------------------------------------------------------------------------------------
-
 def display_init():
     global scalex2,Width,Height,rescale,cnt
-    global window,surface,caption,cgrid,dispinit
+    global window,surface,surfacex1,surfacex2,cgrid,caption,dispinit
 
+    if not dispinit:
+        sdl2.ext.init()
     dispinit = True
-    sdl2.ext.init()
     # clock = sdl2.ext.time.Clock()  # only works in modified version of pysdl2 see https://lukems.github.io/py-sdl2/modules/sdl2ext_time.html
     caption = "Gene Life at iteration %d" % cnt
     if (Height <= 512 and rescale):            # Not yet ported well to SDL2
         scalex2 = True
-        window = sdl2.ext.Window(caption,(2*Width, 2*(Height+16)),(1000,60),sdl2.SDL_PIXELFORMAT_BGRA8888)     # opens sdl2 window, add flags for last parameter
-        surface = sdl2.ext.Window.get_surface(window)             # !!!! FIX to half size # scr = sdl2.surface.Surface((Width,Height+16), 0)
+        #window = sdl2.ext.Window(caption,(2*Width, 2*(Height+16)),(1000,60),sdl2.SDL_PIXELFORMAT_BGRA8888)     # opens sdl2 window, add flags for last parameter
+        windowx1 = sdl2.ext.Window(caption,(Width, Height+16),(500,60),
+                                          sdl2.SDL_WINDOW_SHOWN|sdl2.SDL_WINDOW_INPUT_FOCUS|sdl2.SDL_WINDOW_MOUSE_FOCUS)     # opens sdl2 window
+        window = sdl2.ext.Window(caption,(2*Width, 2*(Height+16)),(500,60),
+                                          sdl2.SDL_WINDOW_SHOWN|sdl2.SDL_WINDOW_INPUT_FOCUS|sdl2.SDL_WINDOW_MOUSE_FOCUS)     # opens sdl2 window x2
+        surfacex1 = sdl2.ext.Window.get_surface(windowx1)
+        surface = surfacex2 = sdl2.ext.Window.get_surface(window)
     else:
         scalex2 = False
-        window = sdl2.ext.Window(caption,(Width, Height+16),(1000,60),
+        window = sdl2.ext.Window(caption,(Width, Height+16),(500,60),
                                           sdl2.SDL_WINDOW_SHOWN|sdl2.SDL_WINDOW_INPUT_FOCUS|sdl2.SDL_WINDOW_MOUSE_FOCUS)     # opens sdl2 window
-        surface = sdl2.ext.Window.get_surface(window)  # ARGB format pixels, use SDL_ConvertSurface if need to convert surface efficiently
+        surface = surfacex1 = sdl2.ext.Window.get_surface(window)  # ARGB format pixels, use SDL_ConvertSurface if need to convert surface efficiently
 
     pf = sdl2.SDL_GetWindowPixelFormat(window.window)   # https://stackoverflow.com/questions/24576570/updating-window-position-in-pysdl2-help
     pfname = sdl2.SDL_GetPixelFormatName(pf)
@@ -388,15 +402,55 @@ def display_init():
 
     cnt = 0
     # window.show()
+    cgrid=sdl2.ext.pixels2d(surfacex1)
     sdl2.SDL_RaiseWindow(window.window)
+    if scalex2:
+        sdl2.ext.fill(surfacex2, 0)
+        sdl2.SDL_BlitScaled(surfacex1,None,surfacex2,None)
     sdl2.ext.Window.refresh(window)
-    cgrid=sdl2.ext.pixels2d(surface)
 
 #-----------------------------------------------------------------------------------------------------------
-
 def display_init2():
+    global scalex2,Width,Height,rescale,cnt
+    global window2,surface2,surface2x1,surface2x2,cgrid2,caption2,dispinit2
+
+    if not dispinit and not dispinit2:
+        sdl2.ext.init()
+    dispinit2 = True
+    # clock = sdl2.ext.time.Clock()  # only works in modified version of pysdl2 see https://lukems.github.io/py-sdl2/modules/sdl2ext_time.html
+    caption2 = "Gene Life at iteration %d" % cnt
+    if (Height <= 512 and rescale):            # Not yet ported well to SDL2
+        scalex2 = True
+        
+        window2x1 = sdl2.ext.Window(caption2,(Width, Height+16),(0,0),
+                                          sdl2.SDL_WINDOW_SHOWN|sdl2.SDL_WINDOW_INPUT_FOCUS|sdl2.SDL_WINDOW_MOUSE_FOCUS)     # opens sdl2 window x1 not displayed
+        window2 = sdl2.ext.Window(caption2,(2*Width, 2*(Height+16)),(500,620),
+                                          sdl2.SDL_WINDOW_SHOWN|sdl2.SDL_WINDOW_INPUT_FOCUS|sdl2.SDL_WINDOW_MOUSE_FOCUS)     # opens sdl2 window x2
+        surface2x1 = sdl2.ext.Window.get_surface(window2x1)
+        surface2 = surface2x2 = sdl2.ext.Window.get_surface(window2)
+    else:
+        scalex2 = False
+        window2 = sdl2.ext.Window(caption2,(Width, Height+16),(1000,620),
+                                          sdl2.SDL_WINDOW_SHOWN|sdl2.SDL_WINDOW_INPUT_FOCUS|sdl2.SDL_WINDOW_MOUSE_FOCUS)     # opens sdl2 window
+        surface2 = surface2x1 = sdl2.ext.Window.get_surface(window2)  # ARGB format pixels, use SDL_ConvertSurface if need to convert surface efficiently
+
+    pf = sdl2.SDL_GetWindowPixelFormat(window2.window)   # https://stackoverflow.com/questions/24576570/updating-window-position-in-pysdl2-help
+    pfname = sdl2.SDL_GetPixelFormatName(pf)
+    # print("pixel format name is %s" % pfname)
+
+    cnt = 0
+    # window.show()
+    cgrid2=sdl2.ext.pixels2d(surface2x1)
+    sdl2.SDL_RaiseWindow(window2.window)
+    if scalex2:
+        sdl2.ext.fill(surface2x2, 0)
+        sdl2.SDL_BlitScaled(surface2x1,None,surface2x2,None)
+    sdl2.ext.Window.refresh(window2)
+#-----------------------------------------------------------------------------------------------------------
+
+def display_init2F():
     global Width,Height,cnt
-    global window2,surface2,caption2,cgrid,dispinit2,render2,texture2,renderer2,factory2,cgolg,grect,image2,message2,font2,textColor2,windowID2
+    global window2,windowID2,surface2,cgrid2,caption2,dispinit2,renderer2,sdlrenderer2,factory2,font2,textColor2,grect,image2,message2
     
     dispinit2 = True
     caption2 = "Gene Life Magnified 2X"
@@ -404,8 +458,7 @@ def display_init2():
     windowID2 = sdl2.SDL_GetWindowID(window2.window)
     window2.show()
     if render2:                                  # see this tutorial https://dev.to/noah11012/using-sdl2-2d-accelerated-renderering-1kcb
-        # renderer2 = sdl2.ext.Renderer(window2)
-        # renderer2 = sdl2.SDL_CreateRenderer( window2.window, -1, sdl2.SDL_RENDERER_ACCELERATED | sdl2.SDL_RENDERER_PRESENTVSYNC );
+        # renderer2 = sdl2.SDL_CreateRenderer( window.window, -1, sdl2.SDL_RENDERER_ACCELERATED | sdl2.SDL_RENDERER_PRESENTVSYNC );
         renderer2 = sdl2.ext.Renderer(window2)
         if (not renderer2):
             print("Failed to create renderer for window")
@@ -416,7 +469,7 @@ def display_init2():
         
         if sdl2.sdlttf.TTF_Init() == -1:
             print("TTF_Init: %s" % sdl2.sdlttf.TTF_GetError())
-        # font2 = sdl2.sdlttf.TTF_OpenFont( str.encode("lazy.ttf"), 28 )
+        # font = sdl2.sdlttf.TTF_OpenFont( str.encode("lazy.ttf"), 28 )
         font2 = sdl2.sdlttf.TTF_OpenFont( str.encode("Arial.ttf"), 10 )
         textColor2=sdl2.SDL_Color()
         textColor2.r = 255
@@ -424,12 +477,12 @@ def display_init2():
         textColor2.g = 255
         textColor2.b = 255
         
-        message = sdl2.sdlttf.TTF_RenderText_Solid( font2, str.encode("Genelife frame %5d" % cnt), textColor2 )
-        grect.x = Width*2-message.contents.w-20
+        message2 = sdl2.sdlttf.TTF_RenderText_Solid( font2, str.encode("Genelife frame %5d" % cnt), textColor2 )
+        grect.x = Width*2-message2.contents.w-20
         grect.y = 20
-        grect.w = message.contents.w
-        grect.h = message.contents.h
-        if not message:
+        grect.w = message2.contents.w
+        grect.h = message2.contents.h
+        if not message2:
             print("error rendering message")
 
         # font_file = sysfont.get_font("freesans")
@@ -443,13 +496,13 @@ def display_init2():
         surface2=sdl2.SDL_CreateRGBSurfaceWithFormat( 0, Width*2, (Height+16)*2, 32, sdl2.SDL_PIXELFORMAT_ARGB32)
         # print(surface2.contents.format.contents)
         sdl2.ext.fill(surface2.contents, 0)
-        image2=factory2.from_surface(surface2)
+        image2=factory.from_surface(surface2)
         sdl2.SDL_RenderCopy(sdlrenderer2, image2.texture, None, None)
-        message2 = factory2.from_surface(message)
+        message2 = factory2.from_surface(message2)
         sdl2.SDL_RenderCopy(sdlrenderer2, message2.texture, None, grect)
         sdl2.SDL_RenderPresent(sdlrenderer2)
 
-        # texture2 = sdl2.SDL_CreateTextureFromSurface(renderer2, surface2);    # destroy with sdl2.SDL_DestroyTexture(texture2)
+        # texture2 = sdl2.SDL_CreateTextureFromSurface(renderer2, surface2);    # destroy with sdl2.SDL_DestroyTexture(texture)
         # texture2 = sdl2.SDL_CreateTexture( renderer2, sdl2.SDL_PIXELFORMAT_ARGB8888, sdl2.SDL_TEXTUREACCESS_STREAMING, Width, Height+16 );
         # if(not texture2):
         #    print("Failed to convert surface into a texture")
@@ -458,39 +511,50 @@ def display_init2():
         # sdl2.SDL_RenderClear(renderer2)
         # sdl2.SDL_RenderCopy(renderer2, texture2, None, None)
         # sdl2.SDL_RenderPresent(renderer2)
-        # factory = sdl2.ext.SpriteFactory(sdl2.ext.TEXTURE, renderer=renderer)
+        # factory2 = sdl2.ext.SpriteFactory(sdl2.ext.TEXTURE, renderer=renderer2)
     else:
         surface2 = sdl2.ext.Window.get_surface(window2)  # ARGB format pixels, use SDL_ConvertSurface if need to convert surface efficiently
         sdl2.ext.Window.refresh(window2)
+    cgrid2=sdl2.ext.pixels2d(surface2)
 
 #-----------------------------------------------------------------------------------------------------------
 
 def show0(count=True):
 # display initial population and count species
     global framenr
-    global surface, window, scalex2, caption, dispinit,colorfunction
+    global surface, window, scalex2, caption, dispinit, colorfunction, colorfunction2
     global surface2, window2, caption2, dispinit2
     # global repscheme,survivalmask,overwritemask,ancselectmask,selection
-    global cancol
+    global cancol,cgolg,cgolg2,cgrid,cgrid2
 
     if not dispinit:
         display_init()
+    if not dispinit2:
         display_init2()
+        # display_init2F()
     caption = "Gene Life at iteration %d" % framenr
     set_caption(window,caption)
 
     cancol=init_buttons()                           # initialize parameter buttons
     
-    colorgrid(colorfunction)
-
+    colorgrid(colorfunction,cgolg,cgrid)
+    
+    if colorfunction2 != -1:
+        colorgrid(colorfunction2,cgolg2,cgrid2)
+        # sdl2.ext.fill(surface2, 0)
+        if sdl2.SDL_BlitScaled(surface,None,surface2,None): print("BlitScaled failed")
+    else:
+        # sdl2.ext.fill(surface2, 0)
+        if sdl2.SDL_BlitScaled(surface,None,surface2,None): print("BlitScaled failed")
     sdl2.ext.Window.refresh(window)
+    sdl2.ext.Window.refresh(window2)
     
     if(count):
         genelife.countspecieshash()
 #-----------------------------------------------------------------------------------------------------------
 
 def update_sim(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
-    global gol, cgrid, colorfunction,colorfunction2
+    global gol, cgolg, cgolg2, cgrid, cgrid2, colorfunction, colorfunction2
     global golg
     global log2N
     global runparams
@@ -504,10 +568,9 @@ def update_sim(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
         if(count): genelife.countspecieshash()
     genelife.genelife_update(nrun, nhist, nstat)
     framenr = framenr+nrun
-    if update1: colorgrid(colorfunction)  # sets  cgrid
-    if update2:
-        if colorfunction2 == -1: colorgrid(colorfunction)  # sets  cgrid
-        else: colorgrid(colorfunction2)
+    if update1: colorgrid(colorfunction,cgolg,cgrid)  # sets  cgrid
+    if update2 and (colorfunction2 != -1):
+            colorgrid(colorfunction2,cgolg2,cgrid2)
     return
 
 #-----------------------------------------------------------------------------------------------------------
@@ -697,21 +760,61 @@ def step(count=True):
     global framenr
     #global gol,golg,golgstats
     global surface, window, scalex2, dispinit
-    global surface2, window2, caption2, dispinit2
+    global surface2, surface2x1, surface2x2, window2, caption2, dispinit2
     
     if not dispinit:
         display_init()
+    if not dispinit2:
         display_init2()
+        # display_init2F()
 
     update_sim(1, 1, 0, 1, 0, 0, count)
     caption = "Gene Life at iteration %d" % framenr
+    
     set_caption(window,caption)
-
+    if scalex2:
+        sdl2.ext.fill(surface2x2, 0)
+        if sdl2.SDL_BlitScaled(surface2x1,None,surface2x2,None): print("BlitScaled failed")
     sdl2.ext.Window.refresh(window)
+    
+    set_caption(window,caption)
+    if scalex2:
+        sdl2.ext.fill(surface2x2, 0)
+        if sdl2.SDL_BlitScaled(surface2x1,None,surface2x2,None): print("BlitScaled failed")
+    sdl2.ext.Window.refresh(window)
+    
     if (count):
         genelife.countspecieshash()
 #-----------------------------------------------------------------------------------------------------------
+def construct_caption(colorfunction1or2,pixeldat,buttonhelp):
+    """ construct window caption
+    """
+    global colorfunction,framenr,nspecies,selection
+    global quadrants,ymax,ymaxq,offdx,offdy,offdt,ncomponents,genealogycoldepth
+    
+    selectiontext0007 = ["largest value","most ones","scissors-well-stone-paper","not well ordered","two target","predator prey","cooperative","neutral"];
+    selectiontext0815 = ["sum fixed","sum variable","edge fixed","edge variable","canonical fixed","canonical variable","2D sym fixed","2D sym variable"];
 
+    
+    caption = "Gene Life at step %d coloring %d nspecies %d " % (framenr,colorfunction1or2,nspecies)
+    if selection < 8:
+        caption = caption + "pairwise selection " + selectiontext0007[selection] + " " + buttonhelp
+    elif selection<16:
+        caption = caption + "LUT encoding " + selectiontext0815[selection-8] + " "
+    if colorfunction1or2 == colorfunction:
+        if quadrants >= 0:
+            paramdat = "repscheme %06x surv. %01x overw. %01x ncoding %06x" % (repscheme,survivalmask,overwritemask,ncoding)
+            caption = caption + ("q%1d " % quadrants) + paramdat
+        if colorfunction == 4: caption = caption + ("ymax %d " % ymax)
+        elif colorfunction == 8: caption = caption + ("offsets (%d,%d,%d) " % (offdx,offdy,offdt))
+        elif colorfunction == 9:
+            ncomponents=genelife.get_ncomponents()
+            caption = caption + ("ncomponents %d " % (ncomponents))
+        elif colorfunction == 10: caption = caption + ("ymaxq %d " % ymaxq)
+        elif colorfunction == 11: caption = caption + ("genealogy_cold %d " % genealogycoldepth)
+        if pixeldat: caption = caption + pixeldat
+    return caption
+#-----------------------------------------------------------------------------------------------------------
 # infinite loop of display updates
 # cmd click in graphics window to stop, click for pixel details or quadrant selection,
 # alt-click or arrow keys for recolor,
@@ -725,8 +828,8 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
     global N
     global gol,golg,golgstats
     global connlabel,connlen,ncomponents
-    global colorfunction,gcolor,genealogycoldepth,ancestortype
-    global ymax,ymaxq,oldymax,oldymaxq,nbhist,nNhist
+    global colorfunction,colorfunction2,gcolor,genealogycoldepth,ancestortype
+    global nspecies,ymax,ymaxq,oldymax,oldymaxq,nbhist,nNhist
     global updatesenabled
     global rulemod,repscheme,survivalmask,birthmask,overwritemask,ancselectmask,selection,ncoding
     global savecnt
@@ -738,9 +841,6 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
     global parhelp
 
     mstime = sdl2.timer.SDL_GetTicks()
-    selectiontext0007 = ["largest value","most ones","scissors-well-stone-paper","not well ordered","two target","predator prey","cooperative","neutral"];
-    selectiontext0815 = ["sum fixed","sum variable","edge fixed","edge variable","canonical fixed","canonical variable","2D sym fixed","2D sym variable"];
-    selectiontext1623 = ["2-16 plane pairwise","2-16 plane pairwise","2-16 plane nearby","2-16 plane nearby","2-64 plane matching","2-64 plane matching","2-64 plane matching","2-64 plane matching"]
     actsizecoltxt= [" color from hashkey"," color log2 of size"," color # pixels"," color sqrt # pixels"]
     
     buttonhelp0007 =    ["0. selective birth for 3-live-nbs ","1. selective birth for 2-live-nbs ",
@@ -760,7 +860,9 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
 
     if not dispinit:
         display_init()
+    if not dispinit2:
         display_init2()
+        # display_init2F()
     cancol=init_buttons()
     
     surviveover = np.array([survivalmask,birthmask,overwritemask],dtype=np.uint32)
@@ -794,7 +896,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                     # sdl2.ext.quit()              # check that quitting SDL here is OK
                 elif event.button.button == sdl2.SDL_BUTTON_LEFT:          # get mouse coords on mouse event
                     mouseclicked = True
-                    if scalex2 or (event.window.windowID == windowID2):
+                    if scalex2:                    # or (event.window.windowID == windowID2):
                         x = (int) (event.button.x//2)
                         y = (int) (event.button.y//2)
                     else:
@@ -924,11 +1026,11 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                             print(("step %d pixel data %s" % (framenr,pixeldat)))
                         elif colorfunction == 9:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
-                            colorgrid(colorfunction)
+                            colorgrid(colorfunction,cgolg,cgrid)
                             pixeldat = "(%d,%d) label %4d nrconn %d" % (x,y,connlabel[y*N+x],connlen[connlabel[y*N+x]])
                         elif colorfunction == 10:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
-                            colorgrid(colorfunction)
+                            colorgrid(colorfunction,cgolg,cgrid)
                             pixeldat = "(%d,%d)" % (x,y)
                 elif event.button.button ==  sdl2.SDL_BUTTON_RIGHT:          # info on button or single plane choice (selection>=20) right mouse button (-click)
                     if scalex2 or event.window.windowID == windowID2:
@@ -971,7 +1073,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                         else: draw_rect(surface,cancol[4][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                 if colorfunction==9 or colorfunction==10:
                     ncomponents=genelife.get_connected_comps(connlabel,connlen,-1,-1)
-                    colorgrid(colorfunction)
+                    colorgrid(colorfunction,cgolg,cgrid)
                 pixeldat = ""
             elif event.type==sdl2.SDL_MOUSEMOTION:
                 if mouseclicked:
@@ -1008,15 +1110,15 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                             genelife.set_selectedgene(golg[x+y*N])
                         elif colorfunction == 9:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
-                            colorgrid(colorfunction)
+                            colorgrid(colorfunction,cgolg,cgrid)
                             pixeldat = "(%d,%d) label %4d nr.conn %d" % (x,y,connlabel[y*N+x],connlen[connlabel[y*N+x]])
                         elif colorfunction == 10:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
-                            colorgrid(colorfunction)
+                            colorgrid(colorfunction,cgolg,cgrid)
                             pixeldat = "(%d,%d)" % (x,y)
                 elif mouseclicked2:
                     if colorfunction == 2:
-                        if scalex2 or event.window.windowID == windowID2:
+                        if scalex2:                 # or event.window.windowID == windowID2:
                             x = (int) (event.motion.x//2)
                             y = (int) (event.motion.y//2)
                         else:
@@ -1059,6 +1161,16 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                     colorfunction = (colorfunction - 1) % 12
                     genelife.set_colorfunction(colorfunction)
                     print('step',framenr,'colorfunction changed to',colorfunction)
+                elif keystatus[sdl2.SDL_SCANCODE_UP]:
+                    colorfunction2 = (colorfunction2 + 1)
+                    if colorfunction2 == 12: colorfunction2 = -1
+                    genelife.set_colorfunction2(colorfunction2)
+                    print('step',framenr,'colorfunction2 changed to',colorfunction2)
+                elif keystatus[sdl2.SDL_SCANCODE_DOWN]:
+                    colorfunction2 = (colorfunction2 - 1)
+                    if colorfunction2 == -2: colorfunction2 = 11
+                    genelife.set_colorfunction2(colorfunction2)
+                    print('step',framenr,'colorfunction2 changed to',colorfunction2)
                 elif keystatus[sdl2.SDL_SCANCODE_EQUALS] or keystatus[sdl2.SDL_SCANCODE_KP_PLUS]:
                     if (colorfunction == 4) or (colorfunction == 5):
                         ymax = ymax * 2
@@ -1222,40 +1334,29 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                 update_sim(nrun, ndisp, nskip, niter, nhist, nstat, count)
             else:
                 if update1:
-                    colorgrid(colorfunction)
+                    colorgrid(colorfunction,cgolg,cgrid)
                 if update2:
-                    if colorfunction2 == -1:
-                        colorgrid(colorfunction)
-                    else:
-                        colorgrid(colorfunction2)
+                    if colorfunction2 != -1:
+                        colorgrid(colorfunction2,cgolg2,cgrid2)
 
         nspecies=genelife.get_nspecies()
-        caption = "Gene Life at step %d coloring %d nspecies %d " % (framenr,colorfunction,nspecies)
-        if selection < 8:
-            caption = caption + "pairwise selection " + selectiontext0007[selection] + " " + buttonhelp
-        elif selection<16:
-            caption = caption + "LUT encoding " + selectiontext0815[selection-8] + " "
-        elif selection<23:
-            caption = caption + "multiplane coupling " + selectiontext1623[selection-16] + " "
-        if quadrants >= 0:
-            paramdat = "repscheme %06x surv. %01x overw. %01x ncoding %06x" % (repscheme,survivalmask,overwritemask,ncoding)
-            caption = caption + ("q%1d " % quadrants) + paramdat
-        if colorfunction == 4: caption = caption + ("ymax %d " % ymax)
-        elif colorfunction == 8: caption = caption + ("offsets (%d,%d,%d) " % (offdx,offdy,offdt))
-        elif colorfunction == 9:
-            ncomponents=genelife.get_ncomponents()
-            caption = caption + ("ncomponents %d " % (ncomponents))
-        elif colorfunction == 10: caption = caption + ("ymaxq %d " % ymaxq)
-        elif colorfunction == 11: caption = caption + ("genealogy_cold %d " % genealogycoldepth)
-        if pixeldat: caption = caption + pixeldat
+        caption=construct_caption(colorfunction,pixeldat,buttonhelp)
+        if colorfunction2 == -1:
+            caption2 = caption
+        else:
+            caption2=construct_caption(colorfunction2,pixeldat,buttonhelp)
         
         if update1:                                         # window 1 updates switched on
             set_caption(window, caption)                    # sets the window caption with current status data
+            if scalex2:
+                #sdl2.ext.fill(surfacex2, 0)
+                sdl2.SDL_BlitScaled(surfacex1,None,surfacex2,None)
             sdl2.ext.Window.refresh(window)                 # copies the window to the display
         elif framenr % 10 == 0: set_caption(window, caption)# only less frequent caption update and no graphics update of window 1
 
         if update2:                                         # if update of 2nd window on
             if render2:
+                if colorfunction2 == -1:
                     sdlrenderer2 = renderer2.sdlrenderer
                     # sdl2.SDL_SetRenderDrawColor( sdlrenderer2, 0xFF, 0xFF, 0xFF, 0xFF )
                     sdl2.SDL_SetRenderDrawColor( sdlrenderer2, 0x00, 0x00, 0x00, 0x00 )
@@ -1268,7 +1369,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                     message2 = factory2.from_surface(message)
                     grect.w = message.contents.w
                     grect.h = message.contents.h
-                    set_caption(window2, caption)
+                    set_caption(window2, caption2)
                     sdl2.SDL_RenderCopy(sdlrenderer2, message2.texture, None, grect)
                     sdl2.SDL_RenderPresent(sdlrenderer2)
                     
@@ -1293,9 +1394,20 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                     sdl2.SDL_RenderCopy( renderer2, texture2, rect, None);
                     sdl2.SDL_RenderPresent( renderer2 )
                     """
+                else:
+                    set_caption(window2, caption2)
+                    if scalex2:
+                        sdl2.ext.fill(surface2x2, 0)
+                        sdl2.SDL_BlitScaled(surface2x1,None,surface2x2,None)
+                    sdl2.ext.Window.refresh(window2)                # copies the 2nd window to the display
             else:
-                sdl2.ext.fill(surface2, 0)
-                sdl2.SDL_BlitScaled(surface,None,surface2,None)
+                set_caption(window2, caption2)
+                if colorfunction2 == -1:
+                    sdl2.ext.fill(surface2, 0)
+                    sdl2.SDL_BlitScaled(surface,None,surface2,None)
+                elif scalex2:
+                    sdl2.ext.fill(surface2x2, 0)
+                    sdl2.SDL_BlitScaled(surface2x1,None,surface2x2,None)
                 sdl2.ext.Window.refresh(window2)                # copies the 2nd window to the display
         
         if framenr % 10 == 0:
@@ -1385,6 +1497,7 @@ def parhelp():
     print("left mouse  ","extract information about local state inside the array, or control buttons below")
     print("right mouse ","choose single plane for GoL display in colorfunction 2 for selection 16-19")
     print("<- , ->     ","decrement or increment the colorfunction analysis type mod 12")
+    print("Down , Up   ","decrement or increment the colorfunction2 analysis type mod 12 : -1 for same as colorfunction")
     print("2           ","toggle second window updates off/on")
     print("b , B       ","decrement or increment the half block for trace display: in range -1,0 to nNhist*2-2=38")
     print("f           ","print frame rate in fps (average of last 10 frames NYI")

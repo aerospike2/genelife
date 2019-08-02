@@ -995,7 +995,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
             cgolg[ij]=(int) mask;
         }
     }
-    else if(colorfunction==8) {         // colorfunction based on packed bit pattern with multiplicative hash, compare with offset
+    else if(colorfunction == 8) {         // colorfunction based on packed bit pattern with multiplicative hash, compare with offset
         int it_nbhood2;
         it_nbhood2 = it_nbhood*it_nbhood+2;
         for (ij=0; ij<N2; ij++) {
@@ -3395,7 +3395,7 @@ void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t g
 
     if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);
     if(vscrolling) v_scroll(newgol,newgolg,newgolb);
-    if (colorfunction==8) packandcompare(newgol,working,golmix);
+    if ((colorfunction == 8) || (colorfunction2 == 8)) packandcompare(newgol,working,golmix);
     if(diagnostics & diag_component_labels) ncomponents=extract_components(newgol);
 
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
@@ -3601,7 +3601,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
 
     if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);                    // [**gol** ??]
     if(vscrolling) v_scroll(newgol,newgolg,newgolb);
-    if (colorfunction==8) packandcompare(newgol,working,golmix);
+    if ((colorfunction == 8) || (colorfunction2 == 8)) packandcompare(newgol,working,golmix);
     if(diagnostics & diag_component_labels) ncomponents=extract_components(newgol);
     if(diagnostics & diag_hash_genes) {
         for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
@@ -3833,7 +3833,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
 
     if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);
     if(vscrolling) v_scroll(newgol,newgolg,newgolb);
-    if (colorfunction==8) packandcompare(newgol,working,golmix);
+    if ((colorfunction == 8) || (colorfunction2 == 8)) packandcompare(newgol,working,golmix);
     if (diagnostics & diag_component_labels) ncomponents=extract_components(newgol);
 
     if(diagnostics & diag_hash_genes) {
@@ -4054,7 +4054,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
 
     if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);
     if(vscrolling) v_scroll(newgol,newgolg,newgolb);
-    if (colorfunction==8) packandcompare(newgol,working,golmix);
+    if ((colorfunction == 8) || (colorfunction2 == 8)) packandcompare(newgol,working,golmix);
     if (diagnostics & diag_component_labels) ncomponents=extract_components(newgol);
 
     if(diagnostics & diag_hash_genes) {
@@ -4307,7 +4307,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
 
     if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);
     if(vscrolling) v_scroll(newgol,newgolg,newgolb);
-    if (colorfunction==8) packandcompare(newgol,working,golmix);
+    if ((colorfunction == 8) || (colorfunction2 == 8)) packandcompare(newgol,working,golmix);
     if(diagnostics & diag_component_labels) ncomponents=extract_components(newgol);
 
     if(diagnostics & diag_hash_genes) {
@@ -4372,7 +4372,7 @@ void genelife_update (int nsteps, int nhist, int nstat) {
             nspeciesquad=activitieshashquad();                                 // colors acttraceq and sets current population arrays, need to run always for continuity
             if(nspeciesquad<0) fprintf(stderr,"error returned from activitieshashquad\n");
         }
-        if(colorfunction==6 || colorfunction==7) {                            // genealogies
+        if(colorfunction==6 || colorfunction==7 || colorfunction2==6 || colorfunction2==7) { // genealogies
             ngenealogydeep=genealogies();                                     // colors genealogytrace
             if(ngenealogydeep<0) fprintf(stderr,"error returned from genealogies\n");
         }
@@ -4769,8 +4769,13 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
 }
 //-------------------------------------------------------------------- set ...---------------------------------------------------------------------------
 void set_colorfunction(int colorfunctionval) {
-    if(colorfunction>11) fprintf(stderr,"error colorfunction value passed %d too large\n",colorfunctionval);
+    if((colorfunctionval>11) || (colorfunctionval<-1)) fprintf(stderr,"error colorfunction value passed %d too large\n",colorfunctionval);
     else     colorfunction = colorfunctionval;
+}
+//.......................................................................................................................................................
+void set_colorfunction2(int colorfunctionin) {
+    if((colorfunctionin>11) || (colorfunctionin<-1)) fprintf(stderr,"error colorfunction value passed %d too large\n",colorfunctionin);
+    else     colorfunction2 = colorfunctionin;
 }
 //.......................................................................................................................................................
 int setget_act_ymax(int actymax) {                  // sets ymax for activities only if argument nonzero, reads old value
@@ -4925,10 +4930,6 @@ void set_activityfnlut(int activityfnlutin) {
 //.......................................................................................................................................................
 void set_colorupdate(int update1) {
     colorupdate1 = update1;
-}
-//.......................................................................................................................................................
-void set_colorfunction2(int colorfunction2in) {
-    colorfunction2 = colorfunction2in;
 }
 //------------------------------------------------------------------- get ... ---------------------------------------------------------------------------
 void  get_shist(int outshist[]){
@@ -6078,7 +6079,7 @@ int genealogies() {  /* genealogies of all currently active species */
 
     for(ij=0;ij<N2;ij++) genealogytrace[ij]=rootgene;           // initialize genealogytrace to root gene before drawing part of it
 
-    if(colorfunction==7) {                                      // time trace of genealogies
+    if(colorfunction==7 || colorfunction2==7) {                 // time trace of genealogies: NB simultaneus display of 6 and 7 not possible :> 2x 7 or 2x 6
       birthstep=0;
       for(i=0;i<nspeciesnow;i++) {
         for(j=0,j1=0;j<jmax;j++) {
@@ -6206,7 +6207,7 @@ int genealogies() {  /* genealogies of all currently active species */
 
     for(ij=0;ij<N2;ij++) genealogytrace[ij]=rootgene;           // initialize genealogytrace to root gene before drawing part of it
 
-    if(colorfunction==7) {                                      // time trace of genealogies
+    if(colorfunction==7 || colorfunction2==7) {                 // time trace of genealogies (takes precedence with two difft displays
       birthstep=0;
       for(i=0;i<nspeciesnow;i++) {
         for(j=0,j1=0;j<jmax;j++) {

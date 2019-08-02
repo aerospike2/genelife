@@ -297,7 +297,7 @@ def colorgenes1(gol, golg, golgstats, cgolg, colorfunction):
     return libcd.colorgenes1( gol, golg, golgstats, cgolg, len(gol), colorfunction)
 
 def colorgenes(cgolg,colorfunction):
-    return libcd.colorgenes( cgolg, len(cgolg),colorfunction)
+    return libcd.colorgenes( cgolg, len(cgolg), colorfunction)
 
 def set_colorfunction(colorfunctionval):
     return libcd.set_colorfunction(colorfunctionval)
