@@ -1519,7 +1519,9 @@ extern inline void selectone_nbs(int s, uint64_t nb2i, int nb[], uint64_t gol[],
     if(s2==3) {                 // 3 live neighbours in 2nd shell pointed to by live first shell neighbours
         *birth = 1ull;
         *birthid = (uint64_t) totsteps; *birthid = (*birthid <<32);
-        *newgene = golg[*birthid+=nb[(nb2i>>(kanc<<2))&0x7]];
+        k = nb[(nb2i>>(kanc<<2))&0x7];
+        *birthid+=k;
+        *newgene = golg[k];
     }
 }
 //-------------------------------------------------------------- selectdifft0 ---------------------------------------------------------------------------
