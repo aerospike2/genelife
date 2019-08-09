@@ -385,8 +385,8 @@ uint64_t planer7[N2];               // golr  7
 static uint64_t state[2];           // State for xorshift pseudorandom number generation. The state must be seeded so that it is not zero
 #define RAND128P(val) {                                                       \
     uint64_t x = state[0]; uint64_t const y = state[1];                       \
-	state[0] = y;	x ^= x << 23;  state[1] = x ^ y ^ (x >> 17) ^ (y >> 26);  \
-	val = state[1] + y;}
+    state[0] = y;    x ^= x << 23;  state[1] = x ^ y ^ (x >> 17) ^ (y >> 26);  \
+    val = state[1] + y;}
 int ranseed = 1234;
 //.......................................................................................................................................................
 const uint64_t m1  = 0x5555555555555555; //binary: 0101...           Constants for Hamming distance macro POPCOUNT64C
@@ -563,6 +563,8 @@ const uint64_t r1 = 0x1111111111111111ull;
 // set_stash            stash current gol,golg in stashgol, stshgolg
 // set_info_transfer_h  set information transfer histogram display value (0,1) from python
 // set_activityfnlut    set collection of functional activity statistics corresponding to functional aggregate of genes by non-neutral bits
+// set_colorupdate1     control update of colorgenes1 and regular print statements via flag colorupdate1
+// set_colorfunction2   choice of colorfunction for window 2
 //..........................................................  get to python driver  .....................................................................
 // get_stash            retrieve current gol,golg from stashed values
 // get_log2N            get the current log2N value from C to python
@@ -772,7 +774,7 @@ void printxy (uint64_t gol[],uint64_t golg[]) {                         // print
     printf("\n");
 }
 //.......................................................................................................................................................
-void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2) {
+void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2, int colorfunction) {
     uint64_t gene, gdiff, g2c, mask, quad;
     int ij,k,nbeven,activity,popcount,labelxy;
     unsigned int d,d0,d1,d2;
@@ -1202,8 +1204,8 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
     }
 }
 //.......................................................................................................................................................
-void colorgenes(int cgolg[], int NN2) {
-    colorgenes1(gol, golg, golgstats, cgolg, NN2);
+void colorgenes(int cgolg[], int NN2, int colorfunction) {
+    colorgenes1(gol, golg, golgstats, cgolg, NN2, colorfunction);
 }
 //------------------------------------------------------------- selectone -------------------------------------------------------------------------------
 extern inline void selectone_of_2(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene, uint64_t *birthid, unsigned int kch) {
@@ -3828,8 +3830,8 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
 
     }  // end for ij
 
-        
-        
+    
+    
 
     if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);
     if(vscrolling) v_scroll(newgol,newgolg,newgolb);
@@ -4431,7 +4433,7 @@ void initialize_planes(int offs[],  int Noffsets) {
     if (!(diagnostics & diag_offset_statistics)) return;
     
     if(Noffsets%3 !=0) fprintf(stderr,"Size of offsets array not a multiple of 3 as expected.");
-    Noff = Noffsets/3;		// Noff global
+    Noff = Noffsets/3;        // Noff global
     if(Noff>24){
         fprintf(stderr,"Too many offsets!  Max=24");
         exit(1);
@@ -4443,19 +4445,19 @@ void initialize_planes(int offs[],  int Noffsets) {
     offsets = (int **) calloc(Noff,sizeof(int *));
     for(i=0; i<Noff; i++) offsets[i] = (int *) calloc(3,sizeof(int)); // each containing xoff, yoff, toff.
     for(idx=0,i=0; i<Noff; i++){
-	    for(j=0; j<3; j++){
-	        offsets[i][j] = offs[idx];
-	        idx++;
-	    }
+        for(j=0; j<3; j++){
+            offsets[i][j] = offs[idx];
+            idx++;
+        }
     }
 
     // compute number of planes from toff = 3rd element of each offest vec:
     int tall,tmx = 0;
     int toff, tmn = Noffsets;
     for(i=0; i<Noff; i++){
-	    toff = offsets[i][2];
-	    if(toff>tmx) tmx = toff; // it does not make sense to have +ve values (this would look into future) so tmx = 0
-	    if(toff<tmn) tmn = toff;
+        toff = offsets[i][2];
+        if(toff>tmx) tmx = toff; // it does not make sense to have +ve values (this would look into future) so tmx = 0
+        if(toff<tmn) tmn = toff;
     }
     if(tmx>0)   {                // exit if positive values of z in (x,y,z) offsets have been entered : these look into future
         fprintf(stderr,"Error: offsets looking into future not allowed ------- tmx = %d, tmn = %d",tmx,tmn);
@@ -4936,7 +4938,7 @@ void  get_shist(int outshist[]){
     int i;
     for(i=0;i<9;i++)
         outshist[i] = shist[i];
-}        
+}
 //.......................................................................................................................................................
 int get_log2N() {
     return(log2N);
@@ -4953,14 +4955,14 @@ void get_stash(){               // retrieve current gol,golg from stashed values
 void get_curgol(uint64_t outgol[], int NN) {
     int ij;
     for (ij=0; ij<NN; ij++) {
-	    outgol[ij] = planes[curPlane][ij];
+        outgol[ij] = planes[curPlane][ij];
     }
 }
 //.......................................................................................................................................................
 void get_curgolg(uint64_t outgolg[], int NN) {
     int ij;
     for (ij=0; ij<NN; ij++) {
-	    outgolg[ij] = planesg[curPlane][ij];
+        outgolg[ij] = planesg[curPlane][ij];
     }
 }
 //.......................................................................................................................................................
@@ -5585,13 +5587,13 @@ void countspecies1(uint64_t gol[], uint64_t golg[], int N2) {     /* counts numb
         POPCOUNT64C(last, nones);
         fitness = 999;
         if (selection == 0) {                                               // 2-live neighbor fitness is integer value
-	        fitness = last;
+            fitness = last;
         }
         else if (selection == 1) {                                          // 2-live neighbor fitness is number of ones
-	        fitness = (uint64_t) nones;
+            fitness = (uint64_t) nones;
         }
         else if ((selection == 2)||(selection == 3)) {                      // cyclic 4 species model
-	        fitness = nones&0x3;                                            // fitness is species class
+            fitness = nones&0x3;                                            // fitness is species class
         }
 
         // fprintf(stderr,"count species %d with gene %llx has counts %llu and %d ones, fitness %llu\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
@@ -6360,7 +6362,7 @@ int get_genealogies(genedata genealogydat[], int narraysize) {  /* return geneal
     free(gindices);free(activities);free(genes);free(curgen);
     genealogydepth = jmax+1;
 
-    return(genealogydepth);   
+    return(genealogydepth);
 }
 int get_genealogies_(uint64_t genealogydat[], int narraysize) {  /* return genealogies of all currently active species */
     int j, jmax, i, ij, k, nspecies, nspeciesnow;
@@ -6456,7 +6458,7 @@ int get_genealogies_(uint64_t genealogydat[], int narraysize) {  /* return genea
     free(gindices);free(activities);free(genes);free(curgen);
     genealogydepth = jmax+1;
 
-    return(genealogydepth);   
+    return(genealogydepth);
 }
 
 void get_gliderinfo(uint64_t outgliderinfo[], int narraysize){               // put 7x7 pattern averaged match counts into outgliderinfo array
