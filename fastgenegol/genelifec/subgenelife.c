@@ -563,8 +563,6 @@ const uint64_t r1 = 0x1111111111111111ull;
 // set_stash            stash current gol,golg in stashgol, stshgolg
 // set_info_transfer_h  set information transfer histogram display value (0,1) from python
 // set_activityfnlut    set collection of functional activity statistics corresponding to functional aggregate of genes by non-neutral bits
-// set_colorupdate1     control update of colorgenes1 and regular print statements via flag colorupdate1
-// set_colorfunction2   choice of colorfunction for window 2
 //..........................................................  get to python driver  .....................................................................
 // get_stash            retrieve current gol,golg from stashed values
 // get_log2N            get the current log2N value from C to python
@@ -774,7 +772,7 @@ void printxy (uint64_t gol[],uint64_t golg[]) {                         // print
     printf("\n");
 }
 //.......................................................................................................................................................
-void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2, int colorfunction) {
+void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2) {
     uint64_t gene, gdiff, g2c, mask, quad;
     int ij,k,nbeven,activity,popcount,labelxy;
     unsigned int d,d0,d1,d2;
@@ -1204,8 +1202,8 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
     }
 }
 //.......................................................................................................................................................
-void colorgenes(int cgolg[], int NN2, int colorfunction) {
-    colorgenes1(gol, golg, golgstats, cgolg, NN2, colorfunction);
+void colorgenes(int cgolg[], int NN2) {
+    colorgenes1(gol, golg, golgstats, cgolg, NN2);
 }
 //------------------------------------------------------------- selectone -------------------------------------------------------------------------------
 extern inline void selectone_of_2(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene, uint64_t *birthid, unsigned int kch) {
