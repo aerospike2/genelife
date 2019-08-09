@@ -20,7 +20,7 @@ const int N = 0x1 << log2N;         // only side lengths powers of 2 allowed to 
 const int N2 = N*N;                 // number of sites in square-toroidal array
 const int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
 const int N2mask = N2 - 1;          // bit mask for array, used instead of modulo operation
-const uint64_t N2bit = N2;          // single bit for mask enquiries for clones with rootgene heritage
+const uint64_t rootclone = N2;      // single bit for mask enquiries for clones with root heritage
 //--------------------------------------------------------- main parameters of model ----------------------------------------------------------------
 unsigned int rulemod = 1;           // det: whether to modify GoL rules
 int selection = 1;                  // fitness of 2 live neighbours:
@@ -49,8 +49,8 @@ int ncoding = 1;                    // byte 0 of python ncoding : number of codi
 int ncoding2 = 0;                   // byte 1 of python ncoding: number of coding bits per gene function for masks in connection with repscheme add2ndmask1st R_6,7
 unsigned int pmutmask;              // binary mask so that prob of choosing zero is pmut = pmutmask/2^32. If value<32 interpret as integer -log2(prob).
 //...........................................................diagnostic control..........................................................................
-//const unsigned int diag_all = 0xffff;             // all diagnostics active
-const unsigned int diag_all = 0xffdb;             // all diagnostics active except clones
+const unsigned int diag_all = 0xffff;             // all diagnostics active
+//const unsigned int diag_all = 0xffdb;             // all diagnostics active except clones
 unsigned int diagnostics = diag_all;              // bit mask for diagnostics as defined by following constants
 const unsigned int diag_hash_genes = 0x1;         // enable hash storage of all genes encountered in simulation
 const unsigned int diag_hash_patterns = 0x2;      // enable hash storage of all patterns encountered in simulation
@@ -1208,15 +1208,13 @@ void colorgenes(int cgolg[], int NN2, int colorfunction) {
     colorgenes1(gol, golg, golgstats, cgolg, NN2, colorfunction);
 }
 //------------------------------------------------------------- selectone -------------------------------------------------------------------------------
-extern inline void selectone_of_2(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene, uint64_t *birthid, unsigned int kch) {
+extern inline void selectone_of_2(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t golb[],uint64_t * birth, uint64_t *newgene, uint64_t *parentid, unsigned int kch) {
 // birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene. Non-random result.
     unsigned int k,d0,d1,d2,d3,dd,swap;                  // number of ones in various gene combinations
     uint64_t livegenes[2],gdiff,gdiff0,gdiff1;           // various gene combinations
     uint64_t gene2centre;                                // gene function centres in sequence space
     int g0011,g0110,prey,prey2,ijanc[2];
 
-    *birthid = (uint64_t) totsteps;
-    *birthid = (*birthid << 32);
     for(k=0;k<2;k++) livegenes[k] = golg[ijanc[k]=nb[(nb2i>>(k<<2))&0x7]];
     POPCOUNT64C(livegenes[0],d0);
     POPCOUNT64C(livegenes[1],d1);
@@ -1224,13 +1222,13 @@ extern inline void selectone_of_2(int s, uint64_t nb2i, int nb[], uint64_t golg[
         case 0:                                          // integer value of sequence as fitness
             *birth = (livegenes[0]^livegenes[1]) ? 1ull: 0ull; // birth condition is two genes different
             *newgene = livegenes[0]>livegenes[1] ?  livegenes[0] : livegenes[1]; // choose one with larger gene to replicate
-            *birthid += (livegenes[0]>livegenes[1] ?  ijanc[0] : ijanc[1]);
+            *parentid = (livegenes[0]>livegenes[1]) ?  golb[ijanc[0]] : golb[ijanc[1]];
             break;
 
         case 1:                                          // number of ones in sequence as fitness
             *birth = (d0^d1) ? 1ull: 0ull;               // birth condition is two genes different in number of ones
             *newgene = (d0>d1) ? livegenes[0] : livegenes[1];
-            *birthid += (d0>d1) ? ijanc[0] : ijanc[1];
+            *parentid = (d0>d1) ? golb[ijanc[0]] : golb[ijanc[1]];
             break;
         case 2:                                          // scissors-stone-well-paper game on number ones mod 4
                                                          // scissors 0 stone 1 well 2 paper 3
@@ -1243,7 +1241,7 @@ extern inline void selectone_of_2(int s, uint64_t nb2i, int nb[], uint64_t golg[
                     dd = d0; d0 = d1; d1 = dd; swap = 1;
                 }
                 *newgene = (d0==0 && d1==3) ? livegenes[swap^0] : livegenes[swap^1];
-                *birthid += (d0==0 && d1==3) ? ijanc[swap^0] : ijanc[swap^1];
+                *parentid = (d0==0 && d1==3) ? golb[ijanc[swap^0]] : golb[ijanc[swap^1]];
             }
             else *newgene = 0ull;
             break;
@@ -1263,7 +1261,7 @@ extern inline void selectone_of_2(int s, uint64_t nb2i, int nb[], uint64_t golg[
                     swap = 1;
                 }
                 *newgene = (d0==0 && d1==3) ? livegenes[swap^0] : livegenes[swap^1];
-                *birthid += (d0==0 && d1==3) ? ijanc[swap^0] : ijanc[swap^1];
+                *parentid = (d0==0 && d1==3) ? golb[ijanc[swap^0]] : golb[ijanc[swap^1]];
             }
             else *newgene = 0ull;
             break;
@@ -1274,7 +1272,7 @@ extern inline void selectone_of_2(int s, uint64_t nb2i, int nb[], uint64_t golg[
             if (d0<ncoding) {if(d0>64-d1) swap=1;else swap=0;}                  // need 64-d1 != d0 to avoid asymmetry in direction               && (64-d1 != d0)
             else {if(64-d0>=d1) swap=1; else swap=0;}
             *newgene = livegenes[swap];
-            *birthid += ijanc[swap];
+            *parentid = golb[ijanc[swap]];
             break;
         case 5:                                          // predator prey model: prey-prey evolves to all 0, predator to complement of prey
             gdiff=livegenes[0]^livegenes[1];
@@ -1285,7 +1283,7 @@ extern inline void selectone_of_2(int s, uint64_t nb2i, int nb[], uint64_t golg[
             // *birth = (gdiff && prey && dd<ncoding) ? 1ull: 0ull;  // birth if different and >=1 prey and close enough match)
             *birth = (gdiff && prey2) || (prey && (!prey2) && (dd<ncoding)) ? 1ull: 0ull; // birth if different and >=1 prey and close enough match)
             *newgene = (prey2 ? ((d0<d1) ? livegenes[0] : livegenes[1]) : ((d0<32) ? livegenes[1] : livegenes[0]));
-            *birthid += (prey2 ? ((d0<d1) ? ijanc[0] : ijanc[1]) : ((d0<32) ? ijanc[1] : ijanc[0]));
+            *parentid = (prey2 ? ((d0<d1) ? golb[ijanc[0]] : golb[ijanc[1]]) : ((d0<32) ? golb[ijanc[1]] : golb[ijanc[0]]));
             break;
         case 6:                                         // birth if 2 genes differently functional (Not Yet Working)
                                                                             // 1st target is WLOG the all 0 sequence, d0 and d1 gives distances of two genes
@@ -1301,14 +1299,14 @@ extern inline void selectone_of_2(int s, uint64_t nb2i, int nb[], uint64_t golg[
             g0110 = d2<dd && d1<dd;                      // gene 0 closer to 2nd target and gene 1 closer to 1st target than they are from each other
             *birth = (g0011 && (d0!=d3)) != (g0110 && (d2!=d1))  ? 1ull: 0ull; // birth if 2 genes closer to two different targets than to each other
             *newgene = (g0011 && (d0!=d3)) ? ((d0<d3) ? livegenes[0] : livegenes[1]) : ((d2<d1) ? livegenes[0] : livegenes[1]);
-            *birthid += (g0011 && (d0!=d3)) ? ((d0<d3) ? ijanc[0] : ijanc[1]) : ((d2<d1) ? ijanc[0] : ijanc[1]);
+            *parentid = (g0011 && (d0!=d3)) ? ((d0<d3) ? golb[ijanc[0]] : golb[ijanc[1]]) : ((d2<d1) ? golb[ijanc[0]] : golb[ijanc[1]]);
             break;
         case 7:                                          // neutral selection but selective birth only occurs if two chosen sequences are same (different) (NB uses RNG)
                                                          // note that birth is already suppressed for 3 identical live nbs unless enforcebirth-3 bit on
                                                          // we want to use this routine only for two live nbs and only when genes not same
             *birth = livegenes[0]^livegenes[1] ? 1ull: 0ull;
             *newgene = golg[nb[kch]];
-            *birthid += nb[kch];
+            *parentid = golb[nb[kch]];
             break;
         // cases 8+: this subroutine is not used
         default:
@@ -1317,19 +1315,19 @@ extern inline void selectone_of_2(int s, uint64_t nb2i, int nb[], uint64_t golg[
     }
 }
 //.......................................................................................................................................................
-extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[], uint64_t * birth, uint64_t *newgene, uint64_t *birthid, uint64_t *nbmask) {
+extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[], uint64_t golb[], uint64_t *birth, uint64_t *newgene, uint64_t *parentid, uint64_t *nbmask, int ij) {
 // result is number of equally fit best neighbours that could be the ancestor (0 if no birth allowed, 1 if unique) and list of these neighbour indices
 // birth is returned 1 if ancestors satisfy selection condition. Selection of which of genes to copy is newgene. Non-random result.
     unsigned int k,nbest,ijanc[8];                        // index for neighbours and number in best fitness category and ij for up to 8 possible ancestors
     unsigned int d[8],dS,dB,d0,d1,d2;                     // number of ones in various gene combinations
     unsigned int scores[8];                               // cumulative scores for pairwise games of individual livegenes (used case repselect == 7)
-    uint64_t livegenes[8],gdiff,extremval,bestnbmask;
+    uint64_t livegenes[8],gdiff,extremval,bestnbmask,birthid;
     unsigned int repselect = (repscheme>>4)&0x7;
 
-    *birthid = (uint64_t) totsteps;
-    *birthid = (*birthid << 32);
+    birthid = (uint64_t) totsteps;
+    birthid = (birthid << 32)+rootclone+ij;
 
-    if(s==0) {*birth = 1ull;  *newgene = genegol[selection-8]; *birthid += N2; return(1);}
+    if(s==0) {*birth = 1ull;  *newgene = genegol[selection-8]; *parentid = birthid; return(1);}
 
     for(k=0;k<s;k++) {
         livegenes[k] = golg[ijanc[k] = nb[(nb1i>>(k<<2))&0x7]];
@@ -1345,7 +1343,7 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
             *birth = (nbest>0) ? 1ull: 0ull;             // birth condition may include later that genes not all same
             for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;   // execute loop until first optimal live neighbour found at k (a one)
             *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
-            *birthid+=ijanc[k&0x7];
+            *parentid=golb[ijanc[k&0x7]];
             break;
         case 2:
         case 3:                                          // number of ones in sequence as fitness : smallest (case 2) or largest (case 3)
@@ -1355,14 +1353,14 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
             *birth = ((nbest>0) ? 1ull: 0ull);           // birth condition may include later that genes not all same
             for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
             *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
-            *birthid+=ijanc[k&0x7];
+            *parentid=golb[ijanc[k&0x7]];
             break;
         case 4:                                          // neutral selection
             for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= 1ull<<(k+0*nbest++); // find set of genes with equal best value : in this case all of them
             *birth = 1ull;                               // birth condition is always true
             for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
             *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
-            *birthid+=ijanc[k&0x7];
+            *parentid=golb[ijanc[k&0x7]];
             break;
         case 5:                                          // neutral selection but birth only occurs if some sequences are different
             for(gdiff=0ull,k=1;k<s;k++) if ((gdiff=livegenes[0]^livegenes[k])) break; // test whether all genes the same
@@ -1372,7 +1370,7 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
             for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
             if (k==s) {k=0;*birth = 0ull;}               // avoid analyze error, and be on safe side
             *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
-            *birthid+=ijanc[k&0x7];
+            *parentid=golb[ijanc[k&0x7]];
             break;
         case 6:                                          // penalize genes by a cost for the numebr of LUT entries realized for survival and/or birth
           switch(selection) {
@@ -1446,7 +1444,7 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
           *birth = 1ull;                                // birth condition is always met since extremval set is always > 0
           for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
           *newgene = livegenes[k&0x7];                  // choose first of selected set to replicate (can make positional dependent choice instead externally)
-          *birthid+=ijanc[k&0x7];
+          *parentid=golb[ijanc[k&0x7]];
           break;
         case 7:                                         // scissors-stone-well-paper game on number ones mod 4, scissors 0 stone 1 well 2 paper 3
             for (k=0;k<s;k++) {                         // exception to numerical order: sc>pa. Do tournament with all others for each livegene and score
@@ -1472,7 +1470,7 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
             }
             for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
             *newgene = livegenes[k&0x7];               // choose first of selected set to replicate (can make positional dependent choice instead externally)
-            *birthid+=ijanc[k&0x7];
+            *parentid=golb[ijanc[k&0x7]];
             break;
         default:
             fprintf(stderr,"Error: s = %d live gene repselect %d is not implemented\n",s,repselect);
@@ -1483,7 +1481,7 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
     return(nbest);
 }
 //------------------------------------------------------------- selectone_nbs ---------------------------------------------------------------------------
-extern inline void selectone_nbs(int s, uint64_t nb2i, int nb[], uint64_t gol[], uint64_t golg[], uint64_t * birth, uint64_t *newgene, uint64_t *birthid) {
+extern inline void selectone_nbs(int s, uint64_t nb2i, int nb[], uint64_t gol[], uint64_t golg[],uint64_t golb[], uint64_t * birth, uint64_t *newgene, uint64_t *parentid) {
 // birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene.
     int k, kanc, l, nb1[8], ij1, i1, j1, j1p1, j1m1, i1p1, i1m1;
     uint64_t nbi, nbil, gene, genelink, s2, sl;
@@ -1518,9 +1516,8 @@ extern inline void selectone_nbs(int s, uint64_t nb2i, int nb[], uint64_t gol[],
     } // for
     if(s2==3) {                 // 3 live neighbours in 2nd shell pointed to by live first shell neighbours
         *birth = 1ull;
-        *birthid = (uint64_t) totsteps; *birthid = (*birthid <<32);
         k = nb[(nb2i>>(kanc<<2))&0x7];
-        *birthid+=k;
+        *parentid=golb[k];
         *newgene = golg[k];
     }
 }
@@ -1782,10 +1779,10 @@ extern inline uint64_t disambiguate(unsigned int kch, uint64_t nb1i, int nb[], u
     }
 }
 //------------------------------------------------------------ hash gene inline fns ---------------------------------------------------------------------
-extern inline void hashaddgene(int ij,uint64_t gene,uint64_t ancestor,uint64_t *golb,uint64_t ancestorid,uint64_t mutation) {
+extern inline void hashaddgene(int ij,uint64_t gene,uint64_t ancestor,uint64_t *golb,uint64_t parentid,uint64_t mutation) {
     genedata gdata;
     uint64_t birthid;
-    extern inline void hashaddclone(uint64_t birthid, uint64_t ancestorid, uint64_t gene, uint64_t updateancestryonly);
+    extern inline void hashaddclone(uint64_t birthid, uint64_t parentid, uint64_t gene, uint64_t updateancestryonly);
     
     if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
         genedataptr->lasttime = totsteps;
@@ -1811,11 +1808,11 @@ extern inline void hashaddgene(int ij,uint64_t gene,uint64_t ancestor,uint64_t *
         if (mutation) {
             birthid = ((uint64_t) totsteps)<<32;
             birthid |= ij;
-            if(ancestor==rootgene) birthid |= N2bit;
-            hashaddclone(birthid,ancestorid,gene,0ull);
+            // if(ancestor==rootgene) birthid |= rootclone; // this does not seem correct, so commented out
+            hashaddclone(birthid,parentid,gene,0ull);
             *golb = birthid;
         }
-        else *golb = ancestorid;
+        else *golb = parentid;
     }
 }
 //.......................................................................................................................................................
@@ -1843,8 +1840,9 @@ extern inline void hashgeneactivity(uint64_t gene, const char errorformat[]) {
         else fprintf(stderr,errorformat,4,totsteps,gene);
 }
 //------------------------------------------------------------ hash clone inline fns --------------------------------------------------------------------
-extern inline void hashaddclone(uint64_t birthid, uint64_t ancestorid, uint64_t gene, uint64_t updateancestryonly) {
+extern inline void hashaddclone(uint64_t birthid, uint64_t parentid, uint64_t gene, uint64_t updateancestryonly) {
     clonedata cdata;
+    static int first = 1;
 
     if(!updateancestryonly) {
         if((clonedataptr = (clonedata *) hashtable_find(&clonetable, birthid)) != NULL) {
@@ -1853,17 +1851,24 @@ extern inline void hashaddclone(uint64_t birthid, uint64_t ancestorid, uint64_t 
         else {
             cdata=cinitdata;
             cdata.birthid=birthid;
-            cdata.ancestorid=ancestorid;
+            cdata.ancestorid=parentid;
             cdata.gene = gene;
             hashtable_insert(&clonetable, birthid,(clonedata *) &cdata);
         }
     }
-    if(!(ancestorid&N2bit)) {             // clone's ancestor is not a rootgene progeny (i.e. not arising from initialization or external input)
-        if((clonedataptr = (clonedata *) hashtable_find(&clonetable, ancestorid)) != NULL) {
+    if(!(parentid&rootclone)) {             // clone's ancestor is not a rootgene progeny (i.e. not arising from initialization or external input)
+        if((clonedataptr = (clonedata *) hashtable_find(&clonetable, parentid)) != NULL) {
             clonedataptr->progeny++;
-            hashaddclone(ancestorid,clonedataptr->ancestorid,clonedataptr->gene,1ull);
+            hashaddclone(parentid,clonedataptr->ancestorid,clonedataptr->gene,1ull);
         }
-        else fprintf(stderr,"error in hashaddclone, the ancestorid %llx of clone %llx to be stored is not stored\n",ancestorid,birthid);
+        else {
+            if (first) {
+                first = 0;
+                fprintf(stderr,"step %d updateancestryonly %lld gene %llx\n",totsteps,updateancestryonly,gene);
+                fprintf(stderr,"birth hex ij %llx ancestor ij %llx birthid time %lld parentid time %lld\n",birthid & N2mask,birthid & N2mask,birthid>>32,parentid>>32);
+            }
+            fprintf(stderr,"error in hashaddclone, the parentid %llx of clone %llx to be stored is not stored\n",parentid,birthid);
+        }
     }
 }
 //.......................................................................................................................................................
@@ -1872,7 +1877,7 @@ extern inline void hashdeleteclone(uint64_t birthid) {
     clonedata * clonedataptr1;
     if((clonedataptr = (clonedata *) hashtable_find(&clonetable, birthid)) != NULL) {
         ancestorid = clonedataptr->ancestorid;
-        if(!(ancestorid&N2bit)) {                   // ancestor is not a rootgene
+        if(!(ancestorid&rootclone)) {                   // ancestor is not a rootgene
             if((clonedataptr1 = (clonedata *) hashtable_find(&clonetable, ancestorid)) != NULL) {
                 if(clonedataptr1->progeny>1) clonedataptr1->progeny--;
                 else hashdeleteclone(ancestorid);
@@ -3062,7 +3067,7 @@ void random_influx(uint64_t gol[],uint64_t golg[],uint64_t golb[],uint64_t newgo
                             newgol[ij] = 1ull;
                             RAND128P(randnr);
                             newgolg[ij] = randnr;
-                            if(diagnostics & diag_hash_genes) hashaddgene(ij,newgolg[ij],rootgene,newgolb+ij,(parentid+N2bit+ij),0x1ull);
+                            if(diagnostics & diag_hash_genes) hashaddgene(ij,newgolg[ij],rootgene,newgolb+ij,(parentid+rootclone+ij),0x1ull);
                         }
                     }
                 }
@@ -3073,7 +3078,7 @@ void random_influx(uint64_t gol[],uint64_t golg[],uint64_t golb[],uint64_t newgo
                         if (!newgol[ij]) {                      // if not live, fill with game of life genome
                             newgol[ij] = 1ull;
                             newgolg[ij] = genegol[selection-8]; // GoL gene for particular selection model coding
-                            if(diagnostics & diag_hash_genes) hashaddgene(ij,newgolg[ij],rootgene,newgolb+ij,(parentid+N2bit+ij),0x1ull);
+                            if(diagnostics & diag_hash_genes) hashaddgene(ij,newgolg[ij],rootgene,newgolb+ij,(parentid+rootclone+ij),0x1ull);
                         }
                     }
                 }
@@ -3153,7 +3158,7 @@ void random_influx(uint64_t gol[],uint64_t golg[],uint64_t golb[],uint64_t newgo
                     else {
                         newgolg[ij] = genegol[selection-8];
                     }
-                    if(diagnostics & diag_hash_genes) hashaddgene(ij,newgolg[ij],rootgene,newgolb+ij,(parentid+N2bit+ij),0x1ull);
+                    if(diagnostics & diag_hash_genes) hashaddgene(ij,newgolg[ij],rootgene,newgolb+ij,(parentid+rootclone+ij),0x1ull);
                 }
             }
         }
@@ -3265,8 +3270,8 @@ void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t g
                           nbc=(nb1i>>(k<<2))&0x7;
                           if(nb[nbc]!=nbch) nb2i = (nbc<<(k1++<<2))+nb2i;
                       }
-                      if (add2nd) selectone_nbs(s,nb2i,nb,gol,golg,&birth,&newgene,&parentid);  //2nd nb modulation
-                      else selectone_of_2(s,nb2i,nb,golg,&birth,&newgene,&parentid,kch);
+                      if (add2nd) selectone_nbs(s,nb2i,nb,gol,golg,golb,&birth,&newgene,&parentid);  //2nd nb modulation
+                      else selectone_of_2(s,nb2i,nb,golg,golb,&birth,&newgene,&parentid,kch);
                       if (birth==0ull) {                                    // optional reset of ancestor & birth if no ancestors chosen in selectone
                         if((enforcebirth&0x1)||rulemodij)  {                // birth cannot fail or genes don't matter or no modification to gol rules
                             newgene = golg[nbch];
@@ -3293,7 +3298,7 @@ void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t g
                 if (((select23live>>1)&0x1)&&(rulemodij||gol[ij])) {        // rule departure from GOL allowed or possible overwrite
                     if ((0x1ull&(overwrite>>1))||!gol[ij]) {                // either overwrite on for s==2 or central site is empty
                         if (add2nd) {
-                            selectone_nbs(s,nb1i,nb,gol,golg,&birth,&newgene,&parentid); //2nd nb modulation
+                            selectone_nbs(s,nb1i,nb,gol,golg,golb,&birth,&newgene,&parentid); //2nd nb modulation
                         }
                         else {
                             nbmask = (0x1ull<<(nb1i&0x7)) + (0x1ull<<((nb1i>>4)&0x7));
@@ -3304,7 +3309,7 @@ void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t g
                                 birth = 1ull;
                             }
                             else {
-                                selectone_of_2(s,nb1i,nb,golg,&birth,&newgene,&parentid,kch);
+                                selectone_of_2(s,nb1i,nb,golg,golb,&birth,&newgene,&parentid,kch);
                             }
                             if(repscheme & R_10_13_2birth_k4) {             // birth only on the active subset of 4 canonical 2-live nb configs if any are active
                                 if(~repscheme & (R_10_2birth_k0<<(kch-1))) birth = 0ull;   // cancel birth if chosen configuration not active
@@ -3527,7 +3532,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
             else {
             
                 if ((ancselectmask>>(s-1)) &0x1) {                          // use genes to select ancestor
-                    nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&parentid,&nbmask);// selection scheme depends on repscheme parameter, selection depends on genes
+                    nbest=selectone_of_s(s,nb1i,nb,golg,golb,&birth,&newgene,&parentid,&nbmask,ij);// selection scheme depends on repscheme parameter, selection depends on genes
                 }
                 else {                                                      // use positional information to select ancestor (leave birth on)
                     nbest = s;
@@ -3738,7 +3743,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
             }
             else {
                 if ((ancselectmask>>(s-1)) &0x1) {                              // use genes to select ancestor
-                    nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&parentid,&nbmask);// selection scheme depends on repscheme parameter, selection depends on genes
+                    nbest=selectone_of_s(s,nb1i,nb,golg,golb,&birth,&newgene,&parentid,&nbmask,ij);// selection scheme depends on repscheme parameter, selection depends on genes
                 }
                 else {                                                          // use positional information to select ancestor (leave birth on)
                     nbest = s;
@@ -3980,7 +3985,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
             }
             else {
                 if ((ancselectmask>>(s-1)) &0x1) {                              // use genes to select ancestor
-                    nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&parentid,&nbmask);// selection scheme depends on repscheme parameter, selection depends on genes
+                    nbest=selectone_of_s(s,nb1i,nb,golg,golb,&birth,&newgene,&parentid,&nbmask,ij);// selection scheme depends on repscheme parameter, selection depends on genes
                 }
                 else {                                                          // use positional information to select ancestor (leave birth on)
                     nbest = s;
@@ -4227,7 +4232,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
             }
             else {
                 if (s>0 && ((ancselectmask>>(s-1))&0x1)) {                      // use genes to select ancestor
-                    nbest=selectone_of_s(s,nb1i,nb,golg,&birth,&newgene,&parentid,&nbmask);// selection scheme depends on repscheme parameter, selection depends on genes
+                    nbest=selectone_of_s(s,nb1i,nb,golg,golb,&birth,&newgene,&parentid,&nbmask,ij);// selection scheme depends on repscheme parameter, selection depends on genes
                 }
                 else {                                                          // use positional information to select ancestor (leave birth on)
                     nbest = s;
@@ -4688,8 +4693,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
                 else if (golgin[ij1]>='0' && golgin[ij1]<'8') golg[ij] = startgenes[golgin[ij1]-'0'];
                 else golg[ij] = startgenes[7];
                 cnt++;
-                golgstats[ij] = 0ull;
-                golb[ij] = N2bit + ij;               // initialize clone to new clone
+                golb[ij] = rootclone + ij;               // initialize clone to new clone at time 0
             }
             // if (golg[ij] == 0 && gol[ij] != 0) fprintf(stderr,"zero gene at %d\n",ij);
         }
@@ -4721,7 +4725,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
                 cnt++;
             }
             golg[ij] = g;
-            golb[ij] = N2bit + ij;
+            golb[ij] = rootclone + ij;
         }
     }
     else {                                          // initfield < 0, use array values from stashed
@@ -4729,7 +4733,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
             gol[ij] = stashgol[ij];
             golg[ij] = stashgolg[ij];
             golgstats[ij] = 0ull;
-            golb[ij] = N2bit + ij;
+            golb[ij] = rootclone + ij;              // might want to define stashgolb and use it here
         }
     }
 
@@ -4757,7 +4761,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     if(diagnostics & diag_hash_genes) {
         for (ij=0; ij<N2; ij++) {
             if(gol[ij]) {
-                hashaddgene(ij,golg[ij],rootgene,golb+ij,N2bit+ij,0x1ull);   // totsteps=0 so parentid is spatial ij + flag N2bit for rootgene
+                hashaddgene(ij,golg[ij],rootgene,golb+ij,rootclone+ij,0x1ull);   // totsteps=0 so parentid is spatial ij + flag rootclone
             }
         }
                                                 // enumerate gene hash keys and values
