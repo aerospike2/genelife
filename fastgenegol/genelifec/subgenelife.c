@@ -983,10 +983,10 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
         if(colorfunction==6) k=2; else k=0;
         for (ij=0; ij<N2; ij++) {
             int i=ij&Nmask; int j=ij>>(log2N+k);
-            if(ancestortype==2) {
+            if((ancestortype==2) & diag_hash_clones) {
                 clone=clonealogytrace[i+(j<<log2N)];                    // double row for each ancestral step to make display more readable in colorfunction 6 mode
                 activity = 0;
-                if (clone == rootclone)   mask = 0x000000ff;       // black color for root
+                if (clone == rootclone)   mask = 0x000000ff;            // black color for root
                 else {
                     if (clone == 0ull) clone = 11778L;                  // random color for clone==0
                     mask = clone * 11400714819323198549ul;
@@ -6233,7 +6233,7 @@ int clonealogies() {                                            // genealogies o
                                                                 //reverse ancestries to allow comparison at same number of clonal speciations
     for (i=0; i<nclonesnow; i++) {
         for(j=0;j<N;j++) {
-            if (working[i+j*N]==rootclone) break;
+            if (working[i+j*N]&rootclone) break;
         }
         for(j1=0;j1<(j>>1);j1++) {
             birthid=working[i+(j-j1-1)*N];
@@ -6258,7 +6258,7 @@ int clonealogies() {                                            // genealogies o
             ij+=N;
             if(ij<N2) {
                 nextclone = working[ij];
-                if(nextclone==rootclone) birthstep=totsteps;
+                if(nextclone&rootclone) birthstep=totsteps;
                 else {
                     if((clonedataptr = (clonedata *) hashtable_find(&clonetable, nextclone)) != NULL) birthstep = (unsigned int) (clonedataptr->birthid>>32);
                     else fprintf(stderr,"ancestor %llx not found at (%d,%d) in clonealogies during birthstep extraction\n",nextclone,ij&Nmask,ij>>log2N);
