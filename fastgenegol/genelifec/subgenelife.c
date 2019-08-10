@@ -180,12 +180,13 @@ smallpatt smallpatts[65536];
 hashtable_t clonetable;             // hash table for clone ancestry
 typedef struct clonedata {
     uint64_t birthid;               // birth time and place of clone (upper 32 bits: time, lower 32 bits: place ij) plus 1 bit (N2) 0: ancesotr 1: no ancestor
-    uint64_t ancestorid;            // ancestor's id : i.e. birth time and place (upper 32 bits: time, lower 32 bits: place ij)
+    uint64_t parentid;              // ancestor's id : i.e. birth time and place (upper 32 bits: time, lower 32 bits: place ij)
     uint64_t gene;                  // gene of this individual
-    unsigned int progeny;           // number of progeny which are alive or have live descendents of this clone (32 bit)
-    unsigned int alive;             // 1 if clone is still alive, otherwise zero (32 bit)
+    unsigned int popln;             // number of live individuals in this clone (32 bit)
+    unsigned int activity;          // activity of clone (32 bit)
+    // unsigned int subclones;      // number of mutant clones stemming from clone (32 bit): not used currently
 } clonedata;
-clonedata cinitdata = {0ull,0ull,0ull,0,1};
+clonedata cinitdata = {0ull,0ull,0ull,1,1}; // initial values of clonedata: popln set to 1
 clonedata *clonedataptr;            // pointer to clonedata instance
 HASHTABLE_SIZE_T const* clones;     // pointer to stored hash table keys (which are the clones, live or with live descendants)
 clonedata* cloneitems;              // list of clonedata structured items stored in hash table
@@ -199,6 +200,7 @@ int nstatG = 0;                     // interval for collecting other statistical
 int genealogydepth = 0;             // depth of genealogies in current population
 int genealogycoldepth = 0;          // genes coloured by colour of ancestor at this depth in colorfunction=11
 int ngenealogydeep;                 // depth of genealogy
+int clonealogydepth = 0;            // depth of clonealogies in current population
 //.........................................................resource management...........................................................................
                                     // prepared but not yet fully implemented or activated
 int rmax = 1;                       // max number of resources per cell : 0 also turns off resource processing
@@ -246,6 +248,7 @@ uint64_t acttrace[N2];              // scrolled trace of last N time points of a
 uint64_t acttraceq[N2];             // scrolled trace of last N time points of activity of N most frequent quad patterns
 unsigned char acttraceqt[N2];       // type of entry in acttraceq : 1 quad, 0 smallpatt (<65536) i.e. corresponding to isnode
 uint64_t genealogytrace[N2];        // image trace of genealogies for N most frequently populated genes
+uint64_t clonealogytrace[N2];       // image trace of clonealogies for N most frequently populated clones
 const int nNhist = 20;              // maximum number of older blocks for trace
 int nbhist=-1;                      // current block for trace
 uint64_t poptrace1[N2*nNhist];      // trace of first N*nNhist time points of population of N most frequent genes
@@ -495,7 +498,14 @@ const uint64_t r1 = 0x1111111111111111ull;
 // selectdifft7         select the most central (left) of seven live neighbours or first one in canonical rotation
 // selectdifft          select the most central (left) of sum live neighbours or first one in canonical rotation : calls 1 of selectdifft1-7
 // disambiguate         disambiguate the cases where the canonical rotation does not uniquely identify a pattern start point : 1 of 8 methods
-// testlut              tests LUT calculation via selectdifft: prepares shortcut array lookup
+//...................................................... hash table management for genes and clones .....................................................
+// hashaddgene          add new gene to hash table, increment popln and ancestor information for genes already encountered. If mutation calls hashaddclone
+// hashdeletegene       decrements population count for gene, printing error message if not found or already zero. Calls hashdeletefromclone
+// hashgeneextinction   record gene extinctions in hash gene table, counting number of extinctions
+// hashgeneactivity     update activity of gene
+// hashaddclone         add new clone to hash table, increment popln information for existing clones
+// hashdeletefromclone  decrements population count for clone, printing error message if not found or already zero
+// hashcloneactivity    update activity of clone
 //......................................................  pattern storage and analysis  .................................................................
 // patt_hash            hash function for a pattern specified by 4 64-bit (8x8) patterns
 // newkey               assign one of free keys kept in a linked list, allocated 1024 at a time (used if hash-key already occupied with different quadtree)
@@ -594,10 +604,12 @@ const uint64_t r1 = 0x1111111111111111ull;
 // cmpfunc1             compare gene counts in population
 // cmpfunc2             compare gene values corresponding to given number index in hash table
 // cmpfunc3             compare population counts of hash stored genes
+// cmpfunc3c            compare population counts of hash stored clones
 // cmpfunc3q            compare pixel counts (pop1s) of hash stored quad patterns
 // cmpfunc3qs           compare pixel counts (pop1s) of hash stored small patterns
 // cmpfunc4             compare birth times of hash stored genes
 // cmpfunc5             compare common genealogy level gene values of hash stored genes
+// cmpfunc5c            compare common clonealogy level clone values of hash stored clones
 // cmpfunct6            compare according to ancestry in genealogytrace using activity ordering
 // cmpfunc7             compare according to ancestry in genealogytrace using population size ordering
 //..........................................................  gene and pattern analysis of dynamics .....................................................
@@ -611,6 +623,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // activitieshash       calculate array of current gene activities and update acttrace array of genes in activity plot format
 // activitieshashquad   calculate array of current quad activities and update acttraceq array of patterns in activity plot format
 // genealogies          calculate and display genealogies
+// clonealogies         calculate and display clonealogies: genealogies of clones
 //-------------------------------------------------------------------------------------------------------------------------------------------------------
 //--------------------------------------------------------------- colorgenes ----------------------------------------------------------------------------
 extern inline int integerSqrt(int n) {                  // the largest integer smaller than the square root of n (n>=0)
@@ -1782,7 +1795,7 @@ extern inline uint64_t disambiguate(unsigned int kch, uint64_t nb1i, int nb[], u
 extern inline void hashaddgene(int ij,uint64_t gene,uint64_t ancestor,uint64_t *golb,uint64_t parentid,uint64_t mutation) {
     genedata gdata;
     uint64_t birthid;
-    extern inline void hashaddclone(uint64_t birthid, uint64_t parentid, uint64_t gene, uint64_t updateancestryonly);
+    extern inline void hashaddclone(uint64_t birthid, uint64_t parentid, uint64_t gene);
     
     if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
         genedataptr->lasttime = totsteps;
@@ -1808,21 +1821,24 @@ extern inline void hashaddgene(int ij,uint64_t gene,uint64_t ancestor,uint64_t *
         if (mutation) {
             birthid = ((uint64_t) totsteps)<<32;
             birthid |= ij;
-            // if(ancestor==rootgene) birthid |= rootclone; // this does not seem correct, so commented out
-            hashaddclone(birthid,parentid,gene,0ull);
+            hashaddclone(birthid,parentid,gene);
             *golb = birthid;
         }
-        else *golb = parentid;
+        else {
+            *golb = parentid;
+            if((clonedataptr = (clonedata *) hashtable_find(&clonetable, parentid)) != NULL) clonedataptr->popln++;
+            else fprintf(stderr,"error in hashclone update, %llx clone not saved\n",parentid);
+        }
     }
 }
 //.......................................................................................................................................................
 extern inline void hashdeletegene(uint64_t gene,uint64_t birthid,const char errorformat[]) {
-    extern inline void hashdeleteclone(uint64_t birthid);
+    extern inline void hashdeletefromclone(uint64_t birthid);
     
     if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {genedataptr->popcount--;}
     else fprintf(stderr,errorformat,totsteps,gene);     // errorformat must contain %d and %llx format codes in this order
     
-    // if(diagnostics & diag_hash_clones) hashdeleteclone(birthid);
+    if(diagnostics & diag_hash_clones) hashdeletefromclone(birthid);
 }
 //.......................................................................................................................................................
 extern inline void hashgeneextinction(uint64_t gene,const char errorformat[]) {
@@ -1840,53 +1856,33 @@ extern inline void hashgeneactivity(uint64_t gene, const char errorformat[]) {
         else fprintf(stderr,errorformat,4,totsteps,gene);
 }
 //------------------------------------------------------------ hash clone inline fns --------------------------------------------------------------------
-extern inline void hashaddclone(uint64_t birthid, uint64_t parentid, uint64_t gene, uint64_t updateancestryonly) {
+extern inline void hashaddclone(uint64_t birthid, uint64_t parentid, uint64_t gene) {
     clonedata cdata;
-    static int first = 1;
 
-    if(!updateancestryonly) {
-        if((clonedataptr = (clonedata *) hashtable_find(&clonetable, birthid)) != NULL) {
-            fprintf(stderr,"error in hashaddclone, %llx already present\n",birthid);
-        }
-        else {
-            cdata=cinitdata;
-            cdata.birthid=birthid;
-            cdata.ancestorid=parentid;
-            cdata.gene = gene;
-            hashtable_insert(&clonetable, birthid,(clonedata *) &cdata);
-        }
+    if((clonedataptr = (clonedata *) hashtable_find(&clonetable, birthid)) != NULL) {
+        fprintf(stderr,"error in hashaddclone, %llx already present\n",birthid);
     }
-    if(!(parentid&rootclone)) {             // clone's ancestor is not a rootgene progeny (i.e. not arising from initialization or external input)
-        if((clonedataptr = (clonedata *) hashtable_find(&clonetable, parentid)) != NULL) {
-            clonedataptr->progeny++;
-            hashaddclone(parentid,clonedataptr->ancestorid,clonedataptr->gene,1ull);
-        }
-        else {
-            if (first) {
-                first = 0;
-                fprintf(stderr,"step %d updateancestryonly %lld gene %llx\n",totsteps,updateancestryonly,gene);
-                fprintf(stderr,"birth hex ij %llx ancestor ij %llx birthid time %lld parentid time %lld\n",birthid & N2mask,birthid & N2mask,birthid>>32,parentid>>32);
-            }
-            fprintf(stderr,"error in hashaddclone, the parentid %llx of clone %llx to be stored is not stored\n",parentid,birthid);
-        }
+    else {
+        cdata=cinitdata;
+        cdata.birthid=birthid;
+        cdata.parentid=parentid;
+        cdata.gene = gene;
+        hashtable_insert(&clonetable, birthid,(clonedata *) &cdata);
     }
 }
 //.......................................................................................................................................................
-extern inline void hashdeleteclone(uint64_t birthid) {
-    uint64_t ancestorid;
-    clonedata * clonedataptr1;
+extern inline void hashdeletefromclone(uint64_t birthid) {
     if((clonedataptr = (clonedata *) hashtable_find(&clonetable, birthid)) != NULL) {
-        ancestorid = clonedataptr->ancestorid;
-        if(!(ancestorid&rootclone)) {                   // ancestor is not a rootgene
-            if((clonedataptr1 = (clonedata *) hashtable_find(&clonetable, ancestorid)) != NULL) {
-                if(clonedataptr1->progeny>1) clonedataptr1->progeny--;
-                else hashdeleteclone(ancestorid);
-            }
-            else fprintf(stderr,"error finding clone ancestor with id %llx at time %d\n",ancestorid,totsteps);
-        }
-        hashtable_remove( &clonetable, birthid );
+        if(clonedataptr->popln) clonedataptr->popln--;
+        else fprintf(stderr,"error in deleting individual from clone: popln already zero\n");
+        // if (!clonedataptr->popln) hashtable_remove( &clonetable, birthid );
     }
-    else fprintf(stderr,"error deleting clone with birthid %llx at time %d : not found in hash table\n",birthid,totsteps);
+    else fprintf(stderr,"error deleting from clone with birthid %llx at time %d : not found in hash table\n",birthid,totsteps);
+}
+//.......................................................................................................................................................
+extern inline void hashcloneactivity(uint64_t birthid, const char errorformat[]) {
+        if((clonedataptr = (clonedata *) hashtable_find(&clonetable, birthid)) != NULL) clonedataptr->activity++;
+        else fprintf(stderr,errorformat,6,totsteps,birthid);
 }
 //------------------------------------------------------- hash quadtree inline fns ----------------------------------------------------------------------
 extern inline uint16_t rotate16(uint16_t patt) {                                        // rotate bits in 4x4 pattern for 90 deg clockwise rotation
@@ -3408,6 +3404,7 @@ void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t g
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error %d in update at step %d, gene %llx not stored\n");
         if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
+        if(newgolb[ij]) hashcloneactivity(newgolb[ij],"hash activity storage error in update, clone %llx not stored\n");
     }
     // if(diagnostics & diag_hash_patterns) qimage = quadimage(newgol,&patt,log2N); // quadtree hash of entire image
 }
@@ -5392,6 +5389,10 @@ int cmpfunc3 (const void * pa, const void * pb) {
     return ( geneitems[*(const int*)pa].popcount < geneitems[*(const int*)pb].popcount ? 1 : -1);
 }
 //.......................................................................................................................................................
+int cmpfunc3c (const void * pa, const void * pb) {
+    return ( cloneitems[*(const int*)pa].popln < cloneitems[*(const int*)pb].popln ? 1 : -1);
+}
+//.......................................................................................................................................................
 int cmpfunc3q (const void * pa, const void * pb) {
     return ( quaditems[*(const int*)pa].pop1s < quaditems[*(const int*)pb].pop1s ? 1 : -1);
 }
@@ -5420,6 +5421,20 @@ int cmpfunc5 (const void * pa, const void * pb) {               // sort accordin
         ij1 = i1+j*N; ij2 = i2+j*N;
         gene1=working[ij1]; gene2=working[ij2];
         if(gene1!=gene2) return((((gene1 > gene2) && (gene1!=rootgene)) || (gene2==rootgene)) ? 1 : -1);
+    }
+    return(0);
+}
+//.......................................................................................................................................................
+int cmpfunc5c (const void * pa, const void * pb) {               // sort according to ancestry in clonealogytrace
+
+   int i1,i2,ij1,ij2,j;
+   uint64_t birthid1,birthid2;
+   i1=*(const int *)pa; i2=*(const int *)pb;
+
+   for (j=0;j<clonealogydepth;j++) {
+        ij1 = i1+j*N; ij2 = i2+j*N;
+        birthid1=working[ij1]; birthid2=working[ij2];
+        if(birthid1!=birthid2) return((((birthid1 > birthid2) && (birthid1!=rootclone)) || (birthid2==rootclone)) ? 1 : -1);
     }
     return(0);
 }
@@ -6126,132 +6141,127 @@ int genealogies() {  /* genealogies of all currently active species */
     free(gindices);free(activities);free(popln);
     return(jmax);
 }
-//--------------------------------------------------------------- genealogies ---------------------------------------------------------------------------
-/*int genealogies_clones() {                                      // genealogies of all clones
+//--------------------------------------------------------------- clonealogies --------------------------------------------------------------------------
+int clonealogies() {                                            // genealogies of all clones
     int j, jmax, i, ij, nclones, nclonesnow, birthstep;
     int j1, j2, j3, activity, gorder[N];
-    uint64_t gene, ancgene, nextgene;
+    uint64_t birthid, parentid, nextclone;
+    // uint64_t gene, ancgene, nextgene;
     int *gindices,*popln,*activities,*birthsteps;
 
-
     nclones = hashtable_count(&clonetable);
-    clonetypes = hashtable_keys(&clonetable);
-    cloneitems = (genedata*) hashtable_items( &clonetable );
+    clones = hashtable_keys(&clonetable);
+    cloneitems = (clonedata*) hashtable_items( &clonetable );
 
-    for (i=nspeciesnow=0; i<nspecies; i++)
-        if(geneitems[i].popcount) nspeciesnow++;
+    for (i=nclonesnow=0; i<nclones; i++)
+        if(cloneitems[i].popln) nclonesnow++;
 
-    gindices = (int *) malloc(nspecies*sizeof(int));
-    for (i=j=0; i<nspecies; i++) {
-        if(geneitems[i].popcount) {
+    gindices = (int *) malloc(nclones*sizeof(int));
+    for (i=j=0; i<nclones; i++) {
+        if(cloneitems[i].popln) {
             gindices[j]=i;
             j++;
         }
-        else gindices[nspeciesnow+i-j]=i;
+        else gindices[nclonesnow+i-j]=i;
     }
 
-    qsort(gindices, nspeciesnow, sizeof(int), cmpfunc3);// sort in decreasing population size order
-    // qsort(gindices, nspeciesnow, sizeof(int), cmpfunc4);// alternatively, sort in increasing birthstep order
+    qsort(gindices, nclonesnow, sizeof(int), cmpfunc3c);        // sort in decreasing population size order
 
-    if (nspeciesnow>N) nspeciesnow=N;                           // can only display at most N species, chose oldest
+    if (nclonesnow>N) nclonesnow=N;                             // can only display at most N clones, chose oldest
 
-    popln = (int *) malloc(nspeciesnow*sizeof(int));
-    activities = (int *) malloc(nspeciesnow*sizeof(int));
-    birthsteps = (int *) malloc(nspeciesnow*sizeof(int));
+    popln = (int *) malloc(nclonesnow*sizeof(int));
+    activities = (int *) malloc(nclonesnow*sizeof(int));
+    birthsteps = (int *) malloc(nclonesnow*sizeof(int));
 
-    for (i=0; i<nspeciesnow; i++) {
-        popln[i]=geneitems[gindices[i]].popcount;
-        activities[i]=geneitems[gindices[i]].activity;
-        birthsteps[i]=geneitems[gindices[i]].firsttime;
+    for (i=0; i<nclonesnow; i++) {
+        popln[i]=cloneitems[gindices[i]].popln;
+        activities[i]=cloneitems[gindices[i]].activity;
+        birthsteps[i]=(unsigned int) ((cloneitems[gindices[i]].birthid)>>32);
     }
 
-    for(ij=0;ij<N2;ij++) working[ij]=rootgene;                  // set field to rootgene as background
+    for(ij=0;ij<N2;ij++) working[ij]=rootclone;                 // set field to rootclone as background
     activitymax=0;
-    for (i=jmax=0; i<nspeciesnow; i++) {
-        gene=genotypes[gindices[i]];                            // do not need to copy array to genes since only needed here
-        if(ancestortype) ancgene=geneitems[gindices[i]].recentancestor;
-        else                      ancgene=geneitems[gindices[i]].firstancestor;
-        activity=geneitems[gindices[i]].activity;
+    for (i=jmax=0; i<nclonesnow; i++) {
+        birthid=clones[gindices[i]];                            // do not need to copy array to genes since only needed here
+        parentid=cloneitems[gindices[i]].parentid;
+        activity=cloneitems[gindices[i]].activity;
         if(activity>activitymax) activitymax=activity;
-        working[i]=gene;                                        // ij = i for j=0
+        working[i]=birthid;                                     // ij = i for j=0
         for (j=1;j<N;j++) {                                     // go back at most N links in genealogy
-            gene=ancgene;
-            if(gene==rootgene) break;                           // reached root, exit j loop
+            birthid=parentid;
+            if(birthid==rootclone) break;                       // reached root, exit j loop
             else {
-                if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
-                    if(ancestortype) ancgene=genedataptr->recentancestor;
-                    else ancgene=genedataptr->firstancestor;
-                    activity = genedataptr->activity;
+                if((clonedataptr = (clonedata *) hashtable_find(&clonetable, birthid)) != NULL) {
+                    parentid=clonedataptr->parentid;
+                    activity = clonedataptr->activity;
                     if(activity>activitymax) activitymax=activity;
                 }
-                else fprintf(stderr,"ancestor not found in genealogies\n");
+                else fprintf(stderr,"ancestor not found in clonealogies\n");
             }
             ij = i+j*N;
-            working[ij]=gene;
+            working[ij]=birthid;
         }
         if (j>jmax) jmax=j;
     }
-    genealogydepth = jmax;
+    clonealogydepth = jmax;
 
-                                                                //reverse ancestries to allow comparison at same number of speciations
-    for (i=0; i<nspeciesnow; i++) {
+                                                                //reverse ancestries to allow comparison at same number of clonal speciations
+    for (i=0; i<nclonesnow; i++) {
         for(j=0;j<N;j++) {
-            if (working[i+j*N]==rootgene) break;
+            if (working[i+j*N]==rootclone) break;
         }
         for(j1=0;j1<(j>>1);j1++) {
-            gene=working[i+(j-j1-1)*N];
+            birthid=working[i+(j-j1-1)*N];
             working[i+(j-j1-1)*N]=working[i+j1*N];
-            working[i+j1*N]=gene;
+            working[i+j1*N]=birthid;
         }
     }
     for (i=0; i<N; i++) gorder[i]=i;
-    qsort(gorder, nspeciesnow, sizeof(int), cmpfunc5);          // sort according to ancestral lines - use cmpfunc5 to sorting genes laterally via gene value
-    //qsort(gorder, nspeciesnow, sizeof(int), cmpfunc6);        // sort according to ancestral lines - use cmpfunc6 to sorting genes laterally via activity
-    //qsort(gorder, nspeciesnow, sizeof(int), cmpfunc7);        // sort according to ancestral lines - use cmpfunc7 to sort genes laterally via population size
+    qsort(gorder, nclonesnow, sizeof(int), cmpfunc5c);          // sort according to ancestral lines - use cmpfunc5 to sorting clones laterally via clone value
 
     for (i=0;i<N;i++) if((gorder[i]<0)||(gorder[i]>=N)) fprintf(stderr,"step %d error in gorder out of bounds at i = %d with value %d\n",totsteps,i,gorder[i]);
 
-    for(ij=0;ij<N2;ij++) genealogytrace[ij]=rootgene;           // initialize genealogytrace to root gene before drawing part of it
+    for(ij=0;ij<N2;ij++) clonealogytrace[ij]=rootclone;          // initialize clonealogytrace to root clone before drawing part of it
 
-    if(colorfunction==7 || colorfunction2==7) {                 // time trace of genealogies (takes precedence with two difft displays
+    if(colorfunction==7 || colorfunction2==7) {                 // time trace of clonealogies (takes precedence with two difft displays
       birthstep=0;
-      for(i=0;i<nspeciesnow;i++) {
+      for(i=0;i<nclonesnow;i++) {
         for(j=0,j1=0;j<jmax;j++) {
-            if(gorder[i]>=nspeciesnow) fprintf(stderr,"error in genealogies gorder at i=%d, order value %d out of range\n",i,gorder[i]);
+            if(gorder[i]>=nclonesnow) fprintf(stderr,"error in clonealogies gorder at i=%d, order value %d out of range\n",i,gorder[i]);
             ij = gorder[i]+j*N;
-            gene = working[ij];
+            birthid = working[ij];
             ij+=N;
             if(ij<N2) {
-                nextgene = working[ij];
-                if(nextgene==rootgene) birthstep=totsteps;
+                nextclone = working[ij];
+                if(nextclone==rootclone) birthstep=totsteps;
                 else {
-                    if((genedataptr = (genedata *) hashtable_find(&genetable, nextgene)) != NULL) birthstep = genedataptr->firsttime;
-                    else fprintf(stderr,"ancestor %llx not found at (%d,%d) in genealogies during birthstep extraction\n",nextgene,ij&Nmask,ij>>log2N);
+                    if((clonedataptr = (clonedata *) hashtable_find(&clonetable, nextclone)) != NULL) birthstep = (unsigned int) (clonedataptr->birthid>>32);
+                    else fprintf(stderr,"ancestor %llx not found at (%d,%d) in clonealogies during birthstep extraction\n",nextclone,ij&Nmask,ij>>log2N);
                 }
             }
             else birthstep=totsteps;
             j2 = birthstep*N/totsteps;
             for (j3=j1;j3<j2;j3++) {
                 ij = i+j3*N;
-                genealogytrace[ij]=gene;
+                clonealogytrace[ij]=birthid;
             }
             j1 = j2;
         }
       }
-      // for(i=nspeciesnow;i<N;i++) for(j=0;j<N;j++) genealogytrace[gorder[i]+j*N]=rootgene;
+      // for(i=nclonesnow;i<N;i++) for(j=0;j<N;j++) clonealogytrace[gorder[i]+j*N]=rootclone;
     }
     else {                                                      // species changes only trace (colorfunction == 6)
-      for(i=0;i<nspeciesnow;i++) {
+      for(i=0;i<nclonesnow;i++) {
         for(j=0;j<jmax;j++) {
             ij=i+j*N;
-            genealogytrace[ij]=working[gorder[i]+j*N];
+            clonealogytrace[ij]=working[gorder[i]+j*N];
         }
       }
     }
     free(gindices);free(activities);free(popln);free(birthsteps);
     return(jmax);
 }
-*/
+
 //----------------------------------------------------- ---------------------------------------------------------------------------
 // int get_genealogies() like genealogies, but return data for all geneaologies instead of filling out genealogytrace[]
 
