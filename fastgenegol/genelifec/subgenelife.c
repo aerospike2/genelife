@@ -77,7 +77,7 @@ int colorfunction = 0;              // color function choice of 0: hash or 1: fu
                                     // 9: connected components 10 : connected component activities 11: genealogy based individual colors
 int colorfunction2 = -1;            // colorfunction for second window: as above, but -1 means same value as colorfunction
 int colorupdate1 = 1;               // flag to enable routine print statements to terminal during run : linked to colorfunction display in python
-int ancestortype = 0;               // whether to display and return genealogies via first or most recent ancestor
+int ancestortype = 0;               // whether to display and return genealogies via first or most recent ancestor, or clonal ancetry for value 2
 #define ASCII_ESC 27                // escape for printing terminal commands, such as cursor repositioning : only used in non-graphic version
 //-----------------------------------------masks for named repscheme bits (selection 0-7) ----------------------------------------------------------------
 #define R_0_2sel_3live     0x1      /* 1: for 3-live-n birth, employ selection on two least different live neighbours for ancestor */
@@ -788,7 +788,7 @@ void printxy (uint64_t gol[],uint64_t golg[]) {                         // print
 }
 //.......................................................................................................................................................
 void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2, int colorfunction) {
-    uint64_t gene, gdiff, g2c, mask, quad;
+    uint64_t gene, gdiff, g2c, mask, quad, clone;
     int ij,k,nbeven,activity,popcount,labelxy;
     unsigned int d,d0,d1,d2;
     unsigned int color[3],colormax;
@@ -983,27 +983,52 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
         if(colorfunction==6) k=2; else k=0;
         for (ij=0; ij<N2; ij++) {
             int i=ij&Nmask; int j=ij>>(log2N+k);
-            gene=genealogytrace[i+(j<<log2N)];                      // double row for each ancestral step to make display more readable in colorfunction 6 mode
-            activity = 0;
-            if (gene == selectedgene)    mask = 0xffffffff;         // white color for selected gene
-            else if (gene == rootgene)   mask = 0x000000ff;         // black color for root
-            else if (gene == generepeat) mask = 0x3f3f3fff;         // grey color for repeated gene
-            else {
-                if (gene == 0ull) gene = 11778L;                    // random color for gene==0
-                mask = gene * 11400714819323198549ul;
-                mask = mask >> (64 - 32);                           // hash with optimal prime multiplicator down to 32 bits
-                mask |= 0x080808ffull; // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
-                if((colorfunction==7) && (diagnostics & diag_hash_genes)) {                           // rescale color brightness by activity/activitymax
-                    activity = 0;
-                    if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) activity = genedataptr->activity;
-                    else fprintf(stderr,"gene not found in colorfunction for genealogy\n");
-                    colormax=0;
-                    for(d=0;d<3;d++) if((color[d]=( (mask>>(8+(d<<3))) & 0xff))>colormax) colormax=color[d];
-                    rescalecolor=0.25+0.75*((double)(activity*255))/((double)(activitymax*colormax));         // integer version doesn't work
-                    for(d=0;d<3;d++) color[d]=(unsigned int) (((double) color[d])*rescalecolor);     // rescale colors by activity/activitymax
-                    for(d=0,mask=0xff;d<3;d++) mask |= color[d]<<((d<<3)+8);
+            if(ancestortype==2) {
+                clone=clonealogytrace[i+(j<<log2N)];                    // double row for each ancestral step to make display more readable in colorfunction 6 mode
+                activity = 0;
+                if (clone == rootclone)   mask = 0x000000ff;       // black color for root
+                else {
+                    if (clone == 0ull) clone = 11778L;                  // random color for clone==0
+                    mask = clone * 11400714819323198549ul;
+                    mask = mask >> (64 - 32);                           // hash with optimal prime multiplicator down to 32 bits
+                    mask |= 0x080808ffull; // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
+                    if((colorfunction==7) && (diagnostics & diag_hash_clones)) {                         // rescale color brightness by activity/activitymax
+                        activity = 0;
+                        if((clonedataptr = (clonedata *) hashtable_find(&clonetable, clone)) != NULL) activity = clonedataptr->activity;
+                        else fprintf(stderr,"clone not found in colorfunction for clonealogy\n");
+                        colormax=0;
+                        for(d=0;d<3;d++) if((color[d]=( (mask>>(8+(d<<3))) & 0xff))>colormax) colormax=color[d];
+                        rescalecolor=0.25+0.75*((double)(activity*255))/((double)(activitymax*colormax));         // integer version doesn't work
+                        for(d=0;d<3;d++) color[d]=(unsigned int) (((double) color[d])*rescalecolor);     // rescale colors by activity/activitymax
+                        for(d=0,mask=0xff;d<3;d++) mask |= color[d]<<((d<<3)+8);
+                    }
+                    else {};    // no rescaling of colours for case 6 (formerly cases 5 and 6)
                 }
-                else {};    // no rescaling of colours for case 6 (formerly cases 5 and 6)
+            }
+            else {
+                gene=genealogytrace[i+(j<<log2N)];                      // double row for each ancestral step to make display more readable in colorfunction 6 mode
+                activity = 0;
+                if (gene == selectedgene)    mask = 0xffffffff;         // white color for selected gene
+                else if (gene == rootgene)   mask = 0x000000ff;         // black color for root
+                else if (gene == generepeat) mask = 0x3f3f3fff;         // grey color for repeated gene
+                if (gene == rootgene)   mask = 0x000000ff;              // black color for root
+                else {
+                    if (gene == 0ull) gene = 11778L;                    // random color for gene==0
+                    mask = gene * 11400714819323198549ul;
+                    mask = mask >> (64 - 32);                           // hash with optimal prime multiplicator down to 32 bits
+                    mask |= 0x080808ffull; // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
+                    if((colorfunction==7) && (diagnostics & diag_hash_genes)) {                           // rescale color brightness by activity/activitymax
+                        activity = 0;
+                        if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) activity = genedataptr->activity;
+                        else fprintf(stderr,"gene not found in colorfunction for genealogy\n");
+                        colormax=0;
+                        for(d=0;d<3;d++) if((color[d]=( (mask>>(8+(d<<3))) & 0xff))>colormax) colormax=color[d];
+                        rescalecolor=0.25+0.75*((double)(activity*255))/((double)(activitymax*colormax));         // integer version doesn't work
+                        for(d=0;d<3;d++) color[d]=(unsigned int) (((double) color[d])*rescalecolor);     // rescale colors by activity/activitymax
+                        for(d=0,mask=0xff;d<3;d++) mask |= color[d]<<((d<<3)+8);
+                    }
+                    else {};    // no rescaling of colours for case 6 (formerly cases 5 and 6)
+                }
             }
             cgolg[ij]=(int) mask;
         }

@@ -754,7 +754,7 @@ def show0(count=True):
     if colorfunction2 != -1:
         colorgrid(colorfunction2,cgolg2,cgrid2)
         # sdl2.ext.fill(surface2, 0)
-        if sdl2.SDL_BlitScaled(surfacex1,rect1,surface2x1,rect1): print("BlitScaled failed")
+        if sdl2.SDL_BlitScaled(surfacex1,grect1,surface2x1,grect1): print("BlitScaled failed")
         if sdl2.SDL_BlitScaled(surface2x1,None,surface2,None): print("BlitScaled failed")
 
     else:
@@ -772,7 +772,7 @@ def step(count=True):
     """single step and update display and species counts"""
     global framenr
     #global gol,golg,golgstats
-    global surface, surfacex1, window, scalex2, dispinit, rect1
+    global surface, surfacex1, window, scalex2, dispinit, grect1
     global surface2, surface2x1, window2, caption2, dispinit2
     
     if not dispinit:
@@ -788,7 +788,7 @@ def step(count=True):
     set_caption(window2,caption)
 
     if colorfunction2 != -1:
-        if sdl2.SDL_BlitScaled(surfacex1,rect1,surface2x1,rect1): print("BlitScaled failed")
+        if sdl2.SDL_BlitScaled(surfacex1,grect1,surface2x1,grect1): print("BlitScaled failed")
         if sdl2.SDL_BlitScaled(surface2x1,None,surface2,None): print("BlitScaled failed")
     else:
         if sdl2.SDL_BlitScaled(surface,None,surface2,None): print("BlitScaled failed")
@@ -836,7 +836,7 @@ def construct_caption(colorfunction1or2,pixeldat,buttonhelp):
 # misc. keys save image
 def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
     global mstime,framenr,framerate
-    global surface, surfacex1, surfacex2, window, scalex2, caption, dispinit, update1, rect1
+    global surface, surfacex1, surfacex2, window, scalex2, caption, dispinit, update1, grect1
     global surface2, surface2x1, surface2x2, window2, caption2, dispinit2, grect, render2, update2, renderer2, factory2, image2, message2, font2, textColor2, windowID2
     global N
     global gol,golg,golgstats
@@ -1419,7 +1419,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                     if sdl2.SDL_BlitScaled(surfacex1,None,surface2,None):
                         print("error",sdl2.SDL_GetError(),"executing BlitScaled at step",framenr)
                 else:
-                    if sdl2.SDL_BlitScaled(surfacex1,rect1,surface2x1,rect1): print("BlitScaled failed")
+                    if sdl2.SDL_BlitScaled(surfacex1,grect1,surface2x1,grect1): print("BlitScaled failed")
                     if scalex2:
                         if sdl2.SDL_BlitScaled(surface2x1,None,surface2,None):
                             print("error",sdl2.SDL_GetError(),"executing BlitScaled at step",framenr)
