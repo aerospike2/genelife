@@ -201,6 +201,7 @@ int genealogydepth = 0;             // depth of genealogies in current populatio
 int genealogycoldepth = 0;          // genes coloured by colour of ancestor at this depth in colorfunction=11
 int ngenealogydeep;                 // depth of genealogy
 int clonealogydepth = 0;            // depth of clonealogies in current population
+int nclonealogydeep;                // depth of clonealogy
 //.........................................................resource management...........................................................................
                                     // prepared but not yet fully implemented or activated
 int rmax = 1;                       // max number of resources per cell : 0 also turns off resource processing
@@ -979,12 +980,12 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
             cgolg[ij]= (int) mask;
         }
     }
-    else if(colorfunction==6 || colorfunction == 7){                //genealogies
-        if(colorfunction==6) k=2; else k=0;
+    else if(colorfunction==6 || colorfunction == 7){                    //genealogies
+        if(colorfunction==6) k=2; else k=0;                             // double row for each ancestral step to make display more readable in colorfunction 6 mode
         for (ij=0; ij<N2; ij++) {
             int i=ij&Nmask; int j=ij>>(log2N+k);
-            if((ancestortype==2) & diag_hash_clones) {
-                clone=clonealogytrace[i+(j<<log2N)];                    // double row for each ancestral step to make display more readable in colorfunction 6 mode
+            if((ancestortype==2) && (diagnostics &diag_hash_clones)) {
+                clone=clonealogytrace[i+(j<<log2N)];
                 activity = 0;
                 if (clone == rootclone)   mask = 0x000000ff;            // black color for root
                 else {
@@ -1006,12 +1007,11 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                 }
             }
             else {
-                gene=genealogytrace[i+(j<<log2N)];                      // double row for each ancestral step to make display more readable in colorfunction 6 mode
+                gene=genealogytrace[i+(j<<log2N)];
                 activity = 0;
                 if (gene == selectedgene)    mask = 0xffffffff;         // white color for selected gene
                 else if (gene == rootgene)   mask = 0x000000ff;         // black color for root
                 else if (gene == generepeat) mask = 0x3f3f3fff;         // grey color for repeated gene
-                if (gene == rootgene)   mask = 0x000000ff;              // black color for root
                 else {
                     if (gene == 0ull) gene = 11778L;                    // random color for gene==0
                     mask = gene * 11400714819323198549ul;
@@ -4357,6 +4357,7 @@ void genelife_update (int nsteps, int nhist, int nstat) {
     int activitieshash(void);                                                 // count activities of all currently active gene species
     int activitieshashquad(void);                                             // count activities of all currently active quad pattern species
     int genealogies(void);                                                    // genealogies of all currently active species
+    int clonealogies(void);                                                   // clonealogies of all currently active clones
     void tracestats(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int NN2); // trace statistics based on gol,golg
     void countconfigs(void);
     void countspecies1(uint64_t gol[], uint64_t golg[], int N2);              // count species
@@ -4402,8 +4403,10 @@ void genelife_update (int nsteps, int nhist, int nstat) {
             if(nspeciesquad<0) fprintf(stderr,"error returned from activitieshashquad\n");
         }
         if(colorfunction==6 || colorfunction==7 || colorfunction2==6 || colorfunction2==7) { // genealogies
-            ngenealogydeep=genealogies();                                     // colors genealogytrace
+            ngenealogydeep=genealogies();                                      // colors genealogytrace
             if(ngenealogydeep<0) fprintf(stderr,"error returned from genealogies\n");
+            nclonealogydeep=clonealogies();                                    // colors clonealogytrace
+            if(nclonealogydeep<0) fprintf(stderr,"error returned from clonealogies\n");
         }
         if(!(totsteps%10) && colorupdate1) {
             if (diagnostics & diag_hash_genes)    nallspecies     = hashtable_count(&genetable);
@@ -6207,14 +6210,14 @@ int clonealogies() {                                            // genealogies o
     for(ij=0;ij<N2;ij++) working[ij]=rootclone;                 // set field to rootclone as background
     activitymax=0;
     for (i=jmax=0; i<nclonesnow; i++) {
-        birthid=clones[gindices[i]];                            // do not need to copy array to genes since only needed here
+        birthid=clones[gindices[i]];                            // do not need to copy array since only needed here
         parentid=cloneitems[gindices[i]].parentid;
         activity=cloneitems[gindices[i]].activity;
         if(activity>activitymax) activitymax=activity;
         working[i]=birthid;                                     // ij = i for j=0
-        for (j=1;j<N;j++) {                                     // go back at most N links in genealogy
+        for (j=1;j<N;j++) {                                     // go back at most N links in clonealogy
             birthid=parentid;
-            if(birthid==rootclone) break;                       // reached root, exit j loop
+            if(birthid&rootclone) break;                       // reached root, exit j loop
             else {
                 if((clonedataptr = (clonedata *) hashtable_find(&clonetable, birthid)) != NULL) {
                     parentid=clonedataptr->parentid;

@@ -803,12 +803,11 @@ def construct_caption(colorfunction1or2,pixeldat,buttonhelp):
     """ construct window caption
     """
     global colorfunction,framenr,nspecies,selection
-    global quadrants,ymax,ymaxq,offdx,offdy,offdt,ncomponents,genealogycoldepth
+    global quadrants,ymax,ymaxq,offdx,offdy,offdt,ncomponents,genealogycoldepth,ancestortype
     
     selectiontext0007 = ["largest value","most ones","scissors-well-stone-paper","not well ordered","two target","predator prey","cooperative","neutral"];
     selectiontext0815 = ["sum fixed","sum variable","edge fixed","edge variable","canonical fixed","canonical variable","2D sym fixed","2D sym variable"];
 
-    
     caption = "Gene Life at step %d coloring %d nspecies %d " % (framenr,colorfunction1or2,nspecies)
     if selection < 8:
         caption = caption + "pairwise selection " + selectiontext0007[selection] + " " + buttonhelp
@@ -819,6 +818,7 @@ def construct_caption(colorfunction1or2,pixeldat,buttonhelp):
             paramdat = "repscheme %06x surv. %01x overw. %01x ncoding %06x" % (repscheme,survivalmask,overwritemask,ncoding)
             caption = caption + ("q%1d " % quadrants) + paramdat
         if colorfunction == 4: caption = caption + ("ymax %d " % ymax)
+        elif colorfunction == 5 or colorfunction == 6: caption = caption + ("anc %d " % ancestortype)
         elif colorfunction == 8: caption = caption + ("offsets (%d,%d,%d) " % (offdx,offdy,offdt))
         elif colorfunction == 9:
             ncomponents=genelife.get_ncomponents()
