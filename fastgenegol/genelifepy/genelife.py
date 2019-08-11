@@ -818,7 +818,10 @@ def construct_caption(colorfunction1or2,pixeldat,buttonhelp):
             paramdat = "repscheme %06x surv. %01x overw. %01x ncoding %06x" % (repscheme,survivalmask,overwritemask,ncoding)
             caption = caption + ("q%1d " % quadrants) + paramdat
         if colorfunction == 4: caption = caption + ("ymax %d " % ymax)
-        elif colorfunction == 5 or colorfunction == 6: caption = caption + ("anc %d " % ancestortype)
+        elif colorfunction == 6 or colorfunction == 7:
+            if ancestortype == 0: caption = caption + "anc first "
+            elif ancestortype == 1: caption = caption + "anc recent "
+            elif ancestortype == 2: caption = caption + "anc clonal "
         elif colorfunction == 8: caption = caption + ("offsets (%d,%d,%d) " % (offdx,offdy,offdt))
         elif colorfunction == 9:
             ncomponents=genelife.get_ncomponents()
