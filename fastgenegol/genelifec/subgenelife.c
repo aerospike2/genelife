@@ -586,7 +586,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // get genealogytrace   get current trace of genealogies to python
 // get_nspecies         get number of species from C to python
 // get_genealogydepth   get depth of genealogies returned by get_genealogies()
-// get_genealogies      get current population genealogies (currently near end of code)
+// get_genealogies      // get current population genealogies (currently near end of code)
 // get_hist             get the histogram from C to python
 // get_activities       get the current activity statistics of genes from C to python
 // get_all_activities   get all activity statistics of genes (since t=0) from C to python
