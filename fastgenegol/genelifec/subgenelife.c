@@ -6135,7 +6135,7 @@ int get_genealogies(genedata genealogydat[], int narraysize) {  /* genealogies o
             if(gene==rootgene) break;                             // reached root, exit j loop
             else {
                 for (k=0;k<j;k++) if (gene==curgenealogy[k]) {gene=generepeat;break;};  // if gene already in ancestry, break with generepeat
-                if(gene==generepeat) { ij += (jmax+1);if(narraysize) curgen[j]=gene;else working[ij]=gene;j=j+1;break;}
+                if(gene==generepeat) { if(narraysize) curgen[j]=gene;else working[i+j*N]=gene;j=j+1;break;}
                 if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
                     if(ancestortype==1) ancgene=genedataptr->recentancestor;
                     else                ancgene=genedataptr->firstancestor;
@@ -6145,7 +6145,7 @@ int get_genealogies(genedata genealogydat[], int narraysize) {  /* genealogies o
                 else fprintf(stderr,"ancestor not found in genealogies\n");
             }
             curgenealogy[j]=gene;
-            if(narraysize) curgen[j]=gene; else working[ij]=gene;
+            if(narraysize) curgen[j]=gene; else working[i+j*N]=gene;
         }
         if (j>genealogydepth) genealogydepth=j;
         if(narraysize) {                                        // copy genealogy to python
@@ -6158,8 +6158,8 @@ int get_genealogies(genedata genealogydat[], int narraysize) {  /* genealogies o
             for(k=j; k<=jmax; k++){                             // fill list up to uniform jmax with dummy data
                 genealogydat[ij+k] = genedummy;
             }
+            ij += (jmax+1);
         }
-        ij += (jmax+1);
     }
     if(narraysize) {                                            // if narraysize then return from routine here
         free(curgen);
