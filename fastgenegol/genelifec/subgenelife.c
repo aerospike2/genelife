@@ -6128,8 +6128,8 @@ int get_genealogies(genedata genealogydat[], int narraysize) {  /* genealogies o
         else                ancgene=geneitems[gindices[i]].firstancestor;
         activity=geneitems[gindices[i]].activity;
         if(activity>activitymax) activitymax=activity;
-        if(narraysize)
-        working[i]=curgenealogy[0]=gene;                            // ij = i for j=0
+        curgenealogy[0]=gene;
+        if(!narraysize) working[i]=gene;                          // ij = i for j=0
         for (j=k=1;j<=jmax;j++) {                                 // go back at most jmax links in genealogy
             gene=ancgene;
             if(gene==rootgene) break;                             // reached root, exit j loop
