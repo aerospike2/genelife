@@ -77,7 +77,7 @@ int colorfunction = 0;              // color function choice of 0: hash or 1: fu
                                     // 9: connected components 10 : connected component activities 11: genealogy based individual colors
 int colorfunction2 = -1;            // colorfunction for second window: as above, but -1 means same value as colorfunction
 int colorupdate1 = 1;               // flag to enable routine print statements to terminal during run : linked to colorfunction display in python
-int ancestortype = 0;               // whether to display and return genealogies via first or most recent ancestor, or clonal ancetry for value 2
+int ancestortype = 0;               // display and return genealogies via first (0) or most recent (1) ancestor, clonal ancestry (2) or first & clonal in 2 win (3)
 #define ASCII_ESC 27                // escape for printing terminal commands, such as cursor repositioning : only used in non-graphic version
 //-----------------------------------------masks for named repscheme bits (selection 0-7) ----------------------------------------------------------------
 #define R_0_2sel_3live     0x1      /* 1: for 3-live-n birth, employ selection on two least different live neighbours for ancestor */
@@ -570,7 +570,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // set_seed             set random number seed
 // set_nbhist           set nbhist N-block of time points for trace from GUI for use in activity and population display traces
 // set_genealogycoldepth set genealogycoldepth for colorfunction=11 display
-// set_ancestortype set ancestortype for display and return of first (0) or most recent (1) ancestors in genealogies
+// set_ancestortype     set ancestortype for genealogy display and return of first (0), most recent (1), clonal (2) or first & clonal in 2 windows (3)
 // set_stash            stash current gol,golg in stashgol, stshgolg
 // set_info_transfer_h  set information transfer histogram display value (0,1) from python
 // set_activityfnlut    set collection of functional activity statistics corresponding to functional aggregate of genes by non-neutral bits
@@ -789,7 +789,7 @@ void printxy (uint64_t gol[],uint64_t golg[]) {                         // print
     printf("\n");
 }
 //.......................................................................................................................................................
-void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg[], int NN2, int colorfunction) {
+void colorgenes1(uint64_t gol[], uint64_t golg[], uint64_t golb[], uint64_t golgstats[], int cgolg[], int NN2, int colorfunction, int winnr) {
     uint64_t gene, gdiff, g2c, mask, quad, clone;
     int ij,k,nbeven,activity,popcount,labelxy;
     unsigned int d,d0,d1,d2;
@@ -982,10 +982,14 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
         }
     }
     else if(colorfunction==6 || colorfunction == 7){                    //genealogies
+        int ancestortypec;
         if(colorfunction==6) k=2; else k=0;                             // double row for each ancestral step to make display more readable in colorfunction 6 mode
+        if((colorfunction2==-1) || (ancestortype !=3)) ancestortypec = ancestortype;
+        else if (winnr) ancestortypec = 2;
+        else ancestortypec = 0;
         for (ij=0; ij<N2; ij++) {
             int i=ij&Nmask; int j=ij>>(log2N+k);
-            if((ancestortype==2) && (diagnostics &diag_hash_clones)) {
+            if((ancestortypec==2) && (diagnostics &diag_hash_clones)) {
                 clone=clonealogytrace[i+(j<<log2N)];
                 activity = 0;
                 if (clone == rootclone)   mask = 0x000000ff;            // black color for root
@@ -1172,14 +1176,14 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
         for (ij=0; ij<N2; ij++) {
             quad=acttraceq[ij];
             if(labelcc[ij]) mask = 0xffffffff;
-            else if (quad == rootgene) mask = 0x3f3f3fff;                // grey color for background, all root genes
+            else if (quad == rootgene) mask = 0x3f3f3fff;           // grey color for background, all root genes
             else {
                 if (activity_size_colormode == 0) {
                     mask = quad * 11400714819323198549ul;
-                    mask = mask >> (64 - 32);                           // hash with optimal prime multiplicator down to 32 bits
-                    mask |= 0x080808ffull;                              // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
+                    mask = mask >> (64 - 32);                       // hash with optimal prime multiplicator down to 32 bits
+                    mask |= 0x080808ffull;                          // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
                 }
-                else if (activity_size_colormode == 1) {                // color by log2n, enclosing square size
+                else if (activity_size_colormode == 1) {            // color by log2n, enclosing square size
                     if(acttraceqt[ij] && (q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL) d = log2upper((unsigned int) q->size);
                     else if (!acttraceqt[ij] && quad<65536ull && smallpatts[quad].activity) {
                         d = log2size((short unsigned int) quad);
@@ -1189,7 +1193,7 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
                     setcolor(color,d);
                     mask = (color[0]<<8) | (color[1]<<16) |  (color[2]<<24) | 0xff;
                 }
-                else {                                                  // color by sqrt of nr of live pixels (up to max value of 255)
+                else {                                              // color by sqrt of nr of live pixels (up to max value of 255)
                     int popmax = 255;
                     if(acttraceqt[ij] && (q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL) popcount = q->pop1s;
                     else if (!acttraceqt[ij] && quad<65536ull && smallpatts[quad].activity) {POPCOUNT64C((uint64_t) quad,popcount);}
@@ -1208,29 +1212,45 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
         }
     }
     else if(colorfunction==11){                                     //genealogy based colours of ancestors at genealogycoldepth
-        uint64_t ancestor;
+    
+        uint64_t ancestor,root;
+        int ancestortypec;
+        if((colorfunction2==-1) || (ancestortype !=3)) ancestortypec = ancestortype;
+        else if (winnr) ancestortypec = 2;                          // ancestortype set to 3: use values 0 and 2 in two windows
+        else ancestortypec = 0;
+        if (ancestortypec==2) root = rootclone;
+        else root = rootgene;
+
         for (ij=0; ij<N2; ij++) {
             if (gol[ij] && (diagnostics & diag_hash_genes)) {
-                gene = golg[ij];
+                gene = (ancestortypec==2) ? golb[ij] : golg[ij];    // variable gene holds either birthid (clones) or gene at ij;
                 ancestor=gene;
                 for (int j=1;j<=genealogycoldepth;j++) {
-                    if(ancestor==rootgene) break;                               // reached root, exit j loop
+                    if((ancestortypec!=2) && (ancestor==rootgene)) break;                       // reached root, exit j loop
+                    if((ancestortypec==2) && (ancestor&rootclone)) break;                       // reached root, exit j loop
                     else {
                         gene = ancestor;
-                        if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
-                            if(ancestortype) ancestor=genedataptr->recentancestor;
-                            else             ancestor=genedataptr->firstancestor;
+                        if (ancestortypec==2) {
+                            if((clonedataptr = (clonedata *) hashtable_find(&clonetable, gene)) != NULL) {
+                                ancestor=clonedataptr->parentid;
+                            }
+                            else fprintf(stderr,"ancestor not found in clonealogies\n");
                         }
-                        else fprintf(stderr,"ancestor not found in genealogies\n");
+                        else {
+                            if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
+                                if(ancestortypec==1) ancestor=genedataptr->recentancestor;
+                                else                 ancestor=genedataptr->firstancestor;
+                            }
+                            else fprintf(stderr,"ancestor not found in genealogies\n");
+                        }
                     }
                 }
-                if (gene == 0ull) gene = 11778ull; // random color for gene==0
-                // mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
-                // mask = (gene * 11400714819323198549ul) >> (64 - 32);  // hash with optimal prime multiplicator down to 32 bits
+                if (gene == 0ull) gene = 11778ull;                  // random color for gene==0
                 mask = gene * 11400714819323198549ull;
-                mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
-                mask |= 0x080808ffull; // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
-                if (gene == rootgene) mask = 0x3f3f3fff;                 // grey color for root
+                mask = mask >> (64 - 32);                           // hash with optimal prime multiplicator down to 32 bits
+                mask |= 0x080808ffull;                              // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
+                if((ancestortypec!=2) && (ancestor==rootgene)) mask = 0x3f3f3fff;                // grey color for rootclone
+                if((ancestortypec==2) && (ancestor&rootclone)) mask = 0x3f3f3fff;                // grey color for rootclone
 
                 cgolg[ij] = (int) mask;
             }
@@ -1243,8 +1263,8 @@ void colorgenes1(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int cgolg
     }
 }
 //.......................................................................................................................................................
-void colorgenes(int cgolg[], int NN2, int colorfunction) {
-    colorgenes1(gol, golg, golgstats, cgolg, NN2, colorfunction);
+void colorgenes(int cgolg[], int NN2, int colorfunction, int winnr) {
+    colorgenes1(gol, golg, golb, golgstats, cgolg, NN2, colorfunction, winnr);
 }
 //------------------------------------------------------------- selectone -------------------------------------------------------------------------------
 extern inline void selectone_of_2(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t golb[],uint64_t * birth, uint64_t *newgene, uint64_t *parentid, unsigned int kch) {
@@ -4936,10 +4956,8 @@ void set_genealogycoldepth(int genealogycoldepthin) {
 }
 //.......................................................................................................................................................
 void set_ancestortype(int ancestortypein) {
-    if(ancestortypein <3)
-        ancestortype = ancestortypein;
-    else
-        fprintf(stderr,"ancestor type %d out of range [0..2]\n",ancestortypein);
+    if(ancestortypein <4) ancestortype = ancestortypein;
+    else fprintf(stderr,"ancestor type %d out of range [0..3]\n",ancestortypein);
 }
 //.......................................................................................................................................................
 void set_stash(){               // stash current gol,golg
@@ -5081,16 +5099,17 @@ int get_genealogydepth() {
         genes[i]=genotypes[gindices[i]];
     }
     
+    if(ancestortype>1) fprintf(stderr,"Warning: get_genealogydepth currently only implemented for ancestortypes 0,1, called with %d\n",ancestortype);
     for (i=jmax=0; i<nspeciesnow; i++) {                            // calculate max depth in genealogy jmax
         gene=genes[i];
-        if(ancestortype) ancgene=geneitems[gindices[i]].recentancestor;
+        if(ancestortype==1) ancgene=geneitems[gindices[i]].recentancestor;
         else ancgene=geneitems[gindices[i]].firstancestor;
         for (j=1;;j++) {
             gene=ancgene;
             if(gene==rootgene) break;                               // reached root, exit j loop
             else {
                 if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
-                    if(ancestortype) ancgene=genedataptr->recentancestor;
+                    if(ancestortype==1) ancgene=genedataptr->recentancestor;
                     else ancgene=genedataptr->firstancestor;
                 }
                 else fprintf(stderr,"ancestor not found in genealogies\n");

@@ -239,10 +239,10 @@ def rand_cmap(nlabels, type='bright', first_color_black=True, last_color_black=F
     return random_colormap
 #-----------------------------------------------------------------------------------------------------------
 
-def colorgrid(colorfunction,cgolg,cgrid):
+def colorgrid(colorfunction,cgolg,cgrid,winnr):
     """ colors array according to grid and genegrid using colormethod"""
     global N,cgridt
-    genelife.colorgenes(cgolg,colorfunction)
+    genelife.colorgenes(cgolg,colorfunction,winnr)
     cgridt=np.reshape(cgolg,(N,N)).T
     cgrid[:,0:N] = cgridt   # is there a faster version of this copy that moves the data?
     return
@@ -545,9 +545,9 @@ def update_sim(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
         if(count): genelife.countspecieshash()
     genelife.genelife_update(nrun, nhist, nstat)
     framenr = framenr+nrun
-    if update1: colorgrid(colorfunction,cgolg,cgrid)  # sets  cgrid
+    if update1: colorgrid(colorfunction,cgolg,cgrid,0)  # sets  cgrid
     if update2 and (colorfunction2 != -1):
-            colorgrid(colorfunction2,cgolg2,cgrid2)
+            colorgrid(colorfunction2,cgolg2,cgrid2,1)
     return
 
 #-----------------------------------------------------------------------------------------------------------
@@ -749,10 +749,10 @@ def show0(count=True):
 
     cancol=init_buttons(surfacex1)                           # initialize parameter buttons
 
-    colorgrid(colorfunction,cgolg,cgrid)
+    colorgrid(colorfunction,cgolg,cgrid,0)
     
     if colorfunction2 != -1:
-        colorgrid(colorfunction2,cgolg2,cgrid2)
+        colorgrid(colorfunction2,cgolg2,cgrid2,1)
         # sdl2.ext.fill(surface2, 0)
         if sdl2.SDL_BlitScaled(surfacex1,grect1,surface2x1,grect1): print("BlitScaled failed")
         if sdl2.SDL_BlitScaled(surface2x1,None,surface2,None): print("BlitScaled failed")
@@ -799,7 +799,7 @@ def step(count=True):
     if (count):
         genelife.countspecieshash()
 #-----------------------------------------------------------------------------------------------------------
-def construct_caption(colorfunction1or2,pixeldat,buttonhelp):
+def construct_caption(colorfunction1or2,pixeldat,buttonhelp,win):
     """ construct window caption
     """
     global colorfunction,framenr,nspecies,selection
@@ -809,26 +809,29 @@ def construct_caption(colorfunction1or2,pixeldat,buttonhelp):
     selectiontext0815 = ["sum fixed","sum variable","edge fixed","edge variable","canonical fixed","canonical variable","2D sym fixed","2D sym variable"];
 
     caption = "Gene Life at step %d coloring %d nspecies %d " % (framenr,colorfunction1or2,nspecies)
+    if(win == 2): caption = "2nd " + caption
     if selection < 8:
         caption = caption + "pairwise selection " + selectiontext0007[selection] + " " + buttonhelp
     elif selection<16:
         caption = caption + "LUT encoding " + selectiontext0815[selection-8] + " "
-    if colorfunction1or2 == colorfunction:
-        if quadrants >= 0:
-            paramdat = "repscheme %06x surv. %01x overw. %01x ncoding %06x" % (repscheme,survivalmask,overwritemask,ncoding)
-            caption = caption + ("q%1d " % quadrants) + paramdat
-        if colorfunction == 4: caption = caption + ("ymax %d " % ymax)
-        elif colorfunction == 6 or colorfunction == 7:
-            if ancestortype == 0: caption = caption + "anc first "
-            elif ancestortype == 1: caption = caption + "anc recent "
-            elif ancestortype == 2: caption = caption + "anc clonal "
-        elif colorfunction == 8: caption = caption + ("offsets (%d,%d,%d) " % (offdx,offdy,offdt))
-        elif colorfunction == 9:
-            ncomponents=genelife.get_ncomponents()
-            caption = caption + ("ncomponents %d " % (ncomponents))
-        elif colorfunction == 10: caption = caption + ("ymaxq %d " % ymaxq)
-        elif colorfunction == 11: caption = caption + ("genealogy_cold %d " % genealogycoldepth)
-        if pixeldat: caption = caption + pixeldat
+
+    if quadrants >= 0:
+        paramdat = "repscheme %06x surv. %01x overw. %01x ncoding %06x" % (repscheme,survivalmask,overwritemask,ncoding)
+        caption = caption + ("q%1d " % quadrants) + paramdat
+    if colorfunction1or2 == 4: caption = caption + ("ymax %d " % ymax)
+    elif colorfunction1or2 == 6 or colorfunction1or2 == 7 or colorfunction1or2 == 11:
+        if colorfunction1or2 == 11: caption = caption + ("-ealogy_coldepth %d " % genealogycoldepth)
+        if ancestortype == 0: caption = caption + "anc first "
+        elif ancestortype == 1: caption = caption + "anc recent "
+        elif ancestortype == 2: caption = caption + "anc clonal "
+        elif ancestortype == 3: caption = caption + "anc first & clonal"
+    elif colorfunction1or2 == 8: caption = caption + ("offsets (%d,%d,%d) " % (offdx,offdy,offdt))
+    elif colorfunction1or2 == 9:
+        ncomponents=genelife.get_ncomponents()
+        caption = caption + ("ncomponents %d " % (ncomponents))
+    elif colorfunction1or2 == 10: caption = caption + ("ymaxq %d " % ymaxq)
+
+    if pixeldat: caption = caption + pixeldat
     return caption
 #-----------------------------------------------------------------------------------------------------------
 # infinite loop of display updates
@@ -1043,11 +1046,11 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                             print(("step %d pixel data %s" % (framenr,pixeldat)))
                         elif colorfunction == 9:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
-                            colorgrid(colorfunction,cgolg,cgrid)
+                            colorgrid(colorfunction,cgolg,cgrid,0)
                             pixeldat = "(%d,%d) label %4d nrconn %d" % (x,y,connlabel[y*N+x],connlen[connlabel[y*N+x]])
                         elif colorfunction == 10:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
-                            colorgrid(colorfunction,cgolg,cgrid)
+                            colorgrid(colorfunction,cgolg,cgrid,0)
                             pixeldat = "(%d,%d)" % (x,y)
                 elif event.button.button ==  sdl2.SDL_BUTTON_RIGHT:          # info on button or single plane choice (selection>=20) right mouse button (-click)
                     if scalex2 or event.window.windowID == windowID2:
@@ -1090,7 +1093,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                         else: draw_rect(surfacex1,cancol[4][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                 if colorfunction==9 or colorfunction==10:
                     ncomponents=genelife.get_connected_comps(connlabel,connlen,-1,-1)
-                    colorgrid(colorfunction,cgolg,cgrid)
+                    colorgrid(colorfunction,cgolg,cgrid,0)
                 pixeldat = ""
             elif event.type==sdl2.SDL_MOUSEMOTION:
                 if mouseclicked:
@@ -1127,11 +1130,11 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                             genelife.set_selectedgene(golg[x+y*N])
                         elif colorfunction == 9:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
-                            colorgrid(colorfunction,cgolg,cgrid)
+                            colorgrid(colorfunction,cgolg,cgrid,0)
                             pixeldat = "(%d,%d) label %4d nr.conn %d" % (x,y,connlabel[y*N+x],connlen[connlabel[y*N+x]])
                         elif colorfunction == 10:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
-                            colorgrid(colorfunction,cgolg,cgrid)
+                            colorgrid(colorfunction,cgolg,cgrid,0)
                             pixeldat = "(%d,%d)" % (x,y)
                 elif mouseclicked2:
                     if colorfunction == 2:
@@ -1262,10 +1265,12 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                         print('step',framenr,'new gcolor =',gcolor)
                     elif colorfunction == 6 or colorfunction == 7 or colorfunction == 11:
                         ancestortype= ancestortype + 1
-                        if ancestortype > 2:
+                        if ancestortype > 3:
                             ancestortype = 0
                         genelife.set_ancestortype(ancestortype)
-                        if ancestortype == 2:
+                        if ancestortype == 3:
+                            print('step',framenr,'new ancestor choice clonal for win 2 first for win 1')
+                        elif ancestortype == 2:
                             print('step',framenr,'new ancestor choice clonal')
                         elif ancestortype == 1:
                             print('step',framenr,'new ancestor choice recent')
@@ -1351,17 +1356,17 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                 update_sim(nrun, ndisp, nskip, niter, nhist, nstat, count)
             else:
                 if update1:
-                    colorgrid(colorfunction,cgolg,cgrid)
+                    colorgrid(colorfunction,cgolg,cgrid,0)
                 if update2:
                     if colorfunction2 != -1:
-                        colorgrid(colorfunction2,cgolg2,cgrid2)
+                        colorgrid(colorfunction2,cgolg2,cgrid2,1)
 
         nspecies=genelife.get_nspecies()
-        caption=construct_caption(colorfunction,pixeldat,buttonhelp)
+        caption=construct_caption(colorfunction,pixeldat,buttonhelp,1)
         if colorfunction2 == -1:
-            caption2 = caption
+            caption2 = "2nd "+caption
         else:
-            caption2=construct_caption(colorfunction2,pixeldat,buttonhelp)
+            caption2=construct_caption(colorfunction2,pixeldat,buttonhelp,2)
         
         if update1:                                         # window 1 updates switched on
             set_caption(window, caption)                    # sets the window caption with current status data
@@ -1521,7 +1526,7 @@ def parhelp():
     print("b , B       ","decrement or increment the half block for trace display: in range -1,0 to nNhist*2-2=38")
     print("f           ","print frame rate in fps (average of last 10 frames NYI")
     print("F           ","toggle to fullscreen NYI")
-    print("g           ","toggle on/off inherited coloring of connected components from overlapping components (colfn 9) or first/recent ancestors (6,7,11)")
+    print("g           ","toggle on/off inherited coloring of connected cpts from overlapping cpts (colfn 9) or cycle first/recent/clonal/both ancestors (6,7,11)")
     print("h           ","print this help")
     print("H           ","toggle horizon mode on or off: upper half of array obeys unmodified GoL rule")
     print("i           ","toggle display and calculation of info_transfer_histogram on/off")
