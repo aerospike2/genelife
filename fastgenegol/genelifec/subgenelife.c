@@ -1387,11 +1387,11 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
 
     birthid = (uint64_t) totsteps;
     birthid = (birthid << 32)+rootclone+ij;
-
     if(s==0) {*birth = 1ull;  *newgene = genegol[selection-8]; *parentid = birthid; return(1);}
 
     for(k=0;k<s;k++) {
-        livegenes[k] = golg[ijanc[k] = nb[(nb1i>>(k<<2))&0x7]];
+        ijanc[k] = nb[(nb1i>>(k<<2))&0x7];
+        livegenes[k] = golg[ijanc[k]];
         POPCOUNT64C(livegenes[k],d[k]);
     }
 
@@ -1403,6 +1403,7 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
             for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= ((livegenes[k]==extremval) ? 1ull<< (k+0*nbest++) : 0ull); // find set of genes with equal best value
             *birth = (nbest>0) ? 1ull: 0ull;             // birth condition may include later that genes not all same
             for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;   // execute loop until first optimal live neighbour found at k (a one)
+            if (k==s) {k=0;*birth = 0ull;}               // in case no genes with best value, no birth, avoid k being out of bounds below
             *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
             *parentid=golb[ijanc[k&0x7]];
             break;
@@ -1413,6 +1414,7 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
             for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= (d[k]==extremval ? 1ull<<(k+0*nbest++) : 0ull); // find set of genes with equal best value
             *birth = ((nbest>0) ? 1ull: 0ull);           // birth condition may include later that genes not all same
             for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
+            if (k==s) {k=0;*birth = 0ull;}               // in case no genes with best value, no birth, avoid k being out of bounds below
             *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
             *parentid=golb[ijanc[k&0x7]];
             break;
@@ -1420,6 +1422,7 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
             for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= 1ull<<(k+0*nbest++); // find set of genes with equal best value : in this case all of them
             *birth = 1ull;                               // birth condition is always true
             for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
+            if (k==s) {k=0;*birth = 0ull;}               // in case no genes with best value, no birth, avoid k being out of bounds below
             *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
             *parentid=golb[ijanc[k&0x7]];
             break;
@@ -1429,7 +1432,7 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
             else { nbest = 0; bestnbmask = 0ull;}
             *birth = gdiff ? 1ull : 0ull;                // birth condition is genes not all same
             for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
-            if (k==s) {k=0;*birth = 0ull;}               // avoid analyze error, and be on safe side
+            if (k==s) {k=0;*birth = 0ull;}               // in case no genes with best value, no birth, avoid k being out of bounds below
             *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
             *parentid=golb[ijanc[k&0x7]];
             break;
@@ -1504,6 +1507,8 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
           for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= (d[k]==extremval) ? 1ull<<(k+0*nbest++) : 0ull; // find set of genes with equal best value
           *birth = 1ull;                                // birth condition is always met since extremval set is always > 0
           for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
+          if (k==s) {k=0;*birth = 0ull;}                // in case no genes with best value, no birth, avoid k being out of bounds below
+          // if(k==s) fprintf(stderr,"Error in selectone_of_s case 6: k>=s (%d > %d)\n",k,s);
           *newgene = livegenes[k&0x7];                  // choose first of selected set to replicate (can make positional dependent choice instead externally)
           *parentid=golb[ijanc[k&0x7]];
           break;
@@ -1530,6 +1535,8 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
                 bestnbmask = d0 ? 0x7ull : 0;
             }
             for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
+            if (k==s) {k=0;*birth = 0ull;}             // in case no genes with best value, no birth, avoid k being out of bounds below
+            //if(k==s) fprintf(stderr,"Error in selectone_of_s case 7: k>=s (%d > %d)\n",k,s);
             *newgene = livegenes[k&0x7];               // choose first of selected set to replicate (can make positional dependent choice instead externally)
             *parentid=golb[ijanc[k&0x7]];
             break;
@@ -1794,28 +1801,28 @@ extern inline unsigned int selectdifft(int sum, uint64_t nbmask, int *crot, int 
         }
 }
 //.......................................................................................................................................................
-extern inline uint64_t disambiguate(unsigned int kch, uint64_t nb1i, int nb[], uint64_t golg[], int nsame, uint64_t *birth, uint64_t *birthid, uint64_t randnr) {
+extern inline uint64_t disambiguate(unsigned int kch, uint64_t nb1i, int nb[], uint64_t golg[], uint64_t golb[], int nsame, uint64_t *birth, uint64_t *parentid, uint64_t randnr, int ij) {
     uint64_t gene,newgene;
     int ijanc,newijanc;
     unsigned int d,dmin;
     int k;
 
-    *birthid = (uint64_t) totsteps; *birthid = (*birthid <<32);
-
     switch ((repscheme>>8)&0x7) {
         case 0:  kch += ((nsame-1)&(randnr>>32))<< (nsame ==4 ? 1 : 2);                  // random choice
                  kch &=0x7;
-                 *birthid += nb[(nb1i>>(kch<<2))&0x7];
-                 return( golg[nb[(nb1i>>(kch<<2))&0x7]]);
-        case 1:  *birthid += nb[(nb1i>>(kch<<2))&0x7];
-                 return( golg[nb[(nb1i>>(kch<<2))&0x7]]);                                // ignore asymmetry issue, continue regardless;
-        case 2:  *birth = 0; return(0ull);                                               // abandom birth attempt
+                 ijanc = nb[(nb1i>>(kch<<2))&0x7];
+                 *parentid = golb[ijanc];
+                 return( golg[ijanc]);
+        case 1:  ijanc = nb[(nb1i>>(kch<<2))&0x7];                                       // ignore asymmetry issue, continue regardless;
+                 *parentid = golb[ijanc];
+                 return( golg[ijanc]);
+        case 2:  *birth = 0ull; return(0ull);                                            // abandom birth attempt
         case 3:  for (newgene=~0ull,newijanc=0,k=0;k<nsame;k++) {                        // choose minimum value gene
                      kch+=k*(nsame==4 ? 2 : 4);
                      gene=golg[ijanc=nb[(nb1i>>(kch<<2))&0x7]];
                      if (gene<newgene) {newgene = gene;newijanc=ijanc;}
                  };
-                 *birthid += newijanc;
+                 *parentid = golb[newijanc];
                  return(newgene);
         case 4:  for (newgene=~0ull,newijanc=0,dmin=64+1,k=0;k<nsame;k++) {              // choose least nr ones gene or minimum value if same
                      kch+=k*(nsame==4 ? 2 : 4);
@@ -1823,17 +1830,17 @@ extern inline uint64_t disambiguate(unsigned int kch, uint64_t nb1i, int nb[], u
                      POPCOUNT64C(gene,d);
                      if((d<dmin) || (d==dmin && newgene < gene)) {newgene = gene;newijanc=ijanc;}
                  };
-                 *birthid += newijanc;
+                 *parentid = golb[newijanc];
                  return(newgene);
         case 5:  for (newgene=~0ull,ijanc=0,k=0;k<nsame;k++) {                           // choose AND of ambiguous alternative gene
                      kch+=k*(nsame==4 ? 2 : 4);
                      newgene&=golg[ijanc=nb[(nb1i>>(kch<<2))&0x7]];
                  };
-                 *birthid += ijanc;                                                      // there are more than one ancestors here: last one is chosen, others forgotten
+                 *parentid = golb[ijanc];                                                // there are more than one ancestors here: last one is chosen, others forgotten
                  return(newgene);
-        case 6:  *birthid += N2;                                                         // default ancestor for input genes
+        case 6:  *parentid = (((uint64_t) totsteps) <<32) + rootclone + ij;// default ancestor for input genes
                  return(genegol[selection-8]);                                           // choose gene with GoL encoding : needs fixing for selection 11,13
-        case 7:  *birthid += N2;                                                         // default ancestor for input genes
+        case 7:  *parentid = (uint64_t) totsteps; *parentid = (*parentid <<32) + rootclone + ij;// default ancestor for input genes
                  return(randnr);                                                         // choose random gene : should update randnr outside to ensure indept
         default: fprintf(stderr,"Error in switch of ambiguous rotation resolution, should never reach here\n");
                  return(0ull);
@@ -1866,7 +1873,7 @@ extern inline void hashaddgene(int ij,uint64_t gene,uint64_t ancestor,uint64_t *
             fprintf(stderr,"error in hashaddgene, the ancestor %llx of gene %llx to be stored is not stored\n",ancestor,gene);
     }
     if(diagnostics & diag_hash_clones) {
-        if (mutation) {
+        if (mutation || (parentid&rootclone)) {                   // when s=0 birth involves the creation of a new clone from root and rootclone bit set in parentid
             birthid = ((uint64_t) totsteps)<<32;
             birthid |= ij;
             hashaddclone(birthid,parentid,gene);
@@ -1875,7 +1882,10 @@ extern inline void hashaddgene(int ij,uint64_t gene,uint64_t ancestor,uint64_t *
         else {
             *golb = parentid;
             if((clonedataptr = (clonedata *) hashtable_find(&clonetable, parentid)) != NULL) clonedataptr->popln++;
-            else fprintf(stderr,"error in hashclone update, %llx clone not saved\n",parentid);
+            else {
+                fprintf(stderr,"step %d error in hashclone update, %llx clone not saved\n",totsteps,parentid);
+                fprintf(stderr,"ij %llx rootclone %d tstep %lld\n",parentid&N2mask,(parentid&rootclone)?1:0,parentid>>32);
+            }
         }
     }
 }
@@ -3593,7 +3603,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                 if(nbest>1 ) {
                     kch=selectdifft(nbest,nbmask,&crot,&kodd,&nsame);       // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
                     RAND128P(randnr);                                       // used in special cases of disambiguate (0 random choice & 7 random gene) only
-                    if(nsame) newgene = disambiguate(kch, nb1i, nb, golg, nsame, &birth, &parentid, randnr); // restore symmetry via one of 8 repscheme options
+                    if(nsame) newgene = disambiguate(kch, nb1i, nb, golg, golb, nsame, &birth, &parentid, randnr, ij); // restore symmetry via one of 8 repscheme options
                     else {
                         newgene = golg[nb[kch]];
                         parentid = golb[nb[kch]];
@@ -3824,7 +3834,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
                 if(nbest>1 ) {
                     kch=selectdifft(nbest,nbmask,&crot,&kodd,&nsame);           // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
                     RAND128P(randnr);                                           // used in special cases of disambiguate (0 random choice & 7 random gene) only
-                    if(nsame) newgene = disambiguate(kch, nb1i, nb, golg, nsame, &birth, &parentid, randnr); // restore symmetry via one of 8 repscheme options
+                    if(nsame) newgene = disambiguate(kch, nb1i, nb, golg, golb, nsame, &birth, &parentid, randnr, ij); // restore symmetry via one of 8 repscheme options
                     else {
                         newgene = golg[nb[kch]];
                         parentid = golb[nb[kch]];
@@ -4065,7 +4075,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
                 if(nbest>1 ) {
                     kch=selectdifft(nbest,nbmask,&crot,&kodd,&nsame);           // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
                     RAND128P(randnr);                                           // used in special cases of disambiguate (0 random choice & 7 random gene) only
-                    if(nsame) newgene = disambiguate(kch, nb1i, nb, golg, nsame, &birth, &parentid, randnr); // restore symmetry via one of 8 repscheme options
+                    if(nsame) newgene = disambiguate(kch, nb1i, nb, golg, golb, nsame, &birth, &parentid, randnr, ij); // restore symmetry via one of 8 repscheme options
                     else {
                         newgene = golg[nb[kch]];
                         parentid = golb[nb[kch]];
@@ -4312,7 +4322,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
                 if(nbest>1 ) {
                     kch=selectdifft(nbest,nbmask,&crot,&kodd,&nsame);           // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
                     RAND128P(randnr);                                           // used in special cases of disambiguate (0 random choice & 7 random gene) only
-                    if(nsame) newgene = disambiguate(kch, nb1i, nb, golg, nsame, &birth, &parentid, randnr); // restore symmetry via one of 8 repscheme options
+                    if(nsame) newgene = disambiguate(kch, nb1i, nb, golg, golb, nsame, &birth, &parentid, randnr, ij); // restore symmetry via one of 8 repscheme options
                     else {
                         newgene = golg[nb[kch]];
                         parentid = golb[nb[kch]];
