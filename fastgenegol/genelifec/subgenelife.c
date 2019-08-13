@@ -1801,6 +1801,7 @@ extern inline unsigned int selectdifft(int sum, uint64_t nbmask, int *crot, int 
         }
 }
 //.......................................................................................................................................................
+// kch, nb1i, nb, golg, golb, nsame, &birth, &parentid, randnr, ij
 extern inline uint64_t disambiguate(unsigned int kch, uint64_t nb1i, int nb[], uint64_t golg[], uint64_t golb[], int nsame, uint64_t *birth, uint64_t *parentid, uint64_t randnr, int ij) {
     uint64_t gene,newgene;
     int ijanc,newijanc;
@@ -1813,9 +1814,9 @@ extern inline uint64_t disambiguate(unsigned int kch, uint64_t nb1i, int nb[], u
                  ijanc = nb[(nb1i>>(kch<<2))&0x7];
                  *parentid = golb[ijanc];
                  return( golg[ijanc]);
-        case 1:  ijanc = nb[(nb1i>>(kch<<2))&0x7];                                       // ignore asymmetry issue, continue regardless;
+        case 1:  ijanc = nb[kch];                                                        // ignore asymmetry issue, continue regardless;
                  *parentid = golb[ijanc];
-                 if(*parentid == 0ull) fprintf(stderr,"error in disambiguate case 1: parentid set to golb[%d] which is 0\n",ijanc);
+                 // if(*parentid == 0ull) fprintf(stderr,"error in disambiguate case 1: parentid set to golb[%d] which is 0 kch %d\n",ijanc,kch);
                  return( golg[ijanc]);
         case 2:  *birth = 0ull; return(0ull);                                            // abandom birth attempt
         case 3:  for (newgene=~0ull,newijanc=0,k=0;k<nsame;k++) {                        // choose minimum value gene
@@ -1839,7 +1840,7 @@ extern inline uint64_t disambiguate(unsigned int kch, uint64_t nb1i, int nb[], u
                  };
                  *parentid = golb[ijanc];                                                // there are more than one ancestors here: last one is chosen, others forgotten
                  return(newgene);
-        case 6:  *parentid = (((uint64_t) totsteps) <<32) + rootclone + ij;// default ancestor for input genes
+        case 6:  *parentid = (((uint64_t) totsteps) <<32) + rootclone + ij;              // default ancestor for input genes
                  return(genegol[selection-8]);                                           // choose gene with GoL encoding : needs fixing for selection 11,13
         case 7:  *parentid = (uint64_t) totsteps; *parentid = (*parentid <<32) + rootclone + ij;// default ancestor for input genes
                  return(randnr);                                                         // choose random gene : should update randnr outside to ensure indept
@@ -3609,8 +3610,15 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                         newgene = golg[nb[kch]];
                         parentid = golb[nb[kch]];
                     }
-                    if(!parentid) fprintf(stderr,"error parentid=0: s %d nbest %d nsame %d kch %d ij %d\n",s,nbest,nsame,kch,ij);
-                    if(!parentid) fprintf(stderr,"error parentid=0: nb[kch] %d nsame %d kch %d ij %d\n",nb[kch],nsame,kch,ij);
+                    /* if(!parentid) {
+                        fprintf(stderr,"error parentid=0: s %d nbest %d nsame %d kch %d ij %d\n",s,nbest,nsame,kch,ij);
+                        fprintf(stderr,"error parentid=0: nb[kch] %d nsame %d kch %d ij %d\n",nb[kch],nsame,kch,ij);
+                        fprintf(stderr,"error parentid=0: nb1i %llx nbmask %llx\n",nb1i,nbmask);
+                        fprintf(stderr,"error parentid=0: nb[0..7]");for(k=0;k<8;k++) fprintf(stderr," %d",nb[k]); fprintf(stderr,"\n");
+                        fprintf(stderr,"error parentid=0: gol at nbs ");for(k=0;k<8;k++) fprintf(stderr," %llx",gol[nb[k]]); fprintf(stderr,"\n");
+                        fprintf(stderr,"error parentid=0: golg at nbs ");for(k=0;k<8;k++) fprintf(stderr," %llx",golg[nb[k]]); fprintf(stderr,"\n");
+                        fprintf(stderr,"error parentid=0: golb at nbs ");for(k=0;k<8;k++) fprintf(stderr," %llx",golb[nb[k]]); fprintf(stderr,"\n");
+                    } */
                 }
             }
             if (birth) {                                                    // ask again because disambiguate may turn off birth

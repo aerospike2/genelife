@@ -1167,7 +1167,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
             elif event.type == sdl2.SDL_KEYDOWN:
                 # keystatus = sdl2.SDL_GetKeyboardState(None) # keystatus should also reveal if pressed if event structure doesn't work
                 # if keystatus[sdl2.SDL_SCANCODE_H]:
-                print("key pressed")
+                # print("key pressed")
                 if event.key.keysym.scancode == sdl2.SDL_SCANCODE_H:                   # alternatively use:
                     if   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT:
                         rulemod = rulemod ^ 2   # horizon mode with GoL in upper half toggled on/off
