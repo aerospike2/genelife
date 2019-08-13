@@ -78,7 +78,7 @@ int colorfunction = 0;              // color function choice of 0: hash or 1: fu
                                     // 9: connected components 10 : connected component activities 11: genealogy based individual colors
 int colorfunction2 = -1;            // colorfunction for second window: as above, but -1 means same value as colorfunction
 int colorupdate1 = 1;               // flag to enable routine print statements to terminal during run : linked to colorfunction display in python
-int ancestortype = 0;               // display and return genealogies via first (0) or most recent (1) ancestor, clonal ancestry (2) or first & clonal in 2 win (3)
+int ancestortype = 0;               // display and return genealogies via first ancestor (0), clonal ancestry (1) or first & clonal in 2 win (2)
 #define ASCII_ESC 27                // escape for printing terminal commands, such as cursor repositioning : only used in non-graphic version
 //-----------------------------------------masks for named repscheme bits (selection 0-7) ----------------------------------------------------------------
 #define R_0_2sel_3live     0x1      /* 1: for 3-live-n birth, employ selection on two least different live neighbours for ancestor */
@@ -142,11 +142,10 @@ typedef struct genedata {           // value of keys stored for each gene encoun
     unsigned int dummy;             // pad to 64 bit word boundary
     uint64_t gene;                  // stored gene : note that two difft 64-bit genes may be stored at same location, so need check
     uint64_t firstancestor;         // this is initialized to a special gene seq (rootgene) not likely ever to occur for starting genes
-    uint64_t recentancestor;        // this is the most recently observed ancestor for this genotype (initialized to rootgene)
 } genedata;
 const uint64_t rootgene = 0xfedcba9876543210; // initial special gene as root for genealogies
 const uint64_t generepeat = 0x0123456789abcdef; // special gene sequence to denote repeated genes found in genealogy
-genedata ginitdata = {1,0,0,0,-1,0,0,0,0ull,rootgene,rootgene};  // initialization data structure for gene data
+genedata ginitdata = {1,0,0,0,-1,0,0,0,0ull,rootgene};  // initialization data structure for gene data
 genedata *genedataptr;              // pointer to a genedata instance
 HASHTABLE_SIZE_T const* genotypes;  // pointer to stored hash table keys (which are the genotypes)
 genedata* geneitems;                // list of genedata structured items stored in hash table
@@ -572,7 +571,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // set_seed             set random number seed
 // set_nbhist           set nbhist N-block of time points for trace from GUI for use in activity and population display traces
 // set_genealogycoldepth set genealogycoldepth for colorfunction=11 display
-// set_ancestortype     set ancestortype for genealogy display and return of first (0), most recent (1), clonal (2) or first & clonal in 2 windows (3)
+// set_ancestortype     set ancestortype for genealogy display and return of first (0), clonal (1) or first & clonal in 2 windows (2)
 // set_stash            stash current gol,golg in stashgol, stshgolg
 // set_info_transfer_h  set information transfer histogram display value (0,1) from python
 // set_activityfnlut    set collection of functional activity statistics corresponding to functional aggregate of genes by non-neutral bits
@@ -986,12 +985,12 @@ void colorgenes1(uint64_t gol[], uint64_t golg[], uint64_t golb[], uint64_t golg
     else if(colorfunction==6 || colorfunction == 7){                    //genealogies
         int ancestortypec;
         if(colorfunction==6) k=2; else k=0;                             // double row for each ancestral step to make display more readable in colorfunction 6 mode
-        if((colorfunction2==-1) || (ancestortype !=3)) ancestortypec = ancestortype;
-        else if (winnr) ancestortypec = 2;
+        if((colorfunction2==-1) || (ancestortype !=2)) ancestortypec = ancestortype;
+        else if (winnr) ancestortypec = 1;
         else ancestortypec = 0;
         for (ij=0; ij<N2; ij++) {
             int i=ij&Nmask; int j=ij>>(log2N+k);
-            if((ancestortypec==2) && (diagnostics &diag_hash_clones)) {
+            if((ancestortypec==1) && (diagnostics &diag_hash_clones)) {
                 clone=clonealogytrace[i+(j<<log2N)];
                 activity = 0;
                 if (clone == rootclone)   mask = 0x000000ff;            // black color for root
@@ -1217,10 +1216,10 @@ void colorgenes1(uint64_t gol[], uint64_t golg[], uint64_t golb[], uint64_t golg
     
         uint64_t ancestor,root;
         int ancestortypec;
-        if((colorfunction2==-1) || (ancestortype !=3)) ancestortypec = ancestortype;
-        else if (winnr) ancestortypec = 2;                          // ancestortype set to 3: use values 0 and 2 in two windows
+        if((colorfunction2==-1) || (ancestortype !=2)) ancestortypec = ancestortype;
+        else if (winnr) ancestortypec = 1;                          // ancestortype set to 3: use values 0 and 2 in two windows
         else ancestortypec = 0;
-        if (ancestortypec==2) root = rootclone;
+        if (ancestortypec==1) root = rootclone;
         else root = rootgene;
 
         for (ij=0; ij<N2; ij++) {
@@ -1228,11 +1227,11 @@ void colorgenes1(uint64_t gol[], uint64_t golg[], uint64_t golb[], uint64_t golg
                 gene = (ancestortypec==2) ? golb[ij] : golg[ij];    // variable gene holds either birthid (clones) or gene at ij;
                 ancestor=gene;
                 for (int j=1;j<=genealogycoldepth;j++) {
-                    if((ancestortypec!=2) && (ancestor==rootgene)) break;                       // reached root, exit j loop
-                    if((ancestortypec==2) && (ancestor&rootclone)) break;                       // reached root, exit j loop
+                    if((ancestortypec!=1) && (ancestor==rootgene)) break;                       // reached root, exit j loop
+                    if((ancestortypec==1) && (ancestor&rootclone)) break;                       // reached root, exit j loop
                     else {
                         gene = ancestor;
-                        if (ancestortypec==2) {
+                        if (ancestortypec==1) {
                             if((clonedataptr = (clonedata *) hashtable_find(&clonetable, gene)) != NULL) {
                                 ancestor=clonedataptr->parentid;
                             }
@@ -1240,8 +1239,7 @@ void colorgenes1(uint64_t gol[], uint64_t golg[], uint64_t golb[], uint64_t golg
                         }
                         else {
                             if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
-                                if(ancestortypec==1) ancestor=genedataptr->recentancestor;
-                                else                 ancestor=genedataptr->firstancestor;
+                                ancestor=genedataptr->firstancestor;
                             }
                             else fprintf(stderr,"ancestor not found in genealogies\n");
                         }
@@ -1251,8 +1249,8 @@ void colorgenes1(uint64_t gol[], uint64_t golg[], uint64_t golb[], uint64_t golg
                 mask = gene * 11400714819323198549ull;
                 mask = mask >> (64 - 32);                           // hash with optimal prime multiplicator down to 32 bits
                 mask |= 0x080808ffull;                              // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
-                if((ancestortypec!=2) && (ancestor==rootgene)) mask = 0x3f3f3fff;                // grey color for rootclone
-                if((ancestortypec==2) && (ancestor&rootclone)) mask = 0x3f3f3fff;                // grey color for rootclone
+                if((ancestortypec!=1) && (ancestor==rootgene)) mask = 0x3f3f3fff;                // grey color for rootclone
+                if((ancestortypec==1) && (ancestor&rootclone)) mask = 0x3f3f3fff;                // grey color for rootclone
 
                 cgolg[ij] = (int) mask;
             }
@@ -1857,7 +1855,6 @@ extern inline void hashaddgene(int ij,uint64_t gene,uint64_t ancestor,uint64_t *
     if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
         genedataptr->lasttime = totsteps;
         if(mutation) {
-            genedataptr->recentancestor = ancestor;
             genedataptr->recenttime = (short unsigned int) totsteps;
         }
         genedataptr->popcount++;
@@ -1867,7 +1864,6 @@ extern inline void hashaddgene(int ij,uint64_t gene,uint64_t ancestor,uint64_t *
         gdata.gene = gene;
         gdata.firsttime = gdata.recenttime = gdata.lasttime = (short unsigned int) totsteps;
         gdata.firstancestor = ancestor;
-        gdata.recentancestor = ancestor;
         hashtable_insert(&genetable, gene,(genedata *) &gdata);
     }
     if(ancestor != rootgene) {
@@ -5006,8 +5002,8 @@ void set_genealogycoldepth(int genealogycoldepthin) {
 }
 //.......................................................................................................................................................
 void set_ancestortype(int ancestortypein) {
-    if(ancestortypein <4) ancestortype = ancestortypein;
-    else fprintf(stderr,"ancestor type %d out of range [0..3]\n",ancestortypein);
+    if(ancestortypein <3) ancestortype = ancestortypein;
+    else fprintf(stderr,"ancestor type %d out of range [0..2]\n",ancestortypein);
 }
 //.......................................................................................................................................................
 void set_stash(){               // stash current gol,golg
@@ -5149,18 +5145,16 @@ int get_genealogydepth() {
         genes[i]=genotypes[gindices[i]];
     }
     
-    if(ancestortype>1) fprintf(stderr,"Warning: get_genealogydepth currently only implemented for ancestortypes 0,1, called with %d\n",ancestortype);
+    if(ancestortype>0) fprintf(stderr,"Warning: get_genealogydepth currently only implemented for ancestortypes 0 called with %d\n",ancestortype);
     for (i=jmax=0; i<nspeciesnow; i++) {                            // calculate max depth in genealogy jmax
         gene=genes[i];
-        if(ancestortype==1) ancgene=geneitems[gindices[i]].recentancestor;
-        else ancgene=geneitems[gindices[i]].firstancestor;
+        ancgene=geneitems[gindices[i]].firstancestor;
         for (j=1;;j++) {
             gene=ancgene;
             if(gene==rootgene) break;                               // reached root, exit j loop
             else {
                 if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
-                    if(ancestortype==1) ancgene=genedataptr->recentancestor;
-                    else ancgene=genedataptr->firstancestor;
+                    ancgene=genedataptr->firstancestor;
                 }
                 else fprintf(stderr,"ancestor not found in genealogies\n");
             }
@@ -6157,8 +6151,7 @@ int get_genealogies(genedata genealogydat[], int narraysize) {  /* genealogies o
     if(narraysize) {                                                // need to allocate data for genealogy array in python
         for (i=jmax=0; i<nspeciesnow; i++) {                        // calculate max depth in genealogy jmax
             gene=genotypes[gindices[i]];
-            if(ancestortype==1) ancgene=geneitems[gindices[i]].recentancestor;
-            else             ancgene=geneitems[gindices[i]].firstancestor;
+            ancgene=geneitems[gindices[i]].firstancestor;
             working[0]=gene;                                        // use working instead of genealogy1 array here as length needed may be larger than N
             for (j=1;;j++) {
                 gene=ancgene;
@@ -6167,8 +6160,7 @@ int get_genealogies(genedata genealogydat[], int narraysize) {  /* genealogies o
                     for (k=0;k<j;k++) if (gene==working[k]) {gene=generepeat;break;};   // if gene already in ancestry, break with generepeat
                     if(gene==generepeat) { j=j+1;break;}
                     if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
-                        if(ancestortype==1) ancgene=genedataptr->recentancestor;
-                        else ancgene=genedataptr->firstancestor;
+                        ancgene=genedataptr->firstancestor;
                     }
                     else fprintf(stderr,"ancestor not found in genealogies\n");
                 }
@@ -6193,8 +6185,7 @@ int get_genealogies(genedata genealogydat[], int narraysize) {  /* genealogies o
     for (i=ij=genealogydepth=0; i<nspeciesnow; i++) {
         gene=genotypes[gindices[i]];                              // do not need to copy array to genes since only needed here
         if(narraysize) curgen[0]=gene;
-        if(ancestortype==1) ancgene=geneitems[gindices[i]].recentancestor;
-        else                ancgene=geneitems[gindices[i]].firstancestor;
+        ancgene=geneitems[gindices[i]].firstancestor;
         activity=geneitems[gindices[i]].activity;
         if(activity>activitymax) activitymax=activity;
         curgenealogy[0]=gene;
@@ -6206,8 +6197,7 @@ int get_genealogies(genedata genealogydat[], int narraysize) {  /* genealogies o
                 for (k=0;k<j;k++) if (gene==curgenealogy[k]) {gene=generepeat;break;};  // if gene already in ancestry, break with generepeat
                 if(gene==generepeat) { if(narraysize) curgen[j]=gene;else working[i+j*N]=gene;j=j+1;break;}
                 if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {
-                    if(ancestortype==1) ancgene=genedataptr->recentancestor;
-                    else                ancgene=genedataptr->firstancestor;
+                    ancgene=genedataptr->firstancestor;
                     activity = genedataptr->activity;
                     if(activity>activitymax) activitymax=activity;
                 }
@@ -6268,8 +6258,7 @@ int get_genealogies(genedata genealogydat[], int narraysize) {  /* genealogies o
                 if(nextgene==rootgene) birthstep=totsteps;
                 else {
                     if((genedataptr = (genedata *) hashtable_find(&genetable, nextgene)) != NULL) {
-                        if(ancestortype==1) birthstep = (unsigned int) genedataptr->recenttime;
-                        else                birthstep = (unsigned int) genedataptr->firsttime;
+                        birthstep = (unsigned int) genedataptr->firsttime;
                     }
                     else fprintf(stderr,"ancestor %llx not found at (%d,%d) in genealogies during birthstep extraction\n",nextgene,ij&Nmask,ij>>log2N);
                 }

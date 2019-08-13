@@ -823,10 +823,9 @@ def construct_caption(colorfunction1or2,pixeldat,buttonhelp,win):
     if colorfunction1or2 == 4: caption = caption + ("ymax %d " % ymax)
     elif colorfunction1or2 == 6 or colorfunction1or2 == 7 or colorfunction1or2 == 11:
         if colorfunction1or2 == 11: caption = caption + ("-ealogy_coldepth %d " % genealogycoldepth)
-        if ancestortype == 0: caption = caption + "anc first "
-        elif ancestortype == 1: caption = caption + "anc recent "
-        elif ancestortype == 2: caption = caption + "anc clonal "
-        elif ancestortype == 3: caption = caption + "anc first & clonal"
+        if   ancestortype == 0: caption = caption + "anc first "
+        elif ancestortype == 1: caption = caption + "anc clonal "
+        elif ancestortype == 2: caption = caption + "anc first & clonal"
     elif colorfunction1or2 == 8: caption = caption + ("offsets (%d,%d,%d) " % (offdx,offdy,offdt))
     elif colorfunction1or2 == 9:
         ncomponents=genelife.get_ncomponents()
@@ -1269,15 +1268,13 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                         print('step',framenr,'new gcolor =',gcolor)
                     elif colorfunction == 6 or colorfunction == 7 or colorfunction == 11:
                         ancestortype= ancestortype + 1
-                        if ancestortype > 3:
+                        if ancestortype > 2:
                             ancestortype = 0
                         genelife.set_ancestortype(ancestortype)
-                        if ancestortype == 3:
+                        if ancestortype == 2:
                             print('step',framenr,'new ancestor choice clonal for win 2 first for win 1')
-                        elif ancestortype == 2:
-                            print('step',framenr,'new ancestor choice clonal')
                         elif ancestortype == 1:
-                            print('step',framenr,'new ancestor choice recent')
+                            print('step',framenr,'new ancestor choice clonal')
                         else:
                             print('step',framenr,'new ancestor choice first')
                 elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_I:
@@ -1530,7 +1527,7 @@ def parhelp():
     print("b , B       ","decrement or increment the half block for trace display: in range -1,0 to nNhist*2-2=38")
     print("f           ","print frame rate in fps (average of last 10 frames NYI")
     print("F           ","toggle to fullscreen NYI")
-    print("g           ","toggle on/off inherited coloring of connected cpts from overlapping cpts (colfn 9) or cycle first/recent/clonal/both ancestors (6,7,11)")
+    print("g           ","toggle on/off inherited coloring of connected cpts from overlapping cpts (colfn 9) or cycle first/clonal/both ancestors (6,7,11)")
     print("h           ","print this help")
     print("H           ","toggle horizon mode on or off: upper half of array obeys unmodified GoL rule")
     print("i           ","toggle display and calculation of info_transfer_histogram on/off")
