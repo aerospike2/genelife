@@ -119,7 +119,7 @@ ancestortype = 0
 info_transfer_h = 0
 activityfnlut = 0
                                          # parameter initialization
-runparams = np.zeros(9,np.int32)         # 9 parameters passed to C
+runparams = np.zeros(10,np.int32)        # 10 parameters passed to C
 simparams = np.zeros(6,np.int32)         # 6 parameters passed to C
 nrun=1; ndisp=1000; nskip=0; niter=1;    # simulation time stepping parameters: nrun CA updates per step, ndisp nr steps to display before skip,
                                          # nskip nr of CA updates to skip over display, niter nr of repeats of disp-skip cycle
@@ -144,6 +144,7 @@ ancselectmask = runparams[8] = 0xff      # bit mask for enabling gene-selective 
 colorfunction = runparams[5] = 0         # color function 0(hash), >=1(fnal), 2 nongulstate or color gol planes, 3 notgolrul yellow
                                          # 4 activities 5 populations 6 genealogy steps 7 genealogy temporal with activity scaled colors
                                          # 8 glider detection 9 connected component labelling 10 connected component activities
+colorfunction2 = runparams[9] = -1       # colorfunction for 2nd window: -1 same as first window
 initfield = runparams[6] = 100           # 1 init via 32x32 genepat.dat, n>1 init via nxn rand array
 nlog2pmut = simparams[0] = 8             # log2 gene mutation probability (0 or >56 means no mutation)
 initial1density = simparams[1] =  16384  # initial 1 density in GOL state
@@ -164,7 +165,6 @@ numHis = len(offsets)
 histo=np.zeros(numHis,np.uint64)
 flatoff =  [x for sublist in offsets for x in sublist]
 npoffsets = np.array(flatoff,np.int32)
-colorfunction2 = -1
 
 # setup of color map : black for 0, colors for 1 to LEN+1 or 257 for colormethod 0 or 1
 #-----------------------------------------------------------------------------------------------------------
@@ -560,7 +560,8 @@ def pr_params():
     print("runparams[4] = survivalmask = %x"%survivalmask)      
     print("runparams[7] = birthmask = %x"%birthmask)
     print("runparams[8] = ancselectmask = %x"%ancselectmask)
-    print("runparams[5] = colorfunction = ",colorfunction)            
+    print("runparams[5] = colorfunction = ",colorfunction)
+    print("runparams[9] = colorfunction2 = ",colorfunction2)
     print("runparams[6] = initfield = ",initfield)                
     print("simparams[0] = nlog2pmut = ",nlog2pmut)                
     print("simparams[1] = initial1density = ",initial1density)          
@@ -588,6 +589,7 @@ def set_params():
     runparams[5] = colorfunction             # color function; 0(hash), 1-3 (functional), 2 nongulstate or color gol planes, 3 notgolrul yellow
                                              # 4 activities 5 genealogy steps 6 genealogy temporal 7 genealogy with activity scaled colors 8 glider detection
                                              # 9 connected component labels and novelty (n) 10 connected component activities
+    runparams[9] = colorfunction2            # -1 for same as clorfunction, otherwise values as in colorfunction
     runparams[6] = initfield                 # 0 full field random or start depending on initialrdensity, 1 init via 32x32 genepat.dat, n>1 init via nxn rand array
     simparams[0] = nlog2pmut                 # log2 gene mutation probability (0 or >56 means no mutation)
     simparams[1] = initial1density           # initial 1 density in GOL state
@@ -903,8 +905,8 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
     
     event = sdl2.SDL_Event()
     while (gogo):
-        # for event in sdl2.ext.get_events():
-        if (sdl2.SDL_PollEvent(ctypes.byref(event))):
+        for event in sdl2.ext.get_events():
+        # if (sdl2.SDL_PollEvent(ctypes.byref(event))):
             if event.type == sdl2.SDL_QUIT:
                 mouseclicked = False
                 gogo = False
@@ -1163,35 +1165,37 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                             if k<18:
                                 buttonhelp = buttonhelp0007[k]
             elif event.type == sdl2.SDL_KEYDOWN:
-                keystatus = sdl2.SDL_GetKeyboardState(None) # keystatus should also reveal if pressed if event structure doesn't work
-                if keystatus[sdl2.SDL_SCANCODE_H]:          # alternatively use: if event.key == sdl2.SDL_SCANCODE_H:
+                # keystatus = sdl2.SDL_GetKeyboardState(None) # keystatus should also reveal if pressed if event structure doesn't work
+                # if keystatus[sdl2.SDL_SCANCODE_H]:
+                print("key pressed")
+                if event.key.keysym.scancode == sdl2.SDL_SCANCODE_H:                   # alternatively use:
                     if   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT:
                         rulemod = rulemod ^ 2   # horizon mode with GoL in upper half toggled on/off
                         print(("step %d rulemod changed to %x (Horizon mode)" % (framenr,rulemod)))
                         genelife.set_rulemod(rulemod)
                     else:
                         parhelp()
-                elif keystatus[sdl2.SDL_SCANCODE_SPACE]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_SPACE:
                     pause = 1-pause
-                elif keystatus[sdl2.SDL_SCANCODE_RIGHT]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_RIGHT:
                     colorfunction = (colorfunction + 1) % 12
                     genelife.set_colorfunction(colorfunction)
                     print('step',framenr,'colorfunction changed to',colorfunction)
-                elif keystatus[sdl2.SDL_SCANCODE_LEFT]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_LEFT:
                     colorfunction = (colorfunction - 1) % 12
                     genelife.set_colorfunction(colorfunction)
                     print('step',framenr,'colorfunction changed to',colorfunction)
-                elif keystatus[sdl2.SDL_SCANCODE_UP]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_UP:
                     colorfunction2 = (colorfunction2 + 1)
                     if colorfunction2 == 12: colorfunction2 = -1
                     genelife.set_colorfunction2(colorfunction2)
                     print('step',framenr,'colorfunction2 changed to',colorfunction2)
-                elif keystatus[sdl2.SDL_SCANCODE_DOWN]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_DOWN:
                     colorfunction2 = (colorfunction2 - 1)
                     if colorfunction2 == -2: colorfunction2 = 11
                     genelife.set_colorfunction2(colorfunction2)
                     print('step',framenr,'colorfunction2 changed to',colorfunction2)
-                elif keystatus[sdl2.SDL_SCANCODE_EQUALS] or keystatus[sdl2.SDL_SCANCODE_KP_PLUS]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_EQUALS or event.key == sdl2.SDL_SCANCODE_KP_PLUS:
                     if (colorfunction == 4) or (colorfunction == 5):
                         ymax = ymax * 2
                         oldymax = genelife.setget_act_ymax(ymax)
@@ -1204,7 +1208,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                         genealogycoldepth = genealogycoldepth + 1
                         genelife.set_genealogycoldepth(genealogycoldepth)
                         print('step',framenr,'new genealogycoldepth =',genealogycoldepth)
-                elif keystatus[sdl2.SDL_SCANCODE_MINUS] or keystatus[sdl2.SDL_SCANCODE_KP_MINUS]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_MINUS or event.key == sdl2.SDL_SCANCODE_KP_MINUS:
                     if (colorfunction == 4) or (colorfunction == 5):
                         ymax = ymax // 2
                         oldymax = genelife.setget_act_ymax(ymax)
@@ -1218,20 +1222,20 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                             genealogycoldepth = genealogycoldepth - 1
                             genelife.set_genealogycoldepth(genealogycoldepth)
                             print('step',framenr,'new genealogycoldepth =',genealogycoldepth)
-                elif keystatus[sdl2.SDL_SCANCODE_1]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_1:
                     update1=1-update1
                     genelife.set_colorupdate(update1)
                     if update1: print('step',framenr,'first window updates turned on')
                     else:       print('step',framenr,'first window updates turned off')
-                elif keystatus[sdl2.SDL_SCANCODE_2]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_2:
                     update2=1-update2
                     if update2: print('step',framenr,'second window updates turned on')
                     else:       print('step',framenr,'second window updates turned off')
-                elif keystatus[sdl2.SDL_SCANCODE_B]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_B:
                     nbhistmax=framenr//(N//2)
                     nbhistold = nbhist
                     if nbhistmax >= nNhist*2-1: nbhistmax=nNhist*2-2;
-                    if sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT:
+                    if sdl2.SDL_GetModState() & sdl2.KMOD_SHIFT:
                         nbhist = nbhist+1
                         if nbhist > nbhistmax:
                             nbhist = -1
@@ -1242,7 +1246,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                     if nbhist!=nbhistold:
                         print('step',framenr,"nbhist changed to ",nbhist)
                         genelife.set_nbhist(nbhist)
-                elif keystatus[sdl2.SDL_SCANCODE_F]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_F:
                     print("entering key F")
                     if   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT:
                         print("entering shift key F")
@@ -1258,7 +1262,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                     else:
                         print("entering key f")
                         print("no of frames per second (av. last 10) = %f" % framerate)
-                elif keystatus[sdl2.SDL_SCANCODE_G]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_G:
                     if colorfunction == 9:
                         gcolor = (gcolor+1)%10;
                         genelife.set_gcolors()
@@ -1276,7 +1280,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                             print('step',framenr,'new ancestor choice recent')
                         else:
                             print('step',framenr,'new ancestor choice first')
-                elif keystatus[sdl2.SDL_SCANCODE_I]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_I:
                     nbhoods=[7,3,5,7]
                     info_transfer_h = info_transfer_h + 1;
                     if (info_transfer_h == 4):  info_transfer_h = 0;
@@ -1284,20 +1288,20 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                     else: do_info_transfer = 0;
                     genelife.set_info_transfer_h(do_info_transfer,nbhoods[info_transfer_h])
                     print('step',framenr,'info_transfer_h =',info_transfer_h)
-                elif keystatus[sdl2.SDL_SCANCODE_L]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_L:
                     activityfnlut = 1 - activityfnlut
                     genelife.set_activityfnlut(activityfnlut)
                     print('step',framenr,'activityfnlut =',activityfnlut)
-                elif keystatus[sdl2.SDL_SCANCODE_N]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_N:
                     noveltyfilter=1-noveltyfilter
                     print('step',framenr,"noveltyfilter changed to ",noveltyfilter)
                     genelife.set_noveltyfilter()
-                elif keystatus[sdl2.SDL_SCANCODE_P]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_P:
                     activity_size_colormode=(activity_size_colormode+1)%4
                     print('step',framenr,"activity_size_colormode changed to ",activity_size_colormode)
                     genelife.set_activity_size_colormode()
                     pixeldat=actsizecoltxt[activity_size_colormode]
-                elif keystatus[sdl2.SDL_SCANCODE_Q]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_Q:
                     if   sdl2.SDL_GetModState() & sdl2.KMOD_LALT:
                         quadrants = eval(input("Enter an integer between -1 and 6: "))
                     elif   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT:
@@ -1306,7 +1310,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                         if quadrants >= 0: quadrants = quadrants-1
                     print('step',framenr,"quadrants changed to ",quadrants)
                     genelife.set_quadrant(quadrants)
-                elif keystatus[sdl2.SDL_SCANCODE_R]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_R:
                     if   sdl2.SDL_GetModState() & sdl2.KMOD_LALT:
                         rbackground,randominflux = eval(input("Enter rbackground [0-32768] and randominflux (3 deletions only, 2 GoL gene, 1 random gene:"))
                         print('step',framenr,"rbackground changed to ",rbackground,"with random mode ",randominflux)
@@ -1323,7 +1327,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                         randominflux = 1 if randominflux !=1 else 0
                         print('step',framenr,"randominflux changed to ",randominflux)
                         genelife.set_randominflux(randominflux)
-                elif keystatus[sdl2.SDL_SCANCODE_S]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_S:
                     fname = "images/genelife_sel%02d_t%03d_r%08x_s%03d.jpeg" % (selection,framenr,repscheme,savecnt)
                     err = sdl2.surface.SDL_SaveBMP(window, fname)
                     if err:
@@ -1331,22 +1335,22 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                     else:
                         print("image saved "+fname)
                     savecnt = savecnt + 1
-                elif keystatus[sdl2.SDL_SCANCODE_T]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_T:
                     if   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT:
                         if(offdt<0): offdt = offdt+1
                     elif offdt>-maxPlane+1: offdt = offdt-1
                     print('step',framenr,"offset dt changed to ",offdt)
                     genelife.set_offsets(offdx,offdy,offdt)
-                elif keystatus[sdl2.SDL_SCANCODE_V]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_V:
                     vscrolling=1-vscrolling
                     print('step',framenr,"vscrolling changed to ",vscrolling)
                     genelife.set_vscrolling()
-                elif keystatus[sdl2.SDL_SCANCODE_X]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_X:
                     if   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT: offdx = offdx+1
                     else: offdx = offdx-1
                     print('step',framenr,"offset dx changed to ",offdx)
                     genelife.set_offsets(offdx,offdx,offdt)
-                elif keystatus[sdl2.SDL_SCANCODE_Y]:
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_Y:
                     if   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT: offdy = offdy+1
                     else: offdy = offdy-1
                     print('step',framenr,"offset dy changed to ",offdy)

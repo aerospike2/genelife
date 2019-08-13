@@ -3609,7 +3609,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                         newgene = golg[nb[kch]];
                         parentid = golb[nb[kch]];
                     }
-                    if(!parentid) fprintf(stderr,"error parentid=0: nbest %d nsame %d kch %d ij %d\n",nbest,nsame,kch,ij);
+                    if(!parentid) fprintf(stderr,"error parentid=0: s %d nbest %d nsame %d kch %d ij %d\n",s,nbest,nsame,kch,ij);
                     if(!parentid) fprintf(stderr,"error parentid=0: nb[kch] %d nsame %d kch %d ij %d\n",nb[kch],nsame,kch,ij);
                 }
             }
@@ -3683,6 +3683,11 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
             }
             newgolgstats[ij] = 0ull;             // need to update statistics of neighbours with parenting information, so init required
         }
+    }
+    
+    for (ij=0; ij<N2; ij++) {
+        if(newgol[ij] && !newgolb[ij]) fprintf(stderr,"error golb zero for non-zero gol at ij=%d\n",ij);
+        if(newgol[ij] && !newgolg[ij]) fprintf(stderr,"probable error golg zero for non-zero gol at ij=%d\n",ij);
     }
 
     if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);                    // [**gol** ??]
@@ -4656,6 +4661,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     initfield = runparams[6];
     birthmask=runparams[7];
     ancselectmask=runparams[8];
+    colorfunction2 = runparams[9];
 
     randominflux = 0;
     vscrolling = last_scrolled = 0;
@@ -4679,8 +4685,8 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
 
     fprintf(stderr,"___________________________________________________________________________________________\n");
     fprintf(stderr,"_________________________________ genelife simulation _____________________________________\n");
-    fprintf(stderr,"runparams %d %d %d %d %d %d %d %d %d\n",runparams[0],runparams[1],runparams[2],
-                    runparams[3],runparams[4],runparams[5],runparams[6],runparams[7],runparams[8]);
+    fprintf(stderr,"runparams %d %d %d %d %d %d %d %d %d %d\n",runparams[0],runparams[1],runparams[2],
+                    runparams[3],runparams[4],runparams[5],runparams[6],runparams[7],runparams[8],runparams[9]);
     fprintf(stderr,"simparams %d %d %d %d %d %d\n",simparams[0],simparams[1],simparams[2],simparams[3],simparams[4],ranseed);
     fprintf(stderr,"pmutmask %x (NB 0 means no mutation)\n",pmutmask);
 
