@@ -47,7 +47,8 @@ unsigned int overwritemask = 0x3;   // for selection 0-7 bit mask for 4 cases of
 unsigned int ancselectmask = 0xff;  // whether to use selection between genes to determine ancestor: for each birth rule (0 use positional choice via selectdifft)
 int ncoding = 1;                    // byte 0 of python ncoding : number of coding bits per gene function
 int ncoding2 = 0;                   // byte 1 of python ncoding: number of coding bits per gene function for masks in connection with repscheme add2ndmask1st R_6,7
-unsigned int pmutmask;              // binary mask so that prob of choosing zero is pmut = pmutmask/2^32. If value<32 interpret as integer -log2(prob).
+unsigned int pmutmask;              // binary mask so that prob of choosing zero is pmut = pmutmask/2^32. If value<32 interpret as integer -log2(prob)
+int parentdies = 1;                 // model variant enhancing interpretation of non-proliferative birth as movement (1) or default (0) : currently sum_lut only
 //...........................................................diagnostic control..........................................................................
 const unsigned int diag_all = 0xffff;             // all diagnostics active
 //const unsigned int diag_all = 0xffdb;             // all diagnostics active except clones
@@ -121,6 +122,7 @@ int ancestortype = 0;               // display and return genealogies via first 
 #define F_nongolchg 0x400           /* bit is 1 if state when produced (ie changed to) was made by a non GoL rule */
 #define F_3g_same   0x800           /* bit is 1 if exactly 3 live nbs and all 3 have same gene */
 #define F_survmut   0x1000          /* bit is 1 if mutation or survival from non-replicated mutant: mutation(t) or mutation(t-1)&survival(t) */
+#define F_parent    0x2000          /* bit is 1 if individual that was at this site was parent/ancestor/genetic donor of a new individual born in last step */
 #define F_3_livenbs 0xff0000        /* mask for storing configuration of 3 live neighbours : clockwise from top-left neighbour (NW) */
 //----------------------------------------------------------hash table implementation of python style dictionary---------------------------------------
 #define HASHTABLE_IMPLEMENTATION    /* uses Mattias Gustavsson's hashtable (github) for unsigned 64 bit key dictionary */
@@ -3490,6 +3492,8 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
     else if (ncoding ==2)   allcoding = 0xffffffff;
     else                    allcoding = 0xffff;
     
+    if(parentdies) for (ij=0; ij<N2; ij++) newgolgstats[ij] = 0ull;             // need to update statistics of neighbours with parenting information, so init required
+    
     for (ij=0; ij<N2; ij++) {                                                   // loop over all sites of 2D torus with side length N
         i = ij & Nmask;  j = ij >> log2N;                                       // row & column
         jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                       // toroidal (j+1)*N and (j-1)*N
@@ -3554,7 +3558,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                     // if(s ==3 && genecode!=genegol[selection-8]) fprintf(stderr,"genecode %llx != genegol %llx at ij %d\n",genecode,genegol[selection-8],ij);
                 }
             }
-            else if (rulemodij==2){                                          // hard death on alternating site membrane at j=N/2+initfield/2
+            else if (rulemodij==2){                                          // hard death on membrane defined above via macro "membrane"
                 survive = 0ull;
                 birth = 0ull;
             }
@@ -3615,6 +3619,10 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                     if(golij) hashdeletegene(golg[ij],golb[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n");
                     hashaddgene(ij,newgene,ancestor,newgolb+ij,parentid,statflag & F_mutation);
                 }
+                if (parentdies) {
+                    unsigned int ij1 = parentid & N2mask;
+                    newgolgstats[ij1] = newgolgstats[ij1] | F_parent;
+                }
             }
         }
         if(!birth) {                                                       // need instead of else because if(birth) section may change value of birth
@@ -3629,15 +3637,15 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                     statflag |= F_death;
                     newgol[ij]  = 0ull;                                    // new game of life cell value dead
                     newgolg[ij] = 0ull;                                    // gene dies
-                    newgolb[ij]=0ull;
+                    newgolb[ij] = 0ull;
                     if(diagnostics & diag_hash_genes)
                         hashdeletegene(golg[ij],golb[ij],"step %d hash delete error 2 in update, gene %llx not stored\n");
                 }
             }
             else {                                                         // empty and no birth, stays empty
-                newgol[ij] = golij;
+                newgol[ij]  = golij;
                 newgolg[ij] = golg[ij];
-                newgolb[ij]=golb[ij];
+                newgolb[ij] = golb[ij];
             }
         }
 
@@ -3646,8 +3654,23 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
             if(newgol[ij]) statflag |= F_nongolchg;
         }
         if(golij) statflag |= F_golstate;                                   // this is the last gol state, not the new state
-        newgolgstats[ij] = statflag;
+        if (parentdies) newgolgstats[ij] = newgolgstats[ij] | statflag;     // newgolgstats may already contain updated parenthood info F_parent
+        else newgolgstats[ij] = statflag;
     }  // end for ij
+
+    if(parentdies) {
+        for (ij=0; ij<N2; ij++) {
+            statflag = newgolgstats[ij];
+            if(gol[ij] && !(statflag&F_birth) && !(statflag&F_death) && (statflag&F_parent)) {
+                newgol[ij]  = 0ull;                                    // new game of life cell value dead
+                newgolg[ij] = 0ull;                                    // gene dies
+                newgolb[ij] = 0ull;
+                if(diagnostics & diag_hash_genes)
+                    hashdeletegene(golg[ij],golb[ij],"step %d hash delete error 2 in update, gene %llx not stored\n");
+            }
+            newgolgstats[ij] = 0ull;             // need to update statistics of neighbours with parenting information, so init required
+        }
+    }
 
     if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);                    // [**gol** ??]
     if(vscrolling) v_scroll(newgol,newgolg,newgolb);
@@ -3764,7 +3787,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
                     }
                 }
             }
-            else if (rulemodij==2){                                                 // hard death on alternating site membrane at j=N/2+initfield/2
+            else if (rulemodij==2){                                                 // hard death on membrane defined above via macro "membrane"
                 survive = 0ull;
                 birth = 0ull;
             }
@@ -4008,7 +4031,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
                     }
                 }
             }
-            else if (rulemodij==2){                                                 // hard death on alternating site membrane at j=N/2+initfield/2
+            else if (rulemodij==2){                                                 // hard death on membrane defined above via macro "membrane"
                 survive = 0ull;
                 birth = 0ull;
             }
@@ -4255,7 +4278,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
                     }
                 }
             }
-            else if (rulemodij==2){                                             // hard death on alternating site membrane at j=N/2+initfield/2
+            else if (rulemodij==2){                                             // hard death on membrane defined above via macro "membrane"
                 survive = 0ull;
                 birth = 0ull;
             }
