@@ -1815,6 +1815,7 @@ extern inline uint64_t disambiguate(unsigned int kch, uint64_t nb1i, int nb[], u
                  return( golg[ijanc]);
         case 1:  ijanc = nb[(nb1i>>(kch<<2))&0x7];                                       // ignore asymmetry issue, continue regardless;
                  *parentid = golb[ijanc];
+                 if(*parentid == 0ull) fprintf(stderr,"error in disambiguate case 1: parentid set to golb[%d] which is 0\n",ijanc);
                  return( golg[ijanc]);
         case 2:  *birth = 0ull; return(0ull);                                            // abandom birth attempt
         case 3:  for (newgene=~0ull,newijanc=0,k=0;k<nsame;k++) {                        // choose minimum value gene
@@ -3608,6 +3609,8 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                         newgene = golg[nb[kch]];
                         parentid = golb[nb[kch]];
                     }
+                    if(!parentid) fprintf(stderr,"error parentid=0: nbest %d nsame %d kch %d ij %d\n",nbest,nsame,kch,ij);
+                    if(!parentid) fprintf(stderr,"error parentid=0: nb[kch] %d nsame %d kch %d ij %d\n",nb[kch],nsame,kch,ij);
                 }
             }
             if (birth) {                                                    // ask again because disambiguate may turn off birth
