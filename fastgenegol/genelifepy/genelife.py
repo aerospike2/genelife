@@ -144,6 +144,7 @@ ancselectmask = runparams[8] = 0xff      # bit mask for enabling gene-selective 
 colorfunction = runparams[5] = 0         # color function 0(hash), >=1(fnal), 2 nongulstate or color gol planes, 3 notgolrul yellow
                                          # 4 activities 5 populations 6 genealogy steps 7 genealogy temporal with activity scaled colors
                                          # 8 glider detection 9 connected component labelling 10 connected component activities
+                                         # 11 genealogy depth 12 genetic glider detection
 colorfunction2 = runparams[9] = -1       # colorfunction for 2nd window: -1 same as first window
 initfield = runparams[6] = 100           # 1 init via 32x32 genepat.dat, n>1 init via nxn rand array
 nlog2pmut = simparams[0] = 8             # log2 gene mutation probability (0 or >56 means no mutation)
@@ -587,8 +588,9 @@ def set_params():
     runparams[7] = birthmask                 # 8-32 bit birth mask for allowing genes to modify LUTs
     runparams[8] = ancselectmask             # 8-32 bit ancesor selection mask to allow genetic selection to determine ancesotr for LUT rule
     runparams[5] = colorfunction             # color function; 0(hash), 1-3 (functional), 2 nongulstate or color gol planes, 3 notgolrul yellow
-                                             # 4 activities 5 genealogy steps 6 genealogy temporal 7 genealogy with activity scaled colors 8 glider detection
+                                             # 4 activities 5 popln 6 genealogy steps 7 genealogy temporal 8 glider detection
                                              # 9 connected component labels and novelty (n) 10 connected component activities
+                                             # 11 genealogy depth 12 genetic glider detection
     runparams[9] = colorfunction2            # -1 for same as clorfunction, otherwise values as in colorfunction
     runparams[6] = initfield                 # 0 full field random or start depending on initialrdensity, 1 init via 32x32 genepat.dat, n>1 init via nxn rand array
     simparams[0] = nlog2pmut                 # log2 gene mutation probability (0 or >56 means no mutation)
@@ -1177,21 +1179,21 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                 elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_SPACE:
                     pause = 1-pause
                 elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_RIGHT:
-                    colorfunction = (colorfunction + 1) % 12
+                    colorfunction = (colorfunction + 1) % 13
                     genelife.set_colorfunction(colorfunction)
                     print('step',framenr,'colorfunction changed to',colorfunction)
                 elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_LEFT:
-                    colorfunction = (colorfunction - 1) % 12
+                    colorfunction = (colorfunction - 1) % 13
                     genelife.set_colorfunction(colorfunction)
                     print('step',framenr,'colorfunction changed to',colorfunction)
                 elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_UP:
                     colorfunction2 = (colorfunction2 + 1)
-                    if colorfunction2 == 12: colorfunction2 = -1
+                    if colorfunction2 == 13: colorfunction2 = -1
                     genelife.set_colorfunction2(colorfunction2)
                     print('step',framenr,'colorfunction2 changed to',colorfunction2)
                 elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_DOWN:
                     colorfunction2 = (colorfunction2 - 1)
-                    if colorfunction2 == -2: colorfunction2 = 11
+                    if colorfunction2 == -2: colorfunction2 = 12
                     genelife.set_colorfunction2(colorfunction2)
                     print('step',framenr,'colorfunction2 changed to',colorfunction2)
                 elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_EQUALS or event.key == sdl2.SDL_SCANCODE_KP_PLUS:

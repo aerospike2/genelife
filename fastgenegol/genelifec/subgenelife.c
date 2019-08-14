@@ -75,8 +75,8 @@ int initfield = 0;                  // 0 input from random field of random or st
 int colorfunction = 0;              // color function choice of 0: hash or 1: functional (color classes depends on selection parameter)
                                     // 2: as in 1 but color sites where last step was non GoL rule yellow, 3: as in 2 but yellow if state produced by non GoL
                                     // 4: activities 5: populations 6: genealogies without time 7: genealogies with time brightness by activity 8: gliders
-                                    // 9: connected components 10 : connected component activities 11: genealogy based individual colors
-int colorfunction2 = -1;            // colorfunction for second window: as above, but -1 means same value as colorfunction
+                                    // 9: connected components 10 : connected component activities 11: genealogy based individual colors 12: genetic glider det
+int colorfunction2 = -1;            // colorfunction for second window: as above, but -1 means same value as colorfunction : only one fn call made
 int colorupdate1 = 1;               // flag to enable routine print statements to terminal during run : linked to colorfunction display in python
 int ancestortype = 0;               // display and return genealogies via first ancestor (0), clonal ancestry (1) or first & clonal in 2 win (2)
 #define ASCII_ESC 27                // escape for printing terminal commands, such as cursor repositioning : only used in non-graphic version
@@ -793,7 +793,7 @@ void printxy (uint64_t gol[],uint64_t golg[]) {                         // print
 //.......................................................................................................................................................
 void colorgenes1(uint64_t gol[], uint64_t golg[], uint64_t golb[], uint64_t golgstats[], int cgolg[], int NN2, int colorfunction, int winnr) {
     uint64_t gene, gdiff, g2c, mask, quad, clone;
-    int ij,k,nbeven,activity,popcount,labelxy;
+    int ij,k,j,jper,nbeven,activity,popcount,labelxy;
     unsigned int d,d0,d1,d2;
     unsigned int color[3],colormax;
     double rescalecolor;
@@ -1227,7 +1227,7 @@ void colorgenes1(uint64_t gol[], uint64_t golg[], uint64_t golb[], uint64_t golg
             if (gol[ij] && (diagnostics & diag_hash_genes)) {
                 gene = (ancestortypec==2) ? golb[ij] : golg[ij];    // variable gene holds either birthid (clones) or gene at ij;
                 ancestor=gene;
-                for (int j=1;j<=genealogycoldepth;j++) {
+                for (j=1;j<=genealogycoldepth;j++) {
                     if((ancestortypec!=1) && (ancestor==rootgene)) break;                       // reached root, exit j loop
                     if((ancestortypec==1) && (ancestor&rootclone)) break;                       // reached root, exit j loop
                     else {
@@ -1253,6 +1253,33 @@ void colorgenes1(uint64_t gol[], uint64_t golg[], uint64_t golb[], uint64_t golg
                 if((ancestortypec!=1) && (ancestor==rootgene)) mask = 0x3f3f3fff;                // grey color for rootclone
                 if((ancestortypec==1) && (ancestor&rootclone)) mask = 0x3f3f3fff;                // grey color for rootclone
 
+                cgolg[ij] = (int) mask;
+            }
+            else cgolg[ij] = 0;
+        }
+    }
+    else if(colorfunction==12){                                     // colouring based on periodicity of dynamic record of 16 last states in golr for live genes
+        short unsigned int dscale[16] = {0xff,0xcf,0x7f,0x4f,0x2f,0x27,0x1f,0x1d,0x1b,0x19,0x17,0x15,0x14,0x13,0x12,0x11};
+        for (ij=0; ij<N2; ij++) {
+            if (gol[ij] && (diagnostics & diag_hash_genes)) {
+                gdiff = gene = golr[ij];                            // variable gene holds dynamical record stored in golr
+                d = d0 = 64;                                        // max number of mismatches
+                jper = 0;
+                for (j=0;j<15;j++) {
+                    gdiff = (gdiff>>4)|((gdiff&0xfull)<<60);        // rotate record cyclically by one time step
+                    POPCOUNT64C((gene^gdiff),d);                    // number of difference positions between gene and gdiff
+                    if(d<d0) {
+                        d0=d;
+                        jper = j;
+                    }
+                }
+                if (d0 > 15) mask = 0x080808ffull;                  // dark grey color for no significant periodic match found
+                else {
+                    mask = 0xffull;
+                    mask |= (jper*(15-d0))<<24;
+                    mask |= ((15-jper)*(15-d0))<<16;
+                    mask |= dscale[d0]<<8;
+                }
                 cgolg[ij] = (int) mask;
             }
             else cgolg[ij] = 0;
@@ -4951,13 +4978,13 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     if(diagnostics & diag_component_labels) ncomponents=extract_components(gol);
 }
 //-------------------------------------------------------------------- set ...---------------------------------------------------------------------------
-void set_colorfunction(int colorfunctionval) {
-    if((colorfunctionval>11) || (colorfunctionval<-1)) fprintf(stderr,"error colorfunction value passed %d too large\n",colorfunctionval);
-    else     colorfunction = colorfunctionval;
+void set_colorfunction(int colorfunctionin) {
+    if((colorfunctionin>12) || (colorfunctionin<0)) fprintf(stderr,"error colorfunction value passed %d out of range\n",colorfunctionin);
+    else     colorfunction = colorfunctionin;
 }
 //.......................................................................................................................................................
 void set_colorfunction2(int colorfunctionin) {
-    if((colorfunctionin>11) || (colorfunctionin<-1)) fprintf(stderr,"error colorfunction value passed %d too large\n",colorfunctionin);
+    if((colorfunctionin>12) || (colorfunctionin<-1)) fprintf(stderr,"error colorfunction value passed %d out of range\n",colorfunctionin);
     else     colorfunction2 = colorfunctionin;
 }
 //.......................................................................................................................................................
