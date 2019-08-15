@@ -583,6 +583,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // get_log2N            get the current log2N value from C to python
 // get_curgol           get current gol array from C to python
 // get_curgolg          get current golg array from C to python
+// get_curgolbr         get current golb and golr arrays from C to python
 // get_stats            get the traced statistics from C to python
 // get_acttrace         get current acttrace array C to python
 // get genealogytrace   get current trace of genealogies to python
@@ -5169,6 +5170,16 @@ void get_curgolg(uint64_t outgolg[], int NN) {
     int ij;
     for (ij=0; ij<NN; ij++) {
         outgolg[ij] = planesg[curPlane][ij];
+    }
+}
+//.......................................................................................................................................................
+void get_curgolbr(uint64_t outgolb[], uint64_t outgolr[], int NN) {
+    int ij;
+    for (ij=0; ij<NN; ij++) {
+        outgolb[ij] = planesb[curPlane][ij];
+    }
+    for (ij=0; ij<NN; ij++) {
+        outgolr[ij] = planesr[curPlane][ij];
     }
 }
 //.......................................................................................................................................................

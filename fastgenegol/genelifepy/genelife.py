@@ -28,6 +28,8 @@ Height = N
 
 gol = np.zeros(N2,np.uint64)
 golg = np.zeros(N2,np.uint64)
+golb = np.zeros(N2,np.uint64)
+golr = np.zeros(N2,np.uint64)
 golgstats = np.zeros(N2,np.uint64)
 
 nspecies = 0
@@ -848,7 +850,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
     global surface, surfacex1, surfacex2, window, scalex2, caption, dispinit, update1, grect1
     global surface2, surface2x1, surface2x2, window2, caption2, dispinit2, grect, render2, update2, renderer2, factory2, image2, message2, font2, textColor2, windowID2
     global N
-    global gol,golg,golgstats
+    global gol,golg,golb,golr,golgstats
     global connlabel,connlen,ncomponents
     global colorfunction,colorfunction2,gcolor,genealogycoldepth,ancestortype
     global nspecies,ymax,ymaxq,oldymax,oldymaxq,nbhist,nNhist
@@ -1012,10 +1014,13 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                                 surviveover[0],surviveover[1],surviveover[2]= survivalmask,birthmask,overwritemask
                                 genelife.set_surviveover64(surviveover)
                     else: # y<N
-                        if colorfunction < 4 or colorfunction == 8 or colorfunction == 11:
+                        if colorfunction < 4 or colorfunction == 8 or colorfunction >10 :
                             genelife.get_curgol(gol)    # get current gol,golg,golgstats arrays
                             genelife.get_curgolg(golg)
-                            genelife.get_curgolgstats(golgstats)
+                            if colorfunction > 10:
+                                genelife.get_curgolbr(golb,golr)
+                            else:
+                                genelife.get_curgolgstats(golgstats)
                             if quadrants >= 0 and selection<8:   # set the two bits in repscheme corresponding to quadrant
                                 repscheme=genelife.set_repscheme_bits(quadrants,x,y,surviveover)
                                 survivalmask  = surviveover[0]
@@ -1025,7 +1030,12 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                                 quadrants = -1
                                 pixeldat = ""
                             else:
-                                pixeldat = "(%d,%d) gol %016x gene %016x status %016x" % (x,y,gol[x+y*N],golg[x+y*N],golgstats[x+y*N])
+                                if colorfunction < 10:
+                                    pixeldat = "(%d,%d) gol %01x gene %016x status %016x" % (x,y,gol[x+y*N],golg[x+y*N],golgstats[x+y*N])
+                                elif colorfunction == 11:
+                                    pixeldat = "(%d,%d) gol %01x cloneid %016x gene %016x" % (x,y,gol[x+y*N],golb[x+y*N],golg[x+y*N])
+                                elif colorfunction == 12:
+                                    pixeldat = "(%d,%d) gol %01x golr %016x golg %016x" % (x,y,gol[x+y*N],golr[x+y*N],golg[x+y*N])
                                 print(("step %d pixel data %s" % (framenr,pixeldat)))
                                 if selection == 8:                              # color rule table rectangles at base by rule derived from gene at current pixel
                                     for k in range(16):

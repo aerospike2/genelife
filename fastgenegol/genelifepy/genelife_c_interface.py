@@ -80,6 +80,8 @@ libcd.get_curgol.restype = None
 libcd.get_curgol.argtypes = [uint64_array,c_int]
 libcd.get_curgolg.restype = None
 libcd.get_curgolg.argtypes = [uint64_array,c_int]
+libcd.get_curgolbr.restype = None
+libcd.get_curgolbr.argtypes = [uint64_array,uint64_array,c_int]
 libcd.get_curgolgstats.restype = None
 libcd.get_curgolgstats.argtypes = [uint64_array,c_int]
 libcd.get_gliderinfo.restype = None
@@ -196,6 +198,9 @@ def get_curgol(gol):
 
 def get_curgolg(golg):
     return libcd.get_curgolg(golg, int(len(golg)))
+
+def get_curgolbr(golb,golr):
+    return libcd.get_curgolbr(golb, golr, int(len(golr)))
 
 def get_curgolgstats(golgstats):
     return libcd.get_curgolgstats(golgstats, int(len(golgstats)))
