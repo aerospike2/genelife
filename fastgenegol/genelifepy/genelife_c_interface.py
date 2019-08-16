@@ -100,8 +100,6 @@ libcd.get_curtime.argtypes = None
 libcd.get_curtime.restype = c_int
 libcd.get_stats.restype = None
 libcd.get_stats.argtypes = [int_array, int_array, int_array, int_array, c_int]
-libcd.get_shist.restype = None
-libcd.get_shist.argtypes = [int_array]
 libcd.get_activities.restype = c_int
 libcd.get_activities.argtypes = [uint64_array, int_array, c_int]
 libcd.get_all_activities.restype = c_int
@@ -240,9 +238,6 @@ def get_histo(gol):
 
 def get_stats(livesites,genotypes,stepstats,configstats,nstats):
     return libcd.get_stats(livesites,genotypes,stepstats,configstats,nstats)
-
-def get_shist(shist):
-    return libcd.get_shist(shist);
 
 def get_activities(genes,activities):
     return libcd.get_activities(genes,activities,int(len(genes)))
