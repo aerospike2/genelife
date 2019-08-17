@@ -819,7 +819,7 @@ def construct_caption(colorfunction1or2,pixeldat,buttonhelp,win):
     if selection < 8:
         caption = caption + "pairwise selection " + selectiontext0007[selection] + " " + buttonhelp
     elif selection<16:
-        caption = caption + "LUT encoding " + selectiontext0815[selection-8] + " "
+        caption = caption + "LUT encoding " + selectiontext0815[selection-8] + " " + buttonhelp
 
     if quadrants >= 0:
         paramdat = "repscheme %06x surv. %01x overw. %01x ncoding %06x" % (repscheme,survivalmask,overwritemask,ncoding)
@@ -1065,7 +1065,8 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
                             colorgrid(colorfunction,cgolg,cgrid,0)
                             pixeldat = "(%d,%d)" % (x,y)
-                elif event.button.button ==  sdl2.SDL_BUTTON_RIGHT:          # info on button or single plane choice (selection>=20) right mouse button (-click)
+                elif event.button.button ==  sdl2.SDL_BUTTON_RIGHT:          # info on button or selection<8 model - right mouse button (-click)
+                    print("right mouse button pressed")
                     if scalex2 or event.window.windowID == windowID2:
                         x = (int) (event.button.x//2)
                         y = (int) (event.button.y//2)
@@ -1159,13 +1160,6 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                         else:
                             x = event.motion.x
                             y = event.motion.y
-                        if y >= N and selection==12:
-                            k=x>>(log2N-6)
-                            if k<64:
-                                displayoneplane=k
-                                genelife.set_displayoneplane(displayoneplane)
-                            if updatesenabled:
-                                updatesenabled=False
                     if selection<8:
                         if scalex2 or event.window.windowID == windowID2:
                             x = (int) (event.motion.x//2)

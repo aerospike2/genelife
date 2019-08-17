@@ -801,10 +801,10 @@ void printxy (uint64_t gol[],uint64_t golg[]) {                         // print
 //.......................................................................................................................................................
 void golr_digest (uint64_t golr, int *mismatches, int *period) {    // extract optimal period match: number of mismatches and period
     uint64_t gdiff;
-    int j,d,d0,jper;
+    int j,d,d0,d1,jper;
     
     gdiff = golr;                                       // variable golr holds dynamical record
-    d = d0 = 64;                                        // max number of mismatches
+    d0 = 64; d1 = 0;                                    // min,max number of mismatches
     jper = 0;
     for (j=0;j<15;j++) {
         gdiff = (gdiff>>4)|((gdiff&0xfull)<<60);        // rotate record cyclically by one time step
@@ -813,8 +813,10 @@ void golr_digest (uint64_t golr, int *mismatches, int *period) {    // extract o
             d0=d;
             jper = j;
         }
+        if(d>d1) d1=d;
     }
-    *mismatches = d0;
+    
+    *mismatches = d0==d1 ? -1 : d0;                     // return -1 if min mismatches = max mismatches (constant signal), else min nr of mismatches
     *period = jper;
 }
 //.......................................................................................................................................................
@@ -1290,7 +1292,7 @@ void colorgenes1(uint64_t gol[], uint64_t golg[], uint64_t golb[], uint64_t golg
         for (ij=0; ij<N2; ij++) {
             if (gol[ij] && (diagnostics & diag_hash_genes)) {
                 gdiff = gene = golr[ij];                            // variable gene holds dynamical record stored in golr
-                d = d0 = 64;                                        // max number of mismatches
+                d0 = 64; d1 = 0;                                    // min,max number of mismatches
                 jper = 0;
                 for (j=0;j<15;j++) {
                     gdiff = (gdiff>>4)|((gdiff&0xfull)<<60);        // rotate record cyclically by one time step
@@ -1299,13 +1301,19 @@ void colorgenes1(uint64_t gol[], uint64_t golg[], uint64_t golb[], uint64_t golg
                         d0=d;
                         jper = j;
                     }
+                    if(d>d1) d1=d;
                 }
                 if (d0 > 15) mask = 0x080808ffull;    // dark grey color for no significant periodic match found
                 else {
                     mask = 0xffull;
-                    mask |= (jper*(15-d0))<<24;
-                    mask |= ((15-jper)*(15-d0))<<16;
-                    mask |= dscale[d0]<<8;
+                    if ((d0==d1) && (~gene&0x8) && (~gdiff&0x8)) {
+                        mask |= 0x3f<<8;
+                    }
+                    else {
+                        mask |= (jper*(15-d0))<<24;
+                        mask |= ((15-jper)*(15-d0))<<16;
+                        mask |= dscale[d0]<<8;
+                    }
                 }
                 cgolg[ij] = (int) mask;
             }
@@ -3734,7 +3742,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                     newgol[ij]  = golij;                                   // new game of life cell value same as old
                     newgolg[ij] = golg[ij];                                // gene stays same
                     newgolb[ij] = golb[ij];
-                    newgolr[ij] = (golr[ij]<<4)| (s-1);                    // register s-1 in record_of_dynamics_gene golr along with 0 value of bit3 for survival event
+                    newgolr[ij] = (golr[ij]<<4) | (s-1);                   // register s-1 in record_of_dynamics_gene golr along with 0 value of bit3 for survival event
                 }
                 else {                                                     // death
                     statflag |= F_death;
@@ -3971,7 +3979,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
                     newgol[ij]  = gol[ij];                                      // new game of life cell value same as old
                     newgolg[ij] = golg[ij];                                     // gene stays same
                     newgolb[ij] = golb[ij];
-                    newgolr[ij] = (golr[ij]<<4)| (s-1);                         // register s-1 in record_of_dynamics_gene golr along with 0 value of bit3 for survival event
+                    newgolr[ij] = (golr[ij]<<4) | (s-1);                        // register s-1 in record_of_dynamics_gene golr along with 0 value of bit3 for survival event
                 }
                 else {                                                          // gene bit = 0 => death
                     statflag |= F_death;
@@ -4219,7 +4227,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
                     newgol[ij]  = gol[ij];                                      // new game of life cell value same as old
                     newgolg[ij] = golg[ij];                                     // gene stays same
                     newgolb[ij] = golb[ij];
-                    newgolr[ij] = (golr[ij]<<4)| (s-1);                         // register s-1 in record_of_dynamics_gene golr along with 0 value of bit3 for survival event
+                    newgolr[ij] = (golr[ij]<<4) | (s-1);                        // register s-1 in record_of_dynamics_gene golr along with 0 value of bit3 for survival event
                 }
                 else {                                                          // gene bit = 0 => death
                     statflag |= F_death;
@@ -4500,7 +4508,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
                     newgol[ij]  = gol[ij];                                     // new game of life cell value same as old
                     newgolg[ij] = golg[ij];                                    // gene stays same
                     newgolb[ij] = golb[ij];
-                    newgolr[ij] = (golr[ij]<<4)| (s-1);                        // register s-1 in record_of_dynamics_gene golr along with 0 value of bit3 for survival event
+                    newgolr[ij] = (golr[ij]<<4) | (s-1);                       // register s-1 in record_of_dynamics_gene golr along with 0 value of bit3 for survival event
                 }
                 else {                                                         // gene bit = 0 => death
                     statflag |= F_death;
@@ -4513,7 +4521,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
                 }
             }
             else{                                                              // no birth on empty cell
-                newgol[ij] = gol[ij];
+                newgol[ij]  = gol[ij];
                 newgolg[ij] = golg[ij];
                 newgolb[ij] = golb[ij];
                 newgolr[ij] = golr[ij];
