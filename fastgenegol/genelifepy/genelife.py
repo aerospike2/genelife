@@ -826,7 +826,7 @@ def construct_caption(colorfunction1or2,pixeldat,buttonhelp,win):
         caption = caption + ("q%1d " % quadrants) + paramdat
     if colorfunction1or2 == 4: caption = caption + ("ymax %d " % ymax)
     elif colorfunction1or2 == 6 or colorfunction1or2 == 7 or colorfunction1or2 == 11:
-        if colorfunction1or2 == 11: caption = caption + ("-ealogy_coldepth %d " % genealogycoldepth)
+        if colorfunction1or2 == 11: caption = caption + ("gcdepth %d " % genealogycoldepth)
         if   ancestortype == 0: caption = caption + "anc first "
         elif ancestortype == 1: caption = caption + "anc clonal "
         elif ancestortype == 2: caption = caption + "anc first & clonal"
@@ -1073,12 +1073,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                         x = event.button.x
                         y = event.button.y
                     if y >= N:
-                        if selection>=20:
-                            k=x>>(log2N-6)
-                            if k<64:
-                                displayoneplane=k
-                                genelife.set_displayoneplane(displayoneplane)
-                        elif selection < 8:   # info
+                        if selection < 8:   # info
                             k=x>>(log2N-6)
                             if k<18:
                                 buttonhelp = buttonhelp0007[k]
@@ -1117,11 +1112,18 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                         x = event.motion.x
                         y = event.motion.y
                     if x < N and y < N:
-                        if colorfunction < 4 or colorfunction == 8:
+                        if colorfunction < 4 or colorfunction == 8 or colorfunction > 10:
                             genelife.get_curgol(gol)    # get current gol,golg,golgstats arrays
                             genelife.get_curgolg(golg)
-                            genelife.get_curgolgstats(golgstats)
-                            pixeldat = "(%d,%d) gol %016x gene %016x status %016x" % (x,y,gol[x+y*N],golg[x+y*N],golgstats[x+y*N])
+                            if colorfunction < 10:
+                                    genelife.get_curgolgstats(golgstats)
+                                    pixeldat = "(%d,%d) gol %016x gene %016x status %016x" % (x,y,gol[x+y*N],golg[x+y*N],golgstats[x+y*N])
+                            elif colorfunction == 11:
+                                    genelife.get_curgolbr(golb,golr)
+                                    pixeldat = "(%d,%d) gol %01x cloneid %016x gene %016x" % (x,y,gol[x+y*N],golb[x+y*N],golg[x+y*N])
+                            elif colorfunction == 12:
+                                    genelife.get_curgolbr(golb,golr)
+                                    pixeldat = "(%d,%d) gol %01x golr %016x golg %016x" % (x,y,gol[x+y*N],golr[x+y*N],golg[x+y*N])
                             if selection == 8:
                                 for k in range(16):
                                     draw_rect(surfacex1,cancol[1][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])

@@ -22,26 +22,26 @@ const int Nmask = N - 1;            // bit mask for side length, used instead of
 const int N2mask = N2 - 1;          // bit mask for array, used instead of modulo operation
 const uint64_t rootclone = N2;      // single bit for mask enquiries for clones with root heritage
 //--------------------------------------------------------- main parameters of model ----------------------------------------------------------------
-unsigned int rulemod = 1;           // det: whether to modify GoL rules
-int selection = 1;                  // fitness of 2 live neighbours:
-                                    // 0. integer value   1. number of ones  2. scissors-stone-well-paper: wins over left 1-1-2-2
-                                    // 3. scissors-stone-well-paper 1-1-1-1 4. 5. predator prey 6. two target coding 7. selection always fails (no result)
-                                    // 8. genes encode lut based on sum for survival (1-8) and birth (1-8)
-                                    // 9. like 8 but genes penalized in fitness for the number of lut entries active (& poss. also proximity to mask edge)
-                                    // 10. genes encode lut based on sum and canonical rotations survival/birth sum 2-6 (4,7,10,7,4 canon. rotations)
-                                    // 11. like 10 but with genes penalized as in 9
-                                    // 12. genes encode lut based on total live neighbour distance lower and upper cutoffs for survival and birth
-                                    // 13. like 12 but with genes penalized as in 9
-                                    // 14. two match-coupled planes : one with genes
-                                    // 15. like 14 but with genes penalized as in 9
+unsigned int rulemod = 1;           // determine whether to modify GoL rules
+int selection = 1;                  // 0-7 fitness of 2 live neighbours, 8-15 lut symmetry and encoding scheme
+                                    // 0.  integer value                        1. number of ones         2. scissors-stone-well-paper: wins over left 1-1-2-2
+                                    // 3.  scissors-stone-well-paper 1-1-1-1    4. 5. predator prey       6. two target coding     7. selection always fails (no result)
+                                    // 8.  genes encode lut based on sum s for survival/birth:  s 1-8 (8 configs): ncoding determines nr of fixed position bits per LUT entry
+                                    // 9.  like 8 but position-independent encoding of lut entries
+                                    // 10. genes encode lut based on sum and edge-centred count (s,se) for survival/birth: s 1-8 se 0-4 (2,3,4,5,4,3,2,1 configs): ncoding as above
+                                    // 11. like 10 but position-independent encoding of lut entries
+                                    // 12. genes encode lut based on sum s and canonical rotations survival/birth sum 2-6 (4,7,10,7,4 canon.rotns) : ncoding 1 bit only
+                                    // 13. like 12 but but position-independent encoding of lut entries
+                                    // 14. genes encode lut based on 2D rotation/reflection symmetries for sum 0-4 only (1,2,6,10,13 cann.rotns) 2x32 bits: ncoding 1 bit only
+                                    // 15. like 14 but position-independent encoding of lut entries
 unsigned int repscheme = 1;         // replication scheme with separate meaning for selection 0-7 (update_23) and 8-15 other update fns
-                                    // selection 0-7: see #define R_... 1st section below
-                                    //   lowest 10 bits define 5 pairs of bit options for:
-                                    //   0,1 select birth 2,3 neighbour choice 4,5 enforce birth 6,7 2nd,1st neighbour genes 8,9 no successive nonGoL
-                                    //   bits 10-13 specify 4-bit mask for 2-live neighbour birth onl for those of the 4 canonical configurations set
-                                    //   bits 14-20 activate quadrant exploration of specific subset of the first 5 pairs of repscheme and survival and overwrite masks
-                                    //   bit 21 parentdies
-                                    // selection 8-15: see #define R... 2nd section below
+                                    // for selection 0-7: see #define R_... 1st section below
+                                    // --  lowest 10 bits define 5 pairs of bit options for:
+                                    // --  0,1 select birth 2,3 neighbour choice 4,5 enforce birth 6,7 2nd,1st neighbour genes 8,9 no successive nonGoL
+                                    // --  bits 10-13 specify 4-bit mask for 2-live neighbour birth onl for those of the 4 canonical configurations set
+                                    // --  bits 14-20 activate quadrant exploration of specific subset of the first 5 pairs of repscheme and survival and overwrite masks
+                                    // --  bit 21 parentdies
+                                    // for selection 8-15: see #define R... 2nd section below
 unsigned int survivalmask = 0x3;    // for selection 0-7 survive mask for two (bit 1) and three (bit 0) live neighbours
                                     // for selection=8,9 it is 16-bit and for 10-11 it is 19-bit and 12-13 32-bit survival mask to restrict luts
 unsigned int birthmask = 0x0;       // for selection 0-7 unused, birth control is done via bits 0,1,4,5 of repscheme
@@ -52,7 +52,6 @@ unsigned int ancselectmask = 0xff;  // whether to use selection between genes to
 int ncoding = 1;                    // byte 0 of python ncoding : number of coding bits per gene function
 int ncoding2 = 0;                   // byte 1 of python ncoding: number of coding bits per gene function for masks in connection with repscheme add2ndmask1st R_6,7
 unsigned int pmutmask;              // binary mask so that prob of choosing zero is pmut = pmutmask/2^32. If value<32 interpret as integer -log2(prob)
-int parentdies = 0;                 // model variant enhancing interpretation of non-proliferative birth as movement (1) or default (0): set in repscheme
 //...........................................................diagnostic control..........................................................................
 const unsigned int diag_all = 0xffff;             // all diagnostics active
 //const unsigned int diag_all = 0xffdb;             // all diagnostics active except clones
@@ -83,6 +82,7 @@ int colorfunction = 0;              // color function choice of 0: hash or 1: fu
 int colorfunction2 = -1;            // colorfunction for second window: as above, but -1 means same value as colorfunction : only one fn call made
 int colorupdate1 = 1;               // flag to enable routine print statements to terminal during run : linked to colorfunction display in python
 int ancestortype = 0;               // display and return genealogies via first ancestor (0), clonal ancestry (1) or first & clonal in 2 win (2)
+int parentdies = 0;                 // model variant enhancing interpretation of non-proliferative birth as movement (1) or default (0): set in repscheme
 #define ASCII_ESC 27                // escape for printing terminal commands, such as cursor repositioning : only used in non-graphic version
 //-----------------------------------------masks for named repscheme bits (selection 0-7) ----------------------------------------------------------------
 #define R_0_2sel_3live     0x1      /* 1: for 3-live-n birth, employ selection on two least different live neighbours for ancestor */
