@@ -53,21 +53,21 @@ int ncoding = 1;                    // byte 0 of python ncoding : number of codi
 int ncoding2 = 0;                   // byte 1 of python ncoding: number of coding bits per gene function for masks in connection with repscheme add2ndmask1st R_6,7
 unsigned int pmutmask;              // binary mask so that prob of choosing zero is pmut = pmutmask/2^32. If value<32 interpret as integer -log2(prob)
 //...........................................................diagnostic control..........................................................................
-const unsigned int diag_all = 0xffff;             // all diagnostics active
-//const unsigned int diag_all = 0xffdb;             // all diagnostics active except clones
-unsigned int diagnostics = diag_all;              // bit mask for diagnostics as defined by following constants
-const unsigned int diag_hash_genes = 0x1;         // enable hash storage of all genes encountered in simulation
-const unsigned int diag_hash_patterns = 0x2;      // enable hash storage of all patterns encountered in simulation
-const unsigned int diag_hash_clones = 0x4;        // enable hash storage of all clones encountered in simulation
-const unsigned int diag_activities = 0x8;         // enable activity statistics recording for genes and patterns
-const unsigned int diag_simp_genealogies = 0x10;  // enable simple genealogies with first or most recent ancestor
-const unsigned int diag_clone_genealogies = 0x20; // enable genealogies by hashed clones
-const unsigned int diag_component_labels = 0x40;  // enable spatial connected component labelling, mapping and coloring
-const unsigned int diag_offset_statistics = 0x80; // enable collection of offset histogram statistics: histo,numHisto,offsets,Noff
-const unsigned int diag_scrolling_trace = 0x100;  // enable scrolling time tracing of activities for genes and patterns,populations,genealogies
-const unsigned int diag_longtime_trace = 0x200;   // enable longer time tracing of activities for genes and patterns,populations (poss.genealogies)
-const unsigned int diag_general_statistics = 0x400;// enable collection of general statistics: livesites,genestats,stepstats,configstats
-const unsigned int diag_info_transfer_hist = 0x800;// enable collection of glider information transfer histogram in 8 directions  N E S W NE SE SW NW
+const unsigned int diag_all                 = 0xffff;   // all diagnostics active
+//const unsigned int diag_all               = 0xffdb;   // all diagnostics active except clones
+unsigned int diagnostics                    = diag_all; // bit mask for diagnostics as defined by following constants
+const unsigned int diag_hash_genes          = 0x1;      // enable hash storage of all genes encountered in simulation
+const unsigned int diag_hash_patterns       = 0x2;      // enable hash storage of all patterns encountered in simulation
+const unsigned int diag_hash_clones         = 0x4;      // enable hash storage of all clones encountered in simulation
+const unsigned int diag_activities          = 0x8;      // enable activity statistics recording for genes and patterns
+const unsigned int diag_simp_genealogies    = 0x10;     // enable simple genealogies with first or most recent ancestor
+const unsigned int diag_clone_genealogies   = 0x20;     // enable genealogies by hashed clones
+const unsigned int diag_component_labels    = 0x40;     // enable spatial connected component labelling, mapping and coloring
+const unsigned int diag_offset_statistics   = 0x80;     // enable collection of offset histogram statistics: histo,numHisto,offsets,Noff
+const unsigned int diag_scrolling_trace     = 0x100;    // enable scrolling time tracing of activities for genes and patterns,populations,genealogies
+const unsigned int diag_longtime_trace      = 0x200;    // enable longer time tracing of activities for genes and patterns,populations (poss.genealogies)
+const unsigned int diag_general_statistics  = 0x400;    // enable collection of general statistics: livesites,genestats,stepstats,configstats
+const unsigned int diag_info_transfer_hist  = 0x800;    // enable collection of glider information transfer histogram in 8 directions  N E S W NE SE SW NW
 //-----------------------------------------------------------initialization and color parameters---------------------------------------------------------
 int initial1density = (1<<15)>>1;   // initial density of ones in gol as integer value, divide by 2^15 for true density
 int initialrdensity = (1<<15)>>1;   // initial density of random genes in live sites, divide by 2^15 for true density
@@ -83,7 +83,6 @@ int colorfunction2 = -1;            // colorfunction for second window: as above
 int colorupdate1 = 1;               // flag to enable routine print statements to terminal during run : linked to colorfunction display in python
 int ancestortype = 0;               // display and return genealogies via first ancestor (0), clonal ancestry (1) or first & clonal in 2 win (2)
 int parentdies = 0;                 // model variant enhancing interpretation of non-proliferative birth as movement (1) or default (0): set in repscheme
-#define ASCII_ESC 27                // escape for printing terminal commands, such as cursor repositioning : only used in non-graphic version
 //-----------------------------------------masks for named repscheme bits (selection 0-7) ----------------------------------------------------------------
 #define R_0_2sel_3live     0x1      /* 1: for 3-live-n birth, employ selection on two least different live neighbours for ancestor */
 #define R_1_2sel_2live     0x2      /* 1: allow 2-live-n birth, employ selection on 2 live neighbours for ancestor */
@@ -115,31 +114,35 @@ int parentdies = 0;                 // model variant enhancing interpretation of
 #define R_810_disambig    0x700     /* 0-7 choice of different disambiguation mechanisms for symmetric canonical rotations */
 #define R_parentdies      0x800     /* whether parent is forced to die on birth : only used for selection 8-15 */
 //----------------------------------------status flag bits for recording site status in golgstats array---------------------------------------------------
-#define F_s_live    0x7             /* s value mod 8 (number of live neighbors) for selection 8-15  and separate bits below for selection 0 to 7 */
-#define F_1_live    0x1             /* bit is bit0 of s for selection 8-15 or 1 if exactly 1 live neighbours for selection 0-7 : currently not set*/
-#define F_2_live    0x2             /* bit is bit1 of s for selection 8-15 or 1 if exactly 2 live neighbours for selection 0-7*/
-#define F_3_live    0x4             /* bit is bit2 of s for selection 8-15 or 1 if exactly 3 live neighbours */
-#define F_birth     0x8             /* bit is 1 if birth (includes overwriting of genes for some parameter values) */
-#define F_mutation  0x10            /* bit is 1 if a mutation event occured */
-#define F_2select   0x20            /* bit is 1 if the 2 live neighbour selection routine was employed : selection 0-7 only*/
-#define F_survival  0x40            /* bit is 1 if last step was a 1->1 gol survival */
-#define F_death     0x80            /* bit is 1 if last step involved the death of a gene ie 1->0 gol transition */
-#define F_golstate  0x100           /* bit is 1 if gol state is 1 */
-#define F_golchange 0x200           /* bit is 1 if state changed at last step */
-#define F_nongolchg 0x400           /* bit is 1 if state when produced (ie changed to) was made by a non GoL rule */
-#define F_notgolrul 0x800           /* bit is 1 if last step not a GoL rule*/
-#define F_survmut   0x1000          /* bit is 1 if mutation or survival from non-replicated mutant: mutation(t) or mutation(t-1)&survival(t) */
-#define F_parent    0x2000          /* bit is 1 if individual that was at this site was parent/ancestor/genetic donor of a new individual born in last step */
-#define F_parentaldeath 0x4000      /* bit is 1 if individual dies only because it was a parent under parentdies=1 option */
-#define F_3g_same   0x8000          /* bit is 1 if exactly 3 live nbs and all 3 have same gene : only for selection 0-7*/
-#define F_livenbs   0xff0000        /* mask for storing configuration of live neighbours : clockwise from top-left neighbour (NW) (sel 0-7 for s>1, sel 8-15 for s>0) */
+#define F_s_live          0x7       /* s value mod 8 (number of live neighbors) for selection 8-15  and separate bits below for selection 0 to 7 */
+#define F_1_live          0x1       /* bit is bit0 of s for selection 8-15 or 1 if exactly 1 live neighbours for selection 0-7 : currently not set*/
+#define F_2_live          0x2       /* bit is bit1 of s for selection 8-15 or 1 if exactly 2 live neighbours for selection 0-7*/
+#define F_3_live          0x4       /* bit is bit2 of s for selection 8-15 or 1 if exactly 3 live neighbours */
+#define F_birth           0x8       /* bit is 1 if birth (includes overwriting of genes for some parameter values) */
+#define F_mutation        0x10      /* bit is 1 if a mutation event occured */
+#define F_disambig        0x80      /* bit is 1 if the disambiguate routine is used: nbest>1, nsame > 1 */
+#define F_survival        0x20      /* bit is 1 if last step was a 1->1 gol survival */
+#define F_death           0x40      /* bit is 1 if last step involved the death of a gene ie 1->0 gol transition */
+#define F_golstate        0x100     /* bit is 1 if gol state is 1 */
+#define F_golchange       0x200     /* bit is 1 if state changed at last step */
+#define F_nongolchg       0x400     /* bit is 1 if state when produced (ie changed to) was made by a non GoL rule */
+#define F_notgolrul       0x800     /* bit is 1 if last step not a GoL rule*/
+#define F_survmut         0x1000    /* bit is 1 if mutation or survival from non-replicated mutant: mutation(t) or mutation(t-1)&survival(t) */
+#define F_parent          0x2000    /* bit is 1 if individual that was at this site was parent/ancestor/genetic donor of a new individual born in last step */
+#define F_parentaldeath   0x4000    /* bit is 1 if individual died at this step only because it was a parent under parentdies=1 option */
+#define F_dummy           0x8000    /* free: not yet used */
+#define F_livenbs         0xff0000  /* mask for storing configuration of live neighbours : clockwise from top-left neighbour (NW) (sel 0-7 for s>1, sel 8-15 for s>0) */
+#define F_2select         0x1000000 /* bit is 1 if the 2 live neighbour selection routine was employed : selection 0-7 only*/
+#define F_3g_same         0x2000000 /* bit is 1 if exactly 3 live nbs and all 3 have same gene : only for selection 0-7*/
+//................................................................ miscellaneous ......................................................................
+#define ASCII_ESC         27        /* escape for printing terminal commands, such as cursor repositioning : only used in non-graphic version */
 //----------------------------------------------------------hash table implementation of python style dictionary---------------------------------------
-#define HASHTABLE_IMPLEMENTATION    /* uses Mattias Gustavsson's hashtable (github) for unsigned 64 bit key dictionary */
-#define HASHTABLE_U64 uint64_t
-#define HASHTABLE_U32 uint32_t
-#define HASHTABLE_SIZE_T uint64_t   /* use 64 bit unsigned key type consistent with this file */
+#define HASHTABLE_IMPLEMENTATION    // uses Mattias Gustavsson's hashtable (github) for unsigned 64 bit key dictionary
+#define HASHTABLE_U64 uint64_t      // define the hashtable 64bit unsigned int type as uint64_t
+#define HASHTABLE_U32 uint32_t      // define the hashtable 32bit unsigned int type as uint32_t
+#define HASHTABLE_SIZE_T uint64_t   // use 64 bit unsigned key type consistent with this file
 #include "hashtable.h"              // Gustavsson's file was modified because the 64bit to 32bit key compression code produces 0 for some values
-hashtable_t genetable;
+hashtable_t genetable;              // genetable contains the hash table for genes : the hash table keys are the 64bit genes themselves
 typedef struct genedata {           // value of keys stored for each gene encountered in simulation
     unsigned int popcount;          // initialized to 1
     short unsigned int firsttime;   // first time the gene was created from ancestor: initialized to 0
@@ -160,7 +163,7 @@ HASHTABLE_SIZE_T const* genotypes;  // pointer to stored hash table keys (which 
 genedata* geneitems;                // list of genedata structured items stored in hash table
 int genefnindices[1<<24];           // table of activities for functional gene indices calculated by genefnindex
 //.......................................................................................................................................................
-hashtable_t quadtable;              // hash table for quad tree
+hashtable_t quadtable;              // hash table for quad tree of spatial live state patterns
 typedef struct quadnode {           // stored quadtree binary pattern nodes for population over time (currently only for analysis not computation)
     uint64_t hashkey;               // hash table look up key for node : enables tree exploration more directly than construction from nw,ne,sw,se including collision avoidance
 //    uint64_t firstancestor;         // pattern immediately preceding the generation of this pattern
@@ -212,8 +215,7 @@ int genealogycoldepth = 0;          // genes coloured by colour of ancestor at t
 int ngenealogydeep;                 // depth of genealogy
 int clonealogydepth = 0;            // depth of clonealogies in current population
 int nclonealogydeep;                // depth of clonealogy
-//.........................................................resource management...........................................................................
-                                    // prepared but not yet fully implemented or activated
+//.........................................................resource management NYI.......................................................................
 int rmax = 1;                       // max number of resources per cell : 0 also turns off resource processing
 int rthresh = 3;                    // minimum resource number per neighborhood to allow birth process
 int rbirth = 2;                     // minimum resource number per neighborhood to allow birth replenishment
@@ -593,6 +595,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // get_curgolbr         get current golb and golr arrays from C to python
 // get_stats            get the traced statistics from C to python
 // get_acttrace         get current acttrace array C to python
+// get_poptrace         get current poptrace array C to python
 // get genealogytrace   get current trace of genealogies to python
 // get_nspecies         get number of species from C to python
 // get_genealogydepth   get depth of genealogies returned by get_genealogies()
@@ -972,7 +975,7 @@ void colorgenes1(uint64_t gol[], uint64_t golg[], uint64_t golb[], uint64_t golg
             cgolg[ij]= (int) mask;
         }
     }
-    else if(colorfunction==5){                                  // populations
+    else if(colorfunction==5){                                  // populations of genes or clones
         int actmax = 0;                                         // need to bring this parameter up to python
         if(nbhist==-1) {
             traceptr =&poptrace[0];
@@ -3696,7 +3699,10 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                 if(nbest>1 ) {
                     kch=selectdifft(nbest,nbmask,&crot,&kodd,&nsame);       // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
                     RAND128P(randnr);                                       // used in special cases of disambiguate (0 random choice & 7 random gene) only
-                    if(nsame) newgene = disambiguate(&kch, nb1i, nb, golg, golb, nsame, &birth, &parentid, randnr, ij); // restore symmetry via one of 8 repscheme options
+                    if(nsame) {
+                        newgene = disambiguate(&kch, nb1i, nb, golg, golb, nsame, &birth, &parentid, randnr, ij); // restore symmetry via one of 8 repscheme options
+                        if(birth) statflag |= F_disambig;
+                    }
                     else {
                         newgene = golg[nb[kch]];
                         parentid = golb[nb[kch]];
@@ -3932,7 +3938,10 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
                 if(nbest>1 ) {
                     kch=selectdifft(nbest,nbmask,&crot,&kodd,&nsame);           // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
                     RAND128P(randnr);                                           // used in special cases of disambiguate (0 random choice & 7 random gene) only
-                    if(nsame) newgene = disambiguate(&kch, nb1i, nb, golg, golb, nsame, &birth, &parentid, randnr, ij); // restore symmetry via one of 8 repscheme options
+                    if(nsame) {
+                        newgene = disambiguate(&kch, nb1i, nb, golg, golb, nsame, &birth, &parentid, randnr, ij); // restore symmetry via one of 8 repscheme options
+                        if(birth) statflag |= F_disambig;
+                    }
                     else {
                         newgene = golg[nb[kch]];
                         parentid = golb[nb[kch]];
@@ -4181,7 +4190,10 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
                 if(nbest>1 ) {
                     kch=selectdifft(nbest,nbmask,&crot,&kodd,&nsame);           // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
                     RAND128P(randnr);                                           // used in special cases of disambiguate (0 random choice & 7 random gene) only
-                    if(nsame) newgene = disambiguate(&kch, nb1i, nb, golg, golb, nsame, &birth, &parentid, randnr, ij); // restore symmetry via one of 8 repscheme options
+                    if(nsame) {
+                        newgene = disambiguate(&kch, nb1i, nb, golg, golb, nsame, &birth, &parentid, randnr, ij); // restore symmetry via one of 8 repscheme options
+                        if(birth) statflag |= F_disambig;
+                    }
                     else {
                         newgene = golg[nb[kch]];
                         parentid = golb[nb[kch]];
@@ -4462,7 +4474,10 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
                 if(nbest>1 ) {
                     kch=selectdifft(nbest,nbmask,&crot,&kodd,&nsame);           // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
                     RAND128P(randnr);                                           // used in special cases of disambiguate (0 random choice & 7 random gene) only
-                    if(nsame) newgene = disambiguate(&kch, nb1i, nb, golg, golb, nsame, &birth, &parentid, randnr, ij); // restore symmetry via one of 8 repscheme options
+                    if(nsame) {
+                        newgene = disambiguate(&kch, nb1i, nb, golg, golb, nsame, &birth, &parentid, randnr, ij); // restore symmetry via one of 8 repscheme options
+                        if(birth) statflag |= F_disambig;
+                    }
                     else {
                         newgene = golg[nb[kch]];
                         parentid = golb[nb[kch]];
@@ -5249,6 +5264,13 @@ void get_acttraceq(uint64_t outgolg[], int NN) {
     int ij;
     for (ij=0; ij<NN; ij++) {
         outgolg[ij] = acttraceq[ij];
+    }
+}
+//.......................................................................................................................................................
+void get_poptrace(uint64_t outgolg[], int NN) {
+    int ij;
+    for (ij=0; ij<NN; ij++) {
+        outgolg[ij] = poptrace[ij];
     }
 }
 //.......................................................................................................................................................

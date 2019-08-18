@@ -114,6 +114,8 @@ libcd.get_all_quad_activities.restype = c_int
 libcd.get_all_quad_activities.argtypes = [uint64_array, int_array, c_int]
 libcd.get_acttrace.restype = None
 libcd.get_acttrace.argtypes = [uint64_array,c_int]
+libcd.get_poptrace.restype = None
+libcd.get_poptrace.argtypes = [uint64_array,c_int]
 libcd.get_genealogytrace.restype = None
 libcd.get_genealogytrace.argtypes = [uint64_array,c_int]
 libcd.get_sorted_popln_act.restype = c_int
@@ -253,6 +255,9 @@ def get_small_activities(smalls,activities):
 
 def get_acttrace(acttrace):
     return libcd.get_acttrace(acttrace, int(len(acttrace)))
+
+def get_poptrace(poptrace):
+    return libcd.get_poptrace(poptrace, int(len(poptrace)))
 
 def get_genealogytrace(genealogytrace):
     return libcd.get_genealogytrace(genealogytrace, int(len(genealogytrace)))

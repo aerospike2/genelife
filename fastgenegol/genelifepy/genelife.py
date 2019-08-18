@@ -1052,6 +1052,9 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                         elif colorfunction == 4:
                             genelife.get_acttrace(golg)
                             pixeldat = "(%d,%d) gene %016x" % (x,y,golg[x+y*N])
+                        elif colorfunction == 5:
+                            genelife.get_poptrace(golg)
+                            pixeldat = "(%d,%d) gene %016x" % (x,y,golg[x+y*N])
                         elif colorfunction <= 7:
                             genelife.get_genealogytrace(golg)
                             pixeldat = "(%d,%d) gene %016x" % (x,y,golg[x+y*N])
@@ -1139,6 +1142,9 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                                     draw_rect(surfacex1,cancol[4][k]*(1+(np.right_shift(np.uint64(golg[x+y*N]),np.uint64(k))&np.uint64(0x1))),[k<<(log2N-6),Height+6,3*sc,3*sc])
                         elif colorfunction == 4:
                             genelife.get_acttrace(golg)
+                            pixeldat = "(%d,%d) gene %016x" % (x,y,golg[x+y*N])
+                        elif colorfunction == 5:
+                            genelife.get_poptrace(golg)
                             pixeldat = "(%d,%d) gene %016x" % (x,y,golg[x+y*N])
                         elif colorfunction <= 7:
                             genelife.get_genealogytrace(golg)
