@@ -215,6 +215,7 @@ int genealogycoldepth = 0;          // genes coloured by colour of ancestor at t
 int ngenealogydeep;                 // depth of genealogy
 int clonealogydepth = 0;            // depth of clonealogies in current population
 int nclonealogydeep;                // depth of clonealogy
+int ambigsum;                       // temporary statistic of ambiguous resolution cases
 //.........................................................resource management NYI.......................................................................
 int rmax = 1;                       // max number of resources per cell : 0 also turns off resource processing
 int rthresh = 3;                    // minimum resource number per neighborhood to allow birth process
@@ -1655,28 +1656,28 @@ extern inline void selectone_nbs(int s, uint64_t nb2i, int nb[], uint64_t gol[],
         *kch = k;
     }
 }
-//-------------------------------------------------------------- selectdifft0 ---------------------------------------------------------------------------
+//-------------------------------------------------------------- selectdifftx ---------------------------------------------------------------------------
 extern inline unsigned int selectdifft0(uint64_t nbmask, int *crot, int *kodd) {
     *kodd = 0;
     *crot = 0;
-    return(0);                                               // replication of live nb in bit 0 of canonical rotation
+    return(0);                                                 // replication of live nb in bit 0 of canonical rotation
 }
-//-------------------------------------------------------------- selectdifft1 ---------------------------------------------------------------------------
+//.......................................................................................................................................................
 extern inline unsigned int selectdifft1(uint64_t nbmask, int *crot, int *kodd) {
 // selection based on canonical rotation
     int k,kmin;
     uint64_t nbmaskr, nbmaskrm;
 
-    for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {       // compute canonical rotation (minimum) of this mask
-        nbmaskr = ((nbmaskr & 0x1ull)<<7) | (nbmaskr>>1);    // 8 bit rotate right
-        if (nbmaskr < nbmaskrm) {                            // choose minimal value of mask rotation
-            nbmaskrm = nbmaskr;                              // neighbor mask rotate min is current rotation
-            kmin = k;                                        // no of times rotated to right
+    for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {         // compute canonical rotation (minimum) of this mask
+        nbmaskr = ((nbmaskr & 0x1ull)<<7) | (nbmaskr>>1);      // 8 bit rotate right
+        if (nbmaskr < nbmaskrm) {                              // choose minimal value of mask rotation
+            nbmaskrm = nbmaskr;                                // neighbor mask rotate min is current rotation
+            kmin = k;                                          // no of times rotated to right
         }
     }
     *kodd = kmin & 0x1;
     *crot = 0;
-    return(kmin);                                            // replication of live nb in bit 0 of canonical rotation
+    return(kmin);                                              // replication of live nb in bit 0 of canonical rotation
 }
 //.......................................................................................................................................................
 extern inline unsigned int selectdifft2(uint64_t nbmask, int *crot, int *kodd) {
@@ -1684,14 +1685,14 @@ extern inline unsigned int selectdifft2(uint64_t nbmask, int *crot, int *kodd) {
     int k,kmin;
     uint64_t nbmaskr, nbmaskrm;
 
-    for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {       // compute canonical rotation (minimum) of this mask
-        nbmaskr = ((nbmaskr & 0x1ull)<<7) | (nbmaskr>>1);    // 8 bit rotate right
-        if (nbmaskr < nbmaskrm) {                            // choose minimal value of mask rotation
-            nbmaskrm = nbmaskr;                              // neighbor mask rotate min is current rotation
-            kmin = k;                                        // no of times rotated to right
+    for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {         // compute canonical rotation (minimum) of this mask
+        nbmaskr = ((nbmaskr & 0x1ull)<<7) | (nbmaskr>>1);      // 8 bit rotate right
+        if (nbmaskr < nbmaskrm) {                              // choose minimal value of mask rotation
+            nbmaskrm = nbmaskr;                                // neighbor mask rotate min is current rotation
+            kmin = k;                                          // no of times rotated to right
         }
     }
-    *kodd = kmin & 0x1;
+    *kodd = kmin & 0x1;                                        // if not canonical, replication of live neighbour in other (non zero k) position
     switch (nbmaskrm) {                                        //              x03    x05    x09    x11
         case 0x03ull : k = 1; *crot = 0; break;                // 00000011    |01.|  <-
         case 0x05ull : k = 2; *crot = 1; break;                // 00000101    |...|  |0.2|  <-
@@ -1703,37 +1704,37 @@ extern inline unsigned int selectdifft2(uint64_t nbmask, int *crot, int *kodd) {
         } //default case
     } //switch
 
-    if (canonical) return(kmin);                                      // replication of live neigbour in bit 0 of canonical rotation
-    else return((kmin+k)&0x7);                                        // rotate unique nb k left (kmin) back to orig nb pat
+    if (canonical) return(kmin);                               // replication of live neigbour in bit 0 of canonical rotation
+    else return((kmin+k)&0x7);                                 // rotate unique nb k left (kmin) back to orig nb pat
 }
 //.......................................................................................................................................................
 extern inline unsigned int selectdifft3(uint64_t nbmask, int *crot, int *kodd) {
     unsigned int k,kmin;
     uint64_t nbmaskr,nbmaskrm;
 
-    for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {                // compute canonical rotation (minimum) of this mask
-        nbmaskr = ((nbmaskr & 1ull)<<7) | (nbmaskr>>1);               // 8 bit rotate right
-        if (nbmaskr < nbmaskrm) {                                     // choose minimal value of mask rotation
-            nbmaskrm = nbmaskr;                                       // neighbor mask rotate min is current rotation
-            kmin = k;                                                 // no of times rotated to right
+    for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {         // compute canonical rotation (minimum) of this mask
+        nbmaskr = ((nbmaskr & 1ull)<<7) | (nbmaskr>>1);        // 8 bit rotate right
+        if (nbmaskr < nbmaskrm) {                              // choose minimal value of mask rotation
+            nbmaskrm = nbmaskr;                                // neighbor mask rotate min is current rotation
+            kmin = k;                                          // no of times rotated to right
         }
     }
-    *kodd = kmin & 0x1;                                                                     // replication of live neighbour in most different position
-    switch (nbmaskrm) {                              //              x07    x0b    x0d    x13    x15    x19    x25
-        case 0x07ull : k = 1; *crot = 0; break;      // 00000111    |012|  <-
-        case 0x0bull : k = 0; *crot = 1; break;      // 00001011    |...|  |01.|  <-
-        case 0x0dull : k = 3; *crot = 2; break;      // 00001101    |...|  |..3|  |0.2|   <-
-        case 0x13ull : k = 1; *crot = 3; break;      // 00010011           |...|  |..3|  |01.|   <-
-        case 0x15ull : k = 2; *crot = 4; break;      // 00010101                  |...|  |...|  |0.2|   <-
-        case 0x19ull : k = 0; *crot = 5; break;      // 00011001                         |..4|  |...|  |0..|   <-
-        case 0x25ull : k = 5; *crot = 6; break;      // 00100101                                |..4|  |..3|  |0.2|  <-
-        default  : {                                 //                                                |..4|  |...|
-                                                     //                                                       |.5.|
+    *kodd = kmin & 0x1;                                        // replication of live neighbour in most different position
+    switch (nbmaskrm) {                                        //              x07    x0b    x0d    x13    x15    x19    x25
+        case 0x07ull : k = 1; *crot = 0; break;                // 00000111    |012|  <-
+        case 0x0bull : k = 0; *crot = 1; break;                // 00001011    |...|  |01.|  <-
+        case 0x0dull : k = 3; *crot = 2; break;                // 00001101    |...|  |..3|  |0.2|   <-
+        case 0x13ull : k = 1; *crot = 3; break;                // 00010011           |...|  |..3|  |01.|   <-
+        case 0x15ull : k = 2; *crot = 4; break;                // 00010101                  |...|  |...|  |0.2|   <-
+        case 0x19ull : k = 0; *crot = 5; break;                // 00011001                         |..4|  |...|  |0..|   <-
+        case 0x25ull : k = 5; *crot = 6; break;                // 00100101                                |..4|  |..3|  |0.2|  <-
+        default  : {                                           //                                                |..4|  |...|
+                                                               //                                                       |.5.|
             fprintf(stderr,"Error in canonical rotation for three live neighbours nbmaskrm = %llx for mask %llx\n",nbmaskrm,nbmask); k = 0;
         } //default case
     } //switch
-    if (canonical) return(kmin);                                      // replication of live neigbour in bit 0 of canonical rotation
-    else return((kmin+k)&0x7);                                        // rotate unique nb k left (kmin) back to orig nb pat
+    if (canonical) return(kmin);                               // replication of live neigbour in bit 0 of canonical rotation
+    else return((kmin+k)&0x7);                                 // rotate unique nb k left (kmin) back to orig nb pat
 
 }
 //.......................................................................................................................................................
@@ -1741,61 +1742,61 @@ extern inline unsigned int selectdifft4(uint64_t nbmask, int *crot, int *kodd) {
     int k,kmin;
     uint64_t nbmaskr,nbmaskrm;
 
-    for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {                // compute canonical rotation (minimum) of this mask
-        nbmaskr = ((nbmaskr & 0x1ull)<<7) | (nbmaskr>>1);             // 8 bit rotate right
-        if (nbmaskr < nbmaskrm) {                                     // choose minimal value of mask rotation
-            nbmaskrm = nbmaskr;                                       // neighbor mask rotate min is current rotation
-            kmin = k;                                                 // no of times rotated to right
+    for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {         // compute canonical rotation (minimum) of this mask
+        nbmaskr = ((nbmaskr & 0x1ull)<<7) | (nbmaskr>>1);      // 8 bit rotate right
+        if (nbmaskr < nbmaskrm) {                              // choose minimal value of mask rotation
+            nbmaskrm = nbmaskr;                                // neighbor mask rotate min is current rotation
+            kmin = k;                                          // no of times rotated to right
         }
     }
-    *kodd = kmin&0x1;                                                                 // replication of live neighbour in most central position (left disambiguation)
-    switch (nbmaskrm) {                             //              x07f    x17    x1b    x1d    x27    x2b    x2d   x33   x35    x55
-        case 0x0full : k = 1; *crot = 0; break;     // 00001111    |012|  <-
-        case 0x17ull : k = 2; *crot = 1; break;     // 00010111    |..3|  |012|  <-
-        case 0x1bull : k = 1; *crot = 2; break;     // 00011011    |...|  |...|  |01.|   <-
-        case 0x1dull : k = 2; *crot = 3; break;     // 00011101           |..4|  |..3|  |0.2|   <-
-        case 0x27ull : k = 2; *crot = 4; break;     // 00100111                  |..4|  |..3|  |012|   <-
-        case 0x2bull : k = 3; *crot = 5; break;     // 00101011                         |..4|  |...|  |01.|   <-
-        case 0x2dull : k = 2; *crot = 6; break;     // 00101101                                |.5.|  |..3|  |0.2|  <-
-        case 0x33ull : k = 1; *crot = 7; break;     // 00110011                                       |.5.|  |..3|  |01.|  <-
-        case 0x35ull : k = 2; *crot = 8; break;     // 00110101                                              |.5.|  |...|  |0.2|  <-
-        case 0x55ull : k = 2; *crot = 9; break;     // 01010101                                                     |.54|  |...|  |0.2|  <-
-        default  : {                                //                                                                     |.54|  |...|
-                                                    //                                                                            |6.4|
+    *kodd = kmin&0x1;                                          // replication of live neighbour in most central position (left disambiguation)
+    switch (nbmaskrm) {                                        //              x07f    x17    x1b    x1d    x27    x2b    x2d   x33   x35    x55
+        case 0x0full : k = 1; *crot = 0; break;                // 00001111    |012|  <-
+        case 0x17ull : k = 2; *crot = 1; break;                // 00010111    |..3|  |012|  <-
+        case 0x1bull : k = 1; *crot = 2; break;                // 00011011    |...|  |...|  |01.|   <-
+        case 0x1dull : k = 2; *crot = 3; break;                // 00011101           |..4|  |..3|  |0.2|   <-
+        case 0x27ull : k = 2; *crot = 4; break;                // 00100111                  |..4|  |..3|  |012|   <-
+        case 0x2bull : k = 3; *crot = 5; break;                // 00101011                         |..4|  |...|  |01.|   <-
+        case 0x2dull : k = 2; *crot = 6; break;                // 00101101                                |.5.|  |..3|  |0.2|  <-
+        case 0x33ull : k = 1; *crot = 7; break;                // 00110011                                       |.5.|  |..3|  |01.|  <-
+        case 0x35ull : k = 2; *crot = 8; break;                // 00110101                                              |.5.|  |...|  |0.2|  <-
+        case 0x55ull : k = 2; *crot = 9; break;                // 01010101                                                     |.54|  |...|  |0.2|  <-
+        default  : {                                           //                                                                     |.54|  |...|
+                                                               //                                                                            |6.4|
             fprintf(stderr,"Error in canonical rotation for four live neighbours nbmaskrm = %llx for mask %llx\n",nbmaskrm,nbmask); k = 0;
         } //default case
     } //switch
-    if (canonical) return(kmin);                                      // replication of live neigbour in bit 0 of canonical rotation
-    else return((kmin+k)&0x7);                                        // rotate unique nb k left (kmin) back to orig nb pat
+    if (canonical) return(kmin);                               // replication of live neigbour in bit 0 of canonical rotation
+    else return((kmin+k)&0x7);                                 // rotate unique nb k left (kmin) back to orig nb pat
 }
 //.......................................................................................................................................................
 extern inline unsigned int selectdifft5(uint64_t nbmask, int *crot, int *kodd) {
     unsigned int k,kmin;
     uint64_t nbmaskr,nbmaskrm;
 
-    for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {                // compute canonical rotation (minimum) of this mask
-        nbmaskr = ((nbmaskr & 1ull)<<7) | (nbmaskr>>1);               // 8 bit rotate right
-        if (nbmaskr < nbmaskrm) {                                     // choose minimal value of mask rotation
-            nbmaskrm = nbmaskr;                                       // neighbor mask rotate min is current rotation
-            kmin = k;                                                 // no of times rotated to right
+    for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {         // compute canonical rotation (minimum) of this mask
+        nbmaskr = ((nbmaskr & 1ull)<<7) | (nbmaskr>>1);        // 8 bit rotate right
+        if (nbmaskr < nbmaskrm) {                              // choose minimal value of mask rotation
+            nbmaskrm = nbmaskr;                                // neighbor mask rotate min is current rotation
+            kmin = k;                                          // no of times rotated to right
         }
     }
     *kodd = kmin & 0x1;
-    switch (nbmaskrm) {                              //              x1f    x2f    x3d    x3b    x57    x37    x5b
-        case 0x1full : k = 2; *crot = 0; break;      // 00011111    |012|  <-
-        case 0x2full : k = 2; *crot = 1; break;      // 00101111    |..3|  |012|  <-
-        case 0x3dull : k = 3; *crot = 2; break;      // 00111101    |..4|  |..3|  |0.2|   <-
-        case 0x3bull : k = 3; *crot = 3; break;      // 00111011           |.5.|  |..3|  |01.|   <-
-        case 0x57ull : k = 2; *crot = 4; break;      // 01010111                  |.54|  |..3|  |012|   <-
-        case 0x37ull : k = 2; *crot = 5; break;      // 00110111                         |.54|  |...|  |012|   <-
-        case 0x5bull : k = 3; *crot = 6; break;      // 01011011                                |6.4|  |...|  |01.|  <-
-        default  : {                                 //                                                |.54|  |..3|
-                                                     //                                                       |6.4|
+    switch (nbmaskrm) {                                        //              x1f    x2f    x3d    x3b    x57    x37    x5b
+        case 0x1full : k = 2; *crot = 0; break;                // 00011111    |012|  <-
+        case 0x2full : k = 2; *crot = 1; break;                // 00101111    |..3|  |012|  <-
+        case 0x3dull : k = 3; *crot = 2; break;                // 00111101    |..4|  |..3|  |0.2|   <-
+        case 0x3bull : k = 3; *crot = 3; break;                // 00111011           |.5.|  |..3|  |01.|   <-
+        case 0x57ull : k = 2; *crot = 4; break;                // 01010111                  |.54|  |..3|  |012|   <-
+        case 0x37ull : k = 2; *crot = 5; break;                // 00110111                         |.54|  |...|  |012|   <-
+        case 0x5bull : k = 3; *crot = 6; break;                // 01011011                                |6.4|  |...|  |01.|  <-
+        default  : {                                           //                                                |.54|  |..3|
+                                                               //                                                       |6.4|
             fprintf(stderr,"Error in canonical rotation for five live neighbours nbmaskrm = %llx for mask %llx\n",nbmaskrm,nbmask); k = 0;
         } //default case
     } //switch
-    if (canonical) return(kmin);                                      // replication of live neigbour in bit 0 of canonical rotation
-    else return((kmin+k)&0x7);                                        // rotate unique nb k left (kmin) back to orig nb pat
+    if (canonical) return(kmin);                               // replication of live neigbour in bit 0 of canonical rotation
+    else return((kmin+k)&0x7);                                 // rotate unique nb k left (kmin) back to orig nb pat
 }
 //.......................................................................................................................................................
 extern inline unsigned int selectdifft6(uint64_t nbmask, int *crot, int *kodd) {
@@ -1803,11 +1804,11 @@ extern inline unsigned int selectdifft6(uint64_t nbmask, int *crot, int *kodd) {
     int k,kmin;
     uint64_t nbmaskr, nbmaskrm;
 
-    for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {       // compute canonical rotation (minimum) of this mask
-        nbmaskr = ((nbmaskr & 0x1ull)<<7) | (nbmaskr>>1);    // 8 bit rotate right
-        if (nbmaskr < nbmaskrm) {                            // choose minimal value of mask rotation
-            nbmaskrm = nbmaskr;                              // neighbor mask rotate min is current rotation
-            kmin = k;                                        // no of times rotated to right
+    for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {         // compute canonical rotation (minimum) of this mask
+        nbmaskr = ((nbmaskr & 0x1ull)<<7) | (nbmaskr>>1);      // 8 bit rotate right
+        if (nbmaskr < nbmaskrm) {                              // choose minimal value of mask rotation
+            nbmaskrm = nbmaskr;                                // neighbor mask rotate min is current rotation
+            kmin = k;                                          // no of times rotated to right
         }
     }
     *kodd = kmin & 0x1;
@@ -1817,12 +1818,12 @@ extern inline unsigned int selectdifft6(uint64_t nbmask, int *crot, int *kodd) {
         case 0x6full : k = 3; *crot = 2; break;                // 01101111    |.54|  |..3|  |012|   <-
         case 0x77ull : k = 4; *crot = 3; break;                // 01110111           |6.4|  |..3|  |012|   <-
         default  : {                                           //                           |65.|  |...|
-                                                                   //                                  |654|
+                                                               //                                  |654|
             fprintf(stderr,"Error in canonical rotation for six live neighbours nbmaskrm = %llx for mask %llx\n",nbmaskrm,nbmask); k = 0;
         } //default case
     } //switch
-    if (canonical) return(kmin);                                      // replication of live neigbour in bit 0 of canonical rotation
-    else return((kmin+k)&0x7);                                        // rotate unique nb k left (kmin) back to orig nb pat
+    if (canonical) return(kmin);                               // replication of live neigbour in bit 0 of canonical rotation
+    else return((kmin+k)&0x7);                                 // rotate unique nb k left (kmin) back to orig nb pat
 }
 //.......................................................................................................................................................
 extern inline unsigned int selectdifft7(uint64_t nbmask, int *crot, int *kodd) {
@@ -1830,17 +1831,17 @@ extern inline unsigned int selectdifft7(uint64_t nbmask, int *crot, int *kodd) {
     int k,kmin;
     uint64_t nbmaskr, nbmaskrm;
 
-    for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {       // compute canonical rotation (minimum) of this mask
-        nbmaskr = ((nbmaskr & 0x1ull)<<7) | (nbmaskr>>1);    // 8 bit rotate right
-        if (nbmaskr < nbmaskrm) {                            // choose minimal value of mask rotation
-            nbmaskrm = nbmaskr;                              // neighbor mask rotate min is current rotation
-            kmin = k;                                        // no of times rotated to right
+    for (k=1,nbmaskrm=nbmaskr=nbmask,kmin=0;k<8;k++) {         // compute canonical rotation (minimum) of this mask
+        nbmaskr = ((nbmaskr & 0x1ull)<<7) | (nbmaskr>>1);      // 8 bit rotate right
+        if (nbmaskr < nbmaskrm) {                              // choose minimal value of mask rotation
+            nbmaskrm = nbmaskr;                                // neighbor mask rotate min is current rotation
+            kmin = k;                                          // no of times rotated to right
         }
     }
     *kodd = kmin & 0x1;
     *crot = 0;
-    if (canonical) return(kmin);                            // replication of live nb in bit 0 of canonical rotation
-    else  return((kmin+3)&0x7);                             // replication of live nb in bit 3 (middle) of canonical rotation
+    if (canonical) return(kmin);                               // replication of live nb in bit 0 of canonical rotation
+    else  return((kmin+3)&0x7);                                // replication of live nb in bit 3 (middle) of canonical rotation
 }
 //.......................................................................................................................................................
 extern inline unsigned int selectdifft(int sum, uint64_t nbmask, int *crot, int *kodd, int *nsame) {
@@ -1855,7 +1856,8 @@ extern inline unsigned int selectdifft(int sum, uint64_t nbmask, int *crot, int 
                              return(kch);
                     case 3:  return(selectdifft3(nbmask, crot, kodd));
                     case 4:  kch=selectdifft4(nbmask, crot, kodd);
-                             if (*crot==2) *nsame = 2;
+                             // if (*crot==2) *nsame = 2;      // this case can be resolved with good rotation symmetry
+                             if (*crot==7) *nsame = 2;
                              else if (*crot==9) *nsame = 4;
                              return(kch);
                     case 5:  return(selectdifft5(nbmask, crot, kodd));
@@ -1867,8 +1869,25 @@ extern inline unsigned int selectdifft(int sum, uint64_t nbmask, int *crot, int 
         }
 }
 //.......................................................................................................................................................
-// kch, nb1i, nb, golg, golb, nsame, &birth, &parentid, randnr, ij
-extern inline uint64_t disambiguate(unsigned int *kchx, uint64_t nb1i, int nb[], uint64_t golg[], uint64_t golb[], int nsame, uint64_t *birth, uint64_t *parentid, uint64_t randnr, int ij) {
+extern inline void analyze_nbs(int ij, uint64_t gol[], int nnb[], uint64_t *nnb1i, int *ns) {
+    int i,j,ip1,im1,jp1,jm1,s,k;
+    uint64_t nb1i,gols;
+    
+    i = ij & Nmask;  j = ij >> log2N;                                       // row & column
+    jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                       // toroidal (j+1)*N and (j-1)*N
+    ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                             // toroidal i+1, i-1
+    nnb[0]=jm1+im1; nnb[1]=jm1+i; nnb[2]=jm1+ip1; nnb[3]=j*N+ip1;               // new order of nbs
+    nnb[4]=jp1+ip1; nnb[5]=jp1+i; nnb[6]=jp1+im1; nnb[7]=j*N+im1;
+    for (s=0,nb1i=0ull,k=0;k<8;k++) {                           // packs non-zero nb indices in first up to 8*4 bits
+        gols=gol[nnb[k]];                                                    // whether neighbor is alive
+        s += gols;                                                          // s is number of live nbs
+        nb1i = (nb1i << (gols<<2)) + (gols*k);                              // nb1i is packed list of live neighbour indices
+    }
+    *nnb1i = nb1i;
+    *ns = s;
+}
+//.......................................................................................................................................................
+extern inline uint64_t disambiguate(unsigned int *kchx, uint64_t nb1i, int nb[],  uint64_t gol[], uint64_t golg[], uint64_t golb[], int nsame, uint64_t *birth, uint64_t *parentid, uint64_t randnr, int ij) {
     uint64_t gene,newgene;
     int ijanc,newijanc;
     unsigned int kch,d,dmin;
@@ -1886,7 +1905,15 @@ extern inline uint64_t disambiguate(unsigned int *kchx, uint64_t nb1i, int nb[],
                  // if(*parentid == 0ull) fprintf(stderr,"error in disambiguate case 1: parentid set to golb[%d] which is 0 kch %d\n",ijanc,kch);
                  return( golg[ijanc]);
         case 2:  *birth = 0ull; return(0ull);                                            // abandom birth attempt
-        case 3:  for (newgene=~0ull,newijanc=0,k=0;k<nsame;k++) {                        // choose minimum value gene
+        case 3:  for (newgene=~0ull,ijanc=0,k=0;k<nsame;k++) {                           // try to choose nb with least chance of survival/birth: if not unique no birth
+                     kch+=k*(nsame==4 ? 2 : 4);
+                     kch &= 0x7; *kchx = kch;
+                     ijanc=nb[(nb1i>>(kch<<2))&0x7];
+                     newgene&=golg[ijanc];
+                 };
+                 *parentid = golb[ijanc];                                                // there are more than one ancestors here: last one is chosen, others forgotten
+                 return(newgene);
+        case 4:  for (newgene=~0ull,newijanc=0,k=0;k<nsame;k++) {                        // choose minimum value gene
                      kch+=k*(nsame==4 ? 2 : 4);
                      kch &= 0x7; *kchx = kch;
                      gene=golg[ijanc=nb[(nb1i>>(kch<<2))&0x7]];
@@ -1894,7 +1921,7 @@ extern inline uint64_t disambiguate(unsigned int *kchx, uint64_t nb1i, int nb[],
                  };
                  *parentid = golb[newijanc];
                  return(newgene);
-        case 4:  for (newgene=~0ull,newijanc=0,dmin=64+1,k=0;k<nsame;k++) {              // choose least nr ones gene or minimum value if same
+        case 5:  for (newgene=~0ull,newijanc=0,dmin=64+1,k=0;k<nsame;k++) {              // choose least nr ones gene or minimum value if same
                      kch+=k*(nsame==4 ? 2 : 4);
                      kch &= 0x7; *kchx = kch;
                      gene=golg[ijanc=nb[(nb1i>>(kch<<2))&0x7]];
@@ -1902,13 +1929,6 @@ extern inline uint64_t disambiguate(unsigned int *kchx, uint64_t nb1i, int nb[],
                      if((d<dmin) || (d==dmin && newgene < gene)) {newgene = gene;newijanc=ijanc;}
                  };
                  *parentid = golb[newijanc];
-                 return(newgene);
-        case 5:  for (newgene=~0ull,ijanc=0,k=0;k<nsame;k++) {                           // choose AND of ambiguous alternative gene
-                     kch+=k*(nsame==4 ? 2 : 4);
-                     kch &= 0x7; *kchx = kch;
-                     newgene&=golg[ijanc=nb[(nb1i>>(kch<<2))&0x7]];
-                 };
-                 *parentid = golb[ijanc];                                                // there are more than one ancestors here: last one is chosen, others forgotten
                  return(newgene);
         case 6:  *parentid = (((uint64_t) totsteps) <<32) + rootclone + ij;              // default ancestor for input genes
                  // *kchx = kch;    no change, retains kch unaltered as in case 1
@@ -3700,7 +3720,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                     kch=selectdifft(nbest,nbmask,&crot,&kodd,&nsame);       // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
                     RAND128P(randnr);                                       // used in special cases of disambiguate (0 random choice & 7 random gene) only
                     if(nsame) {
-                        newgene = disambiguate(&kch, nb1i, nb, golg, golb, nsame, &birth, &parentid, randnr, ij); // restore symmetry via one of 8 repscheme options
+                        newgene = disambiguate(&kch, nb1i, nb, gol, golg, golb, nsame, &birth, &parentid, randnr, ij); // restore symmetry via one of 8 repscheme options
                         if(birth) statflag |= F_disambig;
                     }
                     else {
@@ -3790,6 +3810,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
             }
         }
     }
+    for (ambigsum=0,ij=0; ij<N2; ij++) ambigsum += (newgolgstats[ij]&F_disambig) ? 1 : 0;
 
     if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);                    // [**gol** ??]
     if(vscrolling) v_scroll(newgol,newgolg,newgolb);
@@ -3939,7 +3960,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
                     kch=selectdifft(nbest,nbmask,&crot,&kodd,&nsame);           // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
                     RAND128P(randnr);                                           // used in special cases of disambiguate (0 random choice & 7 random gene) only
                     if(nsame) {
-                        newgene = disambiguate(&kch, nb1i, nb, golg, golb, nsame, &birth, &parentid, randnr, ij); // restore symmetry via one of 8 repscheme options
+                        newgene = disambiguate(&kch, nb1i, nb, gol, golg, golb, nsame, &birth, &parentid, randnr, ij); // restore symmetry via one of 8 repscheme options
                         if(birth) statflag |= F_disambig;
                     }
                     else {
@@ -4026,6 +4047,8 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
             }
         }
     }
+    
+    for (ambigsum=0,ij=0; ij<N2; ij++) ambigsum += (newgolgstats[ij]&F_disambig) ? 1 : 0;
     
     if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);
     if(vscrolling) v_scroll(newgol,newgolg,newgolb);
@@ -4191,7 +4214,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
                     kch=selectdifft(nbest,nbmask,&crot,&kodd,&nsame);           // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
                     RAND128P(randnr);                                           // used in special cases of disambiguate (0 random choice & 7 random gene) only
                     if(nsame) {
-                        newgene = disambiguate(&kch, nb1i, nb, golg, golb, nsame, &birth, &parentid, randnr, ij); // restore symmetry via one of 8 repscheme options
+                        newgene = disambiguate(&kch, nb1i, nb, gol, golg, golb, nsame, &birth, &parentid, randnr, ij); // restore symmetry via one of 8 repscheme options
                         if(birth) statflag |= F_disambig;
                     }
                     else {
@@ -4284,6 +4307,8 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
             }
         }
     }
+
+    for (ambigsum=0,ij=0; ij<N2; ij++) ambigsum += (newgolgstats[ij]&F_disambig) ? 1 : 0;
 
     if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);
     if(vscrolling) v_scroll(newgol,newgolg,newgolb);
@@ -4475,7 +4500,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
                     kch=selectdifft(nbest,nbmask,&crot,&kodd,&nsame);           // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
                     RAND128P(randnr);                                           // used in special cases of disambiguate (0 random choice & 7 random gene) only
                     if(nsame) {
-                        newgene = disambiguate(&kch, nb1i, nb, golg, golb, nsame, &birth, &parentid, randnr, ij); // restore symmetry via one of 8 repscheme options
+                        newgene = disambiguate(&kch, nb1i, nb, gol, golg, golb, nsame, &birth, &parentid, randnr, ij); // restore symmetry via one of 8 repscheme options
                         if(birth) statflag |= F_disambig;
                     }
                     else {
@@ -4566,6 +4591,8 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
             }
         }
     }
+    
+    for (ambigsum=0,ij=0; ij<N2; ij++) ambigsum += (newgolgstats[ij]&F_disambig) ? 1 : 0;
 
     if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);
     if(vscrolling) v_scroll(newgol,newgolg,newgolb);
@@ -4658,6 +4685,7 @@ void genelife_update (int nsteps, int nhist, int nstat) {
             if (diagnostics & diag_hash_clones) {
                 fprintf(stderr," clones %d (all)",nallclones);
             }
+            fprintf(stderr," ambiguous state frequency 4 %d\n",ambigsum);
             fprintf(stderr,"\n");
             fprintf(stderr,"__________________________________________________________________________________________________________________________________________\n");
         }
