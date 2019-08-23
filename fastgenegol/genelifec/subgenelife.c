@@ -114,26 +114,26 @@ int parentdies = 0;                 // model variant enhancing interpretation of
 #define R_810_disambig    0x700     /* 0-7 choice of different disambiguation mechanisms for symmetric canonical rotations */
 #define R_parentdies      0x800     /* whether parent is forced to die on birth : only used for selection 8-15 */
 //----------------------------------------status flag bits for recording site status in golgstats array---------------------------------------------------
-#define F_s_live          0x7       /* s value mod 8 (number of live neighbors) for selection 8-15  and separate bits below for selection 0 to 7 */
-#define F_1_live          0x1       /* bit is bit0 of s for selection 8-15 or 1 if exactly 1 live neighbours for selection 0-7 : currently not set*/
-#define F_2_live          0x2       /* bit is bit1 of s for selection 8-15 or 1 if exactly 2 live neighbours for selection 0-7*/
-#define F_3_live          0x4       /* bit is bit2 of s for selection 8-15 or 1 if exactly 3 live neighbours */
-#define F_birth           0x8       /* bit is 1 if birth (includes overwriting of genes for some parameter values) */
-#define F_mutation        0x10      /* bit is 1 if a mutation event occured */
-#define F_disambig        0x80      /* bit is 1 if the disambiguate routine is used: nbest>1, nsame > 1 */
-#define F_survival        0x20      /* bit is 1 if last step was a 1->1 gol survival */
-#define F_death           0x40      /* bit is 1 if last step involved the death of a gene ie 1->0 gol transition */
-#define F_golstate        0x100     /* bit is 1 if gol state is 1 */
-#define F_golchange       0x200     /* bit is 1 if state changed at last step */
-#define F_nongolchg       0x400     /* bit is 1 if state when produced (ie changed to) was made by a non GoL rule */
-#define F_notgolrul       0x800     /* bit is 1 if last step not a GoL rule*/
-#define F_survmut         0x1000    /* bit is 1 if mutation or survival from non-replicated mutant: mutation(t) or mutation(t-1)&survival(t) */
-#define F_parent          0x2000    /* bit is 1 if individual that was at this site was parent/ancestor/genetic donor of a new individual born in last step */
-#define F_parentaldeath   0x4000    /* bit is 1 if individual died at this step only because it was a parent under parentdies=1 option */
-#define F_dummy           0x8000    /* free: not yet used */
-#define F_livenbs         0xff0000  /* mask for storing configuration of live neighbours : clockwise from top-left neighbour (NW) (sel 0-7 for s>1, sel 8-15 for s>0) */
-#define F_2select         0x1000000 /* bit is 1 if the 2 live neighbour selection routine was employed : selection 0-7 only*/
-#define F_3g_same         0x2000000 /* bit is 1 if exactly 3 live nbs and all 3 have same gene : only for selection 0-7*/
+const int F_s_live =      0x7ull;      // s value mod 8 (number of live neighbors) for selection 8-15  and separate bits below for selection 0 to 7
+const int F_1_live =      0x1ull;      // bit is bit0 of s for selection 8-15 or 1 if exactly 1 live neighbours for selection 0-7 : currently not set
+const int F_2_live =      0x2ull;      // bit is bit1 of s for selection 8-15 or 1 if exactly 2 live neighbours for selection 0-7
+const int F_3_live =      0x4ull;      // bit is bit2 of s for selection 8-15 or 1 if exactly 3 live neighbours
+const int F_birth =       0x8ull;      // bit is 1 if birth (includes overwriting of genes for some parameter values)
+const int F_mutation =    0x10ull;     // bit is 1 if a mutation event occured
+const int F_disambig =    0x80ull;     // bit is 1 if the disambiguate routine is used: nbest>1, nsame > 1
+const int F_survival =    0x20ull;     // bit is 1 if last step was a 1->1 gol survival
+const int F_death =       0x40ull;     // bit is 1 if last step involved the death of a gene ie 1->0 gol transition
+const int F_golstate =    0x100ull;    // bit is 1 if gol state is 1
+const int F_golchange =   0x200ull;    // bit is 1 if state changed at last step
+const int F_nongolchg =   0x400ull;    // bit is 1 if state when produced (ie changed to) was made by a non GoL rule
+const int F_notgolrul =   0x800ull;    // bit is 1 if last step not a GoL rule
+const int F_survmut =     0x1000ull;   // bit is 1 if mutation or survival from non-replicated mutant: mutation(t) or mutation(t-1)&survival(t)
+const int F_parent =      0x2000ull;   // bit is 1 if individual that was at this site was parent/ancestor/genetic donor of a new individual born in last step
+const int F_parentaldeath=0x4000ull;   // bit is 1 if individual died at this step only because it was a parent under parentdies=1 option
+const int F_dummy =       0x8000ull;   // free: not yet used
+const int F_livenbs =     0xff0000ull; // mask for storing configuration of live neighbours : clockwise from top-left neighbour (NW) (sel 0-7 for s>1, sel 8-15 for s>0)
+const int F_2select =     0x1000000ull;// bit is 1 if the 2 live neighbour selection routine was employed : selection 0-7 only
+const int F_3g_same =     0x2000000ull;// bit is 1 if exactly 3 live nbs and all 3 have same gene : only for selection 0-7
 //................................................................ miscellaneous ......................................................................
 #define ASCII_ESC         27        /* escape for printing terminal commands, such as cursor repositioning : only used in non-graphic version */
 //----------------------------------------------------------hash table implementation of python style dictionary---------------------------------------
@@ -216,6 +216,7 @@ int ngenealogydeep;                 // depth of genealogy
 int clonealogydepth = 0;            // depth of clonealogies in current population
 int nclonealogydeep;                // depth of clonealogy
 int ambigsum;                       // temporary statistic of ambiguous resolution cases
+int nbshist[8];                     // global histogram to count neighbourhoods to check for assymetries
 //.........................................................resource management NYI.......................................................................
 int rmax = 1;                       // max number of resources per cell : 0 also turns off resource processing
 int rthresh = 3;                    // minimum resource number per neighborhood to allow birth process
@@ -3614,7 +3615,6 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
     uint64_t newgene, ancestor, parentid;
     uint64_t  survive, birth, overwrite, survivalgene, smask, bmask, statflag, ncodingmask, allcoding;
 
-
     canonical = repscheme & R_2_canonical_nb;                                   // set global choice of canonical rotation bit choice for selectdifftx
     survivalgene = repscheme & R_0_survivalgene;                                // gene determining survival is 1: central gene 2: determined by neighbours
     smask = (uint64_t) survivalmask;                                            // convert to 64 bit mask for efficient usage here
@@ -3811,7 +3811,13 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
         }
     }
     for (ambigsum=0,ij=0; ij<N2; ij++) ambigsum += (newgolgstats[ij]&F_disambig) ? 1 : 0;
-
+    
+    for(k=0;k<8;k++) nbshist[k]=0;
+    for (ij=0; ij<N2; ij++) {
+        if(newgolgstats[ij]&F_birth)
+            for (k=0; k<8; k++) nbshist[k] += (newgolgstats[ij]&(0x1ull<<(16+k))) ? 1: 0;
+    }
+    
     if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);                    // [**gol** ??]
     if(vscrolling) v_scroll(newgol,newgolg,newgolb);
     if ((colorfunction == 8) || (colorfunction2 == 8)) packandcompare(newgol,working,golmix);
@@ -4049,6 +4055,12 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
     }
     
     for (ambigsum=0,ij=0; ij<N2; ij++) ambigsum += (newgolgstats[ij]&F_disambig) ? 1 : 0;
+    
+    for(k=0;k<8;k++) nbshist[k]=0;
+    for (ij=0; ij<N2; ij++) {
+        if(newgolgstats[ij]&F_birth)
+            for (k=0; k<8; k++) nbshist[k] += (newgolgstats[ij]&(0x1ull<<(16+k))) ? 1 : 0;
+    }
     
     if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);
     if(vscrolling) v_scroll(newgol,newgolg,newgolb);
@@ -4309,6 +4321,12 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
     }
 
     for (ambigsum=0,ij=0; ij<N2; ij++) ambigsum += (newgolgstats[ij]&F_disambig) ? 1 : 0;
+    
+    for(k=0;k<8;k++) nbshist[k]=0;
+    for (ij=0; ij<N2; ij++) {
+        if(newgolgstats[ij]&F_birth)
+            for (k=0; k<8; k++) nbshist[k] += (newgolgstats[ij]&(0x1ull<<(16+k))) ? 1 : 0;
+    }
 
     if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);
     if(vscrolling) v_scroll(newgol,newgolg,newgolb);
@@ -4594,6 +4612,12 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
     
     for (ambigsum=0,ij=0; ij<N2; ij++) ambigsum += (newgolgstats[ij]&F_disambig) ? 1 : 0;
 
+    for(k=0;k<8;k++) nbshist[k]=0;
+    for (ij=0; ij<N2; ij++) {
+        if(newgolgstats[ij]&F_birth)
+            for (k=0; k<8; k++) nbshist[k] += (newgolgstats[ij]&(0x1ull<<(16+k))) ? 1 : 0;
+    }
+    
     if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);
     if(vscrolling) v_scroll(newgol,newgolg,newgolb);
     if ((colorfunction == 8) || (colorfunction2 == 8)) packandcompare(newgol,working,golmix);
@@ -4611,7 +4635,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
 void genelife_update (int nsteps, int nhist, int nstat) {
     /* update GoL and gene arrays for toroidal field which has side length which is a binary power of 2 */
     /* encode as much as possible without if structures (use ? : instead) in update routines for optimal vector treatment */
-    int t,npop;
+    int k,t,npop;
     uint64_t *newgol, *newgolg, *newgolgstats, *newgolb, *newgolr;
     genedata *genedatap = NULL;
     int totalpoptrace(uint64_t gol[]);                                        // calculate total current population and store in scrolling trace npopulation
@@ -4685,8 +4709,9 @@ void genelife_update (int nsteps, int nhist, int nstat) {
             if (diagnostics & diag_hash_clones) {
                 fprintf(stderr," clones %d (all)",nallclones);
             }
-            fprintf(stderr," ambiguous state frequency 4 %d\n",ambigsum);
+            fprintf(stderr," ambiguous state s=4 frequency %d",ambigsum);
             fprintf(stderr,"\n");
+            fprintf(stderr,"neighbour occupation statistics at birth (NW,N,NE,E,SE,S,SW,W):"); for(k=0;k<8;k++) fprintf(stderr," %d",nbshist[k]); fprintf(stderr,"\n");
             fprintf(stderr,"__________________________________________________________________________________________________________________________________________\n");
         }
 
