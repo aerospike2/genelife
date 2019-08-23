@@ -1855,7 +1855,7 @@ extern inline unsigned int selectdifft(int sum, uint64_t nbmask, int *crot, int 
                              return(kch);
                     case 3:  return(selectdifft3(nbmask, crot, kodd));
                     case 4:  kch=selectdifft4(nbmask, crot, kodd);
-                             if (*crot==2) *nsame = 2;
+                             if (*crot==2) *nsame = 2;               // corrected from *crot==2 should read 7 : test version here again with 2
                              else if (*crot==9) *nsame = 4;
                              return(kch);
                     case 5:  return(selectdifft5(nbmask, crot, kodd));
@@ -1886,14 +1886,9 @@ extern inline uint64_t disambiguate(unsigned int *kchx, uint64_t nb1i, int nb[],
                  // if(*parentid == 0ull) fprintf(stderr,"error in disambiguate case 1: parentid set to golb[%d] which is 0 kch %d\n",ijanc,kch);
                  return( golg[ijanc]);
         case 2:  *birth = 0ull; return(0ull);                                            // abandom birth attempt
-        case 3:  for (newgene=~0ull,newijanc=0,k=0;k<nsame;k++) {                        // choose minimum value gene
-                     kch+=k*(nsame==4 ? 2 : 4);
-                     kch &= 0x7; *kchx = kch;
-                     gene=golg[ijanc=nb[(nb1i>>(kch<<2))&0x7]];
-                     if (gene<newgene) {newgene = gene;newijanc=ijanc;}
-                 };
-                 *parentid = golb[newijanc];
-                 return(newgene);
+        case 3:  *parentid = (((uint64_t) totsteps) <<32) + rootclone + ij;              // default ancestor for input genes
+                 // *kchx = kch;    no change, retains kch unaltered as in case 1
+                 return(genegol[selection-8]);                                           // choose gene with GoL encoding : needs fixing for selection 11,13
         case 4:  for (newgene=~0ull,newijanc=0,dmin=64+1,k=0;k<nsame;k++) {              // choose least nr ones gene or minimum value if same
                      kch+=k*(nsame==4 ? 2 : 4);
                      kch &= 0x7; *kchx = kch;
@@ -1910,9 +1905,14 @@ extern inline uint64_t disambiguate(unsigned int *kchx, uint64_t nb1i, int nb[],
                  };
                  *parentid = golb[ijanc];                                                // there are more than one ancestors here: last one is chosen, others forgotten
                  return(newgene);
-        case 6:  *parentid = (((uint64_t) totsteps) <<32) + rootclone + ij;              // default ancestor for input genes
-                 // *kchx = kch;    no change, retains kch unaltered as in case 1
-                 return(genegol[selection-8]);                                           // choose gene with GoL encoding : needs fixing for selection 11,13
+        case 6:  for (newgene=~0ull,newijanc=0,k=0;k<nsame;k++) {                        // choose minimum value gene
+                     kch+=k*(nsame==4 ? 2 : 4);
+                     kch &= 0x7; *kchx = kch;
+                     gene=golg[ijanc=nb[(nb1i>>(kch<<2))&0x7]];
+                     if (gene<newgene) {newgene = gene;newijanc=ijanc;}
+                 };
+                 *parentid = golb[newijanc];
+                 return(newgene);
         case 7:  *parentid = (uint64_t) totsteps; *parentid = (*parentid <<32) + rootclone + ij;// default ancestor for input genes
                  // *kchx = kch;    no change, retains kch unaltered as in case 1
                  return(randnr);                                                         // choose random gene : should update randnr outside to ensure indept
