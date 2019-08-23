@@ -5860,7 +5860,7 @@ void countspecies1(uint64_t gol[], uint64_t golg[], int N2) {     /* counts numb
     fprintf(stderr,"The number of different species (countspecies) is %d\n",nspecies);
 
     for (k=0,ij=0;k<nspecies;k++) {     // now condense array to give only different genes with counts
-        // printf("species %4d with gene %x has counts %d\n",k, golgs[ij],counts[k]);
+// printf("species %4d with gene %x has counts %d\n",k, golgs[ij],counts[k]);
         golgs[k]=golgs[ij];
         ij = ij + counts[k];
     }
