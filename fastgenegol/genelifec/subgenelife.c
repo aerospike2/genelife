@@ -1651,11 +1651,13 @@ extern inline void selectone_nbs(int s, uint64_t nb2i, int nb[], uint64_t gol[],
     } // for
     if(s2==3) {                 // 3 live neighbours in 2nd shell pointed to by live first shell neighbours
         *birth = 1ull;
-        k = nb[(nb2i>>(kanc<<2))&0x7];
-        *parentid=golb[k];
-        *newgene = golg[k];
+        k = (nb2i>>(kanc<<2))&0x7;
+        ij1 = nb[k];
+        *parentid=golb[ij1];
+        *newgene = golg[ij1];
         *kch = k;
     }
+    // else no change to birth or kch
 }
 //-------------------------------------------------------------- selectdifftx ---------------------------------------------------------------------------
 extern inline unsigned int selectdifft0(uint64_t nbmask, int *crot, int *kodd) {
@@ -3557,7 +3559,7 @@ void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t g
             if(statflag&F_notgolrul) statflag |= F_nongolchg;
         }
         else if (golgstats[ij]&F_nongolchg) statflag |= F_nongolchg;        // maintain non-GoL chg status until state changed by GoL rule
-        if (parentdies) newgolgstats[ij] = newgolgstats[ij] | statflag;     // newgolgstats may already contain updated parenthood info F_parent
+        if (parentdies) newgolgstats[ij] |= statflag;                       // newgolgstats may already contain updated parenthood info F_parent
         else newgolgstats[ij] = statflag;
     }  // end for ij
 
@@ -3565,8 +3567,8 @@ void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t g
         for (ij=0; ij<N2; ij++) {
             statflag = newgolgstats[ij];
             if(gol[ij] && !(statflag&F_birth) && !(statflag&F_death) && (statflag&F_parent)) {
-                newgol[ij]  = 0ull;                                    // new game of life cell value dead
-                newgolg[ij] = 0ull;                                    // gene dies
+                newgol[ij]  = 0ull;                                         // new game of life cell value dead
+                newgolg[ij] = 0ull;                                         // gene dies
                 newgolb[ij] = 0ull;
                 newgolr[ij] = 0ull;
                 if(diagnostics & diag_hash_genes)
@@ -3712,7 +3714,13 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                 }
                 else {                                                      // use positional information to select ancestor (leave birth on)
                     nbest = s;
-                    // for (nbmask=0ull,k=0;k<s;k++) nbmask |= 0x1ull<<((nb1i>>(k<<2))&0x7);
+                    newgene = parentid = 0ull;                              // newgene, parentid initialized here to avoid warning below (not needed though)
+                    for (nbmask=0ull,k=0;k<s;k++) nbmask |= 0x1ull<<((nb1i>>(k<<2))&0x7);    // check whether this needed here !!!
+                    if (nbest<=1) {
+                        newgene = golg[nb[nb1i&0x7]];                       // for s==1 we define newgene ancestor immediately (s==0 does not reach here)
+                        parentid = golb[nb[nb1i&0x7]];
+                    }
+                    
                 }
                 if(nbest>1 ) {
                     kch=selectdifft(nbest,nbmask,&crot,&kodd,&nsame);       // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
