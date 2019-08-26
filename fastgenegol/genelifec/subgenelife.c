@@ -3313,6 +3313,36 @@ void random_influx(uint64_t gol[],uint64_t golg[],uint64_t golb[],uint64_t newgo
         }
     }
 }
+//---------------------------------------------------------------- save and retrieve gol... data --------------------------------------------------------
+int savegols( uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t golr[]) {
+    FILE *fp;
+    char fname[] = "gol_gsbr_data.dat";
+
+    fp = fopen( fname , "wb" );
+    fwrite(gol  , sizeof(uint64_t) , N2 , fp );
+    fwrite(golg , sizeof(uint64_t) , N2 , fp );
+    fwrite(golgstats, sizeof(uint64_t) , N2 , fp );
+    fwrite(golb , sizeof(uint64_t) , N2 , fp );
+    fwrite(golr , sizeof(uint64_t) , N2 , fp );
+
+    fclose(fp);
+    return 0;
+}
+//.........................................................................................................................................................
+int retrievegols( uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t golr[]) {
+    FILE *fp;
+    char fname[] = "gol_gsbr_data.dat";
+
+    fp = fopen( fname , "rb" );
+    fread(gol ,  sizeof(uint64_t) , N2, fp );
+    fread(golg ,  sizeof(uint64_t) , N2, fp );
+    fread(golgstats, sizeof(uint64_t) , N2, fp );
+    fread(golb , sizeof(uint64_t) , N2, fp );
+    fread(golr , sizeof(uint64_t) , N2, fp );
+
+    fclose(fp);
+    return 0;
+}
 //---------------------------------------------------------------- update_23 ----------------------------------------------------------------------------
 void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t golr[],uint64_t newgol[], uint64_t newgolg[], uint64_t newgolgstats[], uint64_t newgolb[],uint64_t newgolr[]){
     // update for dissection of genetic rule variants within nearest neighbor sum s=2 or 3 only for survival and birth
@@ -3616,6 +3646,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
     uint64_t genecode, gols, golij, nb1i, nbmask, found, randnr, r2;
     uint64_t newgene, ancestor, parentid;
     uint64_t  survive, birth, overwrite, survivalgene, smask, bmask, statflag, ncodingmask, allcoding;
+    static int first = 1;
 
     canonical = repscheme & R_2_canonical_nb;                                   // set global choice of canonical rotation bit choice for selectdifftx
     survivalgene = repscheme & R_0_survivalgene;                                // gene determining survival is 1: central gene 2: determined by neighbours
@@ -3837,6 +3868,15 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
         }
     }
     // if(diagnostics & diag_hash_patterns) qimage = quadimage(newgol,&patt,log2N); // quadtree hash of entire image
+    
+    if(first) {
+        first = 0;
+        retrievegols(gol,golg,golgstats,golb,golr);
+        for (ij=0; ij<N2; ij++) {
+            if(gol[ij]!=newgol[ij]) fprintf(stderr,"step %d gol difference at ij = %d\n",totsteps,ij);
+        }
+    }
+
 }
 //---------------------------------------------------------------- update_lut_dist ----------------------------------------------------------------------
 void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t golr[],uint64_t newgol[], uint64_t newgolg[], uint64_t newgolgstats[], uint64_t newgolb[],uint64_t newgolr[]) {     // selection models 10,11
