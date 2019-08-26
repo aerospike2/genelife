@@ -3314,11 +3314,13 @@ void random_influx(uint64_t gol[],uint64_t golg[],uint64_t golb[],uint64_t newgo
     }
 }
 //---------------------------------------------------------------- save and retrieve gol... data --------------------------------------------------------
-int savegols( uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t golr[]) {
+int savegols( int step, uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t golr[]) {
     FILE *fp;
-    char fname[] = "gol_gsbr_data.dat";
+    char fname[30];
 
+    sprintf(fname,"gol_gsbr_data%d.ext",step);
     fp = fopen( fname , "wb" );
+    
     fwrite(gol  , sizeof(uint64_t) , N2 , fp );
     fwrite(golg , sizeof(uint64_t) , N2 , fp );
     fwrite(golgstats, sizeof(uint64_t) , N2 , fp );
@@ -3328,12 +3330,14 @@ int savegols( uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t go
     fclose(fp);
     return 0;
 }
-//.........................................................................................................................................................
-int retrievegols( uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t golr[]) {
+//---------------------------------------------------------------- save data ----------------------------------------------------------------------------
+int retrievegols( int step, uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t golr[]) {
     FILE *fp;
-    char fname[] = "gol_gsbr_data.dat";
+    char fname[30];
 
+    sprintf(fname,"gol_gsbr_data%d.ext",step);
     fp = fopen( fname , "rb" );
+    
     fread(gol ,  sizeof(uint64_t) , N2, fp );
     fread(golg ,  sizeof(uint64_t) , N2, fp );
     fread(golgstats, sizeof(uint64_t) , N2, fp );
@@ -3646,7 +3650,6 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
     uint64_t genecode, gols, golij, nb1i, nbmask, found, randnr, r2;
     uint64_t newgene, ancestor, parentid;
     uint64_t  survive, birth, overwrite, survivalgene, smask, bmask, statflag, ncodingmask, allcoding;
-    static int first = 1;
 
     canonical = repscheme & R_2_canonical_nb;                                   // set global choice of canonical rotation bit choice for selectdifftx
     survivalgene = repscheme & R_0_survivalgene;                                // gene determining survival is 1: central gene 2: determined by neighbours
@@ -3658,7 +3661,15 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
     else                    allcoding = 0xffff;
     parentdies = (repscheme & R_parentdies) ? 1 : 0;
     if(parentdies) for (ij=0; ij<N2; ij++) newgolgstats[ij] = 0ull;             // need to update statistics of neighbours with parenting information, so init required
-    
+  
+     if(totsteps<5) {
+        retrievegols(totsteps,newgol,newgolg,newgolgstats,newgolb,newgolr);     // previous simulation data placed in newgol...
+        for (ij=0; ij<N2; ij++) {
+            if(golg[ij]!=newgolg[ij]) fprintf(stderr,"step %d golg difference at ij = %d\n",totsteps,ij);
+        }
+    }
+  
+  
     for (ij=0; ij<N2; ij++) {                                                   // loop over all sites of 2D torus with side length N
         i = ij & Nmask;  j = ij >> log2N;                                       // row & column
         jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                       // toroidal (j+1)*N and (j-1)*N
@@ -3772,6 +3783,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                     newgene = golg[nb[kch]];
                     parentid = golb[nb[kch]];
                 }
+                if(totsteps==1 && ij==105178) fprintf(stderr,"DEBUG step %d ij=%d kch=%d nb1i=%llx nbest=%d\n",totsteps,ij,kch,nb1i,nbest);
             }
             if (birth) {                                                    // ask again because disambiguate may turn off birth
                 statflag |= F_birth;
@@ -3833,6 +3845,9 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
         if(golij) statflag |= F_golstate;                                   // this is the last gol state, not the new state
         if (parentdies) newgolgstats[ij] = newgolgstats[ij] | statflag;     // newgolgstats may already contain updated parenthood info F_parent
         else newgolgstats[ij] = statflag;
+        
+        if(totsteps==1 && ij==105178) fprintf(stderr,"DEBUG step %d ij=%d s=%d newgolg[ij]=%llx newgolr[ij]=%llx\n",totsteps,ij,s,newgolg[ij],newgolr[ij]);
+        
     }  // end for ij
 
     if(parentdies) {
@@ -3868,14 +3883,6 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
         }
     }
     // if(diagnostics & diag_hash_patterns) qimage = quadimage(newgol,&patt,log2N); // quadtree hash of entire image
-    
-    if(first) {
-        first = 0;
-        retrievegols(gol,golg,golgstats,golb,golr);
-        for (ij=0; ij<N2; ij++) {
-            if(gol[ij]!=newgol[ij]) fprintf(stderr,"step %d gol difference at ij = %d\n",totsteps,ij);
-        }
-    }
 
 }
 //---------------------------------------------------------------- update_lut_dist ----------------------------------------------------------------------
