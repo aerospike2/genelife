@@ -108,7 +108,7 @@ int main (int argc, char *argv[]) {
         }
     }
 
-    state[0] = rand();state[1] = rand();
+    randstate[0] = rand();randstate[1] = rand();
     Noff = 9;
     runparams[0] = 1;        // 0,1 rulemod
     runparams[1] = 0x19;        // 3-4 repscheme 
