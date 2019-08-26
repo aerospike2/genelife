@@ -847,8 +847,8 @@ def construct_caption(colorfunction1or2,pixeldat,buttonhelp,win):
 # misc. keys save image
 def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
     global mstime,framenr,framerate
-    global surface, surfacex1, surfacex2, window, scalex2, caption, dispinit, update1, grect1
-    global surface2, surface2x1, surface2x2, window2, caption2, dispinit2, grect, render2, update2, renderer2, factory2, image2, message2, font2, textColor2, windowID2
+    global window,surface, surfacex1, surfacex2, window, scalex2, caption, dispinit, update1, grect1
+    global window2,surface2, surface2x1, surface2x2, window2, caption2, dispinit2, grect, render2, update2, renderer2, factory2, image2, message2, font2, textColor2, windowID2
     global N
     global gol,golg,golb,golr,golgstats
     global connlabel,connlen,ncomponents
@@ -906,6 +906,11 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
 
     gcolor=0
     
+    #sdl2.SDL_RestoreWindow(window.window)
+    #sdl2.SDL_RestoreWindow(window2.window)
+    #sdl2.SDL_RaiseWindow(window2.window)
+    #sdl2.SDL_RaiseWindow(window.window)
+
     event = sdl2.SDL_Event()
     while (gogo):
         for event in sdl2.ext.get_events():
@@ -913,11 +918,15 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
             if event.type == sdl2.SDL_QUIT:
                 mouseclicked = False
                 gogo = False
+                #sdl2.SDL_HideWindow(window.window)
+               # sdl2.SDL_HideWindow(window2.window)
                 # sdl2.ext.quit()                  # check that quitting SDL here is OK
             if event.type == sdl2.SDL_MOUSEBUTTONDOWN and update1:
                 if   (sdl2.SDL_GetModState() & sdl2.KMOD_ALT) | (event.button.button == sdl2.SDL_BUTTON_MIDDLE): # quit event loop on middle mouse button (option-click)
                     mouseclicked = False
                     gogo = False
+                    #sdl2.SDL_MinimizeWindow(window.window)
+                    #sdl2.SDL_MinimizeWindow(window2.window)
                     # sdl2.ext.quit()              # check that quitting SDL here is OK
                 elif event.button.button == sdl2.SDL_BUTTON_LEFT:          # get mouse coords on mouse event
                     mouseclicked = True

@@ -1602,7 +1602,9 @@ extern inline int selectone_of_s(int s, uint64_t nb1i, int nb[], uint64_t golg[]
             }
             for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
             if (k==s) {k=0;*birth = 0ull;}             // in case no genes with best value, no birth, avoid k being out of bounds below
-            //if(k==s) fprintf(stderr,"Error in selectone of s case 7: k>=s (%d > %d)\n",k,s);
+            if(k==s) fprintf(stderr,"Error in selectone of s case 7 at ij %d: k>=s (%d > %d)\n",k,s,ij);
+            if (k==s) {k=0;*birth = 0ull;}             // in case no genes with best value, no birth, avoid k being out of bounds below
+
             *newgene = livegenes[k&0x7];               // choose first of selected set to replicate (can make positional dependent choice instead externally)
             *parentid=golb[ijanc[k&0x7]];
             break;
@@ -3715,7 +3717,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                 else {                                                      // use positional information to select ancestor (leave birth on)
                     nbest = s;
                     newgene = parentid = 0ull;                              // newgene, parentid initialized here to avoid warning below (not needed though)
-                    for (nbmask=0ull,k=0;k<s;k++) nbmask |= 0x1ull<<((nb1i>>(k<<2))&0x7);    // check whether this needed here !!!
+                    for (nbmask=0ull,k=0;k<s;k++) nbmask |= 0x1ull<<((nb1i>>(k<<2))&0x7);    // check whether this needed here DEBUG !!!
                     if (nbest<=1) {
                         newgene = golg[nb[nb1i&0x7]];                       // for s==1 we define newgene ancestor immediately (s==0 does not reach here)
                         parentid = golb[nb[nb1i&0x7]];

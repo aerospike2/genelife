@@ -8,9 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		0DD73C052150EF8700F3FF92 /* dispgenelife.c in Sources */ = {isa = PBXBuildFile; fileRef = 5206B80F21507E0B00394209 /* dispgenelife.c */; };
-		5206B81B2150835D00394209 /* fastgolstat.c in Sources */ = {isa = PBXBuildFile; fileRef = 5206B81A2150835C00394209 /* fastgolstat.c */; };
 		5206B822215088E300394209 /* actgenelife.c in Sources */ = {isa = PBXBuildFile; fileRef = 5206B81121507E2200394209 /* actgenelife.c */; };
-		529A8B6E21EE297800A316DB /* subgenelife.c in Sources */ = {isa = PBXBuildFile; fileRef = 529A8B6D21EE297800A316DB /* subgenelife.c */; };
+		523F7F772312D8470090DFCA /* subgenelife.c in Sources */ = {isa = PBXBuildFile; fileRef = 529A8B6D21EE297800A316DB /* subgenelife.c */; };
 		529A8B8321F7200800A316DB /* maxmatch.c in Sources */ = {isa = PBXBuildFile; fileRef = 529A8B7E21F64D2A00A316DB /* maxmatch.c */; };
 		529A8B8421F7200A00A316DB /* maxmatch.c in Sources */ = {isa = PBXBuildFile; fileRef = 529A8B7E21F64D2A00A316DB /* maxmatch.c */; };
 		529A8B8521F7200C00A316DB /* maxmatch.c in Sources */ = {isa = PBXBuildFile; fileRef = 529A8B7E21F64D2A00A316DB /* maxmatch.c */; };
@@ -105,15 +104,12 @@
 		5206B81121507E2200394209 /* actgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = actgenelife.c; path = genelifec/actgenelife.c; sourceTree = SOURCE_ROOT; };
 		5206B81321507EF500394209 /* display.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; name = display.py; path = genelifepy/display.py; sourceTree = SOURCE_ROOT; };
 		5206B81421507F2E00394209 /* activity.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; name = activity.py; path = genelifepy/activity.py; sourceTree = SOURCE_ROOT; };
-		5206B81A2150835C00394209 /* fastgolstat.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = fastgolstat.c; sourceTree = "<group>"; };
 		521C1456214DDE9400E17A8F /* dispgenelife */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = dispgenelife; sourceTree = BUILT_PRODUCTS_DIR; };
 		521C1464214DDF0400E17A8F /* actgenelife */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = actgenelife; sourceTree = BUILT_PRODUCTS_DIR; };
 		521FDCE21F287A6100F08FFB /* fastgenegol */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = fastgenegol; sourceTree = BUILT_PRODUCTS_DIR; };
 		521FDCEC1F287DEE00F08FFB /* genelife_c_interface.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = genelife_c_interface.py; path = genelifepy/genelife_c_interface.py; sourceTree = SOURCE_ROOT; };
-		521FDCF01F287E7100F08FFB /* fastgenegol.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgenegol.c; path = genelifec/fastgenegol.c; sourceTree = SOURCE_ROOT; };
-		521FDCF11F287E7100F08FFB /* fastgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgenelife.c; path = genelifec/fastgenelife.c; sourceTree = SOURCE_ROOT; };
-		521FDCF41F287ECE00F08FFB /* fastgol.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = fastgol.c; path = genelifec/fastgol.c; sourceTree = SOURCE_ROOT; };
 		523F0A762201FE520002FBC5 /* ilog2test */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = ilog2test; sourceTree = BUILT_PRODUCTS_DIR; };
+		523F7F7523116D160090DFCA /* subgenelife_early.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = subgenelife_early.c; path = ../../../../Desktop/subgenelife_early.c; sourceTree = "<group>"; };
 		52416DA51F27425C00721D17 /* libcos_doubles.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libcos_doubles.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		52416DB61F27771500721D17 /* libgenelife.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libgenelife.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		5275A1281F292FA40062765F /* dispgenegol */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = dispgenegol; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -123,13 +119,9 @@
 		528F91A31F333095008DD596 /* SyncServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SyncServices.framework; path = System/Library/Frameworks/SyncServices.framework; sourceTree = SDKROOT; };
 		528F91A51F333143008DD596 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		529A8B6D21EE297800A316DB /* subgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = subgenelife.c; sourceTree = "<group>"; };
-		529A8B7121F1BA5900A316DB /* lapmod.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = lapmod.c; sourceTree = "<group>"; };
-		529A8B7321F1BA9C00A316DB /* lapjv.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = lapjv.h; sourceTree = "<group>"; };
-		529A8B7921F62CF400A316DB /* maxflow.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = maxflow.c; sourceTree = "<group>"; };
 		529A8B7E21F64D2A00A316DB /* maxmatch.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = maxmatch.c; sourceTree = "<group>"; };
 		52A14B3E2177387E000E2ED4 /* hashtable.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hashtable.h; sourceTree = "<group>"; };
 		52ADC4832244044900F9B46A /* genelife.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; path = genelife.py; sourceTree = "<group>"; };
-		52F19B3021ABE7F900D33844 /* sumtest.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = sumtest.c; sourceTree = "<group>"; };
 		52F19B3621ADF3C900D33844 /* lsb64 */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = lsb64; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -214,19 +206,12 @@
 		5206B818215081EB00394209 /* genelifec */ = {
 			isa = PBXGroup;
 			children = (
-				529A8B7921F62CF400A316DB /* maxflow.c */,
-				529A8B7321F1BA9C00A316DB /* lapjv.h */,
-				529A8B7121F1BA5900A316DB /* lapmod.c */,
-				521FDCF41F287ECE00F08FFB /* fastgol.c */,
-				521FDCF01F287E7100F08FFB /* fastgenegol.c */,
-				5206B81A2150835C00394209 /* fastgolstat.c */,
-				521FDCF11F287E7100F08FFB /* fastgenelife.c */,
 				5206B81121507E2200394209 /* actgenelife.c */,
 				5206B80F21507E0B00394209 /* dispgenelife.c */,
-				52F19B3021ABE7F900D33844 /* sumtest.c */,
 				52A14B3E2177387E000E2ED4 /* hashtable.h */,
 				529A8B7E21F64D2A00A316DB /* maxmatch.c */,
 				529A8B6D21EE297800A316DB /* subgenelife.c */,
+				523F7F7523116D160090DFCA /* subgenelife_early.c */,
 			);
 			path = genelifec;
 			sourceTree = "<group>";
@@ -554,7 +539,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				5206B81B2150835D00394209 /* fastgolstat.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -562,8 +546,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				529A8B6E21EE297800A316DB /* subgenelife.c in Sources */,
 				529A8B8321F7200800A316DB /* maxmatch.c in Sources */,
+				523F7F772312D8470090DFCA /* subgenelife.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
