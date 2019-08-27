@@ -283,20 +283,20 @@ def init_button_arrays():
     cancolors = []                                    # lists of button colors
     cancol =[]                                        # expanded lists of button colors, by button
                                                       # no of entries per color region
-    ncanon.append([2,2,2,2,2,4,2,2])                  # selection 0-7
+    ncanon.append([2,2,2,2,2,4,2,2,2])                # selection 0-7
     ncanon.append([8,8,8])                            # selection 8,9
     ncanon.append([2,3,4,5,4,3,2,2,3,4,5,4,3,2,8])    # selection 10,11
     ncanon.append([4,7,10,7,4,4,7,10,7,4,8])          # selection 12,13
     ncanon.append([1,2,6,10,13,1,2,6,10,13,8])        # selection 14,15
                                                       # colors [R,G,B] for different color regions for buttons, colorvals must be < 128
-    cancolors.append([[0,100,0],[0,50,100],[0,80,80],[0,100,50],[100,100,0],[50,100,0],[0,0,127],[100,0,0]]) # selection 0-7
+    cancolors.append([[0,100,0],[0,50,100],[0,80,80],[0,100,50],[100,100,0],[50,100,0],[100,0,100],[0,0,127],[100,0,0]]) # selection 0-7
     cancolors.append([[0,0,127],[0,100,0],[100,0,0]]) # selection 8,9
     cancolors.append([[0,0,127],[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[0,0,127],
                       [0,127,0],[50,127,0],[60,120,0],[100,120,0],[80,120,0],[50,120,0],[0,127,0],[100,0,0]]) # selection 10,11
     cancolors.append([[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[50,127,0],[80,120,0],[100,120,0],[80,120,0],[50,127,0],[100,0,0]])  # selection 12,13
     cancolors.append([[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[50,127,0],[80,120,0],[100,120,0],[80,120,0],[50,127,0],[100,0,0]])  # selection 14,15
                                                      # lists of colors for individual buttons expanded from above, first initialize to zero
-    cancol.append(np.zeros((18,3),np.int32))
+    cancol.append(np.zeros((20,3),np.int32))
     cancol.append(np.zeros((24,3),np.int32))
     cancol.append(np.zeros((54,3),np.int32))
     cancol.append(np.zeros((72,3),np.int32))
@@ -327,13 +327,13 @@ def init_buttons(surface):    # initialize parameter buttons
     # draw_rect(surface,[50,50,50],[0,Height+6,Width,7*sc])
 
     if selection<8:
-        for k in range(18):
-            if k<14:
+        for k in range(20):
+            if k<16:
                 bit = (repscheme>>k)&0x1
-            elif k<16:
-                bit = (survivalmask>>(k-14))&0x1
             elif k<18:
-                bit = (overwritemask>>(k-16))&0x1
+                bit = (survivalmask>>(k-16))&0x1
+            elif k<20:
+                bit = (overwritemask>>(k-18))&0x1
             draw_rect(surface,cancol[0][k]*(1+bit),[k<<(log2N-6),Height+6,3*sc,3*sc])
         j = 0;
         for k in range(len(ncanon[0])):
@@ -874,8 +874,10 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                          "8. enforce GoL if non GoL rule ","9. enforce GoL last change by non GoL ",
                          "10. allow 2-nb birth for canonical config 0 ","11. allow 2-nb birth for canonical config 1 ",
                          "12. allow 2-nb birth for canonical config 2 ","13. allow 2-nb birth for canonical config 3 ",
-                         "14. Survival for 3-live-nbs ","15. Survival for 2-live-nbs ",
-                         "16. Gene overwrite for 3-live-nbs ","17. Gene overwrite for 2-live-nbs "]
+                         "14. Parentdies is forced ","15. Dummy, not yet used ",
+                         "16. Survival for 3-live-nbs ","17. Survival for 2-live-nbs ",
+                         "18. Gene overwrite for 3-live-nbs ","19. Gene overwrite for 2-live-nbs "
+                         ]
     buttonhelp = ""
     if scalex2:
         sc = 1
@@ -939,18 +941,18 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                     if y >= N:
                         k=x>>(log2N-6)
                         if selection<8:
-                            if k<18:
-                                if k<14:
+                            if k<20:
+                                if k<16:
                                     repscheme = repscheme ^ (1<<k)
                                     bit = (repscheme>>k)&0x1
                                     print(("step %d repscheme changed to %x" % (framenr,repscheme)))
-                                elif k<16:
-                                    survivalmask = survivalmask ^ (1<<(k-14))
-                                    bit = (survivalmask>>(k-14))&0x1
+                                elif k<18:
+                                    survivalmask = survivalmask ^ (1<<(k-16))
+                                    bit = (survivalmask>>(k-16))&0x1
                                     print(("step %d survivalmask changed to %x" % (framenr,survivalmask)))
                                 else:
-                                    overwritemask = overwritemask ^ (1<<(k-16))
-                                    bit = (overwritemask>>(k-16))&0x1
+                                    overwritemask = overwritemask ^ (1<<(k-18))
+                                    bit = (overwritemask>>(k-18))&0x1
                                     print(("step %d overwritemask changed to %x" % (framenr,overwritemask)))
                                 draw_rect(surfacex1,cancol[0][k]*(1+bit),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 surviveover[0],surviveover[1]= survivalmask,overwritemask      # 2nd elt only picked up in C as overwrite for selection<8
@@ -1088,7 +1090,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                     if y >= N:
                         if selection < 8:   # info
                             k=x>>(log2N-6)
-                            if k<18:
+                            if k<20:
                                 buttonhelp = buttonhelp0007[k]
                     mouseclicked2 = True
 
@@ -1184,7 +1186,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                             y = event.motion.y
                         if y >= N:
                             k=x>>(log2N-6)
-                            if k<18:
+                            if k<20:
                                 buttonhelp = buttonhelp0007[k]
             elif event.type == sdl2.SDL_KEYDOWN:
                 # keystatus = sdl2.SDL_GetKeyboardState(None) # keystatus should also reveal if pressed if event structure doesn't work
@@ -1480,6 +1482,7 @@ def parhelp():
         print("Green    ","10-13. allow 2-nb birth only for active subset of 4 canonical configs")
         print("Blue     ","14. Survival for 3-live-nbs        ","15. Survival for 2-live-nbs")
         print("Red      ","16. Gene overwrite for 3-live-nbs  ","17. Gene overwrite for 2-live-nbs")
+        print("Purple   ","18. Parentdies forced")
     elif selection < 16:
         print("")
         if selection < 10:
@@ -1521,7 +1524,7 @@ def parhelp():
         print("   bit 0 determines choice of gene(s) for survival rule : OR of live neighbors (0) central gene (1)")
         print("   bit 1 determines combination of nb gene function for even LUT selection 8-14: AND (0) OR (1)")
         print("   bit 2 determines choice of neighbour in canonical rotation : most central/different (0) or first bit (1)")
-        print("   bit 3 reserved for future definition : currently no effect")
+        print("   bit 3 determines whether parentdies set: parents forced to die (1) or not (0)")
         print("repscheme bits 4-7 determine selection scheme based on gene")
         print("   # 0 minimum gene as value (penalizes proliferation) # 1 maximum gene as value (rewards proliferation)")
         print("   # 2 minimum number of ones (penalizes proliferation) # 3 maximum number of ones (rewards proliferation)")

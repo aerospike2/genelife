@@ -96,23 +96,24 @@ int parentdies = 0;                 // model variant enhancing interpretation of
 #define R_9_nongolstatnbs  0x200    /* 1: enforce GoL rule if state of any cell in nbs was last changed by a non GoL rule */
 #define R_10_2birth_k0     0x400    /* 1: bit position at start of k1-4 mask for selective subset of 2-births */
 #define R_10_13_2birth_k4  0x3c00   /* 1: enforce birth for 2 live nbs canonical config for one of k= 1,2,3,4, next 4 bits: choose 1st live nb from TL (asym!) */
-#define R_quadrant         0x1fc000 /* 1: quarter the spatial domain with one or more of 7 pairs of repscheme bits ie 4 different values */
-#define R_14_quadrant_sele 0x4000   /* q0 1: quarter the spatial domain with selection enable values for 2,3 live nbs: only in update ie for selection<8 */
-#define R_15_quadrant_posn 0x8000   /* q1 1: quarter the spatial domain with selection enable values for 2,3 live nbs: only in update ie for selection<8 */
-#define R_16_quadrant_enfb 0x10000  /* q2 1: quarter the spatial domain with enforce birth values for 2,3 live nbs: only in update ie for selection<8 */
-#define R_17_quadrant_2nb1 0x20000  /* q3 1: quarter the spatial domain with 1st nb masks and/or 2nd nb addition: only in update ie for selection<8 */
-#define R_18_quadrant_ngol 0x40000  /* q4 1: quarter the spatial domain with last non gol rule and/or non gol created state: only in update ie for selection<8 */
-#define R_19_quadrant_surv 0x80000  /* q5 1: quarter the spatial domain with survival values for 2,3 live nbs: only in update ie for selection<8 */
-#define R_20_quadrant_over 0x100000 /* q6 1: quarter the spatial domain with overwrite values for 2,3 live nbs: only in update ie for selection<8 */
-#define R_parentdies_23    0x200000 /* whether parent is forced to die on birth : only used for selection 0-7 ie update_23 */
+#define R_14_parentdies_23 0x4000   /* 1. parent is forced to die on birth 0: not: only used for selection 0-7 ie update_23 */
+#define R_15_dummy         0x8000   /* not yet used but connected up to graphical interface */
+#define R_quadrant         0x7f0000 /* 1: quarter the spatial domain with one or more of 7 pairs of repscheme bits ie 4 different values */
+#define R_16_quadrant_sele 0x10000  /* q0 1: quarter the spatial domain with selection enable values for 2,3 live nbs: only in update ie for selection<8 */
+#define R_17_quadrant_posn 0x20000  /* q1 1: quarter the spatial domain with selection enable values for 2,3 live nbs: only in update ie for selection<8 */
+#define R_18_quadrant_enfb 0x40000  /* q2 1: quarter the spatial domain with enforce birth values for 2,3 live nbs: only in update ie for selection<8 */
+#define R_19_quadrant_2nb1 0x80000  /* q3 1: quarter the spatial domain with 1st nb masks and/or 2nd nb addition: only in update ie for selection<8 */
+#define R_20_quadrant_ngol 0x100000 /* q4 1: quarter the spatial domain with last non gol rule and/or non gol created state: only in update ie for selection<8 */
+#define R_21_quadrant_surv 0x200000 /* q5 1: quarter the spatial domain with survival values for 2,3 live nbs: only in update ie for selection<8 */
+#define R_22_quadrant_over 0x400000 /* q6 1: quarter the spatial domain with overwrite values for 2,3 live nbs: only in update ie for selection<8 */
 //.................................................. LUT repscheme (selection 8-15) repscheme bits .......................................................
 #define R_0_survivalgene  0x1       /* 1: survival gene chosen from central existing gene 0: survival gene taken from neighbours as in birth */
 #define R_1_nb_OR_AND     0x2       /* 1: OR of neighbours determines genetic LUT in selection 8,10,12,14 0: AND of neighbours */
 #define R_2_canonical_nb  0x4       /* 1: choose live neighbour at zero bit in canonical rotation 0: choose most difft position */
+#define R_3_parentdies      0x8       /* 1: parent is forced to die on birth 0 not. Only used for selection 8-15 */
 #define R_46_repselect    0x70      /* 0-7 choice of selection mechanism for LUT genes : 0: min 1: max 2: min 1s 3: max 1s 4: neutral 5: neutral difft 6,7: c-S-2B */
 #define R_7_random_resln  0x80      /* 1: random choice amongst selected live neighbours 0: deterministic choice based on gene content and position */
 #define R_810_disambig    0x700     /* 0-7 choice of different disambiguation mechanisms for symmetric canonical rotations */
-#define R_parentdies      0x800     /* whether parent is forced to die on birth : only used for selection 8-15 */
 //----------------------------------------status flag bits for recording site status in golgstats array---------------------------------------------------
 const int F_s_live =      0x7ull;      // s value mod 8 (number of live neighbors) for selection 8-15  and separate bits below for selection 0 to 7
 const int F_1_live =      0x1ull;      // bit is bit0 of s for selection 8-15 or 1 if exactly 1 live neighbours for selection 0-7 : currently not set
@@ -3376,7 +3377,7 @@ void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t g
     add2ndmask1st = ((repscheme & R_6_2ndnb_genes)?1:0)+((repscheme & R_7_1stnb_masks)?2:0);
     nongolnottwice = ((repscheme & R_8_nongolstat)?1:0)+((repscheme & R_9_nongolstatnbs)?2:0);
     add2nd = add2ndmask1st&0x1;
-    parentdies = (repscheme & R_parentdies_23) ? 1 : 0;
+    parentdies = (repscheme & R_14_parentdies_23) ? 1 : 0;
 
     if(parentdies) for (ij=0; ij<N2; ij++) newgolgstats[ij] = 0ull;         // need to update statistics of neighbours with parenting information, so init required
 
@@ -3399,8 +3400,8 @@ void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t g
         rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1);   // if rulemod bit 1 is on then split into half planes with/without mod
         nbmask = 0;
         if(s>1) {
-          if (repscheme & R_17_quadrant_2nb1)  add2ndmask1st =     (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
-          if (repscheme & R_18_quadrant_ngol)  nongolnottwice =    (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
+          if (repscheme & R_19_quadrant_2nb1)  add2ndmask1st =     (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
+          if (repscheme & R_20_quadrant_ngol)  nongolnottwice =    (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
           add2nd = add2ndmask1st&0x1; mask1st=(add2ndmask1st>>1)&0x1;
 
           if(nongolnottwice&0x1) {                                          // check for non GoL changed states
@@ -3436,11 +3437,11 @@ void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t g
         } // end if s>1
         if (s2or3) {                                                        // if 2 or 3 neighbours alive
             if (repscheme & R_quadrant) {                                   // quarter the plane with 4 different parameter values
-                if (repscheme & R_14_quadrant_sele)  select23live =      (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
-                if (repscheme & R_15_quadrant_posn)  pos_canon_neutral = (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
-                if (repscheme & R_16_quadrant_enfb)  enforcebirth =      (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
-                if (repscheme & R_19_quadrant_surv)  survival =          (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
-                if (repscheme & R_20_quadrant_over)  overwrite =         (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
+                if (repscheme & R_16_quadrant_sele)  select23live =      (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
+                if (repscheme & R_17_quadrant_posn)  pos_canon_neutral = (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
+                if (repscheme & R_18_quadrant_enfb)  enforcebirth =      (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
+                if (repscheme & R_21_quadrant_surv)  survival =          (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
+                if (repscheme & R_22_quadrant_over)  overwrite =         (ij > (N2>>1) ? 0x2 : 0x0) + ((ij&Nmask)>(N>>1) ? 0x1 : 0x0);
                 canonical = pos_canon_neutral&0x1;       // global value since needed in ...difft2-6 subroutines
             }
             birth = 0ull;
@@ -3814,7 +3815,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
     if (ncoding==4)         allcoding = 0xffffffffffffffff;                     // mask for total gene coding region
     else if (ncoding ==2)   allcoding = 0xffffffff;
     else                    allcoding = 0xffff;
-    parentdies = (repscheme & R_parentdies) ? 1 : 0;
+    parentdies = (repscheme & R_3_parentdies) ? 1 : 0;
     if(parentdies) for (ij=0; ij<N2; ij++) newgolgstats[ij] = 0ull;             // need to update statistics of neighbours with parenting information, so init required
   
     /* DEBUG if(totsteps<5 && selection==9) {
@@ -3876,7 +3877,8 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                     //if(ij==106195) fprintf(stderr,"DEBUG Genecode sel 9 at totsteps=%d ij=%d genecode=%llx\n",totsteps,ij,genecode);
                     survive = ((genecode&smask)>>(s-1)) & 0x1ull;
                     genecode>>=8;
-                    birth   = ((genecode&bmask)>>(s-1)) & 0x1ull;
+                    if (overwrite || !golij) birth   = ((genecode&bmask)>>(s-1)) & 0x1ull;
+                    else birth = 0ull;
                 }
                 else {                                                          // selection == 8
                     if(repscheme&R_1_nb_OR_AND)
@@ -3895,6 +3897,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                     // if(ij==106195) fprintf(stderr,"DEBUG Genecode sel 8 at totsteps=%d ij=%d genecode=%llx\n",totsteps,ij,genecode);
                     survive=(((genecode>>((s-1)*ncoding)) & ncodingmask) == ncodingmask) && ((smask>>(s-1))&1ull) ? 1ull : 0ull;
                     if (overwrite || !golij) birth=(((genecode>>((8+(s-1))*ncoding)) & ncodingmask) == ncodingmask) && ((bmask>>(s-1))&1ull) ? 1ull : 0ull;
+                    else birth = 0ull;
                 }
             }
             else if (rulemodij==2){                                          // hard death on membrane defined above via macro "membrane"
@@ -3941,7 +3944,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
     survivalgene = repscheme & R_0_survivalgene;                                   // gene determining survival is 1: central gene 2: determined by neighbours
     smask = (uint64_t) survivalmask;                                               // convert to 64 bit mask for efficient usage here
     bmask = (uint64_t) birthmask;
-    parentdies = (repscheme & R_parentdies) ? 1 : 0;
+    parentdies = (repscheme & R_3_parentdies) ? 1 : 0;
     
     if(parentdies) for (ij=0; ij<N2; ij++) newgolgstats[ij] = 0ull;                // need to update statistics of neighbours with parenting information, so init required
 
@@ -4062,7 +4065,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
     survivalgene = repscheme & R_0_survivalgene ? 1ull : 0ull;                      // gene determining survival is 1: central gene 2: determined by neighbours
     smask = (uint64_t) survivalmask;                                                // 32 bits of survivalmask used to limit space of rules, convert to 64 bit masks for efficient usage here
     bmask = (uint64_t) birthmask;                                                   // 32 bits of birthmask
-    parentdies = (repscheme & R_parentdies) ? 1 : 0;
+    parentdies = (repscheme & R_3_parentdies) ? 1 : 0;
     
     if(parentdies) for (ij=0; ij<N2; ij++) newgolgstats[ij] = 0ull;                 // need to update statistics of neighbours with parenting information, so init required
 
@@ -4227,7 +4230,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
     survivalgene = repscheme & R_0_survivalgene;                               // gene determining survival is 1: central gene 2: determined by neighbours
     smask = (uint64_t) survivalmask;                                           // 32 bits of survivalmask used to limit space of rules, convert to 64 bit masks for efficient usage here
     bmask = (uint64_t) birthmask;                                              // 32 bits of birthmask
-    parentdies = (repscheme & R_parentdies) ? 1 : 0;
+    parentdies = (repscheme & R_3_parentdies) ? 1 : 0;
 
     if(parentdies) for (ij=0; ij<N2; ij++) newgolgstats[ij] = 0ull;            // need to update statistics of neighbours with parenting information, so init required
 
@@ -4849,7 +4852,7 @@ void set_quadrant(int quadrant) {
     if (quadrant >= -1 && quadrant < 7) quadrants = quadrant;
     repscheme &= ~R_quadrant;                                           // remove all quadrant bits : only one set at a time in interactive version
     if(quadrant >= 0 && quadrant < 7) {
-        repscheme |= R_14_quadrant_sele<<quadrant;                          // assumes quadrant selectors are 7 successive bits following R_14_...
+        repscheme |= R_16_quadrant_sele<<quadrant;                          // assumes quadrant selectors are 7 successive bits following R_16_...
     }
 }
 //.......................................................................................................................................................

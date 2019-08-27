@@ -71,7 +71,6 @@
 		529A8B7E21F64D2A00A316DB /* maxmatch.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = maxmatch.c; sourceTree = "<group>"; };
 		52A14B3E2177387E000E2ED4 /* hashtable.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hashtable.h; sourceTree = "<group>"; };
 		52ADC4832244044900F9B46A /* genelife.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; path = genelife.py; sourceTree = "<group>"; };
-		52B2F35A2313CF6700DEA82A /* subgenelife_5e40ab2_2.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = subgenelife_5e40ab2_2.c; path = ../../../../Desktop/subgenelife_5e40ab2_2.c; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -118,7 +117,6 @@
 				52A14B3E2177387E000E2ED4 /* hashtable.h */,
 				529A8B7E21F64D2A00A316DB /* maxmatch.c */,
 				529A8B6D21EE297800A316DB /* subgenelife.c */,
-				52B2F35A2313CF6700DEA82A /* subgenelife_5e40ab2_2.c */,
 			);
 			path = genelifec;
 			sourceTree = "<group>";
