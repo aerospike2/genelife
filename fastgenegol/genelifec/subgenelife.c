@@ -1607,8 +1607,6 @@ extern inline int selectone_of_s(unsigned int *kch, int s, uint64_t nb1i, int nb
             }
             for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
             if (k==s) {k=0;*birth = 0ull;}             // in case no genes with best value, no birth, avoid k being out of bounds below
-            if(k==s) fprintf(stderr,"Error in selectone of s case 7 at ij %d: k>=s (%d > %d)\n",k,s,ij);
-            if (k==s) {k=0;*birth = 0ull;}             // in case no genes with best value, no birth, avoid k being out of bounds below
 
             *newgene = livegenes[k&0x7];               // choose first of selected set to replicate (can make positional dependent choice instead externally)
             *parentid=golb[ijanc[k&0x7]];
@@ -3878,7 +3876,6 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                     survive = ((genecode&smask)>>(s-1)) & 0x1ull;
                     genecode>>=8;
                     if (overwrite || !golij) birth   = ((genecode&bmask)>>(s-1)) & 0x1ull;
-                    else birth = 0ull;
                 }
                 else {                                                          // selection == 8
                     if(repscheme&R_1_nb_OR_AND)
@@ -3897,7 +3894,6 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                     // if(ij==106195) fprintf(stderr,"DEBUG Genecode sel 8 at totsteps=%d ij=%d genecode=%llx\n",totsteps,ij,genecode);
                     survive=(((genecode>>((s-1)*ncoding)) & ncodingmask) == ncodingmask) && ((smask>>(s-1))&1ull) ? 1ull : 0ull;
                     if (overwrite || !golij) birth=(((genecode>>((8+(s-1))*ncoding)) & ncodingmask) == ncodingmask) && ((bmask>>(s-1))&1ull) ? 1ull : 0ull;
-                    else birth = 0ull;
                 }
             }
             else if (rulemodij==2){                                          // hard death on membrane defined above via macro "membrane"
@@ -3931,7 +3927,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
     chosen nr of partitions for exploration    0  2  3  4  5  4  3  2  0   total 23
     if we exclude the cases s = 0,8, then there are 23 bits required to distinguish these cases
                                                                                                                 */
-    int s, s1, se, s0, s2or3, k, found;
+    int s, s1, se, s0, s2or3, k, kch, found;
     uint64_t survive,birth,survivenbs,birthnbs,overwrite,survivalgene,smask,bmask,rulemodij,golij;
     static uint64_t summasks[7] = {0x3ull,0x7ull,0xfull,0x1full,0xfull,0x7ull,0x3ull};
     static int sumoffs[7] = {0,2,5,9,14,18,21};
@@ -3961,17 +3957,17 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
             nb1i = (nb1i << (gols<<2)) + (gols*k);                                 // nb1i is packed list of live neighbour indices
             nbmask |= (gols << k);
         }
-        statflag = F_livenbs & (nbmask<<16);                                    // record live neighbour pattern
-        statflag |= F_s_live & (s&0x7);                                         // requires F_s_live to be in lowest 3 bits : val 8 mapped to 0
+        statflag = F_livenbs & (nbmask<<16);                                       // record live neighbour pattern
+        statflag |= F_s_live & (s&0x7);                                            // requires F_s_live to be in lowest 3 bits : val 8 mapped to 0
         newgene = survive = birth = 0ull;
         golij = gol[ij];
         
         if (s>0 && s<8) {
             s1 = s-1;
             s2or3 = (s>>2) ? 0ull : (s>>1);                                        // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
-            gols = s2or3 ? (golij ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;      // GoL calculation next state for non-genetic gol plane
+            gols = s2or3 ? (golij ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;        // GoL calculation next state for non-genetic gol plane
             rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1);     // if rulemod bit 1 is on then split into half planes with/without mod
-            rulemodij = (rulemod&0x4) ? membrane : (rulemod&0x1);                   // if rulemod bit 2 then activate membrane of death
+            rulemodij = (rulemod&0x4) ? membrane : (rulemod&0x1);                  // if rulemod bit 2 then activate membrane of death
             if (rulemodij==1) {                // NB need to put gene calculation outside that we cna do genetic propagation with GoL rulemod off
                 overwrite = overwritemask&(0x1ull<<s1);
                 overwrite = (overwrite || !golij) ? 1ull : 0ull;
@@ -3979,33 +3975,32 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
                 if (overwrite) birth = (bmask>>sumoffs[s1])&summasks[s1] ? 1ull : 0ull;
                 if (survive|birth) {
                     s0 = (s-4 > 0 ? s-4 : 0);
-                    if (golij)   survive = (smask>>(sumoffs[s1]+se-s0))&0x1ull;   // refine decisions for specific combination of s and se
+                    if (golij)   survive = (smask>>(sumoffs[s1]+se-s0))&0x1ull;     // refine decisions for specific combination of s and se
                     if (overwrite) birth = (bmask>>(sumoffs[s1]+se-s0))&0x1ull;     // only allowed if birth,survivalmask permits (ask this before consulting genes)
                     if (survive|birth) {                                            // complete determination of birth or survival
                         if (selection==11) {
                             survivenbs=birthnbs=(repscheme&R_1_nb_OR_AND) ? 0ull : 1ull; // initialization for OR or AND of neighbors resp.
-                            for (k=0;k<8;k++)  {                                    // decodes genes with variable position encoding only for current s,se
-                                if (gol[nb[k]]) {                                   // combine information from genes of all live neighbours
-                                    gene = golg[nb[k]] & (0xf0f0f0f0f0f0f0f0ull | (0x0101010101010101ull<<(se-s0))); // focus gene down to specific required se bit for exact matching
-                                    if (!survivalgene && golij) {                 // coding is 8 bits [(b/s) (s1 2 1 0) (se subset mask 3 2 1 0)]  (exception case s==4,se==4 is x0000001)
-                                        PATTERN8(gene, (s==4 && se==4) ? 0x01 : ((s<<4)|(1<<(se-s0))), found);    //survival rule found? final decision for survival
-                                        if(repscheme&R_1_nb_OR_AND)
-                                            survivenbs |= found? 1ull : 0ull;                                           // incl. special case codes for 5th case se==4 for s==4
-                                        else
-                                            survivenbs &= found? 1ull : 0ull;                                           // incl. special case codes for 5th case se==4 for s==4
-                                    }
-                                    if (overwrite) {
-                                        PATTERN8(gene, (s==4 && se==4) ? 0x81 :(((8|s)<<4)|(1<<(se-s0))), found); //birth rule found? final decision for birth
-                                        if(repscheme&R_1_nb_OR_AND)
-                                            birthnbs |= found? 1ull : 0ull;
-                                        else
-                                            birthnbs &= found? 1ull : 0ull;
-                                    }
+                            for (k=0;k<s;k++)  {                                    // decodes genes with variable position encoding only for current s,se
+                                kch = (nb1i>>(k<<2))&0x7;
+                                gene = golg[nb[kch]] & (0xf0f0f0f0f0f0f0f0ull | (0x0101010101010101ull<<(se-s0))); // focus gene down to specific required se bit for exact matching
+                                if (!survivalgene && golij) {                 // coding is 8 bits [(b/s) (s1 2 1 0) (se subset mask 3 2 1 0)]  (exception case s==4,se==4 is x0000001)
+                                    PATTERN8(gene, (s==4 && se==4) ? 0x01 : ((s<<4)|(1<<(se-s0))), found);    //survival rule found? final decision for survival
+                                    if(repscheme&R_1_nb_OR_AND)
+                                        survivenbs |= found? 1ull : 0ull;           // incl. special case codes for 5th case se==4 for s==4
+                                    else
+                                        survivenbs &= found? 1ull : 0ull;           // incl. special case codes for 5th case se==4 for s==4
+                                }
+                                if (overwrite) {
+                                    PATTERN8(gene, (s==4 && se==4) ? 0x81 :(((8|s)<<4)|(1<<(se-s0))), found); //birth rule found? final decision for birth
+                                    if(repscheme&R_1_nb_OR_AND)
+                                        birthnbs |= found? 1ull : 0ull;
+                                    else
+                                        birthnbs &= found? 1ull : 0ull;
                                 }
                             }
-                            if (survivalgene && golij) {                                                           // survival determined by central gene in this case
-                                    PATTERN8(golg[ij], (s==4 && se==4) ? 0x01 : ((s<<4)|(1ull<<(se-s0))), found);    // survival rule found? final decision for survival
-                                    survivenbs |= found? 1ull : 0ull;                                                   // special case codes for 5th case se==4 for s==4
+                            if (survivalgene && golij) {                            // survival determined by central gene in this case
+                                    PATTERN8(golg[ij], (s==4 && se==4) ? 0x01 : ((s<<4)|(1ull<<(se-s0))), found);   // survival rule found? final decision for survival
+                                    survivenbs |= found? 1ull : 0ull;               // special case codes for 5th case se==4 for s==4
                             }
                             birth &= birthnbs;
                             survive &= survivenbs;
@@ -4647,10 +4642,13 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         case 9:  if (((repscheme>>4)&0x7)==7) genegol[selection-8] = 0xba32ull;   // extended rule for scissors-paper-stone-well gliders
                  else                         genegol[selection-8] = 0xb32ull;    //GoL rule for survival in totalistic LUT case, variable length encoding
                  for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;    // put up to 3 extra bits at top to ensure all nr 1s values occupied
-        case 10: genegol[selection-8] = (0x7ull<<2)|(0xfull<<5)|(0xfull<<37);     //GoL rule for survival in corner/edge dist LUT case, fixed length encoding
-                 for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];break;
-        case 11: genegol[selection-8] = 0xbf3f27ull;                              //GoL rule for survival in corner/edge dist LUT case, variable length encoding
-                 for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];break;
+        case 10: if (((repscheme>>4)&0x7)==7)
+                      genegol[selection-8] = (0x7ull<<2)|(0xfull<<5)|(0x7ull<<34)|(0xfull<<37);  //GoL rule for 2,3 s/b in corner/edge dist LUT case, fixed length encoding
+                 else genegol[selection-8] = (0x7ull<<2)|(0xfull<<5)|(0xfull<<37);  //GoL rule for 2,3 s and 3 b in corner/edge dist LUT case, fixed length encoding
+                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;    // put up to 3 extra bits at top to ensure all nr 1s values occupied
+        case 11: if (((repscheme>>4)&0x7)==7) genegol[selection-8] = 0xbfa73f27ull; //GoL rule for 2,3 s and 3 b in corner/edge dist LUT case, variable length encoding
+                 else                         genegol[selection-8] = 0xbf3f27ull;
+                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;    // put up to 3 extra bits at top to ensure all nr 1s values occupied
         case 12: genegol[selection-8] = 0xfull|(0x7full<<4)|(0x7full<<36);        //GoL rule for survival surv2 1st 4 surv3 next 7 birth3 7 bits from 32+4, canonical case
                  for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];break;
         case 13: genegol[selection-8] = 0x00cd00bbb73b3727;                       //GoL rule for S23 B3 with modular encoding for canonical rotation case
