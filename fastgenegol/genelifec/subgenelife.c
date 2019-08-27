@@ -27,8 +27,8 @@ int selection = 1;                  // 0-7 fitness of 2 live neighbours, 8-15 lu
                                     // 0.  integer value                        1. number of ones         2. scissors-stone-well-paper: wins over left 1-1-2-2
                                     // 3.  scissors-stone-well-paper 1-1-1-1    4. 5. predator prey       6. two target coding     7. selection always fails (no result)
                                     // 8.  genes encode lut based on sum s for survival/birth:  s 1-8 (8 configs): ncoding determines nr of fixed position bits per LUT entry
-                                    // 9.  like 8 but position-independent encoding of lut entries
-                                    // 10. genes encode lut based on sum and edge-centred count (s,se) for survival/birth: s 1-8 se 0-4 (2,3,4,5,4,3,2,1 configs): ncoding as above
+                                    // 9.  like 8 but position-independent encoding of lut entries: ncoding 1 bit only
+                                    // 10. genes encode lut based on sum and edge-centred count (s,se) for survival/birth: s 1-7 se 0-4 (2+3+4+5+4+3+2=23 configs): ncoding 1-bit only
                                     // 11. like 10 but position-independent encoding of lut entries
                                     // 12. genes encode lut based on sum s and canonical rotations survival/birth sum 2-6 (4,7,10,7,4 canon.rotns) : ncoding 1 bit only
                                     // 13. like 12 but but position-independent encoding of lut entries
@@ -1585,9 +1585,9 @@ extern inline int selectone_of_s(unsigned int *kch, int s, uint64_t nb1i, int nb
           break;
         case 7:                                         // scissors-stone-well-paper game on number ones mod 4, scissors 0 stone 1 well 2 paper 3
             for (k=0;k<s;k++) {                         // exception to numerical order: sc>pa. Do tournament with all others for each livegene and score
-                scores[k]=0;
+                scores[k]=0; d0 = d[k]&0x3;
                 for (int k1=0;k1<s;k1++) {
-                    d0 = d[k]&0x3; d1 = d[k1]&0x3;      // if k==k1 there is zero score in next line so allow it
+                    d1 = d[k1]&0x3;                     // if k==k1 there is zero score in next line so allow it
                     scores[k] += ( (d0 > d1 && !(d0 == 3 && d1 == 0)) || (d0 == 0 && d1 == 3) ) ? 1 : 0;
                 }
             }
@@ -1601,7 +1601,7 @@ extern inline int selectone_of_s(unsigned int *kch, int s, uint64_t nb1i, int nb
             *birth = nbest ? 1ull: 0ull;               // birth condition
             if (s==3) {                                // included for compatibility with update_23() for enforcebirth off
                 for(d0=k=0;k<s;k++) for (int k1=0;k1<k;k1++) d0 |= livegenes[k]^livegenes[k1] ? 1 : 0; //  d0 = 1 if  genes are not all the same
-                *birth = d0 ? 1ull: 0ull;    // birth condition modified to only be true if some genes difft
+                *birth = d0 ? 1ull: 0ull;              // birth condition modified to only be true if some genes difft
                 nbest = d0 ? 3 : 0;
                 bestnbmask = d0 ? 0x7ull : 0;
             }
@@ -1611,6 +1611,7 @@ extern inline int selectone_of_s(unsigned int *kch, int s, uint64_t nb1i, int nb
             *newgene = livegenes[k&0x7];               // choose first of selected set to replicate (can make positional dependent choice instead externally)
             *parentid=golb[ijanc[k&0x7]];
             *kch = k;
+            //if(ij==105690) fprintf(stderr,"DEBUG In selectone_of_s at totsteps=%d ij=%d s=%d nbest=%d extremval=%llx bestnbmask=%llx nb1i=%llx kch=%d\n",totsteps,ij,s,nbest,extremval,bestnbmask,nb1i,*kch);
             break;
         default:
             fprintf(stderr,"Error: s = %d live gene repselect %d is not implemented\n",s,repselect);
@@ -3651,7 +3652,7 @@ extern inline void finish_update_ij(int ij,int s,uint64_t golij,uint64_t gols,ui
             else {
                 if ((ancselectmask>>(s-1)) &0x1) {                          // use genes to select ancestor
                     nbest=selectone_of_s(&kch,s,nb1i,nb,golg,golb,&birth,&newgene,&parentid,&nbmask,ij);// selection scheme depends on repscheme parameter, selection depends on genes
-                    //if(ij==106195) fprintf(stderr,"DEBUG Difference 1 at totsteps=%d ij=%d nbest=%d newgene=%llx nb1i=%llx kch=%d\n",totsteps,ij,nbest,newgene,nb1i,kch);
+                    //if(ij==105690) fprintf(stderr,"DEBUG Difference 1 at totsteps=%d ij=%d s=%d nbest=%d birth=%llx newgene=%llx nb1i=%llx kch=%d\n",totsteps,ij,s,nbest,birth,newgene,nb1i,kch);
                 }
                 else {                                                      // use positional information to select ancestor (leave birth on)
                     nbest = s;
@@ -3662,7 +3663,7 @@ extern inline void finish_update_ij(int ij,int s,uint64_t golij,uint64_t gols,ui
                         newgene = golg[nb[kch]];
                         parentid = golb[nb[kch]];
                     }
-                    //if(ij==106195) fprintf(stderr,"DEBUG Difference 2 at totsteps=%d ij=%d nbest=%d newgene=%llx nb1i=%llx kch=%d\n",totsteps,ij,nbest,newgene,nb1i,kch);
+                    //if(ij==105690) fprintf(stderr,"DEBUG Difference 2 at totsteps=%d ij=%d nbest=%d newgene=%llx nb1i=%llx kch=%d\n",totsteps,ij,nbest,newgene,nb1i,kch);
                 }
                 if(nbest>1 ) {
                     kch=selectdifft(nbest,nbmask,&crot,&kodd,&nsame);       // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
@@ -3675,7 +3676,7 @@ extern inline void finish_update_ij(int ij,int s,uint64_t golij,uint64_t gols,ui
                         newgene = golg[nb[kch]];
                         parentid = golb[nb[kch]];
                     }
-                    //if(ij==106195) fprintf(stderr,"DEBUG Difference 3 at totsteps=%d ij=%d nbest=%d newgene=%llx nb1i=%llx kch=%d\n",totsteps,ij,nbest,newgene,nb1i,kch);
+                    //if(ij==105690) fprintf(stderr,"DEBUG Difference 3 at totsteps=%d ij=%d nbest=%d newgene=%llx nb1i=%llx kch=%d\n",totsteps,ij,nbest,newgene,nb1i,kch);
                 }
             }
             if (birth) {                                                    // ask again because disambiguate may turn off birth
@@ -3702,7 +3703,7 @@ extern inline void finish_update_ij(int ij,int s,uint64_t golij,uint64_t gols,ui
                     unsigned int ij1 = nb[kch];
                     newgolgstats[ij1] = newgolgstats[ij1] | F_parent;
                 }
-                //if(ij==106195) fprintf(stderr,"DEBUG Difference 4 at totsteps=%d ij=%d newgene=%llx nb1i=%llx kch=%d\n",totsteps,ij,newgene,nb1i,kch);
+                //if(ij==105690) fprintf(stderr,"DEBUG Difference 4 at totsteps=%d ij=%d newgene=%llx nb1i=%llx kch=%d\n",totsteps,ij,newgene,nb1i,kch);
             }
         }
         if(!birth) {                                                       // need instead of else because if(birth) section may change value of birth
@@ -3724,14 +3725,14 @@ extern inline void finish_update_ij(int ij,int s,uint64_t golij,uint64_t gols,ui
                     if(diagnostics & diag_hash_genes)
                         hashdeletegene(golg[ij],golb[ij],"step %d hash delete error 2 in update, gene %llx not stored\n");
                 }
-                // if(ij==106195) fprintf(stderr,"DEBUG Difference 5 at totsteps=%d ij=%d nb1i=%llx\n",totsteps,ij,nb1i);
+                //if(ij==105690) fprintf(stderr,"DEBUG Difference 5 at totsteps=%d ij=%d nb1i=%llx\n",totsteps,ij,nb1i);
             }
             else {                                                         // empty and no birth, stays empty
                 newgol[ij]  = golij;
                 newgolg[ij] = golg[ij];
                 newgolb[ij] = golb[ij];
                 newgolr[ij] = golr[ij];
-                // if(ij==106195) fprintf(stderr,"DEBUG Difference 6 at totsteps=%d ij=%d nb1i=%llx\n",totsteps,ij,nb1i);
+                //if(ij==105690) fprintf(stderr,"DEBUG Difference 6 at totsteps=%d ij=%d nb1i=%llx\n",totsteps,ij,nb1i);
             }
         }
         if(newgol[ij]!=gols) {
@@ -3742,7 +3743,7 @@ extern inline void finish_update_ij(int ij,int s,uint64_t golij,uint64_t gols,ui
         if (parentdies) newgolgstats[ij] = newgolgstats[ij] | statflag;     // newgolgstats may already contain updated parenthood info F_parent
         else newgolgstats[ij] = statflag;
     
-        // if(ij==106195) fprintf(stderr,"DEBUG First error at totsteps=%d ij=%d s=%d newgolg=%llx newgolr=%llx\n",totsteps,ij,s,newgolg[ij],newgolr[ij]);
+        //if(ij==105690) fprintf(stderr,"DEBUG First error at totsteps=%d ij=%d s=%d newgolg=%llx newgolr=%llx\n",totsteps,ij,s,newgolg[ij],newgolr[ij]);
 }
 //........................................................................................................................................................
 void extern inline finish_update(uint64_t newgol[], uint64_t newgolg[],uint64_t newgolgstats[],uint64_t newgolb[], uint64_t newgolr[], int nbshist[]) {
@@ -3791,15 +3792,18 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
         0 <= s <= 8
         genome =
         8 bits for each possible s value for birth (center site 0) : exclude s=0 no birth of isolated live cells
-        8 bits for each possible s value for survival/death (center site 1) : exclude s=0 no survival of isolated
-        (assume s = 0 => 0 always)
-        using b0 for s=0, b1 for s=1, etc
-              76543210    76543210
+        8 bits for each possible s value for survival/death (center site 1) : exclude s=0 no survival of isolated cells
+        1. fixed length encoding for selection=8: using b0 for s=1, b1 for s=2, etc
+        s-1   76543210    76543210
         GOL = 00000100(0)|00000110(0)
             = 0000 0100 0000 0110
             = 0x0406
+        2. variable length encoding for selection=9: using 4 bit patterns anywhere on 4-bit raster in genome
+        note that one entry suffices for any lut rule: duplicate rules may be used to encode robustness
+        of four bits 0-3, bit 3 encodes birth/survival as 1/0. Bits 0-2 encode the value of s (0-7, s=8 excluded).
+        GOL = 0xb32 or 0x23b2b for example (up to 64 bits)
                                                                                                                 */
-    int s, s2or3, k, kch;
+    int s, s1, s2or3, k, kch;
     unsigned int rulemodij;
     int nb[8],  ij, i, j, jp1, jm1, ip1, im1;
     uint64_t genecode, genecodeb, genecodes, gols, golij, nb1i, nbmask, found;
@@ -3809,13 +3813,14 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
     survivalgene = repscheme & R_0_survivalgene;                                // gene determining survival is 1: central gene 0: determined by neighbours
     smask = (uint64_t) survivalmask;                                            // convert to 64 bit mask for efficient usage here
     bmask = (uint64_t) birthmask;
+    parentdies = (repscheme & R_3_parentdies) ? 1 : 0;
+    if(parentdies) for (ij=0; ij<N2; ij++) newgolgstats[ij] = 0ull;             // need to update statistics of neighbours with parenting information, so init required
+    
     ncodingmask = (1ull<<ncoding)-1ull;                                         // mask for number of bits coding for each lut rule: <=4 for birth and survival case
     if (ncoding==4)         allcoding = 0xffffffffffffffff;                     // mask for total gene coding region
     else if (ncoding ==2)   allcoding = 0xffffffff;
     else                    allcoding = 0xffff;
-    parentdies = (repscheme & R_3_parentdies) ? 1 : 0;
-    if(parentdies) for (ij=0; ij<N2; ij++) newgolgstats[ij] = 0ull;             // need to update statistics of neighbours with parenting information, so init required
-  
+    
     /* DEBUG if(totsteps<5 && selection==9) {
         retrievegols(totsteps,newgol,newgolg,newgolgstats,newgolb,newgolr);     // previous simulation data placed in newgol...
         for (ij=0; ij<N2; ij++) {
@@ -3837,31 +3842,32 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
             nb1i = (nb1i << (gols<<2)) + (gols*k);                              // nb1i is packed list of live neighbour indices (each in range 0-7)
             nbmask |= (gols << k);
         }
-        birth = 0ull;
+        survive = birth = 0ull;
         golij=gol[ij];
         if (s) {
+            s1=s-1;
             s2or3 = (s>>2) ? 0ull : (s>>1);                                     // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
             gols = s2or3 ? (golij ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;     // GoL calculation next state for non-genetic gol plane
             rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1);  // if rulemod bit 1 is on then split into half planes with/without mod
             rulemodij = (rulemod&0x4) ? membrane : (rulemod&0x1);               // if rulemod bit 2 then activate membrane of death overruling previous line
             if(rulemodij==1) {
-                overwrite = overwritemask&(0x1ull<<(s-1));
+                overwrite = overwritemask&(0x1ull<<s1);
                 if (selection==9) {                                             // selection == 9 : NB selection 9 does not use ncoding to determine coding length
                     for (genecodes=genecodeb=(repscheme&R_1_nb_OR_AND)?0ull:0xffff,k=0;k<s;k++) {// decodes genes using variable position encoding: fixed length genecode from nbs variable position encoding
                         kch = (nb1i>>(k<<2))&0x7;
                         if (!survivalgene && golij) {
                             PATTERN4(golg[nb[kch]], (s&0x7), found);          //survival?
                             if(repscheme&R_1_nb_OR_AND)
-                                genecodes |= found? (1ull << (s-1)) : 0ull;
+                                genecodes |= found? (1ull << s1) : 0ull;
                             else
-                                genecodes &= found? (1ull << (s-1)) : 0ull;
+                                genecodes &= found? (1ull << s1) : 0ull;
                         }
                         if (overwrite || !golij) {
                             PATTERN4(golg[nb[kch]], (s|0x8), found);          //birth?
                             if(repscheme&R_1_nb_OR_AND)
-                                genecodeb |= found ? (1ull << (s-1+8)) : 0ull;
+                                genecodeb |= found ? (1ull << (s1+8)) : 0ull;
                             else {
-                                genecodeb &= found ? (1ull << (s-1+8)) : 0ull;
+                                genecodeb &= found ? (1ull << (s1+8)) : 0ull;
                                 //if(ij==106195) fprintf(stderr,"DEBUG Genecode sel 9 at totsteps=%d ij=%d k=%d golg=%llx found=%llx genecode=%llx survivalgene=%llx\n",totsteps,ij,k,golg[nb[k]],found,genecodeb,survivalgene);
                             }
                         }
@@ -3869,13 +3875,13 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                     }
                     if (survivalgene && golij) {                                // survival determined by central gene in this case
                                 PATTERN4(golg[ij], (s&0x7), found);             // survival?
-                                genecodes =  found? 1ull << (s-1) : 0ull;
+                                genecodes =  found? 1ull << s1 : 0ull;
                     }
                     genecode=genecodes|genecodeb;
                     //if(ij==106195) fprintf(stderr,"DEBUG Genecode sel 9 at totsteps=%d ij=%d genecode=%llx\n",totsteps,ij,genecode);
-                    survive = ((genecode&smask)>>(s-1)) & 0x1ull;
+                    survive = ((genecode&smask)>>s1) & 0x1ull;
                     genecode>>=8;
-                    if (overwrite || !golij) birth   = ((genecode&bmask)>>(s-1)) & 0x1ull;
+                    if (overwrite || !golij) birth   = ((genecode&bmask)>>s1) & 0x1ull;
                 }
                 else {                                                          // selection == 8
                     if(repscheme&R_1_nb_OR_AND)
@@ -3891,9 +3897,10 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                             genecode &= golg[nb[kch]];                           // AND of live neighbours encodes birth rule & survival rule
                         }
                     if(survivalgene) genecode = (genecode&(0xffffffffull<<32)) | (golg[ij]&(8ull*ncoding-1ull));   // if central gene codetermines survival DEBUG CHECK
-                    // if(ij==106195) fprintf(stderr,"DEBUG Genecode sel 8 at totsteps=%d ij=%d genecode=%llx\n",totsteps,ij,genecode);
-                    survive=(((genecode>>((s-1)*ncoding)) & ncodingmask) == ncodingmask) && ((smask>>(s-1))&1ull) ? 1ull : 0ull;
-                    if (overwrite || !golij) birth=(((genecode>>((8+(s-1))*ncoding)) & ncodingmask) == ncodingmask) && ((bmask>>(s-1))&1ull) ? 1ull : 0ull;
+                    //if(ij==106195) fprintf(stderr,"DEBUG Genecode sel 8 at totsteps=%d ij=%d genecode=%llx\n",totsteps,ij,genecode);
+                    //if(ij==106195) fprintf(stderr,"DEBUG Genecode sel 8 at totsteps=%d ij=%d genecode=%llx golg1=%llx golg2=%llx\n",totsteps,ij,genecode,golg[nb[nb1i&0x7]],golg[nb[(nb1i>>(1<<2))&0x7]]);
+                    survive=(((genecode>>((s-1)*ncoding)) & ncodingmask) == ncodingmask) && ((smask>>s1)&1ull) ? 1ull : 0ull;
+                    if (overwrite || !golij) birth=(((genecode>>((8+s1)*ncoding)) & ncodingmask) == ncodingmask) && ((bmask>>s1)&1ull) ? 1ull : 0ull;
                 }
             }
             else if (rulemodij==2){                                          // hard death on membrane defined above via macro "membrane"
@@ -3911,9 +3918,9 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
 
     finish_update(newgol, newgolg, newgolgstats, newgolb, newgolr, nbshist);
     
-    /* DEBUG if(totsteps<5 && selection == 8) {
+    /* if(totsteps<5 && selection == 8) {
         savegols(totsteps,gol,golg,golgstats,golb,golr);
-    }*/
+    } */
 
 }
 //---------------------------------------------------------------- update_lut_dist ----------------------------------------------------------------------
@@ -3923,27 +3930,38 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
 /*
     configurations are distinguished by number of ones in two classes (corner,edge-centred) of the 8-bit live neighbour pattern
     for the different s values                 0  1  2  3  4  5  6  7  8
-    there are a nr of partitions               1  2  3  4  5  4  3  2  1   total 25   with se the number in edge centred sites NSEW
+    there are a nr n of partitions             1  2  3  4  5  4  3  2  1   total 25   with se the number in edge centred sites NSEW
     chosen nr of partitions for exploration    0  2  3  4  5  4  3  2  0   total 23
     if we exclude the cases s = 0,8, then there are 23 bits required to distinguish these cases
+    1. Fixed length encdoing has 1 bit per LUT entry: 23 survival bits and then 23 birth bits
+    2. Varibale length encoding uses two bytes : upper byte for s-1 and lower byte for bitmask of which se 0-3 are on
                                                                                                                 */
-    int s, s1, se, s0, s2or3, k, kch, found;
-    uint64_t survive,birth,survivenbs,birthnbs,overwrite,survivalgene,smask,bmask,rulemodij,golij;
+    int s, s1, se, s0, s2or3, k, kch;
+    unsigned int rulemodij;
+    int nb[8], ij, i, j, jp1, jm1, ip1, im1;
+    uint64_t genecode, survivenbs, birthnbs, gols, golij, nb1i, nbmask, found;
+    uint64_t survive, birth, overwrite, survivalgene, smask, bmask, gene;
+    
     static uint64_t summasks[7] = {0x3ull,0x7ull,0xfull,0x1full,0xfull,0x7ull,0x3ull};
     static int sumoffs[7] = {0,2,5,9,14,18,21};
-    int nb[8], ij, i, j, jp1, jm1, ip1, im1;
-    uint64_t genecode, gols, nb1i, nbmask;
-    uint64_t gene, newgene;
-    uint64_t statflag;
+    // static int first = 1;
 
     canonical = repscheme & R_2_canonical_nb;                                      // set global choice of canonical rotation bit choice for selectdifftx
     survivalgene = repscheme & R_0_survivalgene;                                   // gene determining survival is 1: central gene 2: determined by neighbours
     smask = (uint64_t) survivalmask;                                               // convert to 64 bit mask for efficient usage here
     bmask = (uint64_t) birthmask;
     parentdies = (repscheme & R_3_parentdies) ? 1 : 0;
-    
     if(parentdies) for (ij=0; ij<N2; ij++) newgolgstats[ij] = 0ull;                // need to update statistics of neighbours with parenting information, so init required
 
+    /* if(totsteps<5) {
+        retrievegols(totsteps,newgol,newgolg,newgolgstats,newgolb,newgolr);     // previous simulation data placed in newgol...
+        for (ij=0; ij<N2; ij++) {
+            if(gol[ij]!=newgol[ij]) {
+                if(first) {fprintf(stderr,"DEBUG NEW step %d gol difference at ij = %d this gol %llx file gol %llx\n",totsteps,ij,gol[ij],newgol[ij]);first=0;}
+            }
+        }
+    } */
+    
     for (ij=0; ij<N2; ij++) {                                                      // loop over all sites of 2D torus with side length N
         i = ij & Nmask;  j = ij >> log2N;                                          // row & column
         jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                          // toroidal (j+1)*N and (j-1)*N
@@ -3957,9 +3975,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
             nb1i = (nb1i << (gols<<2)) + (gols*k);                                 // nb1i is packed list of live neighbour indices
             nbmask |= (gols << k);
         }
-        statflag = F_livenbs & (nbmask<<16);                                       // record live neighbour pattern
-        statflag |= F_s_live & (s&0x7);                                            // requires F_s_live to be in lowest 3 bits : val 8 mapped to 0
-        newgene = survive = birth = 0ull;
+        survive = birth = 0ull;
         golij = gol[ij];
         
         if (s>0 && s<8) {
@@ -3968,7 +3984,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
             gols = s2or3 ? (golij ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;        // GoL calculation next state for non-genetic gol plane
             rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1);     // if rulemod bit 1 is on then split into half planes with/without mod
             rulemodij = (rulemod&0x4) ? membrane : (rulemod&0x1);                  // if rulemod bit 2 then activate membrane of death
-            if (rulemodij==1) {                // NB need to put gene calculation outside that we cna do genetic propagation with GoL rulemod off
+            if (rulemodij==1) {                // NB need to put gene calculation outside so that we can do genetic propagation with GoL rulemod off
                 overwrite = overwritemask&(0x1ull<<s1);
                 overwrite = (overwrite || !golij) ? 1ull : 0ull;
                 if (golij) survive = (smask>>sumoffs[s1])&summasks[s1] ? 1ull : 0ull;
@@ -3997,6 +4013,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
                                     else
                                         birthnbs &= found? 1ull : 0ull;
                                 }
+                                //if(ij==105690) fprintf(stderr,"DEBUG Genecode sel 11 at totsteps=%d ij=%d k=%d golg=%llx golij=%llx\n",totsteps,ij,k,golg[nb[k]],golij);
                             }
                             if (survivalgene && golij) {                            // survival determined by central gene in this case
                                     PATTERN8(golg[ij], (s==4 && se==4) ? 0x01 : ((s<<4)|(1ull<<(se-s0))), found);   // survival rule found? final decision for survival
@@ -4007,13 +4024,19 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
                         }
                         else {                                                      // selection == 10
                             if(repscheme & R_1_nb_OR_AND)
-                                for (genecode=0ull,k=0;k<8;k++)                     // decodes genes with fixed length encoding by OR
-                                    genecode |= (gol[nb[k]]?golg[nb[k]]:0ull);      // OR of live neighbours encodes birth rule & survival rule
+                                for (genecode=0ull,k=0;k<s;k++) {                   // decodes genes with fixed length encoding by OR
+                                    kch = (nb1i>>(k<<2))&0x7;
+                                    genecode |= golg[nb[kch]];                      // OR of live neighbours encodes birth rule & survival rule
+                                }
                             else
-                                for (genecode=~0ull,k=0;k<8;k++)                    // decodes genes with fixed length encoding by AND
-                                    genecode &= (gol[nb[k]]?golg[nb[k]]:~0ull);     // AND of live neighbours encodes birth rule & survival rule
+                                for (genecode=~0ull,k=0;k<s;k++) {                  // decodes genes with fixed length encoding by AND
+                                    kch = (nb1i>>(k<<2))&0x7;
+                                    genecode &= golg[nb[kch]];                      // AND of live neighbours encodes birth rule & survival rule
+                                }
                             if(survivalgene) genecode = (genecode&(0xffffffffull<32)) | (golg[ij]&0xffffffffull);     // if central gene determines survival
                             genecode &= (bmask << 32)|smask;                        // just to be clear, not required as now already tested above
+                            //if(ij==105690) fprintf(stderr,"DEBUG Genecode sel 10 at totsteps=%d ij=%d genecode=%llx\n",totsteps,ij,genecode);
+                            //if(ij==105690) fprintf(stderr,"DEBUG Genecode sel 10 at totsteps=%d ij=%d genecode=%llx golg1=%llx golg2=%llx\n",totsteps,ij,genecode,golg[nb[nb1i&0x7]],golg[nb[(nb1i>>(1<<2))&0x7]]);
                             if (golij) survive &= (genecode>>(sumoffs[s1]+(se-s0)))&0x1ull;        // 28.7.2019 changed from |=
                             if (overwrite) birth &= (genecode>>(32+sumoffs[s1]+(se-s0)))&0x1ull;
                         }
