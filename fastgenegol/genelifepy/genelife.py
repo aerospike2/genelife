@@ -278,31 +278,31 @@ def set_caption(window, title):
 def init_button_arrays():
     """ initialize information for button area at base of display"""
     global ncanon
-                                                      # initialize lists to empty
-    ncanon = []                                       # lists of number of successive buttons with the same color
-    cancolors = []                                    # lists of button colors
-    cancol =[]                                        # expanded lists of button colors, by button
-                                                      # no of entries per color region
-    ncanon.append([2,2,2,2,2,4,2,2,2])                # selection 0-7
-    ncanon.append([8,8,8])                            # selection 8,9
-    ncanon.append([2,3,4,5,4,3,2,2,3,4,5,4,3,2,8])    # selection 10,11
-    ncanon.append([4,7,10,7,4,4,7,10,7,4,8])          # selection 12,13
-    ncanon.append([1,2,6,10,13,1,2,6,10,13,8])        # selection 14,15
-                                                      # colors [R,G,B] for different color regions for buttons, colorvals must be < 128
+                                                            # initialize lists to empty
+    ncanon = []                                             # lists of number of successive buttons with the same color
+    cancolors = []                                          # lists of button colors
+    cancol =[]                                              # expanded lists of button colors, by button
+                                                            # no of entries per color region
+    ncanon.append([2,2,2,2,2,4,2,2,2])                      # selection 0-7
+    ncanon.append([8,8,8,4,4,3])                            # selection 8,9
+    ncanon.append([2,3,4,5,4,3,2,2,3,4,5,4,3,2,8,4,4,3])    # selection 10,11
+    ncanon.append([4,7,10,7,4,4,7,10,7,4,8,4,4,3])          # selection 12,13
+    ncanon.append([1,2,6,10,13,1,2,6,10,13,8,4,4,3])        # selection 14,15
+                                                            # colors [R,G,B] for different color regions for buttons, colorvals must be < 128 to allow 2x highlight
     cancolors.append([[0,100,0],[0,50,100],[0,80,80],[0,100,50],[100,100,0],[50,100,0],[100,0,100],[0,0,127],[100,0,0]]) # selection 0-7
-    cancolors.append([[0,0,127],[0,100,0],[100,0,0]]) # selection 8,9
+    cancolors.append([[0,0,127],[0,100,0],[100,0,0],[100,100,100],[50,100,50],[100,50,50]]) # selection 8,9
     cancolors.append([[0,0,127],[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[0,0,127],
-                      [0,127,0],[50,127,0],[60,120,0],[100,120,0],[80,120,0],[50,120,0],[0,127,0],[100,0,0]]) # selection 10,11
-    cancolors.append([[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[50,127,0],[80,120,0],[100,120,0],[80,120,0],[50,127,0],[100,0,0]])  # selection 12,13
-    cancolors.append([[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[50,127,0],[80,120,0],[100,120,0],[80,120,0],[50,127,0],[100,0,0]])  # selection 14,15
-                                                     # lists of colors for individual buttons expanded from above, first initialize to zero
+                      [0,127,0],[50,127,0],[60,120,0],[100,120,0],[80,120,0],[50,120,0],[0,127,0],[100,0,0],[100,100,100],[50,100,50],[100,50,50]]) # selection 10,11
+    cancolors.append([[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[50,127,0],[80,120,0],[100,120,0],[80,120,0],[50,127,0],[100,0,0],[100,100,100],[50,100,50],[100,50,50]])  # selection 12,13
+    cancolors.append([[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[50,127,0],[80,120,0],[100,120,0],[80,120,0],[50,127,0],[100,0,0],[100,100,100],[50,100,50],[100,50,50]])  # selection 14,15
+                                                            # lists of colors for individual buttons expanded from above, first initialize to zero
     cancol.append(np.zeros((20,3),np.int32))
-    cancol.append(np.zeros((24,3),np.int32))
-    cancol.append(np.zeros((54,3),np.int32))
-    cancol.append(np.zeros((72,3),np.int32))
-    cancol.append(np.zeros((72,3),np.int32))
+    cancol.append(np.zeros((3*8+11,3),np.int32))
+    cancol.append(np.zeros((2*23+8+11,3),np.int32))
+    cancol.append(np.zeros((2*32+8+11,3),np.int32))
+    cancol.append(np.zeros((2*32+8+11,3),np.int32))
     
-    for l in range(len(ncanon)):                    # buttons for different selection schemes
+    for l in range(len(ncanon)):                            # buttons for different selection schemes
         k=0
         for j in range(len(ncanon[l])):
             for i in range(ncanon[l][j]):
@@ -336,7 +336,7 @@ def init_buttons(surface):    # initialize parameter buttons
                 bit = (overwritemask>>(k-18))&0x1
             draw_rect(surface,cancol[0][k]*(1+bit),[k<<(log2N-6),Height+6,3*sc,3*sc])
         j = 0;
-        for k in range(len(ncanon[0])):
+        for k in range(len(ncanon[0])):                       # white grouping markers
             draw_rect(surface,[200,200,200],[(j<<(log2N-6))-1 if j else 0,Height+4,sc,sc])
             j = j+ncanon[0][k]
     elif selection<10:
@@ -344,8 +344,10 @@ def init_buttons(surface):    # initialize parameter buttons
             draw_rect(surface,cancol[1][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
             draw_rect(surface,cancol[1][k+8]*(1+((birthmask>>(k))&0x1)),[(k+8)<<(log2N-6),Height+6,3*sc,3*sc])
             draw_rect(surface,cancol[1][k+16]*(1+((overwritemask>>(k))&0x1)),[(k+16)<<(log2N-6),Height+6,3*sc,3*sc])
+        for k in range(11):
+            draw_rect(surface,cancol[1][k+24]*(1+((repscheme>>k)&0x1)),[(k+24)<<(log2N-6),Height+6,3*sc,3*sc])
         j = 0;
-        for k in range(len(ncanon[1])):
+        for k in range(len(ncanon[1])):                       # white grouping markers
             draw_rect(surface,[200,200,200],[(j<<(log2N-6))-1 if j else 0,Height+4,sc,sc])
             j = j+ncanon[1][k]
     elif selection<12:
@@ -355,9 +357,12 @@ def init_buttons(surface):    # initialize parameter buttons
             draw_rect(surface,cancol[2][k+23]*(1+((birthmask>>(k))&0x1)),[(k+23)<<(log2N-6),Height+6,3*sc,3*sc])
         for k in range(8):
             draw_rect(surface,cancol[2][k+46]*(1+((overwritemask>>(k))&0x1)),[(k+46)<<(log2N-6),Height+6,3*sc,3*sc])
+        for k in range(11):
+            draw_rect(surface,cancol[2][k+54]*(1+((repscheme>>k)&0x1)),[k<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
         j = 0;
-        for k in range(len(ncanon[2])):
-            draw_rect(surface,[200,200,200],[(j<<(log2N-6))-1 if j else 0,Height+4,sc,sc])
+        for k in range(len(ncanon[2])):                       # white grouping markers
+            jj = (j if j<54 else j-54);
+            draw_rect(surface,[200,200,200],[(jj<<(log2N-6))-1 if jj else 0,Height+4 if j<54 else Height+6+3*sc,sc,sc])
             j = j+ncanon[2][k]
     elif selection<14:
         # draw_rect(surface,[200,200,200],[(32<<(log2N-6))-1,Height+6,1,9])
@@ -366,9 +371,17 @@ def init_buttons(surface):    # initialize parameter buttons
             draw_rect(surface,cancol[3][k+32]*(1+((birthmask>>(k))&0x1)),[(k+32)<<(log2N-6),Height+6,3*sc,3*sc])
         for k in range(8):
             draw_rect(surface,cancol[3][k+64]*(1+((overwritemask>>(k))&0x1)),[(k+32)<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
+        for k in range(11):
+            draw_rect(surface,cancol[3][k+72]*(1+((repscheme>>k)&0x1)),[k<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
         j = 0;
-        for k in range(len(ncanon[3])):
-            draw_rect(surface,[200,200,200],[(j<<(log2N-6))-1 if j else 0,Height+4,sc,sc])
+        for k in range(len(ncanon[3])):                       # white grouping markers
+            if j<64:
+                jj = j;
+            elif j<72:
+                jj = j-32;
+            else:
+                jj = j-72;
+            draw_rect(surface,[200,200,200],[(jj<<(log2N-6))-1 if jj else 0,Height+4 if j<64 else Height+6+3*sc,sc,sc])
             j = j+ncanon[3][k]
     elif selection<16:
         # draw_rect(surface,[200,200,200],[(32<<(log2N-6))-1,Height+6,1,9])
@@ -377,9 +390,17 @@ def init_buttons(surface):    # initialize parameter buttons
             draw_rect(surface,cancol[4][k+32]*(1+((birthmask>>(k))&0x1)),[(k+32)<<(log2N-6),Height+6,3*sc,3*sc])
         for k in range(8):
             draw_rect(surface,cancol[4][k+64]*(1+((overwritemask>>(k))&0x1)),[(k+32)<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
+        for k in range(11):
+            draw_rect(surface,cancol[4][k+72]*(1+((repscheme>>k)&0x1)),[k<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
         j = 0;
-        for k in range(len(ncanon[4])):
-            draw_rect(surface,[200,200,200],[(j<<(log2N-6))-1 if j else 0,Height+4,sc,sc])
+        for k in range(len(ncanon[4])):                       # white grouping markers
+            if j<64:
+                jj = j;
+            elif j<72:
+                jj = j-32;
+            else:
+                jj = j-72;
+            draw_rect(surface,[200,200,200],[(jj<<(log2N-6))-1 if jj else 0,Height+4 if j<64 else Height+6+3*sc,sc,sc])
             j = j+ncanon[4][k]
     return(cancol)
 #-----------------------------------------------------------------------------------------------------------
@@ -968,12 +989,17 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                                     birthmask = birthmask ^ (1<<(k-8))
                                     print(("step %d birthmask changed to %x" % (framenr,birthmask)))
                                     draw_rect(surfacex1,cancol[1][k]*(1+((birthmask>>(k-8))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
-                                else:
+                                elif k<24:
                                     overwritemask = overwritemask ^ (1<<(k-16))
                                     print(("step %d overwritemask changed to %x" % (framenr,overwritemask)))
                                     draw_rect(surfacex1,cancol[1][k]*(1+((overwritemask>>(k-16))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 surviveover[0],surviveover[1],surviveover[2]= survivalmask,birthmask,overwritemask
                                 genelife.set_surviveover64(surviveover)
+                            elif k<24+11:
+                                repscheme = repscheme ^ (1<<(k-24))
+                                print(("step %d repscheme changed to %x" % (framenr,repscheme)))
+                                draw_rect(surfacex1,cancol[1][k]*(1+((repscheme>>(k-24))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                genelife.set_repscheme(repscheme)
                         elif selection < 12:
                             if k<54:
                                 if k<23:
@@ -990,38 +1016,55 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                                     draw_rect(surfacex1,cancol[2][k]*(1+((overwritemask>>(k-46))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 surviveover[0],surviveover[1],surviveover[2]= survivalmask,birthmask,overwritemask
                                 genelife.set_surviveover64(surviveover)
+                            elif k<54+11:
+                                repscheme = repscheme ^ (1<<(k-54))
+                                print(("step %d repscheme changed to %x" % (framenr,repscheme)))
+                                draw_rect(surfacex1,cancol[1][k]*(1+((repscheme>>(k-54))&0x1)),[(k-54)<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
+                                genelife.set_repscheme(repscheme)
                         elif selection<14:
-                            if k<64:
+                            if k<64 and y<N+12:
                                 if k<32:
                                     survivalmask = survivalmask ^ (1<<k)
                                     print(("step %d survivalmask changed to %x" % (framenr,survivalmask)))
                                     draw_rect(surfacex1,cancol[3][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 else:
-                                    if y<N+12:
-                                        birthmask = birthmask ^ (1<<(k-32))
-                                        print(("step %d birthmask changed to %x" % (framenr,birthmask)))
-                                        draw_rect(surfacex1,cancol[3][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
-                                    else:
-                                        overwritemask = overwritemask ^ (1<<(k-32))
-                                        print(("step %d overwritemask changed to %x" % (framenr,overwritemask)))
-                                        draw_rect(surfacex1,cancol[3][k+32]*(1+((overwritemask>>(k-32))&0x1)),[k<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
+                                    birthmask = birthmask ^ (1<<(k-32))
+                                    print(("step %d birthmask changed to %x" % (framenr,birthmask)))
+                                    draw_rect(surfacex1,cancol[3][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                surviveover[0],surviveover[1],surviveover[2]= survivalmask,birthmask,overwritemask
+                                genelife.set_surviveover64(surviveover)
+                            elif k<11:
+                                repscheme = repscheme ^ (1<<k)
+                                print(("step %d repscheme changed to %x" % (framenr,repscheme)))
+                                draw_rect(surfacex1,cancol[3][k+72]*(1+((repscheme>>k)&0x1)),[k<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
+                                genelife.set_repscheme(repscheme)
+                            elif k>=32 and k<40:
+                                overwritemask = overwritemask ^ (1<<(k-32))
+                                print(("step %d overwritemask changed to %x" % (framenr,overwritemask)))
+                                draw_rect(surfacex1,cancol[3][k+32]*(1+((overwritemask>>(k-32))&0x1)),[k<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
                                 surviveover[0],surviveover[1],surviveover[2]= survivalmask,birthmask,overwritemask
                                 genelife.set_surviveover64(surviveover)
                         elif selection<16:
-                            if k<64:
+                            if k<64 and y<N+12:
                                 if k<32:
                                     survivalmask = survivalmask ^ (1<<k)
                                     print(("step %d survivalmask changed to %x" % (framenr,survivalmask)))
                                     draw_rect(surfacex1,cancol[4][k]*(1+((survivalmask>>k)&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 else:
-                                    if y<N+12:
-                                        birthmask = birthmask ^ (1<<(k-32))
-                                        print(("step %d birthmask changed to %x" % (framenr,birthmask)))
-                                        draw_rect(surfacex1,cancol[4][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
-                                    else:
-                                        overwritemask = overwritemask ^ (1<<(k-32))
-                                        print(("step %d overwritemask changed to %x" % (framenr,overwritemask)))
-                                        draw_rect(surfacex1,cancol[4][k+32]*(1+((overwritemask>>(k-32))&0x1)),[k<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
+                                    birthmask = birthmask ^ (1<<(k-32))
+                                    print(("step %d birthmask changed to %x" % (framenr,birthmask)))
+                                    draw_rect(surfacex1,cancol[4][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
+                                surviveover[0],surviveover[1],surviveover[2]= survivalmask,birthmask,overwritemask
+                                genelife.set_surviveover64(surviveover)
+                            elif k<11:
+                                repscheme = repscheme ^ (1<<k)
+                                print(("step %d repscheme changed to %x" % (framenr,repscheme)))
+                                draw_rect(surfacex1,cancol[4][k+72]*(1+((repscheme>>k)&0x1)),[k<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
+                                genelife.set_repscheme(repscheme)
+                            elif k>=32 and k<40:
+                                overwritemask = overwritemask ^ (1<<(k-32))
+                                print(("step %d overwritemask changed to %x" % (framenr,overwritemask)))
+                                draw_rect(surfacex1,cancol[4][k+32]*(1+((overwritemask>>(k-32))&0x1)),[k<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
                                 surviveover[0],surviveover[1],surviveover[2]= survivalmask,birthmask,overwritemask
                                 genelife.set_surviveover64(surviveover)
                     else: # y<N
@@ -1491,34 +1534,31 @@ def parhelp():
             print("Masks for LUT rules for sums 2-6 for survival /left half) and birth (right half)")
             print("blue         ","survival  for sum=1-8 separate buttons for the 8 non-zero sums")
             print("green        ","birth     for sum=1-8 separate buttons for the 8 non-zero sums")
-            print("red          ","overwrite for sum=1-8 separate buttons for the 8 non-zero sums")
-            print("none         ","ancselectmask for sum=1-8 whether to do gene selection on ancestor")
         elif selection < 12:
             print("Control bits for masks to enable gene encoded LUTs (left to right):")
             print("___________________________________________________________________")
             print("Distance dept (2 classes) LUT rules for s,se s 1-7 for survival /left half) and birth (right half)")
             print("blue-purple ","survival sum=1-7 separate buttons for s = 1-7 se = 0-1 0-2 0-3 0-4 1-4 2-4 3-4")
             print("green-yellow","birth    sum=1-7 separate buttons for s = 1-7 se = 0-1 0-2 0-3 0-4 1-4 2-4 3-4")
-            print("red          ","overwrite for sum=1-8 separate buttons for the 8 non-zero sums")
-            print("none         ","ancselectmask for s=1-8 whether to do gene selection on ancestor")
         elif selection < 14:
             print("Control bits for masks to enable gene encoded LUTs (left to right):")
             print("___________________________________________________________________")
             print("Canonical rotation LUT rules for sums 2-6 for survival /left half) and birth (right half)")
             print("blue-purple ","survival sum=2-6 separate buttons for s = 2-6 canonical rotns = 4 7 10 7 4")
             print("green-yellow","birth    sum=2-6 separate buttons for s = 2-6 canonical rotns = 4 7 10 7 4")
-            print("red          ","overwrite for sum=1-8 separate buttons for the 8 non-zero sums")
-            print("none         ","ancselectmask for s=1-8 whether to do gene selection on ancestor")
         elif selection < 16:
             print("Control bits for masks to enable gene encoded LUTs (left to right):")
             print("___________________________________________________________________")
             print("Full 2D symmetry LUT rules for sums 0-4 for survival /left half) and birth (right half)")
             print("blue-purple ","survival sum=0-4 separate buttons for s = 0-4 pattern offset = 1 2 6 10 13")
             print("green-yellow","birth    sum=0-4 separate buttons for s = 0-4 pattern offset = 1 2 6 10 13")
-            print("red          ","overwrite for sum=1-8 separate buttons for the 8 non-zero sums")
-            print("none         ","ancselectmask for s=1-8 whether to do gene selection on ancestor")
+        print("red          ","overwrite for sum=1-8 separate buttons for the 8 non-zero sums")
+        print("none         ","ancselectmask for s=1-8 whether to do gene selection on ancestor")
+        print("grey         ","repscheme 0: central/nb survival, 1: OR/AND gene LUTs, 2: anc 0-canonical/most difft, 3: parentdies forced/not")
+        print("teal         ","repscheme 4-6: one of 8 ancestor selection schemes in selectone_of_s, 7: random choice of ancestor from all live")
+        print("brown        ","repscheme 8-10: one of 8 disambiguation schemes for unresolved ancestor choice possible if s=2,4,6")
         print("")
-        print("Additional control bits for selection are in repscheme")
+        print("Control bits for selection are in repscheme")
         print("______________________________________________________")
         print("repscheme bits 0-3 : ")
         print("   bit 0 determines choice of gene(s) for survival rule : OR of live neighbors (0) central gene (1)")
@@ -1532,13 +1572,13 @@ def parhelp():
         print("   # 6 penalty function -1 for a survival rule -2 for a birth rule  # 7 reserved, currently same as 6")
         print("   bit 7 (val 0x8x) overrides bits 4-6 with random choice of ancestor amongst live neighbours")
         print("repscheme bits 8-10 determine disambiguation method for symmetric cases sum=2,crot=3 and sum=4,crot=2,9")
-        print("   0 random choice : this involves a departure from determinism for these cases")
+        print("   0 random choice amongst as yet unresolved: this involves a departure from determinism for these cases")
         print("   1 ignore problem and choose selected bit of canonical configuration : live with minimal asymmetry")
         print("   2 disallow birth : effectively modifies the rules and is like excluding this LUT entry from the table")
-        print("   3 choose lesser in value of genes if different (otherwise it makes no difference)")
-        print("   4 choose gene with least number of ones and if same, then lesser in value")
-        print("   5 choose AND of genes : this is a symmetric solution")
-        print("   6 choose a default gene such as the gene coding for the Game of Life LUT in these cases")
+        print("   3 choose a default gene such as the gene coding for the Game of Life LUT to resolve ambiguity")
+        print("   4 choose lesser in value of genes if different (otherwise it makes no difference)")
+        print("   5 choose first gene which is most likely to not survive with s<2 or s>3")
+        print("   6 choose first gene which is most likely to not survive or to be overwritten with (s<2 or s>3) xor overwrite")
         print("   7 generate a random gene to give birth to for these ambiguous instances")
     print("")
     print("Other controls:")
