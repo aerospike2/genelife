@@ -4074,7 +4074,13 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
     for the different s values                 0  1  2  3  4  5  6  7  8
     there are a nr of canonical rotations      1  1  4  7 10  7  4  1  1   total 36
     if we exclude the cases s=0,1,7,8 which can create growth artefacts, then there are 32 bits
-                                                                                                                */
+ 
+    1. Fixed length encoding: Survival: s=2 bits 0-3, s=3 bits 4-10, s=4 bits 11-20, s=5 bits 21-27, s=6 bits 28-31; Birth: same + 32
+    2. Modular encoding: Up to 6 10-bit modules. Lower 8 bits stored in first 6*8=48 bits. Upper 2-bits stored pairwise in 12 bits 48-59.
+       Module: 1     0    >=48 ...  7     6     5     4     3     2     1     0       we abbreviate possible values of crot mod 5 as cr0-4 in this description
+               cr4   cr3            s3    s2    s1    s0    crot5 cr2   cr1   cr0     8-bit pattern matching via remapping cr0-4 to lowest 3 bits: 0->001 1->010 2->100 3->001 4->010
+                                    s3    s2    s1    s0    crot5 0/cr2 cr4/1 cr3/0   remapping of bits depending on whether crot mod 5 is >2 / <=2
+                                                                                                */
     int s, smid, s2, s2or3, k, k1, kodd, crot, crot5, crotmod5, pat, found, nsame;
     uint64_t survive,birth,survivenbs,birthnbs,overwrite,survivalgene,smask,bmask,rulemodij,golij;
     static uint64_t summasks[5] = {0xfull,0x7full,0x3ffull,0x7full,0xfull};
@@ -4221,13 +4227,15 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
         (iv) include undifferentiated s=5 instead of 0 : 32 bits
         (v) include undifferentiated s=1,5,6 instead of 0,1  ie s=1-6 : 32 bits
         (vi) split the s-range allowed for birth and survival: S s=1-4 B s=3-5 ie 31 bits for survival and 33 for birth]
+    1. Fixed length encoding: Survival: s=0 bit 0, s=1 bits 1,2, s=2 bits 3-8, s=3 bits 9-18, s=4 bits 19-31; Birth: same + 32
+    2. Modular encoding: Up to 5 12-bit modules. Lower 8 bits in up to 5 modules in bits 0-39, upper 4 bits in up to 5 modules in bits 40-59
 
                                                                                                                 */
     int s, se, slow, s2or3, k, k1, kodd, coff, crot, found, coffdiv6, coffmod6, pat, nsame;
     uint64_t survive,birth,survivenbs,birthnbs,overwrite,survivalgene,smask,bmask,rulemodij,golij;
     static uint64_t summasks[5] = {0x1ull,0x3ull,0x3full,0x3ffull,0x1fffull};  // masks for s= 0,1,2,3,4 with nr cases 1,2,6,10,13
-    static int sumoffs[9] = {0,1,3,9,19,32,42,48,50};                                      // cumulative offsets to start of coding region for s = 0,1,2,3,4,5,6,7,8
-    static int csumoffs[9] = {0,2,4,12,26,46,60,68,2};                                     // start of indexing in confoffs for crot,kodd lookup for s = 0,1,2,3,4,5,6,7,8
+    static int sumoffs[9] = {0,1,3,9,19,32,42,48,50};                          // cumulative offsets to start of coding region for s = 0,1,2,3,4,5,6,7,8 - only s<5 used
+    static int csumoffs[9] = {0,2,4,12,26,46,60,68,2};                         // start of indexing in confoffs for crot,kodd lookup for s = 0,1,2,3,4,5,6,7,8
     static unsigned char confoffs[2+2+8+14+20+14+8+2+2] = {0,0, 0,0, 0,0,1,2,3,3,4,5, 0,1,2,3,3,2,4,5,6,7,4,5,8,9, 0,0,1,2,3,4,1,2,5,6,7,8,9,9,10,10,8,7,11,12,
                                         0,1,2,3,3,2,4,5,6,7,4,5,8,9, 0,0,1,2,3,3,4,5, 0,0, 0,0}; // look up for crot*2+kodd to gene bit offset
     static unsigned char lut[256];
@@ -4668,24 +4676,27 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
                       genegol[selection-8] = (codingmask<<((8+3-1)*ncoding))|(codingmask<<((8+2-1)*ncoding))|(codingmask<<((2-1)*ncoding))|(codingmask<<((3-1)*ncoding));
                  else genegol[selection-8] = (codingmask<<((8+3-1)*ncoding))|(codingmask<<((2-1)*ncoding))|(codingmask<<((3-1)*ncoding));
                  for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;    // put up to 3 extra bits at top to ensure all nr 1s values occupied
-        case 9:  if (((repscheme>>4)&0x7)==7) genegol[selection-8] = 0xba32ull;   // extended rule for scissors-paper-stone-well gliders
-                 else                         genegol[selection-8] = 0xb32ull;    //GoL rule for survival in totalistic LUT case, variable length encoding
+        case 9:  if (((repscheme>>4)&0x7)==7) genegol[selection-8] = 0xba32ull;                             // extended rule for scissors-paper-stone-well gliders
+                 else                         genegol[selection-8] = 0xb32ull;                              //GoL rule for survival in totalistic LUT case, variable length encoding
                  for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;    // put up to 3 extra bits at top to ensure all nr 1s values occupied
-        case 10: if (((repscheme>>4)&0x7)==7)
-                      genegol[selection-8] = (0x7ull<<2)|(0xfull<<5)|(0x7ull<<34)|(0xfull<<37);  //GoL rule for 2,3 s/b in corner/edge dist LUT case, fixed length encoding
-                 else genegol[selection-8] = (0x7ull<<2)|(0xfull<<5)|(0xfull<<37);  //GoL rule for 2,3 s and 3 b in corner/edge dist LUT case, fixed length encoding
-                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;    // put up to 3 extra bits at top to ensure all nr 1s values occupied
-        case 11: if (((repscheme>>4)&0x7)==7) genegol[selection-8] = 0xbfa73f27ull; //GoL rule for 2,3 s and 3 b in corner/edge dist LUT case, variable length encoding
-                 else                         genegol[selection-8] = 0xbf3f27ull;
-                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;    // put up to 3 extra bits at top to ensure all nr 1s values occupied
-        case 12: genegol[selection-8] = 0xfull|(0x7full<<4)|(0x7full<<36);        //GoL rule for survival surv2 1st 4 surv3 next 7 birth3 7 bits from 32+4, canonical case
-                 for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];break;
-        case 13: genegol[selection-8] = 0x00cd00bbb73b3727;                       //GoL rule for S23 B3 with modular encoding for canonical rotation case
-                 for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];break;
-        case 14: genegol[selection-8] = (0x3full<<3)|(0x3ffull<<9)|(0x3ffull<<(32+9)); //GoL rule for S23 B3 for 2D_sym case with 1,2,6,10,13 configs for s=0,1,2,3,4
-                 for (k=0;k<8;k++)   startgenes[k] = genegol[selection-8];break;
-        case 15: genegol[selection-8] = 0x03f3ffb7b3373323;                       //GoL rule for S23 B3 with modular encoding for 2D_sym case
-                 for (k=0;k<8;k++)   startgenes[k] =genegol[selection-8];break;
+        case 10: if (((repscheme>>4)&0x7)==7) genegol[selection-8] = (0x7ull<<2)|(0xfull<<5)|(0x7ull<<34)|(0xfull<<37); //GoL rule for S23 B23 in corner/edge dist LUT case, fixed length encoding
+                 else                         genegol[selection-8] = (0x7ull<<2)|(0xfull<<5)|(0xfull<<37);  //GoL rule for S23 B3 in corner/edge dist LUT case, fixed length encoding
+                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;
+        case 11: if (((repscheme>>4)&0x7)==7) genegol[selection-8] = 0xbfa73f27ull;                         //GoL rule for S23 B23 in corner/edge dist LUT case, variable length encoding
+                 else                         genegol[selection-8] = 0xbf3f27ull;                           //GoL rule for S23 B3 in corner/edge dist LUT case, variable length encoding
+                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;
+        case 12: if (((repscheme>>4)&0x7)==7) genegol[selection-8] = 0xfull|(0x7full<<4)|(0xfull<<32)|(0x7full<<36); //GoL rule for S23 B23 in canonical rotation case, fixed length encoding
+                 else                         genegol[selection-8] = 0xfull|(0x7full<<4)|(0x7full<<36);     //GoL rule for 2,3 s and 3 b in canonical rotation case:  4,7,10,7,4 configs s=2,3,4,5,6
+                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;
+        case 13: if (((repscheme>>4)&0x7)==7) genegol[selection-8] = 0x04cda7bbb73b3727;                    //GoL rule for S23 B23 with modular encoding for canonical rotation case
+                 else                         genegol[selection-8] = 0x00cd00bbb73b3727;                    //GoL rule for S23 B3 with modular encoding for canon rot'n case: 4,7,10,7,4 configs s=2,3,4,5,6
+                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;
+        case 14: if (((repscheme>>4)&0x7)==7) genegol[selection-8] = (0x3full<<3)|(0x3ffull<<9)|(0x3full<<(32+3))|(0x3ffull<<(32+9)); //GoL rule for S23 B23 for 2D_sym case, fixed length encoding
+                 else                         genegol[selection-8] = (0x3full<<3)|(0x3ffull<<9)|(0x3ffull<<(32+9)); //GoL rule for S23 B3 for 2D_sym case with 1,2,6,10,13 configs for s=0,1,2,3,4
+                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;
+        case 15: if (((repscheme>>4)&0x7)==7) genegol[selection-8] = 0x03ffffb7b3a33323;                    //GoL rule for S2(all)3(1st 6) B23 with modular encoding for 2D_sym case (NB smask 0 anyway)
+                 else                         genegol[selection-8] = 0x03f3ffb7b3373323;                    //GoL rule for S23 B3 with modular encoding for 2D_sym case for s=0,1,2,3,4
+                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;
 
         default: for (k=0;k<8;k++) startgenes[k]=(0x1ull<<(4+k*8))-1ull;
     }
