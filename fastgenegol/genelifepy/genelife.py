@@ -899,6 +899,13 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                          "16. Survival for 3-live-nbs ","17. Survival for 2-live-nbs ",
                          "18. Gene overwrite for 3-live-nbs ","19. Gene overwrite for 2-live-nbs "
                          ]
+    buttonhelp0815 =    ["0. survival gene central/nbs ","1. OR/AND of LUTs of nbs ",
+                         "2. canonical 0 position vs difft  ","3. Parentdies is forced ",
+                         "4. bit 0 of selection mode 0-7 ","5. bit 1 of selection mode 0-7 ",
+                         "6. bit 2 of selection mode 0-7 ","7. random ancestor choice ",
+                         "8. bit 0 of disambig mode 0-7 ","9. bit 1 of disambig mode 0-7 ",
+                         "10. bit 2 of disambig mode 0-7 "
+                         ]
     buttonhelp = ""
     if scalex2:
         sc = 1
@@ -1123,20 +1130,23 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                             colorgrid(colorfunction,cgolg,cgrid,0)
                             pixeldat = "(%d,%d)" % (x,y)
                 elif event.button.button ==  sdl2.SDL_BUTTON_RIGHT:          # info on button or selection<8 model - right mouse button (-click)
-                    print("right mouse button pressed")
+                    # print("right mouse button pressed")
                     if scalex2 or event.window.windowID == windowID2:
                         x = (int) (event.button.x//2)
                         y = (int) (event.button.y//2)
                     else:
                         x = event.button.x
                         y = event.button.y
-                    if y >= N:
-                        if selection < 8:   # info
+                    if selection<16:
+                        if y >= N:
                             k=x>>(log2N-6)
-                            if k<20:
-                                buttonhelp = buttonhelp0007[k]
+                            if selection < 8:
+                                if k<20:
+                                    buttonhelp = buttonhelp0007[k]
+                            elif selection < 16:
+                                if y >= N+8 and k<11:
+                                        buttonhelp = buttonhelp0815[k]
                     mouseclicked2 = True
-
             elif event.type==sdl2.SDL_MOUSEBUTTONUP:
                 mouseclicked = False
                 mouseclicked2 = False
@@ -1220,7 +1230,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                         else:
                             x = event.motion.x
                             y = event.motion.y
-                    if selection<8:
+                    if selection<16:
                         if scalex2 or event.window.windowID == windowID2:
                             x = (int) (event.motion.x//2)
                             y = (int) (event.motion.y//2)
@@ -1229,8 +1239,12 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                             y = event.motion.y
                         if y >= N:
                             k=x>>(log2N-6)
-                            if k<20:
-                                buttonhelp = buttonhelp0007[k]
+                            if selection < 8:
+                                if k<20:
+                                    buttonhelp = buttonhelp0007[k]
+                            elif selection < 16:
+                                if y >= N+8 and k<11:
+                                        buttonhelp = buttonhelp0815[k]
             elif event.type == sdl2.SDL_KEYDOWN:
                 # keystatus = sdl2.SDL_GetKeyboardState(None) # keystatus should also reveal if pressed if event structure doesn't work
                 # if keystatus[sdl2.SDL_SCANCODE_H]:
