@@ -1886,10 +1886,10 @@ extern inline void analyze_nbs(int ij, uint64_t gol[], int nnb[], uint64_t *nnb1
     i = ij & Nmask;  j = ij >> log2N;                                       // row & column
     jp1 = ((j+1) & Nmask)*N; jm1 = ((j-1) & Nmask)*N;                       // toroidal (j+1)*N and (j-1)*N
     ip1 =  (i+1) & Nmask; im1 =  (i-1) & Nmask;                             // toroidal i+1, i-1
-    nnb[0]=jm1+im1; nnb[1]=jm1+i; nnb[2]=jm1+ip1; nnb[3]=j*N+ip1;               // new order of nbs
+    nnb[0]=jm1+im1; nnb[1]=jm1+i; nnb[2]=jm1+ip1; nnb[3]=j*N+ip1;           // new order of nbs
     nnb[4]=jp1+ip1; nnb[5]=jp1+i; nnb[6]=jp1+im1; nnb[7]=j*N+im1;
-    for (s=0,nb1i=0ull,k=0;k<8;k++) {                           // packs non-zero nb indices in first up to 8*4 bits
-        gols=gol[nnb[k]];                                                    // whether neighbor is alive
+    for (s=0,nb1i=0ull,k=0;k<8;k++) {                                       // packs non-zero nb indices in first up to 8*4 bits
+        gols=gol[nnb[k]];                                                   // whether neighbor is alive
         s += gols;                                                          // s is number of live nbs
         nb1i = (nb1i << (gols<<2)) + (gols*k);                              // nb1i is packed list of live neighbour indices
     }
@@ -1897,17 +1897,19 @@ extern inline void analyze_nbs(int ij, uint64_t gol[], int nnb[], uint64_t *nnb1
     *ns = s;
 }
 //.......................................................................................................................................................
-extern inline uint64_t disambiguate(unsigned int *kchx, uint64_t nb1i, int nb[],  uint64_t gol[], uint64_t golg[], uint64_t golb[], int nsame, uint64_t *birth, uint64_t *parentid, uint64_t randnr, int ij) {
-    uint64_t gene,newgene;
-    int ijanc,newijanc;
-    unsigned int kch;
-    int k;
+extern inline uint64_t disambiguate(unsigned int *kchx, uint64_t nb1i, int nb[],  uint64_t gol[], uint64_t golg[], uint64_t golb[], int nsame, uint64_t *birth, uint64_t *parentid, int ij) {
+    uint64_t gene,newgene,randnr;
+    int k,ijanc,nnb[8],ns,discase,deathlikely;
+    unsigned int kch,kch1;
+    uint64_t nnb1i;
     
     kch = *kchx;
-    switch ((repscheme>>8)&0x7) {
-        case 0:  kch += ((nsame-1)&(randnr>>32))<< (nsame ==4 ? 1 : 2);                  // random choice
+    discase=(repscheme>>8)&0x7;
+    switch (discase) {
+        case 0:  RAND128P(randnr);                                                      // random choice
+                 kch += ((nsame-1)&(randnr>>32))<< (nsame ==4 ? 1 : 2);
                  kch &= 0x7;*kchx = kch;
-                 ijanc = nb[(nb1i>>(kch<<2))&0x7];
+                 ijanc = nb[kch];
                  *parentid = golb[ijanc];
                  return( golg[ijanc]);
         case 1:  ijanc = nb[kch];                                                        // ignore asymmetry issue, continue regardless;
@@ -1915,33 +1917,38 @@ extern inline uint64_t disambiguate(unsigned int *kchx, uint64_t nb1i, int nb[],
                  // if(*parentid == 0ull) fprintf(stderr,"error in disambiguate case 1: parentid set to golb[%d] which is 0 kch %d\n",ijanc,kch);
                  return( golg[ijanc]);
         case 2:  *birth = 0ull; return(0ull);                                            // abandom birth attempt
-        case 3:  *parentid = (((uint64_t) totsteps) <<32) + rootclone + ij;              // default ancestor for input genes
-                 // *kchx = kch;    no change, retains kch unaltered as in case 1
+        case 3:  *parentid = (((uint64_t) totsteps) <<32) + rootclone + ij;              // choose one GoL input gene, default ancestor for input genes
                  return(genegol[selection-8]);
-        case 4:  for (newgene=~0ull,newijanc=0,k=0;k<nsame;k++) {                        // choose minimum value gene
-                     kch+=k*(nsame==4 ? 2 : 4);
-                     kch &= 0x7; *kchx = kch;
-                     gene=golg[ijanc=nb[(nb1i>>(kch<<2))&0x7]];
-                     if (gene<newgene) {newgene = gene;newijanc=ijanc;}
+        case 4:  for (newgene=golg[nb[kch]],kch1=kch,k=1;k<nsame;k++) {                   // choose minimum value gene
+                     kch1+=k*(nsame==4 ? 2 : 4);kch1 &= 0x7;
+                     ijanc=nb[kch1];
+                     gene=golg[ijanc];
+                     if (gene<newgene) {newgene = gene;kch=kch1;}
                  };
-                 *parentid = golb[newijanc];
+                 *kchx = kch;
+                 ijanc=nb[kch];
+                 *parentid = golb[ijanc];
                  return(newgene);
-        case 5:  for (newgene=~0ull,ijanc=0,k=0;k<nsame;k++) {                           // choose AND of ambiguous alternative gene
-                     kch+=k*(nsame==4 ? 2 : 4);
-                     kch &= 0x7; *kchx = kch;
-                     newgene&=golg[ijanc=nb[(nb1i>>(kch<<2))&0x7]];
+        case 5:
+        case 6:  for (newgene=golg[nb[kch]],kch1=kch,k=0;k<nsame;k++) {                        // choose first gene which is likely to die
+                     kch1+=k*(nsame==4 ? 2 : 4);
+                     kch1 &= 0x7;
+                     ijanc=nb[kch1];
+                     analyze_nbs(ijanc, gol, nnb, &nnb1i, &ns);
+                     if(discase==5) deathlikely = ns<2 || ns>3;
+                     else           deathlikely = ns<2 || ns>3 || ((overwritemask>>(ns-1))&0x1ull);
+                     if(deathlikely) {                           // approx. substitute for death/overwrite calculation
+                        newgene = golg[ijanc];
+                        kch=kch1;
+                        break;
+                     }
                  };
-                 *parentid = golb[ijanc];                                                // there are more than one ancestors here: last one is chosen, others forgotten
-                 return(newgene);
-        case 6:  for (newgene=~0ull,newijanc=0,k=0;k<nsame;k++) {                        // choose minimum value gene
-                     kch+=k*(nsame==4 ? 2 : 4);
-                     kch &= 0x7; *kchx = kch;
-                     gene=golg[ijanc=nb[(nb1i>>(kch<<2))&0x7]];
-                     if (gene<newgene) {newgene = gene;newijanc=ijanc;}
-                 };
-                 *parentid = golb[newijanc];
+                 *kchx = kch;
+                 ijanc=nb[kch];
+                 *parentid = golb[ijanc];
                  return(newgene);
         case 7:  *parentid = (uint64_t) totsteps; *parentid = (*parentid <<32) + rootclone + ij;// default ancestor for input genes
+                 RAND128P(randnr);                                                      // random choice
                  // *kchx = kch;    no change, retains kch unaltered as in case 1
                  return(randnr);                                                         // choose random gene : should update randnr outside to ensure indept
         default: fprintf(stderr,"Error in switch of ambiguous rotation resolution, should never reach here\n");
@@ -3667,9 +3674,8 @@ extern inline void finish_update_ij(int ij,int s,uint64_t golij,uint64_t gols,ui
                 }
                 if(nbest>1 ) {
                     kch=selectdifft(nbest,nbmask,&crot,&kodd,&nsame);       // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
-                    RAND128P(randnr);                                       // used in special cases of disambiguate (0 random choice & 7 random gene) only
                     if(nsame) {
-                        newgene = disambiguate(&kch, nb1i, nb, gol, golg, golb, nsame, &birth, &parentid, randnr, ij); // restore symmetry via one of 8 repscheme options
+                        newgene = disambiguate(&kch, nb1i, nb, gol, golg, golb, nsame, &birth, &parentid, ij); // restore symmetry via one of 8 repscheme options
                         if(birth) statflag |= F_disambig;
                     }
                     else {
