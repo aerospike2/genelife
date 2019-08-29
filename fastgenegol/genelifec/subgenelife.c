@@ -111,10 +111,12 @@ int parentdies = 0;                 // model variant enhancing interpretation of
 #define R_0_survivalgene  0x1       /* 1: survival gene chosen from central existing gene 0: survival gene taken from neighbours as in birth */
 #define R_1_nb_OR_AND     0x2       /* 1: OR of neighbours determines genetic LUT in selection 8,10,12,14 0: AND of neighbours */
 #define R_2_canonical_nb  0x4       /* 1: choose live neighbour at zero bit in canonical rotation 0: choose most difft position */
-#define R_3_parentdies      0x8       /* 1: parent is forced to die on birth 0 not. Only used for selection 8-15 */
+#define R_3_parentdies    0x8       /* 1: parent is forced to die on birth 0 not. Only used for selection 8-15 */
 #define R_46_repselect    0x70      /* 0-7 choice of selection mechanism for LUT genes : 0: min 1: max 2: min 1s 3: max 1s 4: neutral 5: neutral difft 6,7: c-S-2B */
-#define R_7_random_resln  0x80      /* 1: random choice amongst selected live neighbours 0: deterministic choice based on gene content and position */
+#define R_47_repselect    0xf0      /* +8-15 choice of golr selection mechanism : 8: 9: 10: 11: 12: 13: 14: 15:  */
+#define R_11_golr_select  0x80      /* 1: choose 8-15 above 0: choose 0-7 above */
 #define R_810_disambig    0x700     /* 0-7 choice of different disambiguation mechanisms for symmetric canonical rotations */
+#define R_7_random_resln  0x800     /* 1: random choice amongst selected live neighbours 0: deterministic choice based on gene content and position */
 //----------------------------------------status flag bits for recording site status in golgstats array---------------------------------------------------
 const int F_s_live =      0x7ull;      // s value mod 8 (number of live neighbors) for selection 8-15  and separate bits below for selection 0 to 7
 const int F_1_live =      0x1ull;      // bit is bit0 of s for selection 8-15 or 1 if exactly 1 live neighbours for selection 0-7 : currently not set
@@ -807,7 +809,7 @@ void printxy (uint64_t gol[],uint64_t golg[]) {                         // print
     printf("\n");
 }
 //.......................................................................................................................................................
-void golr_digest (uint64_t golr, int *mismatches, int *period) {    // extract optimal period match: number of mismatches and period
+extern inline void golr_digest (uint64_t golr, unsigned int *mismatches, unsigned int *period) {    // extract optimal period match: number of mismatches and period
     uint64_t gdiff;
     int j,d,d0,d1,jper;
     
@@ -824,7 +826,7 @@ void golr_digest (uint64_t golr, int *mismatches, int *period) {    // extract o
         if(d>d1) d1=d;
     }
     
-    *mismatches = d0==d1 ? -1 : d0;                     // return -1 if min mismatches = max mismatches (constant signal), else min nr of mismatches
+    *mismatches = d0==d1 ? 65 : d0;                     // return 65 if min mismatches = max mismatches (constant signal), else min nr of mismatches
     *period = jper;
 }
 //.......................................................................................................................................................
@@ -1445,14 +1447,14 @@ extern inline void selectone_of_2(int s, uint64_t nb2i, int nb[], uint64_t golg[
     }
 }
 //.......................................................................................................................................................
-extern inline int selectone_of_s(unsigned int *kch, int s, uint64_t nb1i, int nb[], uint64_t golg[], uint64_t golb[], uint64_t *birth, uint64_t *newgene, uint64_t *parentid, uint64_t *nbmask, int ij) {
+extern inline int selectone_of_s(unsigned int *kch, int s, uint64_t nb1i, int nb[], uint64_t golg[], uint64_t golb[], uint64_t golr[], uint64_t *birth, uint64_t *newgene, uint64_t *parentid, uint64_t *nbmask, int ij) {
 // result is number of equally fit best neighbours that could be the ancestor (0 if no birth allowed, 1 if unique) and list of these neighbour indices
 // birth is returned 1 if ancestors satisfy selection condition. Selection of which of genes to copy is newgene. Non-random result.
     unsigned int k,nbest,ijanc[8],kchs[8];                // index for neighbours and number in best fitness category and ij, kch for up to 8 possible ancestors
-    unsigned int d[8],dS,dB,d0,d1,d2;                     // number of ones in various gene combinations
+    unsigned int d[8],p[8],dS,dB,d0,d1,d2;                     // number of ones in various gene combinations
     unsigned int scores[8];                               // cumulative scores for pairwise games of individual livegenes (used case repselect == 7)
     uint64_t livegenes[8],gdiff,extremval,bestnbmask,birthid;
-    unsigned int repselect = (repscheme>>4)&0x7;
+    unsigned int repselect = (repscheme & R_47_repselect)>>4; //
 
     birthid = (uint64_t) totsteps;
     birthid = (birthid << 32)+rootclone+ij;
@@ -1461,8 +1463,14 @@ extern inline int selectone_of_s(unsigned int *kch, int s, uint64_t nb1i, int nb
     for(k=0;k<s;k++) {
         kchs[k]=(nb1i>>(k<<2))&0x7;
         ijanc[k] = nb[kchs[k]];
-        livegenes[k] = golg[ijanc[k]];
-        POPCOUNT64C(livegenes[k],d[k]);
+        if(repselect<8) {
+            livegenes[k] = golg[ijanc[k]];
+            POPCOUNT64C(livegenes[k],d[k]);
+        }
+        else {
+            livegenes[k] = golr[ijanc[k]];
+            golr_digest (livegenes[k], d+k, p+k);
+        }
     }
 
     switch (repselect) {
@@ -1616,6 +1624,24 @@ extern inline int selectone_of_s(unsigned int *kch, int s, uint64_t nb1i, int nb
             *parentid=golb[ijanc[k&0x7]];
             *kch = kchs[k];
             //if(ij==IJDEBUG) fprintf(stderr,"DEBUG In selectone_of_s at totsteps=%d ij=%d s=%d nbest=%d extremval=%llx bestnbmask=%llx nb1i=%llx kch=%d\n",totsteps,ij,s,nbest,extremval,bestnbmask,nb1i,*kch);
+            break;
+        case 8:                                        // case 8-15 are intended for golr selection modes
+        case 9:
+        case 10:
+        case 11:
+        case 12:
+        case 13:
+        case 14:
+        case 15:
+            if(repselect&0x1) for(extremval= 0ull,k=0;k<s;k++) extremval = (p[k]>= extremval ? p[k] : extremval); // find value of fittest gene max period
+            else              for(extremval=~0ull,k=0;k<s;k++) extremval = (p[k]<= extremval ? p[k] : extremval); // find value of fittest gene min period
+            for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= (p[k]==extremval ? 1ull<<(k+0*nbest++) : 0ull); // find set of genes with equal best value
+            *birth = ((nbest>0) ? 1ull: 0ull);           // birth condition may include later that genes not all same
+            for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
+            if (k==s) {k=0;*birth = 0ull;}               // in case no genes with best value, no birth, avoid k being out of bounds below
+            *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
+            *parentid=golb[ijanc[k&0x7]];
+            *kch = kchs[k];
             break;
         default:
             fprintf(stderr,"Error: s = %d live gene repselect %d is not implemented\n",s,repselect);
@@ -3669,7 +3695,7 @@ extern inline void finish_update_ij(int ij,int s,uint64_t golij,uint64_t gols,ui
             }
             else {
                 if ((ancselectmask>>(s-1)) &0x1) {                          // use genes to select ancestor
-                    nbest=selectone_of_s(&kch,s,nb1i,nb,golg,golb,&birth,&newgene,&parentid,&nbmask,ij);// selection scheme depends on repscheme parameter, selection depends on genes
+                    nbest=selectone_of_s(&kch,s,nb1i,nb,golg,golb,golr,&birth,&newgene,&parentid,&nbmask,ij);// selection scheme depends on repscheme parameter, selection depends on genes
                     ancestor = newgene;
                     // if(ij==IJDEBUG) fprintf(stderr,"DEBUG Difference 1 at totsteps=%d ij=%d s=%d nbest=%d birth=%llx newgene=%llx nb1i=%llx kch=%d\n",totsteps,ij,s,nbest,birth,newgene,nb1i,kch);
                 }
