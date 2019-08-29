@@ -1005,7 +1005,12 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                                 draw_rect(surfacex1,cancol[1][k]*(1+((repscheme>>(k-24))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 genelife.set_repscheme(repscheme)
                         elif selection < 12:
-                            if k<54:
+                            if k<12 and y>=N+12:
+                                repscheme = repscheme ^ (1<<k)
+                                print(("step %d repscheme changed to %x" % (framenr,repscheme)))
+                                draw_rect(surfacex1,cancol[2][54+k]*(1+((repscheme>>k)&0x1)),[k<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
+                                genelife.set_repscheme(repscheme)
+                            elif k<54:
                                 if k<23:
                                     survivalmask = survivalmask ^ (1<<k)
                                     print(("step %d survivalmask changed to %x" % (framenr,survivalmask)))
@@ -1020,11 +1025,6 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                                     draw_rect(surfacex1,cancol[2][k]*(1+((overwritemask>>(k-46))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                                 surviveover[0],surviveover[1],surviveover[2]= survivalmask,birthmask,overwritemask
                                 genelife.set_surviveover64(surviveover)
-                            elif k<54+12:
-                                repscheme = repscheme ^ (1<<(k-54))
-                                print(("step %d repscheme changed to %x" % (framenr,repscheme)))
-                                draw_rect(surfacex1,cancol[1][k]*(1+((repscheme>>(k-54))&0x1)),[(k-54)<<(log2N-6),Height+8+3*sc,3*sc,3*sc])
-                                genelife.set_repscheme(repscheme)
                         elif selection<14:
                             if k<64 and y<N+12:
                                 if k<32:

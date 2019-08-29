@@ -1463,14 +1463,9 @@ extern inline int selectone_of_s(unsigned int *kch, int s, uint64_t nb1i, int nb
     for(k=0;k<s;k++) {
         kchs[k]=(nb1i>>(k<<2))&0x7;
         ijanc[k] = nb[kchs[k]];
-        if(repselect<8) {
-            livegenes[k] = golg[ijanc[k]];
-            POPCOUNT64C(livegenes[k],d[k]);
-        }
-        else {
-            livegenes[k] = golr[ijanc[k]];
-            golr_digest (livegenes[k], d+k, p+k);
-        }
+        livegenes[k] = golg[ijanc[k]];
+        if(repselect<8) {POPCOUNT64C(livegenes[k],d[k]);}
+        else golr_digest (golr[ijanc[k]], d+k, p+k);
     }
 
     switch (repselect) {
@@ -1627,15 +1622,25 @@ extern inline int selectone_of_s(unsigned int *kch, int s, uint64_t nb1i, int nb
             break;
         case 8:                                        // case 8-15 are intended for golr selection modes
         case 9:
+            if(repselect&0x1) for(extremval= 0ull,k=0;k<s;k++) extremval = (p[k]>= extremval ? p[k] : extremval); // find value of fittest gene max period
+            else              for(extremval=~0ull,k=0;k<s;k++) extremval = (p[k]<= extremval ? p[k] : extremval); // find value of fittest gene min period
+            for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= (p[k]==extremval ? 1ull<<(k+0*nbest++) : 0ull); // find set of genes with equal best value
+            *birth = ((nbest>0) ? 1ull: 0ull);           // birth condition may include later that genes not all same
+            for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
+            if (k==s) {k=0;*birth = 0ull;}               // in case no genes with best value, no birth, avoid k being out of bounds below
+            *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
+            *parentid=golb[ijanc[k&0x7]];
+            *kch = kchs[k];
+            break;
         case 10:
         case 11:
         case 12:
         case 13:
         case 14:
         case 15:
-            if(repselect&0x1) for(extremval= 0ull,k=0;k<s;k++) extremval = (p[k]>= extremval ? p[k] : extremval); // find value of fittest gene max period
-            else              for(extremval=~0ull,k=0;k<s;k++) extremval = (p[k]<= extremval ? p[k] : extremval); // find value of fittest gene min period
-            for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= (p[k]==extremval ? 1ull<<(k+0*nbest++) : 0ull); // find set of genes with equal best value
+            if(repselect&0x1) for(extremval= 0ull,k=0;k<s;k++) extremval = (d[k]>= extremval ? d[k] : extremval); // find value of fittest gene most aperiodic
+            else              for(extremval=~0ull,k=0;k<s;k++) extremval = (d[k]<= extremval ? d[k] : extremval); // find value of fittest gene precise period
+            for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= (d[k]==extremval ? 1ull<<(k+0*nbest++) : 0ull); // find set of genes with equal best value
             *birth = ((nbest>0) ? 1ull: 0ull);           // birth condition may include later that genes not all same
             for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
             if (k==s) {k=0;*birth = 0ull;}               // in case no genes with best value, no birth, avoid k being out of bounds below
