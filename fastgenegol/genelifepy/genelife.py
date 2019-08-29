@@ -1305,7 +1305,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                             print('step',framenr,'new genealogycoldepth =',genealogycoldepth)
                 elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_1:
                     update1=1-update1
-                    genelife.set_colorupdate(update1)
+                    genelife.set_colorupdate1(update1)
                     if update1: print('step',framenr,'first window updates turned on')
                     else:       print('step',framenr,'first window updates turned off')
                 elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_2:

@@ -182,8 +182,8 @@ libcd.set_info_transfer_h.restype = None
 libcd.set_info_transfer_h.argtypes = [c_int,c_int]
 libcd.set_activityfnlut.restype = None
 libcd.set_activityfnlut.argtypes = [c_int]
-libcd.set_colorupdate.restype = None
-libcd.set_colorupdate.argtypes = [c_int]
+libcd.set_colorupdate1.restype = None
+libcd.set_colorupdate1.argtypes = [c_int]
 libcd.set_colorfunction2.restype = None
 libcd.set_colorfunction2.argtypes = [c_int]
 
@@ -373,8 +373,8 @@ def set_info_transfer_h(do_info_transfer,nbhood):
 def set_activityfnlut(activityfnlut):
     return libcd.set_activityfnlut(activityfnlut)
 
-def set_colorupdate(update1):
-    return libcd.set_colorupdate(update1)
+def set_colorupdate1(update1):
+    return libcd.set_colorupdate1(update1)
 
 def set_colorfunction2(colorfunction2):
     return libcd.set_colorfunction2(colorfunction2)
