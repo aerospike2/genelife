@@ -456,9 +456,8 @@ def display_init2():
     if (Height <= 512 and rescale):            # Not yet ported well to SDL2
         scalex2 = True
         
-        window2x1 = sdl2.ext.Window(caption2,(Width, Height+16),(0,0),sdl2.SDL_WINDOW_HIDDEN)                   # opens sdl2 window x1 not displayed
-        window2 = sdl2.ext.Window(caption2,(2*Width, 2*(Height+16)),(500,620),
-                                          sdl2.SDL_WINDOW_SHOWN|sdl2.SDL_WINDOW_INPUT_FOCUS|sdl2.SDL_WINDOW_MOUSE_FOCUS)     # opens sdl2 window x2
+        window2x1 = sdl2.ext.Window(caption2,(Width, Height+16),(0,0),sdl2.SDL_WINDOW_HIDDEN)                   # opens sdl2 window x1 never displayed
+        window2 = sdl2.ext.Window(caption2,(2*Width, 2*(Height+16)),(500,620),sdl2.SDL_WINDOW_HIDDEN)           # opens sdl2 window 2, initially not displayed
         surface2x1 = sdl2.ext.Window.get_surface(window2x1)
         surface2 = surface2x2 = sdl2.ext.Window.get_surface(window2)
         sdl2.SDL_SetSurfaceBlendMode(surface2x1 , sdl2.SDL_BLENDMODE_NONE);
@@ -483,7 +482,7 @@ def display_init2():
     sdl2.ext.Window.refresh(window2)
 #-----------------------------------------------------------------------------------------------------------
 
-def display_init2F():
+def display_init2F():           # window with rendering e.g. for text, currently no longer used
     global Width,Height,cnt
     global window2,windowID2,surface2,cgrid2,caption2,dispinit2,renderer2,sdlrenderer2,factory2,font2,textColor2,grect,image2,message2
     
@@ -936,11 +935,13 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
 
     gcolor=0
     
-    #sdl2.SDL_RestoreWindow(window.window)
-    #sdl2.SDL_RestoreWindow(window2.window)
-    #sdl2.SDL_RaiseWindow(window2.window)
-    #sdl2.SDL_RaiseWindow(window.window)
-
+    sdl2.SDL_ShowWindow(window.window)
+    sdl2.SDL_RaiseWindow(window.window)
+    if colorfunction2 != -1:
+        sdl2.SDL_ShowWindow(window2.window)
+        sdl2.SDL_RaiseWindow(window2.window)
+    else:
+        sdl2.SDL_HideWindow(window2.window)
     event = sdl2.SDL_Event()
     while (gogo):
         for event in sdl2.ext.get_events():
@@ -948,15 +949,11 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
             if event.type == sdl2.SDL_QUIT:
                 mouseclicked = False
                 gogo = False
-                #sdl2.SDL_HideWindow(window.window)
-               # sdl2.SDL_HideWindow(window2.window)
                 # sdl2.ext.quit()                  # check that quitting SDL here is OK
             if event.type == sdl2.SDL_MOUSEBUTTONDOWN and update1:
                 if   (sdl2.SDL_GetModState() & sdl2.KMOD_ALT) | (event.button.button == sdl2.SDL_BUTTON_MIDDLE): # quit event loop on middle mouse button (option-click)
                     mouseclicked = False
                     gogo = False
-                    #sdl2.SDL_MinimizeWindow(window.window)
-                    #sdl2.SDL_MinimizeWindow(window2.window)
                     # sdl2.ext.quit()              # check that quitting SDL here is OK
                 elif event.button.button == sdl2.SDL_BUTTON_LEFT:          # get mouse coords on mouse event
                     mouseclicked = True
@@ -1499,6 +1496,10 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                     sdl2.SDL_RenderPresent( renderer2 )
                     """
                 else:
+                    winflags = sdl2.SDL_GetWindowFlags(window2.window)
+                    if winflags & sdl2.SDL_WINDOW_HIDDEN:
+                        sdl2.SDL_ShowWindow(window2.window)
+                        sdl2.SDL_RaiseWindow(window2.window)
                     set_caption(window2, caption2)
                     if scalex2:
                         if sdl2.SDL_BlitScaled(surface2x1,None,surface2x2,None):
@@ -1507,9 +1508,14 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
             else:
                 set_caption(window2, caption2)
                 if colorfunction2 == -1:
-                    if sdl2.SDL_BlitScaled(surfacex1,None,surface2,None):
-                        print("error",sdl2.SDL_GetError(),"executing BlitScaled at step",framenr)
+                    sdl2.SDL_HideWindow(window2.window)
+                    # if sdl2.SDL_BlitScaled(surfacex1,None,surface2,None):
+                    #    print("error",sdl2.SDL_GetError(),"executing BlitScaled at step",framenr)
                 else:
+                    winflags = sdl2.SDL_GetWindowFlags(window2.window)
+                    if winflags & sdl2.SDL_WINDOW_HIDDEN:
+                        sdl2.SDL_ShowWindow(window2.window)
+                        sdl2.SDL_RaiseWindow(window2.window)
                     if sdl2.SDL_BlitScaled(surfacex1,grect1,surface2x1,grect1): print("BlitScaled failed")
                     if scalex2:
                         if sdl2.SDL_BlitScaled(surface2x1,None,surface2,None):
