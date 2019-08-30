@@ -4609,6 +4609,8 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     char *golgin;
 
     // testmacros(); // test macros used to accelerate processing
+    if(nsimparams>5)
+        ranseed = simparams[5];
     srand(ranseed); // Range: rand returns numbers in the range of [0, RAND_MAX ), and RAND_MAX is specified with a minimum value of 32,767. i.e. 15 bit
     randstate[0] = rand();randstate[1] = rand();
     cnt = 0;
@@ -4650,7 +4652,6 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     else if (selection<10) codingmask = (1ull<<ncoding)-1ull;                    // coding mask used to encode number of bits per LUT (1-4)
     
     startgenechoice = simparams[4];
-    if(nsimparams > 5) ranseed = simparams[5];
 
     fprintf(stderr,"___________________________________________________________________________________________\n");
     fprintf(stderr,"_________________________________ genelife simulation _____________________________________\n");
