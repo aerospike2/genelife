@@ -5005,6 +5005,63 @@ void set_colorupdate(int update1) {
     colorupdate1 = update1;
 }
 //------------------------------------------------------------------- get ... ---------------------------------------------------------------------------
+// compare with colorfunction==12 code above
+int get_glider_count(){
+    int ij,rtn=0,d0,d1,d,inc,jper,j;
+    uint64_t gdiff, gene;
+    short unsigned int dscale[16] = {0xff,0xcf,0x7f,0x4f,0x2f,0x27,0x1f,0x1d,0x1b,0x19,0x17,0x15,0x14,0x13,0x12,0x11};
+    for (ij=0; ij<N2; ij++) {
+        if (gol[ij] && (diagnostics & diag_hash_genes)) {
+            gdiff = gene = golr[ij];                            // variable gene holds dynamical record stored in golr
+            d0 = 64; d1 = 0;                                    // min,max number of mismatches over 15 rotations
+            jper = 0;
+            for (j=0;j<15;j++) {
+                gdiff = (gdiff>>4)|((gdiff&0xfull)<<60);        // rotate record cyclically by one time step
+                POPCOUNT64C((gene^gdiff),d);                    // number of difference positions between gene and gdiff
+                if(d<d0) {
+                    d0=d;
+                    jper = j;
+                }
+                if(d>d1) d1=d;
+            }
+            // if (d0 > 15) mask = 0x080808ffull;    // dark grey color for no significant periodic match found 
+            if (d0 > 15) inc = 0;    // 0 contribution for no significant periodic match found (large mismatch)
+            else {
+                /**********
+                mask = 0xffull;
+                if ((d0==d1) && (~gene&0x8) && (~gdiff&0x8)) {
+                    mask |= 0x3f<<8;
+                }
+                else {          // set RGB of mask
+                    mask |= (jper*(15-d0))<<24;
+                    mask |= ((15-jper)*(15-d0))<<16;
+                    mask |= dscale[d0]<<8;
+                }
+                *********/
+                inc = jper*(15-d0);
+                inc += (15-jper)*(15-d0);
+                inc += dscale[d0];
+            }
+        }
+        else
+            inc = 0;
+        rtn += inc;
+    }
+    return(rtn);
+}
+    
+void  get_shist(int outshist[]){
+    int ij,idx;
+    for(ij=0; ij<N2; ij++){
+        idx = golgstats[ij] & F_s_live;
+        if(idx>8){
+            fprintf(stderr,"bad S value from golstats.\n");
+            break;
+        }
+        outshist[idx]++;
+    }
+}
+
 int get_log2N() {
     return(log2N);
 }
@@ -6431,3 +6488,4 @@ void get_gliderinfo(uint64_t outgliderinfo[], int narraysize){               // 
 }
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------
+

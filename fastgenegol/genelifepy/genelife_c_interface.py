@@ -134,6 +134,8 @@ libcd.get_genes.restype = c_int
 libcd.get_genes.argtypes = [gene_array, c_int]
 libcd.get_genealogies.restype = c_int
 libcd.get_genealogies.argtypes = [gene_array,c_int]
+libcd.get_shist.restype = None
+libcd.get_shist.argtypes = [int_array]
 libcd.colorgenes1.restype = None
 libcd.colorgenes1.argtypes = [uint64_array, uint64_array, uint64_array, uint64_array, int_array, c_int, c_int, c_int]
 libcd.colorgenes.restype = None
@@ -293,10 +295,16 @@ def get_genes(genelist):
     return libcd.get_genes(genelist, int(len(genelist)))
 
 def get_stash():
-    return libcd.get_stash();
+    return libcd.get_stash()
 
 def get_nlive():
-    return libcd.get_nlive();
+    return libcd.get_nlive()
+
+def get_shist(shist):
+    return libcd.get_shist(shist)
+
+def get_glider_count():
+    return libcd.get_glider_count()
 
 def colorgenes1(gol, golg, golb, golgstats, cgolg, colorfunction, winnr):
     return libcd.colorgenes1( gol, golg, golb, golgstats, cgolg, len(gol), colorfunction, winnr)
