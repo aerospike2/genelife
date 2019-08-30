@@ -51,7 +51,10 @@ smallpatt_array = npct.ndpointer(dtype=smallpattdtype, ndim=1, flags=['CONTIGUOU
 try:
     libcd = npct.load_library("libgenelife", ".")
 except:
-    libcd = npct.load_library("libgenelife", "..")
+    try:
+        libcd = npct.load_library("libgenelife", "..")
+    except:
+        libcd = npct.load_library("libgenelife", "../..")
 
 
 
