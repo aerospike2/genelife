@@ -4649,19 +4649,6 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     uint64_t startgenes[16];
     char *golgin;
 
-    // testmacros(); // test macros used to accelerate processing
-    srand(ranseed); // Range: rand returns numbers in the range of [0, RAND_MAX ), and RAND_MAX is specified with a minimum value of 32,767. i.e. 15 bit
-    randstate[0] = rand();randstate[1] = rand();
-    cnt = 0;
-    totsteps = 0;
-    totdisp = 0;
-    statcnts = 0;
-    quadrants = -1;
-    rbackground = 0;
-    quadcollisions = 0;
-
-    // writeFile("genepat.dat");          // can be used to initialize formatted template for gene input of 32x32 array
-
     rulemod = runparams[0];
     repscheme = runparams[1];
     selection = runparams[2];
@@ -4673,16 +4660,12 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     ancselectmask=runparams[8];
     colorfunction2 = runparams[9];
 
-    randominflux = 0;
-    vscrolling = last_scrolled = 0;
-    quadrants = -1;
-
-    pmutmask = (unsigned int) simparams[0];                                 // low values of pmutmask <32 are interpreted as -nlog2pmut
+    pmutmask = (unsigned int) simparams[0];                                      // low values of pmutmask <32 are interpreted as -nlog2pmut
     if(pmutmask<32) pmutmask = (0x1 << (32-pmutmask)) - 0x1ull;                  // NB if pmut==0, pmutmask==zero, no mutation.
     initial1density = simparams[1];
     initialrdensity = simparams[2];
     
-    ncodingin = simparams[3];                                               // used in selection  4,5,6,8,
+    ncodingin = simparams[3];                                                    // used in selection  4,5,6,8,
     ncoding = ncodingin & 0xff;
     ncoding2 = (ncodingin>>8) & 0xff;
     if (ncoding > 64) { fprintf(stderr,"value %d of ncoding is out of range\n",ncoding);ncoding = 64;}
@@ -4692,6 +4675,24 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     
     startgenechoice = simparams[4];
     if(nsimparams > 5) ranseed = simparams[5];
+    
+    srand(ranseed); // Range: rand returns numbers in the range of [0, RAND_MAX ), and RAND_MAX is specified with a minimum value of 32,767. i.e. 15 bit
+    randstate[0] = rand();randstate[1] = rand();                                 // state vector for dedicated 64-bit random number generator macro RAND128P
+    cnt = 0;
+    totsteps = 0;
+    totdisp = 0;
+    statcnts = 0;
+    quadrants = -1;
+    rbackground = 0;
+    quadcollisions = 0;
+    randominflux = 0;
+    vscrolling = last_scrolled = 0;
+    quadrants = -1;
+    gene0=0ull;                                                                 // normally default gene is 0ull : unused when gol state not live
+    nstartgenes = 8;
+    
+    // testmacros();                                                             // test macros used to accelerate processing
+    // writeFile("genepat.dat");                                                 // can be used to initialize formatted template for gene input of 32x32 array
 
     fprintf(stderr,"___________________________________________________________________________________________\n");
     fprintf(stderr,"_________________________________ genelife simulation _____________________________________\n");
@@ -4700,10 +4701,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     fprintf(stderr,"simparams %d %d %d %d %d %d\n",simparams[0],simparams[1],simparams[2],simparams[3],simparams[4],ranseed);
     fprintf(stderr,"pmutmask %x (NB 0 means no mutation)\n",pmutmask);
 
-    gene0=0ull;                                                                 // normally default gene is 0ull : unused when gol state not live
-    nstartgenes = 8;
-
-    switch (selection) {
+    switch (selection) {                                                         // initialize starting genes depending on selection model, encoding and symmetry
         case 0:  for (k=0;k<4;k++) { startgenes[k] = 0xf0f0f0f0f0f0f0f0; startgenes[k+4] = 0x0f0f0f0f0f0f0f0f;} break;
         case 1:  for (k=0;k<8;k++)   startgenes[k] = ((0x1ull<<k*3)-1ull)<<20;break;
         case 2:  for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | 0x606ull;break; // to DEBUG 2-8 difference otehrwise same as case 3:
