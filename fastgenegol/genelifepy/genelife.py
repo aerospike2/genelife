@@ -1619,7 +1619,7 @@ def parhelp():
     print("right mouse ","choose single plane for GoL display in colorfunction 2 for selection 16-19")
     print("<- , ->     ","decrement or increment the colorfunction analysis type mod 12")
     print("Down , Up   ","decrement or increment the colorfunction2 analysis type mod 12 : -1 for same as colorfunction")
-    print("2           ","toggle second window updates off/on")
+    print("1, 2        ","toggle first or second window updates off/on")
     print("b , B       ","decrement or increment the half block for trace display: in range -1,0 to nNhist*2-2=38")
     print("f           ","print frame rate in fps (average of last 10 frames NYI")
     print("F           ","toggle to fullscreen NYI")

@@ -243,6 +243,7 @@ int randominflux=0;                 // 1,2 steady or intermittent random input o
 int rbackground=0;                  // integer background rate of random gene input per frame per site : rate is rbackground/32768 (nonzero overides influx)
                                     // the gene input depends on randominflux value: 2 GoL 1 random
 int vscrolling=0;                   // whether to do vertical scrolling to track upwards growth (losing all states that fall off downward cliff)
+int vscrolly=0;                     // cumulative extent of scrolling (mod N) : to allow clone birthids to be parsed correctly
 int last_scrolled = 0;              // whether vscrolling applied on last time step (needed for correct glider detection)
 int ymax = 2000;                    // gene activity scale max for plotting : will be adjusted dynamically or by keys
 int ymaxq = 2000;                   // quad pattern activity scale max for plotting : will be adjusted dynamically or by keys
@@ -415,11 +416,19 @@ const uint64_t m1  = 0x5555555555555555; //binary: 0101...           Constants f
 const uint64_t m2  = 0x3333333333333333; //binary: 00110011..
 const uint64_t m4  = 0x0f0f0f0f0f0f0f0f; //binary:  4 zeros,  4 ones ...
 const uint64_t h01 = 0x0101010101010101; //the sum of 256 to the power of 0,1,2,3...
+const uint64_t m10 = 0x1111111111111111; //binary: 00010001...       Additional constant for 4-bit byte distance macro POP4COUNT64C
 #define POPCOUNT64C(x, val) {                  /* Wikipedia "Hamming Weight" popcount4c alg */  \
     uint64_t xxxx;                             /* define copy of x argument so that we do not change it */ \
     xxxx = x;                                  /* copy x argument */ \
     xxxx -= (xxxx >> 1) & m1;                  /* put count of each 2 bits into those 2 bits */ \
     xxxx = (xxxx & m2) + ((xxxx >> 2) & m2);   /* put count of each 4 bits into those 4 bits */ \
+    xxxx = (xxxx + (xxxx >> 4)) & m4;          /* put count of each 8 bits into those 8 bits */ \
+    val = (xxxx * h01) >> 56;}                 /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
+#define POP4COUNT64C(x, val) {                 /* Count number of 4-bit bytes which are non zero */  \
+    uint64_t xxxx;                             /* define copy of x argument so that we do not change it */ \
+    xxxx = x;                                  /* copy x argument */ \
+    xxxx = (xxxx | (xxxx >> 1)) & m1;          /* put or of each 2 bits into right bit of pair */ \
+    xxxx = (xxxx | (xxxx >> 2)) & m10;         /* put or of each quartet bits into right bit of quartet */ \
     xxxx = (xxxx + (xxxx >> 4)) & m4;          /* put count of each 8 bits into those 8 bits */ \
     val = (xxxx * h01) >> 56;}                 /* left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... */
 //.......................................................................................................................................................
@@ -809,31 +818,49 @@ void printxy (uint64_t gol[],uint64_t golg[]) {                         // print
     printf("\n");
 }
 //.......................................................................................................................................................
-extern inline void golr_digest (uint64_t golr, unsigned int *mismatches, unsigned int *period) {    // extract optimal period match: number of mismatches and period
+extern inline void golr_digest (uint64_t golr, unsigned int *mismatchmin, unsigned int *mismatchmax, unsigned int *period, int *pershx, int *pershy) {
+                                                        // extract optimal period match: min, max numbers of mismatches,period and x,y offsets for opt. match period
     uint64_t gdiff;
-    int j,d,d0,d1,jper;
+    int j,k,d,d0,d1,dx,dy;
+    unsigned int jper;
+    int nbx[8] = {-1,0,1,1,1,0,-1,-1};
+    int nby[8] = {-1,-1,-1,0,1,1,1,0};
+
     
     gdiff = golr;                                       // variable golr holds dynamical record
-    d0 = 64; d1 = 0;                                    // min,max number of mismatches
+    d0 = 16; d1 = 0;                                    // min,max number of mismatches
+
     jper = 0;
     for (j=0;j<15;j++) {
         gdiff = (gdiff>>4)|((gdiff&0xfull)<<60);        // rotate record cyclically by one time step
-        POPCOUNT64C((golr^gdiff),d);                    // number of difference positions between gene and gdiff
+        POP4COUNT64C((golr^gdiff),d);                    // number of difference positions between gene and gdiff
         if(d<d0) {
             d0=d;
             jper = j;
         }
         if(d>d1) d1=d;
     }
-    
-    *mismatches = d0==d1 ? 65 : d0;                     // return 65 if min mismatches = max mismatches (constant signal), else min nr of mismatches
+    *mismatchmin = d0;
+    *mismatchmax = d1;
     *period = jper;
+    
+    dx = dy = 0;
+    for (j=0;j<=jper;j++) {
+        gdiff = (golr>>(j<<2))&0xfull;
+        if(gdiff&0x8ull) {
+            k = ((unsigned int) gdiff) & 0x7;
+            dx += nbx[k];
+            dy += nby[k];
+        }
+    }
+    *pershx = dx;
+    *pershy = dy;
 }
 //.......................................................................................................................................................
 void colorgenes1(uint64_t gol[], uint64_t golg[], uint64_t golb[], uint64_t golgstats[], int cgolg[], int NN2, int colorfunction, int winnr) {
     uint64_t gene, gdiff, g2c, mask, quad, clone;
-    int ij,k,j,jper,nbeven,activity,popcount,labelxy;
-    unsigned int d,d0,d1,d2;
+    int ij,k,j,nbeven,activity,popcount,labelxy;
+    unsigned int d,d0,d1,d2,jper;
     unsigned int color[3],colormax;
     double rescalecolor;
     uint64_t * traceptr;
@@ -1299,30 +1326,24 @@ void colorgenes1(uint64_t gol[], uint64_t golg[], uint64_t golb[], uint64_t golg
     }
     else if(colorfunction==12){                                     // colouring based on periodicity of dynamic record of 16 last states in golr for live genes
         short unsigned int dscale[16] = {0xff,0xcf,0x7f,0x4f,0x2f,0x27,0x1f,0x1d,0x1b,0x19,0x17,0x15,0x14,0x13,0x12,0x11};
+        int dx,dy;
         for (ij=0; ij<N2; ij++) {
             if (gol[ij] && (diagnostics & diag_hash_genes)) {
                 gdiff = gene = golr[ij];                            // variable gene holds dynamical record stored in golr
-                d0 = 64; d1 = 0;                                    // min,max number of mismatches
-                jper = 0;
-                for (j=0;j<15;j++) {
-                    gdiff = (gdiff>>4)|((gdiff&0xfull)<<60);        // rotate record cyclically by one time step
-                    POPCOUNT64C((gene^gdiff),d);                    // number of difference positions between gene and gdiff
-                    if(d<d0) {
-                        d0=d;
-                        jper = j;
-                    }
-                    if(d>d1) d1=d;
-                }
-                if (d0 > 15) mask = 0x080808ffull;    // dark grey color for no significant periodic match found
+                golr_digest (gene, &d0, &d1, &jper, &dx, &dy);
+                if (d0 > 7) mask = 0x080808ffull;                   // dark grey color for no significant periodic match found
                 else {
                     mask = 0xffull;
-                    if ((d0==d1) && (~gene&0x8) && (~gdiff&0x8)) {
+                    if ((d0==d1) && (~gene&0x8ull)) {               // survival with constant mismatch: ie static pattern : colour dark red
                         mask |= 0x3f<<8;
                     }
+                    else if (dx==0 && dy ==0) {
+                        mask |= 0x7f<<8;                            // stationary pattern: slightly less dark red
+                    }
                     else {
-                        mask |= (jper*(15-d0))<<24;
-                        mask |= ((15-jper)*(15-d0))<<16;
-                        mask |= dscale[d0]<<8;
+                        mask |= (jper*(8-d0))<<25;
+                        mask |= ((15-jper)*(8-d0))<<17;
+                        mask |= dscale[(d0<<1)+1]<<8;
                     }
                 }
                 cgolg[ij] = (int) mask;
@@ -1330,7 +1351,7 @@ void colorgenes1(uint64_t gol[], uint64_t golg[], uint64_t golb[], uint64_t golg
             else cgolg[ij] = 0;
         }
     }
-    for (ij=0; ij<N2; ij++) {                 // convert BGRA format (pygame) to ARGB (PySDL2)
+    for (ij=0; ij<N2; ij++) {                                       // convert BGRA format (pygame) to ARGB (PySDL2)
         uint32_t c = cgolg[ij];
         cgolg[ij]=((c&0xff)<<24) | ((c&0xff00)<<8) | ((c&0xff0000)>>8) | ((c&0xff000000)>>24);
     }
@@ -1451,7 +1472,8 @@ extern inline int selectone_of_s(unsigned int *kch, int s, uint64_t nb1i, int nb
 // result is number of equally fit best neighbours that could be the ancestor (0 if no birth allowed, 1 if unique) and list of these neighbour indices
 // birth is returned 1 if ancestors satisfy selection condition. Selection of which of genes to copy is newgene. Non-random result.
     unsigned int k,nbest,ijanc[8],kchs[8];                // index for neighbours and number in best fitness category and ij, kch for up to 8 possible ancestors
-    unsigned int d[8],p[8],dS,dB,d0,d1,d2;                     // number of ones in various gene combinations
+    unsigned int d[8],dmax[8],p[8],dS,dB,d0,d1,d2;         // d number of ones or mismatches, dmx max mismatches,p period, + other variables
+    int psx[8],psy[8];                                    // periodic shift in x and y for optimal period of recorded displacements
     unsigned int scores[8];                               // cumulative scores for pairwise games of individual livegenes (used case repselect == 7)
     uint64_t livegenes[8],gdiff,extremval,bestnbmask,birthid;
     unsigned int repselect = (repscheme & R_47_repselect)>>4; //
@@ -1465,7 +1487,7 @@ extern inline int selectone_of_s(unsigned int *kch, int s, uint64_t nb1i, int nb
         ijanc[k] = nb[kchs[k]];
         livegenes[k] = golg[ijanc[k]];
         if(repselect<8) {POPCOUNT64C(livegenes[k],d[k]);}
-        else golr_digest (golr[ijanc[k]], d+k, p+k);
+        else golr_digest (golr[ijanc[k]], d+k, dmax+k, p+k, psx+k, psy+k);
     }
 
     switch (repselect) {
@@ -3205,7 +3227,7 @@ short unsigned int extract_components(uint64_t gol[]) {
     return nlabel;
 }
 //----------------------------------------------------------------- geography ---------------------------------------------------------------------------
-void v_scroll(uint64_t newgol[],uint64_t newgolg[],uint64_t newgolb[]) {
+void v_scroll(uint64_t newgol[],uint64_t newgolg[],uint64_t newgolb[],uint64_t newgolr[]) {
     int ij,scroll_needed;
 
     scroll_needed = 0;
@@ -3224,6 +3246,7 @@ void v_scroll(uint64_t newgol[],uint64_t newgolg[],uint64_t newgolb[]) {
                 hashdeletegene(newgolg[ij],newgolb[ij],"error in v_scroll hashdeletegene call for step %d with gene %llx\n");
             newgolg[ij]=gene0;
             newgolb[ij]=0ull;
+            newgolr[ij]=0ull;
         }
     }
 
@@ -3233,6 +3256,7 @@ void v_scroll(uint64_t newgol[],uint64_t newgolg[],uint64_t newgolb[]) {
         newgol[ij]=newgol[ij+N];
         newgolg[ij]=newgolg[ij+N];
         newgolb[ij]=newgolb[ij+N];
+        newgolr[ij]=newgolr[ij+N];
     }
     for (ij=0;ij<N;ij++) {                                  // delete all states and genes in new bottom buffer row
         if(newgol[ij]) {
@@ -3241,6 +3265,7 @@ void v_scroll(uint64_t newgol[],uint64_t newgolg[],uint64_t newgolb[]) {
                 hashdeletegene(newgolg[ij],newgolb[ij],"error in v_scroll hashdeletegene call for step %d with gene %llx\n");
             newgolg[ij]=gene0;
             newgolb[ij]=0ull;
+            newgolr[ij]=0ull;
         }
     }
     for (ij=N2-N;ij<N2;ij++) {                              // clear top row
@@ -3250,11 +3275,12 @@ void v_scroll(uint64_t newgol[],uint64_t newgolg[],uint64_t newgolb[]) {
                 hashdeletegene(newgolg[ij],newgolb[ij],"error in v_scroll hashdeletegene call for step %d with gene %llx\n");
             newgolg[ij]=gene0;
             newgolb[ij]=0ull;
+            newgolr[ij]=0ull;
         }
     }
 }
 //.......................................................................................................................................................
-void random_influx(uint64_t gol[],uint64_t golg[],uint64_t golb[],uint64_t newgol[],uint64_t newgolg[],uint64_t newgolb[]) {
+void random_influx(uint64_t newgol[],uint64_t newgolg[],uint64_t newgolb[],uint64_t newgolr[]) {
     int Nf,i,j,ij,i0,j0,i1,j1,d;
     uint64_t randnr,mask,parentid;
     static unsigned int rmask = (1 << 15) - 1;
@@ -3271,6 +3297,7 @@ void random_influx(uint64_t gol[],uint64_t golg[],uint64_t golb[],uint64_t newgo
                             RAND128P(randnr);
                             newgolg[ij] = randnr;
                             if(diagnostics & diag_hash_genes) hashaddgene(ij,newgolg[ij],rootgene,newgolb+ij,(parentid+rootclone+ij),0x1ull);
+                            newgolr[ij]=0ull;
                         }
                     }
                 }
@@ -3282,6 +3309,7 @@ void random_influx(uint64_t gol[],uint64_t golg[],uint64_t golb[],uint64_t newgo
                             newgol[ij] = 1ull;
                             newgolg[ij] = genegol[selection-8]; // GoL gene for particular selection model coding
                             if(diagnostics & diag_hash_genes) hashaddgene(ij,newgolg[ij],rootgene,newgolb+ij,(parentid+rootclone+ij),0x1ull);
+                            newgolr[ij]=0ull;
                         }
                     }
                 }
@@ -3295,6 +3323,7 @@ void random_influx(uint64_t gol[],uint64_t golg[],uint64_t golb[],uint64_t newgo
                         if(diagnostics & diag_hash_genes) hashdeletegene(newgolg[ij],newgolb[ij],"error in randominflux=3 hashdeletegene call for step %d with gene %llx\n");
                         newgolg[ij]=gene0;
                         newgolb[ij]=0ull;
+                        newgolr[ij]=0ull;
                     }
                 }
             }
@@ -3313,7 +3342,7 @@ void random_influx(uint64_t gol[],uint64_t golg[],uint64_t golb[],uint64_t newgo
                         nb[0]=jm1+im1; nb[1]=jm1+i; nb[2]=jm1+ip1; nb[3]=j*N+ip1;                  // new order of nbs
                         nb[4]=jp1+ip1; nb[5]=jp1+i; nb[6]=jp1+im1; nb[7]=j*N+im1;
                         for (s=se=0,nb1i=0ull,k=0;k<8;k++) {                                       // packs non-zero nb indices in first up to 8*4 bits
-                            gols=gol[nb[k]];                                                       // whether neighbor is alive
+                            gols=newgol[nb[k]];                                                    // whether neighbor is alive
                             s += gols;                                                             // s is number of live nbs
                             se += k&0x1&gols;                                                      // se is number of edge-centred live neighbours (odd k)
                             nb1i = (nb1i << (gols<<2)) + (gols*k);                                 // nb1i is packed list of live neighbour indices
@@ -3324,6 +3353,7 @@ void random_influx(uint64_t gol[],uint64_t golg[],uint64_t golb[],uint64_t newgo
                             if(diagnostics & diag_hash_genes) hashdeletegene(newgolg[ij],newgolb[ij],"error in randominflux=4 hashdeletegene call for step %d with gene %llx\n");
                             newgolg[ij]=gene0;
                             newgolb[ij]=0ull;
+                            newgolr[ij]=0ull;
                         }
                     }
                 }
@@ -3625,7 +3655,7 @@ void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t g
                     newgol[ij]  = 0ull;                                     // new game of life cell value dead
                     newgolg[ij] = 0ull;                                     // gene dies or stays dead
                     newgolb[ij] = 0ull;                                     // clone removed from site
-                    newgolr[ij] = 0ull;
+                    newgolr[ij] = 0ull;                                     // displacement history erased on death
                     if(gol[ij]) statflag |= F_death;
                 }
             } // end no birth
@@ -3668,8 +3698,8 @@ void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t g
         }
     }
 
-    if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);
-    if(vscrolling) v_scroll(newgol,newgolg,newgolb);
+    if(randominflux) random_influx(newgol,newgolg,newgolb,newgolr);
+    if(vscrolling) v_scroll(newgol,newgolg,newgolb,newgolr);
     if ((colorfunction == 8) || (colorfunction2 == 8)) packandcompare(newgol,working,golmix);
     if(diagnostics & diag_component_labels) ncomponents=extract_components(newgol);
 
@@ -3742,7 +3772,7 @@ extern inline void finish_update_ij(int ij,int s,uint64_t golij,uint64_t gols,ui
                     }                }
                 newgol[ij]  =  1ull;                                        // new game of life cell value: alive
                 newgolg[ij] =  newgene;                                     // if birth then newgene
-                newgolr[ij] = (golr[nb[kch]]<<4) | kch | 0x8;               // register ancestor offset index in record_of_dynamics_gene golr along with 0x8 for birth event
+                newgolr[ij] = (golr[nb[kch]]<<4) | kch | 0x8ull;            // register ancestor offset index in record_of_dynamics_gene golr along with 0x8 for birth event
                 if(diagnostics & diag_hash_genes) {
                     if(golij) hashdeletegene(golg[ij],golb[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n");
                     hashaddgene(ij,newgene,ancestor,newgolb+ij,parentid,statflag & F_mutation);
@@ -3819,8 +3849,8 @@ void extern inline finish_update(uint64_t newgol[], uint64_t newgolg[],uint64_t 
             for (k=0; k<8; k++) nbshist[k] += (newgolgstats[ij]&(0x1ull<<(16+k))) ? 1: 0;
     }
     
-    if(randominflux) random_influx(gol,golg,golb,newgol,newgolg,newgolb);                    // [**gol** ??]
-    if(vscrolling) v_scroll(newgol,newgolg,newgolb);
+    if(randominflux) random_influx(newgol,newgolg,newgolb,newgolr);
+    if(vscrolling) v_scroll(newgol,newgolg,newgolb,newgolr);
     if ((colorfunction == 8) || (colorfunction2 == 8)) packandcompare(newgol,working,golmix);
     if(diagnostics & diag_component_labels) ncomponents=extract_components(newgol);
     if(diagnostics & diag_hash_genes) {
@@ -4686,7 +4716,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     rbackground = 0;
     quadcollisions = 0;
     randominflux = 0;
-    vscrolling = last_scrolled = 0;
+    vscrolling = last_scrolled = vscrolly = 0;
     quadrants = -1;
     gene0=0ull;                                                                 // normally default gene is 0ull : unused when gol state not live
     nstartgenes = 8;
