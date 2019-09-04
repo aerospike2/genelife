@@ -41,6 +41,7 @@ cgrid = np.zeros((N,N),np.int32)
 cgridt = np.zeros((N,N),np.int32)
 cgolg =np.zeros(N2,np.int32)
 colorfunction = 0
+nfrstep = 0
 surface = None
 surfacex1 = None
 surfacex2 = None
@@ -160,10 +161,18 @@ startgenechoice = simparams[4] = 8       # initialize genes to startgene number 
 ranseed = simparams[5] = 1234            # initial seed for random number generator
 
                                          # offset initialization
-offsets = [[-1, 0,-1],
+"""offsets = [[-1, 0,-1],
            [ 1, 0,-1],
            [ 0,-1,-1],
-           [ 0, 1,-1]]
+           [ 0, 1,-1]]"""
+offsets = [[ 1, 1, 0],
+           [ 0, 0,-1],
+           [ 0, 0,-2],
+           [ 0, 0,-3],
+           [ 0, 0,-4],
+           [ 0, 0,-5],
+           [ 0, 0,-6],
+           [ 0, 0,-7]]
 numHis = len(offsets)
 histo=np.zeros(numHis,np.uint64)
 flatoff =  [x for sublist in offsets for x in sublist]
@@ -242,10 +251,10 @@ def rand_cmap(nlabels, type='bright', first_color_black=True, last_color_black=F
     return random_colormap
 #-----------------------------------------------------------------------------------------------------------
 
-def colorgrid(colorfunction,cgolg,cgrid,winnr):
+def colorgrid(colorfunction,cgolg,cgrid,winnr,nfrstep):
     """ colors array according to grid and genegrid using colormethod"""
     global N,cgridt
-    genelife.colorgenes(cgolg,colorfunction,winnr)
+    genelife.colorgenes(cgolg,colorfunction,winnr,nfrstep)
     cgridt=np.reshape(cgolg,(N,N)).T
     cgrid[:,0:N] = cgridt   # is there a faster version of this copy that moves the data?
     return
@@ -568,9 +577,9 @@ def update_sim(nrun, ndisp, nskip, niter, nhist, nstat, count=True):
         if(count): genelife.countspecieshash()
     genelife.genelife_update(nrun, nhist, nstat)
     framenr = framenr+nrun
-    if update1: colorgrid(colorfunction,cgolg,cgrid,0)  # sets  cgrid
+    if update1: colorgrid(colorfunction,cgolg,cgrid,0,0)  # sets  cgrid
     if update2 and (colorfunction2 != -1):
-            colorgrid(colorfunction2,cgolg2,cgrid2,1)
+            colorgrid(colorfunction2,cgolg2,cgrid2,1,0)
     return
 
 #-----------------------------------------------------------------------------------------------------------
@@ -775,10 +784,10 @@ def show0(count=True):
 
     cancol=init_buttons(surfacex1)                           # initialize parameter buttons
 
-    colorgrid(colorfunction,cgolg,cgrid,0)
+    colorgrid(colorfunction,cgolg,cgrid,0,0)
     
     if colorfunction2 != -1:
-        colorgrid(colorfunction2,cgolg2,cgrid2,1)
+        colorgrid(colorfunction2,cgolg2,cgrid2,1,0)
         # sdl2.ext.fill(surface2, 0)
         if sdl2.SDL_BlitScaled(surfacex1,grect1,surface2x1,grect1): print("BlitScaled failed")
         if sdl2.SDL_BlitScaled(surface2x1,None,surface2,None): print("BlitScaled failed")
@@ -872,7 +881,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
     global N
     global gol,golg,golb,golr,golgstats
     global connlabel,connlen,ncomponents
-    global colorfunction,colorfunction2,gcolor,genealogycoldepth,ancestortype
+    global colorfunction,colorfunction2,gcolor,nfrstep,genealogycoldepth,ancestortype
     global nspecies,ymax,ymaxq,oldymax,oldymaxq,nbhist,nNhist
     global updatesenabled
     global rulemod,repscheme,survivalmask,birthmask,overwritemask,ancselectmask,selection,ncoding
@@ -932,6 +941,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
     quadrants = -1
     oldymax = genelife.setget_act_ymax(ymax)
     oldymaxq = genelife.setget_act_ymaxq(ymaxq)
+    nfrstep = 0
 
     gcolor=0
     
@@ -1120,11 +1130,11 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                             print(("step %d pixel data %s" % (framenr,pixeldat)))
                         elif colorfunction == 9:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
-                            colorgrid(colorfunction,cgolg,cgrid,0)
+                            colorgrid(colorfunction,cgolg,cgrid,0,0)
                             pixeldat = "(%d,%d) label %4d nrconn %d" % (x,y,connlabel[y*N+x],connlen[connlabel[y*N+x]])
                         elif colorfunction == 10:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
-                            colorgrid(colorfunction,cgolg,cgrid,0)
+                            colorgrid(colorfunction,cgolg,cgrid,0,0)
                             pixeldat = "(%d,%d)" % (x,y)
                 elif event.button.button ==  sdl2.SDL_BUTTON_RIGHT:          # info on button or selection<8 model - right mouse button (-click)
                     # print("right mouse button pressed")
@@ -1169,7 +1179,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                         else: draw_rect(surfacex1,cancol[4][k]*(1+((birthmask>>(k-32))&0x1)),[k<<(log2N-6),Height+6,3*sc,3*sc])
                 if colorfunction==9 or colorfunction==10:
                     ncomponents=genelife.get_connected_comps(connlabel,connlen,-1,-1)
-                    colorgrid(colorfunction,cgolg,cgrid,0)
+                    colorgrid(colorfunction,cgolg,cgrid,0,0)
                 pixeldat = ""
             elif event.type==sdl2.SDL_MOUSEMOTION:
                 if mouseclicked:
@@ -1216,11 +1226,11 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                             genelife.set_selectedgene(golg[x+y*N])
                         elif colorfunction == 9:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
-                            colorgrid(colorfunction,cgolg,cgrid,0)
+                            colorgrid(colorfunction,cgolg,cgrid,0,0)
                             pixeldat = "(%d,%d) label %4d nr.conn %d" % (x,y,connlabel[y*N+x],connlen[connlabel[y*N+x]])
                         elif colorfunction == 10:
                             ncomponents=genelife.get_connected_comps(connlabel,connlen,x,y)
-                            colorgrid(colorfunction,cgolg,cgrid,0)
+                            colorgrid(colorfunction,cgolg,cgrid,0,0)
                             pixeldat = "(%d,%d)" % (x,y)
                 elif mouseclicked2:
                     if colorfunction == 2:
@@ -1261,6 +1271,8 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                         parhelp()
                 elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_SPACE:
                     pause = 1-pause
+                    if not pause:
+                        nfrstep = 0                                                    # number of frames behind viewing returned to zero
                 elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_RIGHT:
                     colorfunction = (colorfunction + 1) % 13
                     genelife.set_colorfunction(colorfunction)
@@ -1330,6 +1342,16 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                     if nbhist!=nbhistold:
                         print('step',framenr,"nbhist changed to ",nbhist)
                         genelife.set_nbhist(nbhist)
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_C:
+                    if colorfunction in [0,1,2,3,11,12]:
+                        if sdl2.SDL_GetModState() & sdl2.KMOD_SHIFT:
+                            nfrstep = nfrstep + 1
+                            if nfrstep == 8: nfrstep = 0
+                        else:
+                            nfrstep = nfrstep - 1
+                            if nfrstep < 0: nfrstep = 8-1
+                        print('step',framenr,"nfrstep changed to ",nfrstep)
+                        # colorgrid(colorfunction,cgolg,cgrid,0,nfrstep)
                 elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_F:
                     print("entering key F")
                     if   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT:
@@ -1442,10 +1464,10 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                 update_sim(nrun, ndisp, nskip, niter, nhist, nstat, count)
             else:
                 if update1:
-                    colorgrid(colorfunction,cgolg,cgrid,0)
+                    colorgrid(colorfunction,cgolg,cgrid,0,nfrstep)
                 if update2:
                     if colorfunction2 != -1:
-                        colorgrid(colorfunction2,cgolg2,cgrid2,1)
+                        colorgrid(colorfunction2,cgolg2,cgrid2,1,0)
 
         nspecies=genelife.get_nspecies()
         caption=construct_caption(colorfunction,pixeldat,buttonhelp,1)
@@ -1619,8 +1641,9 @@ def parhelp():
     print("right mouse ","choose single plane for GoL display in colorfunction 2 for selection 16-19")
     print("<- , ->     ","decrement or increment the colorfunction analysis type mod 12")
     print("Down , Up   ","decrement or increment the colorfunction2 analysis type mod 12 : -1 for same as colorfunction")
-    print("2           ","toggle second window updates off/on")
+    print("1, 2        ","toggle first or second window updates off/on")
     print("b , B       ","decrement or increment the half block for trace display: in range -1,0 to nNhist*2-2=38")
+    print("c , C       ","decrement or increment the playback counter to replay last up to 8 timesteps while paused (with space), colorfn 0-3,11,12 only")
     print("f           ","print frame rate in fps (average of last 10 frames NYI")
     print("F           ","toggle to fullscreen NYI")
     print("g           ","toggle on/off inherited coloring of connected cpts from overlapping cpts (colfn 9) or cycle first/clonal/both ancestors (6,7,11)")
@@ -1635,7 +1658,7 @@ def parhelp():
     print("R leftshift ","toggle intermittent feathered random influx domain on or off")
     print("R rightshift","toggle random deletion perturbation at rbackground rate on or off")
     print("alt-r       ","input background rate of perturbation for random influx")
-    print("s           ","save current image to file in image subdriectory")
+    print("s           ","save current image to file in image subdirectory")
     print("x,X y,Y t,T ","lower (lc) or raise (uc) the (dx,dy,dt) offsets for glider tracking (colorfn 8) (0,0,0)=(all 8 nnb dt=-1)")
     print("v           ","toggle vertical scroll tracking mode : following top most objects and losing lowest objects in contact with 0 row")
     print("+,-         ","increase or decrease ymax or ymaxq for activity display scaled as act/(ymax+act) by a factor of 2")

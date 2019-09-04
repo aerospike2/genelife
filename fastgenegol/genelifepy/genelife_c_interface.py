@@ -137,12 +137,15 @@ libcd.get_genes.restype = c_int
 libcd.get_genes.argtypes = [gene_array, c_int]
 libcd.get_genealogies.restype = c_int
 libcd.get_genealogies.argtypes = [gene_array,c_int]
+<<<<<<< HEAD
 libcd.get_shist.restype = None
 libcd.get_shist.argtypes = [int_array]
 libcd.colorgenes1.restype = None
 libcd.colorgenes1.argtypes = [uint64_array, uint64_array, uint64_array, uint64_array, int_array, c_int, c_int, c_int]
+=======
+>>>>>>> genelife_golr
 libcd.colorgenes.restype = None
-libcd.colorgenes.argtypes = [int_array, c_int, c_int, c_int]
+libcd.colorgenes.argtypes = [int_array, c_int, c_int, c_int, c_int]
 libcd.set_colorfunction.restype = None
 libcd.set_colorfunction.argtypes = [c_int]
 libcd.setget_act_ymax.restype = c_int
@@ -309,11 +312,8 @@ def get_shist(shist):
 def get_glider_count():
     return libcd.get_glider_count()
 
-def colorgenes1(gol, golg, golb, golgstats, cgolg, colorfunction, winnr):
-    return libcd.colorgenes1( gol, golg, golb, golgstats, cgolg, len(gol), colorfunction, winnr)
-
-def colorgenes(cgolg,colorfunction, winnr):
-    return libcd.colorgenes( cgolg, len(cgolg), colorfunction, winnr)
+def colorgenes(cgolg,colorfunction, winnr, nfrstep):
+    return libcd.colorgenes( cgolg, len(cgolg), colorfunction, winnr, nfrstep)
 
 def set_colorfunction(colorfunctionval):
     return libcd.set_colorfunction(colorfunctionval)
