@@ -824,6 +824,7 @@ extern inline void golr_digest (uint64_t golr, unsigned int *mismatchmin, unsign
     unsigned int jper;
     int nbx[8] = {-1,0,1,1,1,0,-1,-1};
     int nby[8] = {-1,-1,-1,0,1,1,1,0};
+    int dsx,dsy;
 
     
     gdiff = golr;                                       // variable golr holds dynamical record
@@ -843,17 +844,23 @@ extern inline void golr_digest (uint64_t golr, unsigned int *mismatchmin, unsign
     *mismatchmax = d1;
     *period = jper;
     
-    dx = dy = 0;
-    for (j=0;j<=jper;j++) {
+    dsx = dsy = dx = dy = 0;
+    for (j=0;j<16;j++) {
         gdiff = (golr>>(j<<2))&0xfull;
         if(gdiff&0x8ull) {
             k = ((unsigned int) gdiff) & 0x7;
             dx += nbx[k];
             dy += nby[k];
         }
+        if (j>=jper) {
+            dsx+=dx;
+            dsy+=dy;
+            dx = dy = 0;
+        }
     }
-    *pershx = dx;
-    *pershy = dy;
+    // average periodic displacements are now dsx/(16-jper), dsy/(16-jper)
+    *pershx = dsx;
+    *pershy = dsy;
 }
 //.......................................................................................................................................................
 void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep) {
@@ -1360,7 +1367,7 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
                     if ((d0==d1) && (~gene&0x8ull)) {               // survival with constant mismatch: ie static pattern : colour dark red
                         mask |= 0x3f<<8;
                     }
-                    else if (dx==0 && dy ==0) {
+                    else if (abs(dx)< 0.25*(16-jper) && abs(dy) < 0.25*(16-jper)) {
                         mask |= 0x7f<<8;                            // stationary pattern: slightly less dark red
                     }
                     else {

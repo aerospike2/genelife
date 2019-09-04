@@ -1643,7 +1643,7 @@ def parhelp():
     print("Down , Up   ","decrement or increment the colorfunction2 analysis type mod 12 : -1 for same as colorfunction")
     print("1, 2        ","toggle first or second window updates off/on")
     print("b , B       ","decrement or increment the half block for trace display: in range -1,0 to nNhist*2-2=38")
-    print("c , C       ","decrement or increment the playback counter to replay last up to 8 timesteps while paused (with space), colorfn 0-3,11,12 only"
+    print("c , C       ","decrement or increment the playback counter to replay last up to 8 timesteps while paused (with space), colorfn 0-3,11,12 only")
     print("f           ","print frame rate in fps (average of last 10 frames NYI")
     print("F           ","toggle to fullscreen NYI")
     print("g           ","toggle on/off inherited coloring of connected cpts from overlapping cpts (colfn 9) or cycle first/clonal/both ancestors (6,7,11)")
