@@ -349,7 +349,7 @@ int **offsets;                      // array of offsets (2D + time) for planes
 int *histo;
 int numHisto;
 // initialize planes:
-#define maxPlane 2                  /* maximum number of planes allowed : values 2,4,8 allowed */
+#define maxPlane 8                  /* maximum number of planes allowed : values 2,4,8 allowed */
 int curPlane = 0;                   // current plane index
 int newPlane = 1;                   // new plane index
 int numPlane = maxPlane;            // number of planes must be power of 2 to allow efficient modulo plane
@@ -511,8 +511,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // mix_color            mix colors from overlapping components, add random drift of colour
 // delay                time delay in ms for graphics
 // printxy              terminal screen print of array on xterm
-// colorgenes1          colour display of genes in one of 12 colorfunction modes, including activities, pattern analysis and genealogies
-// colorgenes           colour genes specified at current time point rather than by arguments to the routine as done in colorgenes1
+// colorgenes           colour display of genes in one of 12 colorfunction modes, including activities, pattern analysis, genealogies and glider detection
 //......................................................  selection of genes for birth  .................................................................
 // selectone_of_2       select one (or none) of two genes based on selection model parameter selection :  returns birth and newgene
 // selectone_of_s       select one (or none) of s genes based on selection model parameter selection :  returns birth and newgene
@@ -601,7 +600,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // set_stash            stash current gol,golg in stashgol, stshgolg
 // set_info_transfer_h  set information transfer histogram display value (0,1) from python
 // set_activityfnlut    set collection of functional activity statistics corresponding to functional aggregate of genes by non-neutral bits
-// set_colorupdate1     control update of colorgenes1 and regular print statements via flag colorupdate1
+// set_colorupdate1     control update of colorgenes and regular print statements via flag colorupdate1
 // set_colorfunction2   choice of colorfunction for window 2
 //..........................................................  get to python driver  .....................................................................
 // get_stash            retrieve current gol,golg from stashed values
@@ -656,7 +655,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // clonealogies         calculate and display clonealogies: genealogies of clones
 // get_gliderinfo       get information about gliders from packed array representation
 //-------------------------------------------------------------------------------------------------------------------------------------------------------
-//--------------------------------------------------------------- colorgenes ----------------------------------------------------------------------------
+//--------------------------------------------------------------- mathematical fns ----------------------------------------------------------------------
 extern inline int integerSqrt(int n) {                  // the largest integer smaller than the square root of n (n>=0)
     int shift,nShifted,result,candidateResult;
     // only works for n >= 0;
@@ -857,9 +856,10 @@ extern inline void golr_digest (uint64_t golr, unsigned int *mismatchmin, unsign
     *pershy = dy;
 }
 //.......................................................................................................................................................
-void colorgenes1(uint64_t gol[], uint64_t golg[], uint64_t golb[], uint64_t golgstats[], int cgolg[], int NN2, int colorfunction, int winnr) {
+void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep) {
     uint64_t gene, gdiff, g2c, mask, quad, clone;
-    int ij,k,j,nbeven,activity,popcount,labelxy;
+    uint64_t *ggol,*ggolg,*ggolb,*ggolr,*ggolgstats;
+    int ij,k,j,nfrPlane,nbeven,activity,popcount,labelxy;
     unsigned int d,d0,d1,d2,jper;
     unsigned int color[3],colormax;
     double rescalecolor;
@@ -870,12 +870,29 @@ void colorgenes1(uint64_t gol[], uint64_t golg[], uint64_t golb[], uint64_t golg
     int labelimage(uint64_t hashkeypatt, short unsigned int labelimg[], short unsigned int label, int offset);
     extern inline int log2size(const short unsigned int golpw);
     void get_gliderinfo(uint64_t outgliderinfo[], int narraysize);
+    static int firstdebug = 1;
+    
+    if (nfrstep==0) {
+        ggol  = gol;
+        ggolg = golg;
+        ggolb = golb;
+        ggolr = golr;
+        ggolgstats = golgstats;
+    }
+    else {
+        nfrPlane = (curPlane+nfrstep) % numPlane;
+        ggol = planes[nfrPlane];                                               // get planes of gol,golg,golb,golr,golgstats data
+        ggolg = planesg[nfrPlane];
+        ggolgstats = planesgs[nfrPlane];
+        ggolb = planesb[nfrPlane];
+        ggolr = planesr[nfrPlane];
+    }
 
     if(colorfunction==0) { // colorfunction based on multiplicative hash
         // see https://stackoverflow.com/questions/6943493/hash-table-with-64-bit-values-as-key/33871291
         for (ij=0; ij<N2; ij++) {
-            if (gol[ij]) {
-                gene = golg[ij];
+            if (ggol[ij]) {
+                gene = ggolg[ij];
                 if (gene == 0ull) gene = 11778ull; // random color for gene==0
                 // mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
                 // mask = (gene * 11400714819323198549ul) >> (64 - 32);  // hash with optimal prime multiplicator down to 32 bits
@@ -895,7 +912,7 @@ void colorgenes1(uint64_t gol[], uint64_t golg[], uint64_t golb[], uint64_t golg
     else if(colorfunction<4){
         for (ij=0; ij<N2; ij++) {
             if (gol[ij]) {
-                gene = golg[ij];
+                gene = ggolg[ij];
                 POPCOUNT64C(gene,d);                                        // assigns number of ones in gene to d
                 switch (selection) {
                         case 0 : gdiff=(gene>>40); mask = ((((gdiff&0xff)<<16)+(((gdiff>>8)&0xff)<<8)+(gdiff>>16))<<8) + 0xff; break;  // MSByte red shade, next 8 green, next 8 blue: highest=white
@@ -951,11 +968,11 @@ void colorgenes1(uint64_t gol[], uint64_t golg[], uint64_t golb[], uint64_t golg
                         default  : mask = ((d+(d<<6)+(d<<12)+(d<<18))<<8) + 0xff;
                 }
                 if(colorfunction==2) {
-                    if(golgstats[ij]&F_nongolchg) mask = 0x00ffffff;        // color states changed by non GoL rule yellow
+                    if(ggolgstats[ij]&F_nongolchg) mask = 0x00ffffff;        // color states changed by non GoL rule yellow
                 }
                 else if (colorfunction==3) {
-                    if(golgstats[ij]&F_survmut) mask = 0xff00ffff;  // color states for surviving fresh mutants (non-replicated) purple/pink
-                    else if(golgstats[ij]&F_notgolrul) mask = 0x00ffffff;  // color states for not GoL rule yellow
+                    if(ggolgstats[ij]&F_survmut) mask = 0xff00ffff;  // color states for surviving fresh mutants (non-replicated) purple/pink
+                    else if(ggolgstats[ij]&F_notgolrul) mask = 0x00ffffff;  // color states for not GoL rule yellow
                 }
 
                 cgolg[ij] = (int) mask;
@@ -1291,7 +1308,7 @@ void colorgenes1(uint64_t gol[], uint64_t golg[], uint64_t golb[], uint64_t golg
 
         for (ij=0; ij<N2; ij++) {
             if (gol[ij] && (diagnostics & diag_hash_genes)) {
-                gene = (ancestortypec==2) ? golb[ij] : golg[ij];    // variable gene holds either birthid (clones) or gene at ij;
+                gene = (ancestortypec==2) ? ggolb[ij] : ggolg[ij];    // variable gene holds either birthid (clones) or gene at ij;
                 ancestor=gene;
                 for (j=1;j<=genealogycoldepth;j++) {
                     if((ancestortypec!=1) && (ancestor==rootgene)) break;                       // reached root, exit j loop
@@ -1327,9 +1344,15 @@ void colorgenes1(uint64_t gol[], uint64_t golg[], uint64_t golb[], uint64_t golg
     else if(colorfunction==12){                                     // colouring based on periodicity of dynamic record of 16 last states in golr for live genes
         short unsigned int dscale[16] = {0xff,0xcf,0x7f,0x4f,0x2f,0x27,0x1f,0x1d,0x1b,0x19,0x17,0x15,0x14,0x13,0x12,0x11};
         int dx,dy;
+        if (firstdebug) {
+            golr_digest (0x1111111111111111ull, &d0, &d1, &jper, &dx, &dy);fprintf(stderr,"golr digest %llx %d %d %d %d %d\n",0x1111111111111111ull, d0, d1, jper, dx, dy);
+            golr_digest (0x1111111111111119ull, &d0, &d1, &jper, &dx, &dy);fprintf(stderr,"golr digest %llx %d %d %d %d %d\n",0x1111111111111119ull, d0, d1, jper, dx, dy);
+            golr_digest (0xaec8aec8aec8aec8ull, &d0, &d1, &jper, &dx, &dy);fprintf(stderr,"golr digest %llx %d %d %d %d %d\n",0xaec8aec8aec8aec8ull, d0, d1, jper, dx, dy);
+            firstdebug=0;
+        }
         for (ij=0; ij<N2; ij++) {
-            if (gol[ij] && (diagnostics & diag_hash_genes)) {
-                gdiff = gene = golr[ij];                            // variable gene holds dynamical record stored in golr
+            if (ggol[ij] && (diagnostics & diag_hash_genes)) {
+                gdiff = gene = ggolr[ij];                            // variable gene holds dynamical record stored in golr
                 golr_digest (gene, &d0, &d1, &jper, &dx, &dy);
                 if (d0 > 7) mask = 0x080808ffull;                   // dark grey color for no significant periodic match found
                 else {
@@ -1355,10 +1378,6 @@ void colorgenes1(uint64_t gol[], uint64_t golg[], uint64_t golb[], uint64_t golg
         uint32_t c = cgolg[ij];
         cgolg[ij]=((c&0xff)<<24) | ((c&0xff00)<<8) | ((c&0xff0000)>>8) | ((c&0xff000000)>>24);
     }
-}
-//.......................................................................................................................................................
-void colorgenes(int cgolg[], int NN2, int colorfunction, int winnr) {
-    colorgenes1(gol, golg, golb, golgstats, cgolg, NN2, colorfunction, winnr);
 }
 //------------------------------------------------------------- selectone -------------------------------------------------------------------------------
 extern inline void selectone_of_2(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t golb[],uint64_t * birth, uint64_t *newgene, uint64_t *parentid, unsigned int *kch) {
@@ -4486,9 +4505,9 @@ void genelife_update (int nsteps, int nhist, int nstat) {
         if((diagnostics & diag_offset_statistics) && nhist && (totsteps%nhist == 0)) countconfigs(); // count configurations
         if((diagnostics & diag_general_statistics) && nstat && (totsteps%nstat == 0)) tracestats(gol,golg,golgstats,N2); // time trace point
 
-        curPlane = (curPlane +1) % numPlane;                                  // update plane pointers to next cyclic position
-        newPlane = (newPlane +1) % numPlane;
-        gol = planes[curPlane];                                               // get planes of gol,golg,golb,golgstats data
+        curPlane = (curPlane+1) % numPlane;                                   // update plane pointers to next cyclic position
+        newPlane = (newPlane+1) % numPlane;
+        gol = planes[curPlane];                                               // get planes of gol,golg,golb,golr,golgstats data
         golg = planesg[curPlane];
         golgstats = planesgs[curPlane];
         golb = planesb[curPlane];
