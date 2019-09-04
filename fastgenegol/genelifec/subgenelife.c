@@ -877,7 +877,7 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
     int labelimage(uint64_t hashkeypatt, short unsigned int labelimg[], short unsigned int label, int offset);
     extern inline int log2size(const short unsigned int golpw);
     void get_gliderinfo(uint64_t outgliderinfo[], int narraysize);
-    static int firstdebug = 1;
+    // static int firstdebug = 1;
     
     if (nfrstep==0) {
         ggol  = gol;
@@ -1351,12 +1351,12 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
     else if(colorfunction==12){                                     // colouring based on periodicity of dynamic record of 16 last states in golr for live genes
         short unsigned int dscale[16] = {0xff,0xcf,0x7f,0x4f,0x2f,0x27,0x1f,0x1d,0x1b,0x19,0x17,0x15,0x14,0x13,0x12,0x11};
         int dx,dy;
-        if (firstdebug) {
+        /* if (firstdebug) {
             golr_digest (0x1111111111111111ull, &d0, &d1, &jper, &dx, &dy);fprintf(stderr,"golr digest %llx %d %d %d %d %d\n",0x1111111111111111ull, d0, d1, jper, dx, dy);
             golr_digest (0x1111111111111119ull, &d0, &d1, &jper, &dx, &dy);fprintf(stderr,"golr digest %llx %d %d %d %d %d\n",0x1111111111111119ull, d0, d1, jper, dx, dy);
             golr_digest (0xaec8aec8aec8aec8ull, &d0, &d1, &jper, &dx, &dy);fprintf(stderr,"golr digest %llx %d %d %d %d %d\n",0xaec8aec8aec8aec8ull, d0, d1, jper, dx, dy);
             firstdebug=0;
-        }
+        } */
         for (ij=0; ij<N2; ij++) {
             if (ggol[ij] && (diagnostics & diag_hash_genes)) {
                 gdiff = gene = ggolr[ij];                            // variable gene holds dynamical record stored in golr
@@ -1502,6 +1502,7 @@ extern inline int selectone_of_s(unsigned int *kch, int s, uint64_t nb1i, int nb
     int psx[8],psy[8];                                    // periodic shift in x and y for optimal period of recorded displacements
     unsigned int scores[8];                               // cumulative scores for pairwise games of individual livegenes (used case repselect == 7)
     uint64_t livegenes[8],gdiff,extremval,bestnbmask,birthid;
+    int extreme1,extreme2;
     unsigned int repselect = (repscheme & R_47_repselect)>>4; //
 
     birthid = (uint64_t) totsteps;
@@ -1668,31 +1669,96 @@ extern inline int selectone_of_s(unsigned int *kch, int s, uint64_t nb1i, int nb
             *kch = kchs[k];
             //if(ij==IJDEBUG) fprintf(stderr,"DEBUG In selectone_of_s at totsteps=%d ij=%d s=%d nbest=%d extremval=%llx bestnbmask=%llx nb1i=%llx kch=%d\n",totsteps,ij,s,nbest,extremval,bestnbmask,nb1i,*kch);
             break;
-        case 8:                                        // case 8-15 are intended for golr selection modes
-        case 9:
-            if(repselect&0x1) for(extremval= 0ull,k=0;k<s;k++) extremval = (p[k]>= extremval ? p[k] : extremval); // find value of fittest gene max period
-            else              for(extremval=~0ull,k=0;k<s;k++) extremval = (p[k]<= extremval ? p[k] : extremval); // find value of fittest gene min period
-            for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= (p[k]==extremval ? 1ull<<(k+0*nbest++) : 0ull); // find set of genes with equal best value
-            *birth = ((nbest>0) ? 1ull: 0ull);           // birth condition may include later that genes not all same
+                                                       // cases 8-15 are intended for golr selection modes
+        case 8:                                        // 8,9 simple optimization for period
+        case 9:                                        // 8 is min period 9 is max period
+            if(repselect&0x1) {
+                for(extreme1= 0,k=0;k<s;k++) extreme1 = ((p[k]>= extreme1)&&(d[k]<=4) ? p[k] : extreme1); // find value of fittest gene with max period
+            }
+            else  {
+                for(extreme1=16,k=0;k<s;k++) extreme1 = ((p[k]<= extreme1)&&(d[k]<=4)) ? p[k] : extreme1; // find value of fittest gene with min period
+            }
+            for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= ((p[k]==extreme1)? 1ull<<(k+0*nbest++) : 0ull); // find set of genes with equal best value
+            *birth = ((nbest>0) ? 1ull: 0ull);         // birth condition may include later that genes not all same
             for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
-            if (k==s) {k=0;*birth = 0ull;}               // in case no genes with best value, no birth, avoid k being out of bounds below
-            *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
+            if (k==s) {k=0;*birth = 0ull;}             // in case no genes with best value, no birth, avoid k being out of bounds below
+            *newgene = livegenes[k&0x7];               // choose first of selected set to replicate (can make positional dependent choice instead externally)
             *parentid=golb[ijanc[k&0x7]];
             *kch = kchs[k];
             break;
-        case 10:
-        case 11:
-        case 12:
-        case 13:
-        case 14:
-        case 15:
-            if(repselect&0x1) for(extremval= 0ull,k=0;k<s;k++) extremval = (d[k]>= extremval ? d[k] : extremval); // find value of fittest gene most aperiodic
-            else              for(extremval=~0ull,k=0;k<s;k++) extremval = (d[k]<= extremval ? d[k] : extremval); // find value of fittest gene precise period
-            for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= (d[k]==extremval ? 1ull<<(k+0*nbest++) : 0ull); // find set of genes with equal best value
-            *birth = ((nbest>0) ? 1ull: 0ull);           // birth condition may include later that genes not all same
+        case 10:                                       // optimization for period and then most accurate periodicity (least mismatches)
+        case 11:                                       // 10 is min period 11 is max period : both with secondary selection for precision of periodicity
+            if(repselect&0x1) {
+                for(extreme1= 0,k=0;k<s;k++) extreme1 = ((p[k]>= extreme1)&&(d[k]<=4) ? p[k] : extreme1); // find value of fittest gene with max period
+                for(extreme2=16,k=0;k<s;k++) extreme2 = ((p[k]==extreme1)&&(d[k]<extreme2)) ? d[k] : extreme2; // find genes with most precise periodicity at this period
+            }
+            else  {
+                for(extreme1=16,k=0;k<s;k++) extreme1 = ((p[k]<= extreme1)&&(d[k]<=4)) ? p[k] : extreme1; // find value of fittest gene with min period
+                for(extreme2=16,k=0;k<s;k++) extreme2 = ((p[k]==extreme1)&&(d[k]<extreme2)) ? d[k] : extreme2; // find genes with most precise periodicity at this period
+            }
+            for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) bestnbmask |= (((p[k]==extreme1)&&(d[k]==extreme2))? 1ull<<(k+0*nbest++) : 0ull); // find set of genes with equal best value
+            *birth = ((nbest>0) ? 1ull: 0ull);         // birth condition may include later that genes not all same
             for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
-            if (k==s) {k=0;*birth = 0ull;}               // in case no genes with best value, no birth, avoid k being out of bounds below
-            *newgene = livegenes[k&0x7];                 // choose first of selected set to replicate (can make positional dependent choice instead externally)
+            if (k==s) {k=0;*birth = 0ull;}             // in case no genes with best value, no birth, avoid k being out of bounds below
+            *newgene = livegenes[k&0x7];               // choose first of selected set to replicate (can make positional dependent choice instead externally)
+            *parentid=golb[ijanc[k&0x7]];
+            *kch = kchs[k];
+            break;
+        case 12:                                       // optimization for large displacement and then for small period
+        case 13:                                       // optimization for large displacement and then large period
+            for(extreme1=0,k=0;k<s;k++) {
+                d0=abs(psx[k])+abs(psy[k]);
+                extreme1 = ((d0 >= extreme1)&&(d[k]<=4) ? d0 : extreme1); // find value of fittest gene with max displacement for clear periodicity
+            }
+            if(repselect&0x1) {
+                for(extreme2=16,k=0;k<s;k++) {
+                    d0=abs(psx[k])+abs(psy[k]);
+                    extreme2 = ((d0==extreme1)&&(p[k]<extreme2)&&(d0>=4)) ? p[k] : extreme2; // find genes with shortest period at max displacement
+                }
+            }
+            else  {
+                for(extreme2=0,k=0;k<s;k++) {
+                    d0=abs(psx[k])+abs(psy[k]);
+                    extreme2 = ((d0==extreme1)&&(p[k]>extreme2)&&(d0>=4)) ? p[k] : extreme2; // find genes with longest period at max displacement
+                }
+            }
+            for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) {
+                d0=abs(psx[k])+abs(psy[k]);
+                bestnbmask |= (((d0==extreme1)&&(p[k]==extreme2))? 1ull<<(k+0*nbest++) : 0ull); // find set of genes with equal best value
+            }
+            *birth = ((nbest>0) ? 1ull: 0ull);         // birth condition may include later that genes not all same
+            for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
+            if (k==s) {k=0;*birth = 0ull;}             // in case no genes with best value, no birth, avoid k being out of bounds below
+            *newgene = livegenes[k&0x7];               // choose first of selected set to replicate (can make positional dependent choice instead externally)
+            *parentid=golb[ijanc[k&0x7]];
+            *kch = kchs[k];
+            break;
+        case 14:                                        // optimization for diagonal displacement and then for small period : currently same as 12
+        case 15:                                        // optimization for diagonal displacement and then for large period : currently same as 13
+            for(extreme1=0,k=0;k<s;k++) {
+                d0=abs(psx[k])+abs(psy[k]);
+                extreme1 = ((d0 >= extreme1)&&(d[k]<=4) ? d0 : extreme1); // find value of fittest gene with max displacement for clear periodicity
+            }
+            if(repselect&0x1) {
+                for(extreme2=16,k=0;k<s;k++) {
+                    d0=abs(psx[k])+abs(psy[k]);
+                    extreme2 = ((d0==extreme1)&&(p[k]<extreme2)&&(d0>=4)) ? p[k] : extreme2; // find genes with shortest period at max displacement
+                }
+            }
+            else  {
+                for(extreme2=0,k=0;k<s;k++) {
+                    d0=abs(psx[k])+abs(psy[k]);
+                    extreme2 = ((d0==extreme1)&&(p[k]>extreme2)&&(d0>=4)) ? p[k] : extreme2; // find genes with longest period at max displacement
+                }
+            }
+            for(bestnbmask=0ull,nbest=0,k=0;k<s;k++) {
+                d0=abs(psx[k])+abs(psy[k]);
+                bestnbmask |= (((d0==extreme1)&&(p[k]==extreme2))? 1ull<<(k+0*nbest++) : 0ull); // find set of genes with equal best value
+            }
+            *birth = ((nbest>0) ? 1ull: 0ull);         // birth condition may include later that genes not all same
+            for(k=0;k<s;k++) if((bestnbmask>>k)&0x1) break;
+            if (k==s) {k=0;*birth = 0ull;}             // in case no genes with best value, no birth, avoid k being out of bounds below
+            *newgene = livegenes[k&0x7];               // choose first of selected set to replicate (can make positional dependent choice instead externally)
             *parentid=golb[ijanc[k&0x7]];
             *kch = kchs[k];
             break;
