@@ -118,26 +118,26 @@ int parentdies = 0;                 // model variant enhancing interpretation of
 #define R_810_disambig    0x700     /* 0-7 choice of different disambiguation mechanisms for symmetric canonical rotations */
 #define R_7_random_resln  0x800     /* 1: random choice amongst selected live neighbours 0: deterministic choice based on gene content and position */
 //----------------------------------------status flag bits for recording site status in golgstats array---------------------------------------------------
-const int F_s_live =      0x7ull;      // s value mod 8 (number of live neighbors) for selection 8-15  and separate bits below for selection 0 to 7
-const int F_1_live =      0x1ull;      // bit is bit0 of s for selection 8-15 or 1 if exactly 1 live neighbours for selection 0-7 : currently not set
-const int F_2_live =      0x2ull;      // bit is bit1 of s for selection 8-15 or 1 if exactly 2 live neighbours for selection 0-7
-const int F_3_live =      0x4ull;      // bit is bit2 of s for selection 8-15 or 1 if exactly 3 live neighbours
-const int F_birth =       0x8ull;      // bit is 1 if birth (includes overwriting of genes for some parameter values)
-const int F_mutation =    0x10ull;     // bit is 1 if a mutation event occured
-const int F_disambig =    0x80ull;     // bit is 1 if the disambiguate routine is used: nbest>1, nsame > 1
-const int F_survival =    0x20ull;     // bit is 1 if last step was a 1->1 gol survival
-const int F_death =       0x40ull;     // bit is 1 if last step involved the death of a gene ie 1->0 gol transition
-const int F_golstate =    0x100ull;    // bit is 1 if gol state is 1
-const int F_golchange =   0x200ull;    // bit is 1 if state changed at last step
-const int F_nongolchg =   0x400ull;    // bit is 1 if state when produced (ie changed to) was made by a non GoL rule
-const int F_notgolrul =   0x800ull;    // bit is 1 if last step not a GoL rule
-const int F_survmut =     0x1000ull;   // bit is 1 if mutation or survival from non-replicated mutant: mutation(t) or mutation(t-1)&survival(t)
-const int F_parent =      0x2000ull;   // bit is 1 if individual that was at this site was parent/ancestor/genetic donor of a new individual born in last step
-const int F_parentaldeath=0x4000ull;   // bit is 1 if individual died at this step only because it was a parent under parentdies=1 option
-const int F_dummy =       0x8000ull;   // free: not yet used
-const int F_livenbs =     0xff0000ull; // mask for storing configuration of live neighbours : clockwise from top-left neighbour (NW) (sel 0-7 for s>1, sel 8-15 for s>0)
-const int F_2select =     0x1000000ull;// bit is 1 if the 2 live neighbour selection routine was employed : selection 0-7 only
-const int F_3g_same =     0x2000000ull;// bit is 1 if exactly 3 live nbs and all 3 have same gene : only for selection 0-7
+const uint64_t F_s_live =      0x7ull;      // s value mod 8 (number of live neighbors) for selection 8-15  and separate bits below for selection 0 to 7
+const uint64_t F_1_live =      0x1ull;      // bit is bit0 of s for selection 8-15 or 1 if exactly 1 live neighbours for selection 0-7 : currently not set
+const uint64_t F_2_live =      0x2ull;      // bit is bit1 of s for selection 8-15 or 1 if exactly 2 live neighbours for selection 0-7
+const uint64_t F_3_live =      0x4ull;      // bit is bit2 of s for selection 8-15 or 1 if exactly 3 live neighbours
+const uint64_t F_birth =       0x8ull;      // bit is 1 if birth (includes overwriting of genes for some parameter values)
+const uint64_t F_mutation =    0x10ull;     // bit is 1 if a mutation event occured
+const uint64_t F_disambig =    0x80ull;     // bit is 1 if the disambiguate routine is used: nbest>1, nsame > 1
+const uint64_t F_survival =    0x20ull;     // bit is 1 if last step was a 1->1 gol survival
+const uint64_t F_death =       0x40ull;     // bit is 1 if last step involved the death of a gene ie 1->0 gol transition
+const uint64_t F_golstate =    0x100ull;    // bit is 1 if gol state is 1
+const uint64_t F_golchange =   0x200ull;    // bit is 1 if state changed at last step
+const uint64_t F_nongolchg =   0x400ull;    // bit is 1 if state when produced (ie changed to) was made by a non GoL rule
+const uint64_t F_notgolrul =   0x800ull;    // bit is 1 if last step not a GoL rule
+const uint64_t F_survmut =     0x1000ull;   // bit is 1 if mutation or survival from non-replicated mutant: mutation(t) or mutation(t-1)&survival(t)
+const uint64_t F_parent =      0x2000ull;   // bit is 1 if individual that was at this site was parent/ancestor/genetic donor of a new individual born in last step
+const uint64_t F_parentaldeath=0x4000ull;   // bit is 1 if individual died at this step only because it was a parent under parentdies=1 option
+const uint64_t F_dummy =       0x8000ull;   // free: not yet used
+const uint64_t F_livenbs =     0xff0000ull; // mask for storing configuration of live neighbours : clockwise from top-left neighbour (NW) (sel 0-7 for s>1, sel 8-15 for s>0)
+const uint64_t F_2select =     0x1000000ull;// bit is 1 if the 2 live neighbour selection routine was employed : selection 0-7 only
+const uint64_t F_3g_same =     0x2000000ull;// bit is 1 if exactly 3 live nbs and all 3 have same gene : only for selection 0-7
 //................................................................ miscellaneous ......................................................................
 #define ASCII_ESC         27        /* escape for printing terminal commands, such as cursor repositioning : only used in non-graphic version */
 #define IJDEBUG       105690        /* ij nr for debug printouts */
@@ -5169,47 +5169,21 @@ void set_colorupdate1(int update1) {
     colorupdate1 = update1;
 }
 //------------------------------------------------------------------- get ... ---------------------------------------------------------------------------
-// compare with colorfunction==12 code above
+// compare with colorfunction==12 code and selectone_of_s code above
 int get_glider_count(){
-    int ij,rtn=0,d0,d1,d,inc,jper,j;
-    uint64_t gdiff, gene;
-    short unsigned int dscale[16] = {0xff,0xcf,0x7f,0x4f,0x2f,0x27,0x1f,0x1d,0x1b,0x19,0x17,0x15,0x14,0x13,0x12,0x11};
+    int ij,rtn=0,d0,inc;
+    unsigned int d,dmax,jper;
+    int psx,psy;
+    
     for (ij=0; ij<N2; ij++) {
         if (gol[ij] && (diagnostics & diag_hash_genes)) {
-            gdiff = gene = golr[ij];                            // variable gene holds dynamical record stored in golr
-            d0 = 64; d1 = 0;                                    // min,max number of mismatches over 15 rotations
-            jper = 0;
-            for (j=0;j<15;j++) {
-                gdiff = (gdiff>>4)|((gdiff&0xfull)<<60);        // rotate record cyclically by one time step
-                POPCOUNT64C((gene^gdiff),d);                    // number of difference positions between gene and gdiff
-                if(d<d0) {
-                    d0=d;
-                    jper = j;
-                }
-                if(d>d1) d1=d;
-            }
-            // if (d0 > 15) mask = 0x080808ffull;    // dark grey color for no significant periodic match found 
-            if (d0 > 15) inc = 0;    // 0 contribution for no significant periodic match found (large mismatch)
-            else {
-                /**********
-                mask = 0xffull;
-                if ((d0==d1) && (~gene&0x8) && (~gdiff&0x8)) {
-                    mask |= 0x3f<<8;
-                }
-                else {          // set RGB of mask
-                    mask |= (jper*(15-d0))<<24;
-                    mask |= ((15-jper)*(15-d0))<<16;
-                    mask |= dscale[d0]<<8;
-                }
-                *********/
-                inc = jper*(15-d0);
-                inc += (15-jper)*(15-d0);
-                inc += dscale[d0];
-            }
+            golr_digest (golr[ij], &d, &dmax, &jper, &psx, &psy); // dynamical record stored in golr
+            d0 = (psx<0 ? -psx : psx) + (psy<0 ? -psy : psy);
+            if (d==dmax || d>4) inc = 0;                          // threshold for periodicity match not reached
+            else if (2*d0<=(15-jper))  inc = 0;                   // threshold for mean mobility not reached
+            else inc = jper + 1;                                   // glider cell counted with value equal to period
+            rtn += inc;
         }
-        else
-            inc = 0;
-        rtn += inc;
     }
     return(rtn);
 }
