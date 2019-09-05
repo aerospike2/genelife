@@ -137,13 +137,8 @@ libcd.get_genes.restype = c_int
 libcd.get_genes.argtypes = [gene_array, c_int]
 libcd.get_genealogies.restype = c_int
 libcd.get_genealogies.argtypes = [gene_array,c_int]
-<<<<<<< HEAD
 libcd.get_shist.restype = None
 libcd.get_shist.argtypes = [int_array]
-libcd.colorgenes1.restype = None
-libcd.colorgenes1.argtypes = [uint64_array, uint64_array, uint64_array, uint64_array, int_array, c_int, c_int, c_int]
-=======
->>>>>>> genelife_golr
 libcd.colorgenes.restype = None
 libcd.colorgenes.argtypes = [int_array, c_int, c_int, c_int, c_int]
 libcd.set_colorfunction.restype = None

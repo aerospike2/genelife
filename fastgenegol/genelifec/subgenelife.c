@@ -511,6 +511,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // mix_color            mix colors from overlapping components, add random drift of colour
 // delay                time delay in ms for graphics
 // printxy              terminal screen print of array on xterm
+// golr_digest          digest information in golr (displacement record), extracting min and max mismatch, period, and x,y displacement of period
 // colorgenes           colour display of genes in one of 12 colorfunction modes, including activities, pattern analysis, genealogies and glider detection
 //......................................................  selection of genes for birth  .................................................................
 // selectone_of_2       select one (or none) of two genes based on selection model parameter selection :  returns birth and newgene
