@@ -144,7 +144,7 @@ overwritemask = runparams[3]= 0x3        # whether to overwrite existing genes a
 survivalmask = runparams[4] = 0x06       # for selection=8-13 this is the GoL survival mask
 birthmask = runparams[7] = 0x04          # for selection=8-13 this is the GoL birth mask
 ancselectmask = runparams[8] = 0xff      # bit mask for enabling gene-selective choice of ancestor for different birth rules
-colorfunction = runparams[5] = 0         # color function 0(hash), >=1(fnal), 2 nongulstate or color gol planes, 3 notgolrul yellow
+colorfunction = runparams[5] = 0         # color function 0(hash), >=1(fnal), 2 nongolstate 3 report of golgstats in 3 colours and 3 levels each
                                          # 4 activities 5 populations 6 genealogy steps 7 genealogy temporal with activity scaled colors
                                          # 8 glider detection 9 connected component labelling 10 connected component activities
                                          # 11 genealogy depth 12 genetic glider detection
@@ -293,17 +293,17 @@ def init_button_arrays():
     cancol =[]                                              # expanded lists of button colors, by button
                                                             # no of entries per color region
     ncanon.append([2,2,2,2,2,4,2,2,2])                      # selection 0-7
-    ncanon.append([8,8,8,4,4,4])                            # selection 8,9
-    ncanon.append([2,3,4,5,4,3,2,2,3,4,5,4,3,2,8,4,4,4])    # selection 10,11
-    ncanon.append([4,7,10,7,4,4,7,10,7,4,8,4,4,4])          # selection 12,13
-    ncanon.append([1,2,6,10,13,1,2,6,10,13,8,4,4,4])        # selection 14,15
+    ncanon.append([8,8,8,4,4,3,1])                          # selection 8,9
+    ncanon.append([2,3,4,5,4,3,2,2,3,4,5,4,3,2,8,4,4,3,1])  # selection 10,11
+    ncanon.append([4,7,10,7,4,4,7,10,7,4,8,4,4,3,1])        # selection 12,13
+    ncanon.append([1,2,6,10,13,1,2,6,10,13,8,4,4,3,1])      # selection 14,15
                                                             # colors [R,G,B] for different color regions for buttons, colorvals must be < 128 to allow 2x highlight
     cancolors.append([[0,100,0],[0,50,100],[0,80,80],[0,100,50],[100,100,0],[50,100,0],[100,0,100],[0,0,127],[100,0,0]]) # selection 0-7
-    cancolors.append([[0,0,127],[0,100,0],[100,0,0],[100,100,100],[50,100,50],[100,50,50]]) # selection 8,9
+    cancolors.append([[0,0,127],[0,100,0],[100,0,0],[100,100,100],[50,100,50],[100,50,50],[100,100,100]]) # selection 8,9
     cancolors.append([[0,0,127],[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[0,0,127],
-                      [0,127,0],[50,127,0],[60,120,0],[100,120,0],[80,120,0],[50,120,0],[0,127,0],[100,0,0],[100,100,100],[50,100,50],[100,50,50]]) # selection 10,11
-    cancolors.append([[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[50,127,0],[80,120,0],[100,120,0],[80,120,0],[50,127,0],[100,0,0],[100,100,100],[50,100,50],[100,50,50]])  # selection 12,13
-    cancolors.append([[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[50,127,0],[80,120,0],[100,120,0],[80,120,0],[50,127,0],[100,0,0],[100,100,100],[50,100,50],[100,50,50]])  # selection 14,15
+                      [0,127,0],[50,127,0],[60,120,0],[100,120,0],[80,120,0],[50,120,0],[0,127,0],[100,0,0],[100,100,100],[50,100,50],[100,50,50],[100,100,100]]) # selection 10,11
+    cancolors.append([[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[50,127,0],[80,120,0],[100,120,0],[80,120,0],[50,127,0],[100,0,0],[100,100,100],[50,100,50],[100,50,50],[100,100,100]])  # selection 12,13
+    cancolors.append([[50,0,127],[80,0,120],[100,0,120],[80,0,120],[50,0,127],[50,127,0],[80,120,0],[100,120,0],[80,120,0],[50,127,0],[100,0,0],[100,100,100],[50,100,50],[100,50,50],[100,100,100]])  # selection 14,15
                                                             # lists of colors for individual buttons expanded from above, first initialize to zero
     cancol.append(np.zeros((20,3),np.int32))
     cancol.append(np.zeros((3*8+12,3),np.int32))
@@ -1099,7 +1099,11 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                                 pixeldat = ""
                             else:
                                 if colorfunction < 10:
-                                    pixeldat = "(%d,%d) gol %01x gene %016x status %016x" % (x,y,gol[x+y*N],golg[x+y*N],golgstats[x+y*N])
+                                    genelife.get_curgolgstats(golgstats)
+                                    if colorfunction == 2:
+                                        pixeldat = "(%d,%d) gol %01x gene %016x s %03d" % (x,y,gol[x+y*N],golg[x+y*N],(golgstats[x+y*N] % 8)+1)
+                                    else:
+                                        pixeldat = "(%d,%d) gol %01x gene %016x status %016x" % (x,y,gol[x+y*N],golg[x+y*N],golgstats[x+y*N])
                                 elif colorfunction == 11:
                                     pixeldat = "(%d,%d) gol %01x cloneid %016x gene %016x" % (x,y,gol[x+y*N],golb[x+y*N],golg[x+y*N])
                                 elif colorfunction == 12:
@@ -1194,8 +1198,11 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                             genelife.get_curgol(gol)    # get current gol,golg,golgstats arrays
                             genelife.get_curgolg(golg)
                             if colorfunction < 10:
-                                    genelife.get_curgolgstats(golgstats)
-                                    pixeldat = "(%d,%d) gol %016x gene %016x status %016x" % (x,y,gol[x+y*N],golg[x+y*N],golgstats[x+y*N])
+                                genelife.get_curgolgstats(golgstats)
+                                if colorfunction == 2:
+                                    pixeldat = "(%d,%d) gol %01x gene %016x s %03d" % (x,y,gol[x+y*N],golg[x+y*N],(golgstats[x+y*N] % 8)+1)
+                                else:
+                                    pixeldat = "(%d,%d) gol %01x gene %016x status %016x" % (x,y,gol[x+y*N],golg[x+y*N],golgstats[x+y*N])
                             elif colorfunction == 11:
                                     genelife.get_curgolbr(golb,golr)
                                     pixeldat = "(%d,%d) gol %01x cloneid %016x gene %016x" % (x,y,gol[x+y*N],golb[x+y*N],golg[x+y*N])

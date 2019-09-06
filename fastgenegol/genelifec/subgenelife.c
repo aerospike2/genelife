@@ -75,8 +75,8 @@ int startgenechoice = 8;            // selection for defined starting genes 0-8 
 int initfield = 0;                  // 0 input from random field of random or start genes, 1 input from file genepat.dat of 32x32 indexes to start genes
                                     // value i>1: initialized to random field on central ixi block only, outside this zero.
                                     // value<0: initialize with gol and golg values
-int colorfunction = 0;              // color function choice of 0: hash or 1: functional (color classes depends on selection parameter)
-                                    // 2: as in 1 but color sites where last step was non GoL rule yellow, 3: as in 2 but yellow if state produced by non GoL
+int colorfunction = 0;              // color function choice of 0: hash or 1: functional (color classes depends on selection parameter) & if last step was non GoL change yellow
+                                    // 2: use numbner of live neighbours to colour  3: colour with 3 colours and 3 levels using information in golgstats
                                     // 4: activities 5: populations 6: genealogies without time 7: genealogies with time brightness by activity 8: gliders
                                     // 9: connected components 10 : connected component activities 11: genealogy based individual colors 12: genetic glider det
 int colorfunction2 = -1;            // colorfunction for second window: as above, but -1 means same value as colorfunction : only one fn call made
@@ -871,10 +871,19 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
     unsigned int d,d0,d1,d2,jper;
     unsigned int color[3],colormax;
     double rescalecolor;
-    uint64_t * traceptr;
+    uint64_t *traceptr;
     int *npopptr;
+    const int colpopmax = 225;                                              // it would be useful to bring this parameter up to python
+    const double colpoplow = 50.0;
+    const double logcolpopmax= log(colpoplow+(double) colpopmax);
+    int actmax = 0;                                                         // it would be useful to bring this parameter up to python
+    int ancestortypec;
+    int it_nbhood2;
+    short unsigned int dscale[16] = {0xff,0xcf,0x7f,0x4f,0x2f,0x27,0x1f,0x1d,0x1b,0x19,0x17,0x15,0x14,0x13,0x12,0x11};
+    int dx,dy;
     quadnode *q;
-    static int numones[16]={0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4};
+    uint64_t qid,ancestor,root;
+    // static int numones[16]={0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4};
     int labelimage(uint64_t hashkeypatt, short unsigned int labelimg[], short unsigned int label, int offset);
     extern inline int log2size(const short unsigned int golpw);
     void get_gliderinfo(uint64_t outgliderinfo[], int narraysize);
@@ -889,25 +898,26 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
     }
     else {
         nfrPlane = (curPlane+nfrstep) % numPlane;
-        ggol = planes[nfrPlane];                                               // get planes of gol,golg,golb,golr,golgstats data
+        ggol = planes[nfrPlane];                                            // get planes of gol,golg,golb,golr,golgstats data
         ggolg = planesg[nfrPlane];
         ggolgstats = planesgs[nfrPlane];
         ggolb = planesb[nfrPlane];
         ggolr = planesr[nfrPlane];
     }
 
-    if(colorfunction==0) { // colorfunction based on multiplicative hash
+    switch (colorfunction) {
+      case 0:                                                               // colorfunction based on multiplicative hash
         // see https://stackoverflow.com/questions/6943493/hash-table-with-64-bit-values-as-key/33871291
         for (ij=0; ij<N2; ij++) {
             if (ggol[ij]) {
                 gene = ggolg[ij];
-                if (gene == 0ull) gene = 11778ull; // random color for gene==0
-                // mask = (gene * 11400714819323198549ul) >> (64 - 8);   // hash with optimal prime multiplicator down to 8 bits
-                // mask = (gene * 11400714819323198549ul) >> (64 - 32);  // hash with optimal prime multiplicator down to 32 bits
+                if (gene == 0ull) gene = 11778ull;                          // random color for gene==0
+                // mask = (gene * 11400714819323198549ul) >> (64 - 8);      // hash with optimal prime multiplicator down to 8 bits
+                // mask = (gene * 11400714819323198549ul) >> (64 - 32);     // hash with optimal prime multiplicator down to 32 bits
                 mask = gene * 11400714819323198549ull;
-                mask = mask >> (64 - 32);   // hash with optimal prime multiplicator down to 32 bits
+                mask = mask >> (64 - 32);                                   // hash with optimal prime multiplicator down to 32 bits
                 if(rulemod & 0x4) mask = (((ij>>log2N)==((N>>1)-(initfield>>1)-1) || ((ij>>log2N)==((N>>1)-(initfield>>1)-2))) && (ij & 0x1) ? 0x00ffffffull : mask);
-                mask |= 0x080808ffull; // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
+                mask |= 0x080808ffull;                                      // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
                 cgolg[ij] = (int) mask;
             }
             else {
@@ -916,10 +926,10 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
                 cgolg[ij] = (int) mask;
             }
         }
-    }
-    else if(colorfunction<4){
+        break;
+      case 1:                                                               // functional color assignment based on selection model
         for (ij=0; ij<N2; ij++) {
-            if (gol[ij]) {
+            if (ggol[ij]) {
                 gene = ggolg[ij];
                 POPCOUNT64C(gene,d);                                        // assigns number of ones in gene to d
                 switch (selection) {
@@ -955,44 +965,51 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
                         case 14: POPCOUNT64C(gene&0xffffffffull,d1); POPCOUNT64C((gene>>32)&0xffffffffull,d2);
                                  mask = (d2<<27)+(d1<<11)+0xff; break;
                         case 15: mask = 0xffffffff;  break; // NYI
-                        case 16:
-                        case 17: for (d=0,mask=0;d<16;d++) {d2=(gene>>(d<<2))&0xf;d2=(d2!=d)?1:0;mask+=(d2*0x2a)<<((d%3)<<3);}
-                                 mask = (mask<<8)+0x7f7f7fff;break;  // 0x2a is 42, approx 1/6 (ie <16/3) of 255
-                        case 18:
-                        case 19: for (d=0,mask=0;d<16;d++) {d2=(gene>>(d<<2))&0xf;d2=numones[d2];mask+=(d2*0xb)<<((d%3)<<3);}
-                                 mask = (mask<<8)+0x7f7f7fff;break;  // 0x2a is 42, approx 1/6 (ie <16/3) of 255
-                        case 20:
-                        case 21:
-                        case 22:
-                        case 23: d2= (d>>5) ? 5*32 + d-32 : ((d>>4) ? 4*32 + (d-16)*2
-                                                         : ((d>>3) ? 3*32 + (d-8)*4
-                                                         : ((d>>2) ? 2*32 + (d-4)*8
-                                                         : ((d>>1) ? 32 + (d-2)*16
-                                                         : d*32))));
-                                mask = gene * 11400714819323198549ul;mask = mask >> (64 - 16);
-                                mask = ((d2+62)<<8)+(mask<<16)+0xff;break;
-                        case 24:
-                        case 25: mask = ((gene>>40)<<8)+0xff; break;
                         default  : mask = ((d+(d<<6)+(d<<12)+(d<<18))<<8) + 0xff;
                 }
-                if(colorfunction==2) {
-                    if(ggolgstats[ij]&F_nongolchg) mask = 0x00ffffff;        // color states changed by non GoL rule yellow
-                }
-                else if (colorfunction==3) {
-                    if(ggolgstats[ij]&F_survmut) mask = 0xff00ffff;  // color states for surviving fresh mutants (non-replicated) purple/pink
-                    else if(ggolgstats[ij]&F_notgolrul) mask = 0x00ffffff;  // color states for not GoL rule yellow
-                }
+                if(ggolgstats[ij]&F_nongolchg) mask = 0x00c0c0ff;       // color states changed by non GoL rule are shown in yellow
+
+               
+                // if(ggolgstats[ij]&F_survmut) mask = 0xff00ffff;         // color states for surviving fresh mutants (non-replicated) purple/pink
+                // else if(ggolgstats[ij]&F_notgolrul) mask = 0x00ffffff;  // color states for not GoL rule yellow
 
                 cgolg[ij] = (int) mask;
             }
             else cgolg[ij] = 0;
         }
-    }
-    else if(colorfunction==4){                                  // activities
-        const int colpopmax = 225;                                      // need to bring this parameter up to python
-        const double colpoplow = 50.0;
-        const double logcolpopmax= log(colpoplow+(double) colpopmax);
-
+        break;
+      case 2:                                                               // colouring by s state and central state (and pattern)
+        for (ij=0; ij<N2; ij++) {
+            gene = ggolgstats[ij];
+            if (ggol[ij]) {
+                mask = 0xffull + ((F_s_live&gene) << (16+5));
+                cgolg[ij] = (int) mask;
+            }
+            else if (F_s_live&gene) {
+                mask = 0xffull + ((F_s_live&gene) << (24+5));
+                cgolg[ij] = (int) mask;
+            }
+            else cgolg[ij] = 0;
+        }
+        break;
+      case 3:                                                               // color states report golgstats status of processing
+                                                                            // principle is to map bits to one of 3 colours
+                                                                            // green: 7: mutation 6:  birth 5: parent
+                                                                            // blue:  7: survival or disambig used 6: parentdies 5: normal death
+                                                                            // red:   7: parentaldeath 6: nongolchange 5: not gol rule
+        for (ij=0; ij<N2; ij++) {
+            gene = ggolgstats[ij];
+            if (ggol[ij]||((F_death|F_parentaldeath)&gene)) {
+                mask = 0xffull;                                             // opaque
+                mask |= (((F_parentaldeath&gene) ? 0x80ull : 0ull) + ((F_nongolchg&gene) ? 0x40ull : 0ull) + ((F_notgolrul&gene) ? 0x20ull : 0ull))<<8;  // red
+                mask |= (((F_mutation&gene) ? 0x80ull : 0ull) + ((F_birth&gene) ? 0x40ull : 0ull) + ((F_parent&gene) ? 0x20ull : 0ull))<<16;             // green
+                mask |= ((((F_survival|F_disambig)&gene) ? 0x80ull : 0ull) + ((F_dummy&gene) ? 0x40ull : 0ull) + ((F_death&gene) ? 0x20ull : 0ull))<<24;           // blue
+                cgolg[ij] = (int) mask;
+            }
+            else cgolg[ij] = 0;
+        }
+        break;
+      case 4:                                                               // activities
         if(nbhist==-1) {
             traceptr =&acttrace[0];
             npopptr = &npopulation[0];
@@ -1033,9 +1050,8 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
             if ((npopptr[i+((ij+i1)&Nmask)]>>log2N)==(N-1-(ij>>log2N))) mask = 0xffffffff;  // overlay plot with trace of density in white (except if pop=N2)
             cgolg[ij]= (int) mask;
         }
-    }
-    else if(colorfunction==5){                                  // populations of genes or clones
-        int actmax = 0;                                         // need to bring this parameter up to python
+        break;
+      case 5:                                                   // populations of genes or clones
         if(nbhist==-1) {
             traceptr =&poptrace[0];
             npopptr = &npopulation[0];
@@ -1073,9 +1089,9 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
             if ((npopptr[i+((ij+i1)&Nmask)]>>log2N)==(N-1-(ij>>log2N))) mask = 0xffffffff;  // overlay plot with trace of density in white (except if pop=N2)
             cgolg[ij]= (int) mask;
         }
-    }
-    else if(colorfunction==6 || colorfunction == 7){                    //genealogies
-        int ancestortypec;
+        break;
+      case 6:                                                   // genealogies
+      case 7:                                                   // genealogies with temporal resolution
         if(colorfunction==6) k=2; else k=0;                             // double row for each ancestral step to make display more readable in colorfunction 6 mode
         if((colorfunction2==-1) || (ancestortype !=2)) ancestortypec = ancestortype;
         else if (winnr) ancestortypec = 1;
@@ -1130,9 +1146,8 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
             }
             cgolg[ij]=(int) mask;
         }
-    }
-    else if(colorfunction == 8) {         // colorfunction based on packed bit pattern with multiplicative hash, compare with offset
-        int it_nbhood2;
+        break;
+      case 8:                                                           // colorfunction based on packed bit pattern with multiplicative hash, compare with offset
         it_nbhood2 = it_nbhood*it_nbhood+2;
         for (ij=0; ij<N2; ij++) {
                 gene = golmix[ij];
@@ -1204,79 +1219,78 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
             }
             
         }
-    }
-    else if(colorfunction==9) {                                     // colorfunction based on unique labelling of separate components in image
-      if (diagnostics & diag_component_labels) {
-        for (ij=0; ij<NN2; ij++) labelcc[ij]=relabel[label[ij]];    // transfer labels to interactive working area
-        if(xdisplay>=0 && ydisplay>=0) {
-            if ((labelxy=label[xdisplay+ydisplay*N])) {
-                for (ij=0; ij<NN2; ij++) if (label[ij]==complist[labelxy].label) labelcc[ij]=0xffff;    // label chosen component white at its current location
-                d=complist[labelxy].log2n;
-                short unsigned int conn = connlists[labelxy];
-                while(conn) {
-                    for (ij=0; ij<NN2; ij++) if (oldlabel[ij]==connections[conn].oldlab) {
-                        if (labelcc[ij]==0xffff) labelcc[ij]=0xfffd; // color old connected components overlapping pink
-                        else labelcc[ij]=0xfffe;                     // color old connected components not overlapping red
+        break;
+      case 9:                                                   // colorfunction based on unique labelling of separate components in image
+          if (diagnostics & diag_component_labels) {
+            for (ij=0; ij<NN2; ij++) labelcc[ij]=relabel[label[ij]];    // transfer labels to interactive working area
+            if(xdisplay>=0 && ydisplay>=0) {
+                if ((labelxy=label[xdisplay+ydisplay*N])) {
+                    for (ij=0; ij<NN2; ij++) if (label[ij]==complist[labelxy].label) labelcc[ij]=0xffff;    // label chosen component white at its current location
+                    d=complist[labelxy].log2n;
+                    short unsigned int conn = connlists[labelxy];
+                    while(conn) {
+                        for (ij=0; ij<NN2; ij++) if (oldlabel[ij]==connections[conn].oldlab) {
+                            if (labelcc[ij]==0xffff) labelcc[ij]=0xfffd; // color old connected components overlapping pink
+                            else labelcc[ij]=0xfffe;                     // color old connected components not overlapping red
+                        }
+                        conn=connections[conn].next;
                     }
-                    conn=connections[conn].next;
+                    for (ij=0; ij<(1<<(d<<1)); ij++) labelcc[(ij&((1<<d)-1)) + (ij>>d)*N] = 0;  // initialize component drawing area to zero in top left corner
+                    if (complist[labelxy].quad) labelimage(complist[labelxy].quad, labelcc, 0xffff, 0); // extract this component and label it white
+                    else labelimage(complist[labelxy].patt, labelcc, 0xffff, 0);  // component involves patt not quad
                 }
-                for (ij=0; ij<(1<<(d<<1)); ij++) labelcc[(ij&((1<<d)-1)) + (ij>>d)*N] = 0;  // initialize component drawing area to zero in top left corner
-                if (complist[labelxy].quad) labelimage(complist[labelxy].quad, labelcc, 0xffff, 0); // extract this component and label it white
-                else labelimage(complist[labelxy].patt, labelcc, 0xffff, 0);  // component involves patt not quad
             }
-        }
- 
-        if (!gcolors) {
-          for (ij=0; ij<NN2; ij++) {
-            if (labelcc[ij]) {
-                // quad = (uint64_t) relabel[label[ij]];            // use gene variable simply as label for connected component (no connection with gene)
-                quad = (uint64_t) labelcc[ij];                      // use gene variable simply as label for connected component (no connection with gene)
-                mask = quad * 11400714819323198549ull;              // map label (quasi-uniformly) into larger unsigned colour space
-                mask = mask >> (64 - 32);                           // hash with optimal prime multiplicator down to 32 bits
-                mask |= 0x080808ffull;                              // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
-                if (noveltyfilter && (diagnostics & diag_hash_patterns)) {
-                    quad = complist[label[ij]].quad;
-                    if((d=complist[label[ij]].patt)) popcount=smallpatts[d].activity; // number of times small (<= 4x4) pattern encountered previously
-                    else if((q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL) // if we reach here, quad should have been stored in hash table
-                        popcount=q->activity;                       // number of times large pattern encountered previously (poss. also as part of larger patt)
-                    else popcount=1;                                // should never occur, but just in case, assume novel
-                    if (popcount>1) mask &= (mask&0x3f3f3fff);      // darken non novel components (currently a little too much)
+     
+            if (!gcolors) {
+              for (ij=0; ij<NN2; ij++) {
+                if (labelcc[ij]) {
+                    // quad = (uint64_t) relabel[label[ij]];            // use gene variable simply as label for connected component (no connection with gene)
+                    quad = (uint64_t) labelcc[ij];                      // use gene variable simply as label for connected component (no connection with gene)
+                    mask = quad * 11400714819323198549ull;              // map label (quasi-uniformly) into larger unsigned colour space
+                    mask = mask >> (64 - 32);                           // hash with optimal prime multiplicator down to 32 bits
+                    mask |= 0x080808ffull;                              // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
+                    if (noveltyfilter && (diagnostics & diag_hash_patterns)) {
+                        quad = complist[label[ij]].quad;
+                        if((d=complist[label[ij]].patt)) popcount=smallpatts[d].activity; // number of times small (<= 4x4) pattern encountered previously
+                        else if((q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL) // if we reach here, quad should have been stored in hash table
+                            popcount=q->activity;                       // number of times large pattern encountered previously (poss. also as part of larger patt)
+                        else popcount=1;                                // should never occur, but just in case, assume novel
+                        if (popcount>1) mask &= (mask&0x3f3f3fff);      // darken non novel components (currently a little too much)
+                    }
+                    if (labelcc[ij] == 0xffff) mask = 0xffffffffull;    // recolor selected component white
+                    else if (labelcc[ij] == 0xfffd) mask = 0xc0c0ffffull; // recolor connected old components overlapping with selected component pink
+                    else if (labelcc[ij] == 0xfffe) mask = 0x0000ffffull; // recolor connected old components not overlapping with selected component red
+                    cgolg[ij] = (int) mask;
                 }
-                if (labelcc[ij] == 0xffff) mask = 0xffffffffull;      // recolor selected component white
-                else if (labelcc[ij] == 0xfffd) mask = 0xc0c0ffffull; // recolor connected old components overlapping with selected component pink
-                else if (labelcc[ij] == 0xfffe) mask = 0x0000ffffull; // recolor connected old components not overlapping with selected component red
-                cgolg[ij] = (int) mask;
+                else cgolg[ij] = 0;
+              }
             }
-            else cgolg[ij] = 0;
-          }
-        }
-        else {                                                       // with gcolors set, color according to computed inherited label colours
-          for (ij=0; ij<NN2; ij++) {
-            if (label[ij]) cgolg[ij] = (int) rgba(complist[label[ij]].gcolor);
-            else cgolg[ij] = 0;
-          }
-        }
-      } // diag_component_labels
-    }
-    else if(colorfunction==10){                                     //activities for patterns with size weighted colours
-        uint64_t qid;
+            else {                                                      // with gcolors set, color according to computed inherited label colours
+              for (ij=0; ij<NN2; ij++) {
+                if (label[ij]) cgolg[ij] = (int) rgba(complist[label[ij]].gcolor);
+                else cgolg[ij] = 0;
+              }
+            }
+          } // diag_component_labels
+          break;
+      case 10:                                                          //activities for patterns with size weighted colours
         for (ij=0; ij<NN2; ij++) labelcc[ij]=0;
         if(xdisplay>=0 && ydisplay>=0) {
             if ((qid=acttraceq[xdisplay+ydisplay*N])) {
-                labelimage(qid, labelcc, 0xffff, 0);                // extract this component and label it white
+                labelimage(qid, labelcc, 0xffff, 0);                    // extract this component and label it white
             }
         }
         for (ij=0; ij<N2; ij++) {
             quad=acttraceq[ij];
             if(labelcc[ij]) mask = 0xffffffff;
-            else if (quad == rootgene) mask = 0x3f3f3fff;           // grey color for background, all root genes
+            else if (quad == rootgene) mask = 0x3f3f3fff;               // grey color for background, all root genes
             else {
                 if (activity_size_colormode == 0) {
                     mask = quad * 11400714819323198549ul;
-                    mask = mask >> (64 - 32);                       // hash with optimal prime multiplicator down to 32 bits
-                    mask |= 0x080808ffull;                          // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
+                    mask = mask >> (64 - 32);                           // hash with optimal prime multiplicator down to 32 bits
+                    mask |= 0x080808ffull;                              // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
                 }
-                else if (activity_size_colormode == 1) {            // color by log2n, enclosing square size
+                else if (activity_size_colormode == 1) {                // color by log2n, enclosing square size
                     if(acttraceqt[ij] && (q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL) d = log2upper((unsigned int) q->size);
                     else if (!acttraceqt[ij] && quad<65536ull && smallpatts[quad].activity) {
                         d = log2size((short unsigned int) quad);
@@ -1286,7 +1300,7 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
                     setcolor(color,d);
                     mask = (color[0]<<8) | (color[1]<<16) |  (color[2]<<24) | 0xff;
                 }
-                else {                                              // color by sqrt of nr of live pixels (up to max value of 255)
+                else {                                                  // color by sqrt of nr of live pixels (up to max value of 255)
                     int popmax = 255;
                     if(acttraceqt[ij] && (q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL) popcount = q->pop1s;
                     else if (!acttraceqt[ij] && quad<65536ull && smallpatts[quad].activity) {POPCOUNT64C((uint64_t) quad,popcount);}
@@ -1303,13 +1317,10 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
             if ((npopulation[ij&Nmask]>>log2N)==(ij>>log2N)) mask = 0xffffffff;  // overlay plot with trace of density in white (except if pop=N2)
             cgolg[ij]= (int) mask;
         }
-    }
-    else if(colorfunction==11){                                     //genealogy based colours of ancestors at genealogycoldepth
-    
-        uint64_t ancestor,root;
-        int ancestortypec;
+        break;
+      case 11:                                                          //genealogy based colours of ancestors at genealogycoldepth
         if((colorfunction2==-1) || (ancestortype !=2)) ancestortypec = ancestortype;
-        else if (winnr) ancestortypec = 1;                          // ancestortype set to 3: use values 0 and 2 in two windows
+        else if (winnr) ancestortypec = 1;                              // ancestortype set to 3: use values 0 and 2 in two windows
         else ancestortypec = 0;
         if (ancestortypec==1) root = rootclone;
         else root = rootgene;
@@ -1348,10 +1359,8 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
             }
             else cgolg[ij] = 0;
         }
-    }
-    else if(colorfunction==12){                                     // colouring based on periodicity of dynamic record of 16 last states in golr for live genes
-        short unsigned int dscale[16] = {0xff,0xcf,0x7f,0x4f,0x2f,0x27,0x1f,0x1d,0x1b,0x19,0x17,0x15,0x14,0x13,0x12,0x11};
-        int dx,dy;
+        break;
+      case 12:                                                      // colouring based on periodicity of dynamic record of 16 last states in golr for live genes
         /* if (firstdebug) {
             golr_digest (0x1111111111111111ull, &d0, &d1, &jper, &dx, &dy);fprintf(stderr,"golr digest %llx %d %d %d %d %d\n",0x1111111111111111ull, d0, d1, jper, dx, dy);
             golr_digest (0x1111111111111119ull, &d0, &d1, &jper, &dx, &dy);fprintf(stderr,"golr digest %llx %d %d %d %d %d\n",0x1111111111111119ull, d0, d1, jper, dx, dy);
@@ -1381,6 +1390,10 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
             }
             else cgolg[ij] = 0;
         }
+        break;
+      default:
+        fprintf(stderr,"Error: colorfunction %d not supported\n",colorfunction);
+        break;
     }
     for (ij=0; ij<N2; ij++) {                                       // convert BGRA format (pygame) to ARGB (PySDL2)
         uint32_t c = cgolg[ij];
