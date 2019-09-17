@@ -327,6 +327,7 @@ unsigned int connpref[NLM];         // preferred backward connected component at
 unsigned int connpreff[NLM];        // preferred forward connected component at time t for each component at time t-1
 int connused = 0;                   // used connection nodes
 int gcolors = 0;                    // use inherited colors to color connected components
+int conn_genetic = 1;               // 0: if gol state only used to determine connected components 1: if golg state used as well
 //............................................... optimal linear assignment t-1 to t ....................................................................
 // #include "lapjv.h"               // modified from Tomas Kazmar python interfaced implementation of Jonker-Volgenant LAPMOD algorithm, if using lapmod.c
 unsigned int iilap[NLM];            // indices of start of each variable length row in sparse cost matrix : first entry 0, last entry nclap
@@ -559,7 +560,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 //......................................................  fast component labelling  ......................................................................
 // lab_union            disjoint rank union of equivalence classes returning common root
 // label_cell           label a cell (site) in the cellular automata with first pass label of connected component
-// label_cell_Wu        alternative version according to secondary paper by Wu discussing Suzuki decision tree
+// label_cell_genetic   label a cell (site) for connected component analysis taking differences in genes into account
 // checklabels          check that the label tree consistently points to labels of lower values as we go via parents to root
 // flattenlabels        flatten label tree so that each label points to its unique root
 // label_components     do two-pass fast component labelling with 8-neighbour using Suzuki decision tree, rank union and periodic BCs, connect t-1 labels with t
@@ -2735,7 +2736,7 @@ extern inline short unsigned int lab_union(equivrec eqv[], short unsigned int i,
 // Return the root of union tree in equivalence relation's disjoint union-set forest
     short unsigned int root = i;
     while (eqv[root].pt<root) {
-        eqv[root].pt = eqv[eqv[root].pt].pt;        // halving algorithm to compress path on the fly
+        eqv[root].pt = eqv[eqv[root].pt].pt;       // halving algorithm to compress path on the fly
         root = eqv[root].pt;
     }
     if (i != j) {
@@ -2749,11 +2750,11 @@ extern inline short unsigned int lab_union(equivrec eqv[], short unsigned int i,
         if (root == rooti) return root;
         rootj=root;
         // if (eqv[rooti].rank < eqv[rootj].rank) {                 // swap rooti, rootj so that rooti has larger rank : disrupts ordering!
-        if (rooti > rootj) {                 // swap rooti, rootj so that rooti is lower of two
+        if (rooti > rootj) {                        // swap rooti, rootj so that rooti is lower of two
             rootj=rooti;
             rooti=root;
         }
-        eqv[rootj].pt = rooti;                                 // merge rootj into rooti
+        eqv[rootj].pt = rooti;                      // merge rootj into rooti
         if (eqv[rooti].rank == eqv[rootj].rank) {
             eqv[rooti].rank++;
         }
@@ -2761,39 +2762,40 @@ extern inline short unsigned int lab_union(equivrec eqv[], short unsigned int i,
     return root;
 }
 //.......................................................................................................................................................
-extern inline short unsigned int label_cell_Wu(int ij,short unsigned int *nlabel) {  // first version, slightly less efficient?, not used
-    short unsigned int clabel,clabel1,labelij;
-    clabel=label[deltaxy(ij,0,-1)];                  // deltaxy takes periodic BCs into account (b in Suzuki Decision Tree, see Wu et.al.)
-    if(clabel) labelij=eqv[clabel].pt;         // b
-    else {                                           // N (=b) unlabelled
-        clabel=label[deltaxy(ij,1,-1)];              // (c in Suzuki DT)
+extern inline short unsigned int label_cell(int ij,short unsigned int *nlabel) {
+    short unsigned int clabel,clabel1,labelij,labelijold;
+    labelijold=label[ij];
+    clabel=label[deltaxy(ij,0,-1)];                         // deltaxy takes periodic BCs into account (b in Suzuki Decision Tree, 2010)
+    if(clabel) labelij=eqv[clabel].pt;         // copy b
+    else {                                                  // N (=b) unlabelled
+        clabel=label[deltaxy(ij,-1,0)];                     // W (d in Suzuki DT)
         if(clabel) {
-            clabel1=label[deltaxy(ij,-1,-1)];        // NW (a in Suzuki DT)
+            clabel1=label[deltaxy(ij,1,-1)];                // NE (c in Suzuki DT)
             if(clabel1) {
-                labelij=lab_union(eqv,clabel,clabel1); // c,a
+                labelij=lab_union(eqv,clabel1,clabel);      // resolve c,d
             }
             else {
-                clabel1=label[deltaxy(ij,-1,0)];     // W (d in Suzuki DT)
-                if(clabel1) {
-                    labelij=lab_union(eqv,clabel,clabel1); // c,d
-                }
-                else {
-                    labelij=eqv[clabel].pt;    // c
-                }
+                labelij=eqv[clabel].pt;        // copy d
             }
         }
         else {
-            clabel=label[deltaxy(ij,-1,-1)];         // NW (a in Suzuki DT)
+            clabel=label[deltaxy(ij,1,-1)];                 // NE (c in Suzuki DT)
             if(clabel) {
-                labelij=eqv[clabel].pt;        // a
-            }
-            else {
-                clabel=label[deltaxy(ij,-1,0)];      // W (d in Suzuki DT)
-                if(clabel) {
-                    labelij=eqv[clabel].pt;    // d
+                clabel1=label[deltaxy(ij,-1,-1)];           // NW (a in Suzuki DT)
+                if(clabel1) {
+                    labelij=lab_union(eqv,clabel,clabel1);  // resolve c,a
                 }
                 else {
-                    clabel=++*nlabel;                // new label if a,b,c,d all without labels
+                    labelij=eqv[clabel].pt;    // copy c
+                }
+            }
+            else {
+                clabel1=label[deltaxy(ij,-1,-1)];           // NW (a in Suzuki DT)
+                if(clabel1) {
+                    labelij=eqv[clabel1].pt;   // copy a
+                }
+                else {
+                    clabel=++*nlabel;                       // new label if a,b,c,d all without labels
                     eqv[clabel].pt=clabel;
                     labelij=clabel;
                     eqv[clabel].rank=0;
@@ -2801,46 +2803,52 @@ extern inline short unsigned int label_cell_Wu(int ij,short unsigned int *nlabel
             }
         }
     }
+    if (labelijold) labelij= lab_union(eqv,labelij,labelijold); // resolve labelij,labelijold needed for periodic BCs wrap around
     return labelij;
 }
 //.......................................................................................................................................................
-extern inline short unsigned int label_cell(int ij,short unsigned int *nlabel) {
-    short unsigned int clabel,clabel1,labelij,labelijold;
+extern inline short unsigned int label_cell_genetic(int ij,short unsigned int *nlabel,uint64_t golg[]) {
+    short unsigned int clabel0,clabel1,labelij,labelijold;
+    int ij0,ij1;
+    uint64_t gene;
+    
     labelijold=label[ij];
-    clabel=label[deltaxy(ij,0,-1)];                  // deltaxy takes periodic BCs into account (b in Suzuki Decision Tree, 2010)
-    if(clabel) labelij=eqv[clabel].pt;         // copy b
-    else {                                           // N (=b) unlabelled
-        clabel=label[deltaxy(ij,-1,0)];              // W (d in Suzuki DT)
-        if(clabel) {
-            clabel1=label[deltaxy(ij,1,-1)];         // NE (c in Suzuki DT)
-            if(clabel1) {
-                labelij=lab_union(eqv,clabel1,clabel); // resolve c,d
+    gene = golg[ij];
+    clabel0=label[ij0=deltaxy(ij,0,-1)];                         // deltaxy takes periodic BCs into account (b in Suzuki Decision Tree, 2010)
+    if(clabel0&&(golg[ij0]==gene))
+        labelij=eqv[clabel0].pt;                // copy b
+    else {                                                       // N (=b) unlabelled
+        clabel0=label[ij0=deltaxy(ij,-1,0)];                     // W (d in Suzuki DT)
+        if(clabel0&&(golg[ij0]==gene)) {
+            clabel1=label[ij1=deltaxy(ij,1,-1)];                 // NE (c in Suzuki DT)
+            if(clabel1&&(golg[ij1]==gene)) {
+                labelij=lab_union(eqv,clabel1,clabel0);          // resolve c,d
             }
             else {
-                labelij=eqv[clabel].pt;        // copy d
+                labelij=eqv[clabel0].pt;        // copy d
             }
         }
         else {
-            clabel=label[deltaxy(ij,1,-1)];              // NE (c in Suzuki DT)
-            if(clabel) {
-                clabel1=label[deltaxy(ij,-1,-1)];        // NW (a in Suzuki DT)
-                if(clabel1) {
-                    labelij=lab_union(eqv,clabel,clabel1); // resolve c,a
+            clabel0=label[ij0=deltaxy(ij,1,-1)];                 // NE (c in Suzuki DT)
+            if(clabel0&&(golg[ij0]==gene)) {
+                clabel1=label[ij1=deltaxy(ij,-1,-1)];            // NW (a in Suzuki DT)
+                if(clabel1&&(golg[ij1]==gene)) {
+                    labelij=lab_union(eqv,clabel0,clabel1);      // resolve c,a
                 }
                 else {
-                    labelij=eqv[clabel].pt;        // copy c
+                    labelij=eqv[clabel0].pt;    // copy c
                 }
             }
             else {
-                clabel1=label[deltaxy(ij,-1,-1)];        // NW (a in Suzuki DT)
-                if(clabel1) {
-                    labelij=eqv[clabel1].pt;       // copy a
+                clabel1=label[ij1=deltaxy(ij,-1,-1)];            // NW (a in Suzuki DT)
+                if(clabel1&&(golg[ij1]==gene)) {
+                    labelij=eqv[clabel1].pt;   // copy a
                 }
                 else {
-                    clabel=++*nlabel;                    // new label if a,b,c,d all without labels
-                    eqv[clabel].pt=clabel;
-                    labelij=clabel;
-                    eqv[clabel].rank=0;
+                    clabel0=++*nlabel;                           // new label if a,b,c,d all without labels
+                    eqv[clabel0].pt=clabel0;
+                    labelij=clabel0;
+                    eqv[clabel0].rank=0;
                 }
             }
         }
@@ -2876,7 +2884,7 @@ void flattenlabels(equivrec eqv[],unsigned short int *nlabel) {
     *nlabel = xlabel-1;
 }
 //.......................................................................................................................................................
-short unsigned int label_components(uint64_t gol[]) {
+short unsigned int label_components(uint64_t gol[],uint64_t golg[]) {
 // fast component labelling, updating global equivalence table equiv and placing labels in global array label, return number of labels
     int i,ij,sum,sumoverlap,maxoverlap,overallmaxoverlap;   //   abc   scan mask to calculate label at position e
     short unsigned int nlabel = 0;                          //   de
@@ -2908,19 +2916,38 @@ short unsigned int label_components(uint64_t gol[]) {
     for(i=0;i<(NLM);i++) eqv[i].size=0;
     for(i=0;i<(NLM);i++) xlap[i]=ylap[i]=0;
 
-    for(ij=0;ij<N2;ij++) {                                  // do first pass main array
-        if (gol[ij]) {
-            label[ij]=label_cell(ij,&nlabel);
+    if(conn_genetic) {                                          // version taking genetic differences into account : separate label if different gene
+            for(ij=0;ij<N2;ij++) {                              // do first pass main array
+            if (gol[ij]) {
+                label[ij]=label_cell_genetic(ij,&nlabel,golg);
+            }
+        }
+        for(ij=0;ij<N;ij++) {                                   // redo first row sites to take periodic wrap around into account
+            if (gol[ij]) {
+                label[ij]=label_cell_genetic(ij,&nlabel,golg);
+            }
+        }
+        for(ij=N;ij<N2;ij+=N) {                                 // redo first column sites to take periodic wrap around into account
+            if (gol[ij]) {
+                label[ij]=label_cell_genetic(ij,&nlabel,golg);
+            }
         }
     }
-    for(ij=0;ij<N;ij++) {                                   // redo first row sites to take periodic wrap around into account
-        if (gol[ij]) {
-            label[ij]=label_cell(ij,&nlabel);
+    else {                                                      // version looking only at live/empty state of gol array for connected components
+        for(ij=0;ij<N2;ij++) {                                  // do first pass main array
+            if (gol[ij]) {
+                label[ij]=label_cell(ij,&nlabel);
+            }
         }
-    }
-    for(ij=N;ij<N2;ij+=N) {                                 // redo first column sites to take periodic wrap around into account
-        if (gol[ij]) {
-            label[ij]=label_cell(ij,&nlabel);
+        for(ij=0;ij<N;ij++) {                                   // redo first row sites to take periodic wrap around into account
+            if (gol[ij]) {
+                label[ij]=label_cell(ij,&nlabel);
+            }
+        }
+        for(ij=N;ij<N2;ij+=N) {                                 // redo first column sites to take periodic wrap around into account
+            if (gol[ij]) {
+                label[ij]=label_cell(ij,&nlabel);
+            }
         }
     }
     // checklabels(eqv,&nlabel);                            // check labels point to lower values in equivalence table
@@ -3192,7 +3219,7 @@ short unsigned int label_components(uint64_t gol[]) {
     return nlabel;
 }
 //.......................................................................................................................................................
-short unsigned int extract_components(uint64_t gol[]) {
+short unsigned int extract_components(uint64_t gol[],uint64_t golg[]) {
     int i,j,ij,ij1,log2n;
     short unsigned int k,nside,nlabel,patt;
     short unsigned int histside[log2N+1];
@@ -3204,7 +3231,7 @@ short unsigned int extract_components(uint64_t gol[]) {
         oldcomplist[i]=complist[i];                                                                     // copy whole component struct to previous time step list
     }
     oldncomponents=ncomponents;
-    ncomponents = label_components(gol);                                                                // label connected components at this time step
+    ncomponents = label_components(gol,golg);                                                                // label connected components at this time step
     nlabel = ncomponents;
 
     for(i=1;i<=nlabel;i++) {                                                                            // initialize component structures for horizontal scan
@@ -3807,7 +3834,7 @@ void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t g
     if(randominflux) random_influx(newgol,newgolg,newgolb,newgolr);
     if(vscrolling) v_scroll(newgol,newgolg,newgolb,newgolr);
     if ((colorfunction == 8) || (colorfunction2 == 8)) packandcompare(newgol,working,golmix);
-    if(diagnostics & diag_component_labels) ncomponents=extract_components(newgol);
+    if(diagnostics & diag_component_labels) ncomponents=extract_components(newgol,newgolg);
 
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
         if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error %d in update at step %d, gene %llx not stored\n");
@@ -3958,7 +3985,7 @@ void extern inline finish_update(uint64_t newgol[], uint64_t newgolg[],uint64_t 
     if(randominflux) random_influx(newgol,newgolg,newgolb,newgolr);
     if(vscrolling) v_scroll(newgol,newgolg,newgolb,newgolr);
     if ((colorfunction == 8) || (colorfunction2 == 8)) packandcompare(newgol,working,golmix);
-    if(diagnostics & diag_component_labels) ncomponents=extract_components(newgol);
+    if(diagnostics & diag_component_labels) ncomponents=extract_components(newgol,newgolg);
     if(diagnostics & diag_hash_genes) {
         for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
             if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error %d in update at step %d, gene %llx not stored\n");     // [**gol**]
@@ -5017,7 +5044,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     }
 
     // if(diagnostics & diag_hash_patterns) qimage = quadimage(newgol,&patt,log2N); // quadtree hash of entire image
-    if(diagnostics & diag_component_labels) ncomponents=extract_components(gol);
+    if(diagnostics & diag_component_labels) ncomponents=extract_components(gol,golg);
 }
 //-------------------------------------------------------------------- set ...---------------------------------------------------------------------------
 void set_colorfunction(int colorfunctionin) {
