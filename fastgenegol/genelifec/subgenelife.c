@@ -2916,7 +2916,7 @@ short unsigned int label_components(uint64_t gol[],uint64_t golg[]) {
     for(i=0;i<(NLM);i++) eqv[i].size=0;
     for(i=0;i<(NLM);i++) xlap[i]=ylap[i]=0;
 
-    if(conn_genetic) {                                          // version taking genetic differences into account : separate label if different gene
+    if(conn_genetic) {                                          // taking genetic differences into account : separate label if different gene
             for(ij=0;ij<N2;ij++) {                              // do first pass main array
             if (gol[ij]) {
                 label[ij]=label_cell_genetic(ij,&nlabel,golg);
@@ -2933,7 +2933,7 @@ short unsigned int label_components(uint64_t gol[],uint64_t golg[]) {
             }
         }
     }
-    else {                                                      // version looking only at live/empty state of gol array for connected components
+    else {                                                      // ignoring genetic differences,  looking only at live/empty state of gol array for connected components
         for(ij=0;ij<N2;ij++) {                                  // do first pass main array
             if (gol[ij]) {
                 label[ij]=label_cell(ij,&nlabel);

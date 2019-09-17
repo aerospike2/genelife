@@ -876,8 +876,8 @@ def construct_caption(colorfunction1or2,pixeldat,buttonhelp,win):
 # misc. keys save image
 def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
     global mstime,framenr,framerate
-    global window,surface, surfacex1, surfacex2, window, scalex2, caption, dispinit, update1, grect1
-    global window2,surface2, surface2x1, surface2x2, window2, caption2, dispinit2, grect, render2, update2, renderer2, factory2, image2, message2, font2, textColor2, windowID2
+    global window, surface, surfacex1, surfacex2, scalex2, caption, dispinit, update1, grect1
+    global window2, surface2, surface2x1, surface2x2, caption2, dispinit2, grect, render2, update2, renderer2, factory2, image2, message2, font2, textColor2, windowID2
     global N
     global gol,golg,golb,golr,golgstats
     global connlabel,connlen,ncomponents
@@ -1338,7 +1338,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                     nbhistmax=framenr//(N//2)
                     nbhistold = nbhist
                     if nbhistmax >= nNhist*2-1: nbhistmax=nNhist*2-2;
-                    if sdl2.SDL_GetModState() & sdl2.KMOD_SHIFT:
+                    if sdl2.SDL_GetModState() & (sdl2.KMOD_LSHIFT|sdl2.KMOD_RSHIFT):
                         nbhist = nbhist+1
                         if nbhist > nbhistmax:
                             nbhist = -1
@@ -1351,7 +1351,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                         genelife.set_nbhist(nbhist)
                 elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_C:
                     if colorfunction in [0,1,2,3,11,12]:
-                        if sdl2.SDL_GetModState() & sdl2.KMOD_SHIFT:
+                        if sdl2.SDL_GetModState() & (sdl2.KMOD_LSHIFT|sdl2.KMOD_RSHIFT):
                             nfrstep = nfrstep + 1
                             if nfrstep == 8: nfrstep = 0
                         else:
@@ -1361,7 +1361,7 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                         # colorgrid(colorfunction,cgolg,cgrid,0,nfrstep)
                 elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_F:
                     print("entering key F")
-                    if   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT:
+                    if   sdl2.SDL_GetModState() &  (sdl2.KMOD_LSHIFT|sdl2.KMOD_RSHIFT):
                         print("entering shift key F")
                         if scalex2 or event.window.windowID == windowID2:
                             windowsize=(2*Width, 2*(Height+16))
@@ -1439,15 +1439,20 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                         print('step',framenr,"randominflux changed to ",randominflux)
                         genelife.set_randominflux(randominflux)
                 elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_S:
-                    fname = "images/genelife_sel%02d_t%03d_r%08x_s%03d.jpeg" % (selection,framenr,repscheme,savecnt)
-                    err = sdl2.surface.SDL_SaveBMP(window, fname)
+                    if   (sdl2.SDL_GetModState() &  (sdl2.KMOD_LSHIFT | sdl2.KMOD_RSHIFT)) and (colorfunction2 != -1):
+                        fname = "./images/genelife_sel%02d_t%03d_r%08x_s%03d_c%02d.jpeg" % (selection,framenr,repscheme,savecnt,colorfunction2)
+                        err = sdl2.sdlimage.IMG_SavePNG(surface2,bytes(fname, encoding="ascii"))
+                    else:
+                        fname = "./images/genelife_sel%02d_t%03d_r%08x_s%03d_c%02d.jpeg" % (selection,framenr,repscheme,savecnt,colorfunction)
+                        # err = sdl2.SDL_SaveBMP(ctypes.byref(surface),bytes(fname, encoding="ascii")) # does not work because of surface type error
+                        err = sdl2.sdlimage.IMG_SavePNG(surface,bytes(fname, encoding="ascii"))
                     if err:
                         print("error %d file not saved" % err)
                     else:
                         print("image saved "+fname)
                     savecnt = savecnt + 1
                 elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_T:
-                    if   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT:
+                    if   sdl2.SDL_GetModState() &  (sdl2.KMOD_LSHIFT|sdl2.KMOD_RSHIFT):
                         if(offdt<0): offdt = offdt+1
                     elif offdt>-maxPlane+1: offdt = offdt-1
                     print('step',framenr,"offset dt changed to ",offdt)
@@ -1457,12 +1462,12 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                     print('step',framenr,"vscrolling changed to ",vscrolling)
                     genelife.set_vscrolling()
                 elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_X:
-                    if   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT: offdx = offdx+1
+                    if   sdl2.SDL_GetModState() &  (sdl2.KMOD_LSHIFT|sdl2.KMOD_RSHIFT): offdx = offdx+1
                     else: offdx = offdx-1
                     print('step',framenr,"offset dx changed to ",offdx)
                     genelife.set_offsets(offdx,offdx,offdt)
                 elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_Y:
-                    if   sdl2.SDL_GetModState() &  sdl2.KMOD_SHIFT: offdy = offdy+1
+                    if   sdl2.SDL_GetModState() &  (sdl2.KMOD_LSHIFT|sdl2.KMOD_RSHIFT): offdy = offdy+1
                     else: offdy = offdy-1
                     print('step',framenr,"offset dy changed to ",offdy)
                     genelife.set_offsets(offdx,offdy,offdt)
@@ -1665,7 +1670,7 @@ def parhelp():
     print("R leftshift ","toggle intermittent feathered random influx domain on or off")
     print("R rightshift","toggle random deletion perturbation at rbackground rate on or off")
     print("alt-r       ","input background rate of perturbation for random influx")
-    print("s           ","save current image to file in image subdirectory")
+    print("s,S         ","save current image from window 1 (s) 2 (S) to file in image subdirectory")
     print("x,X y,Y t,T ","lower (lc) or raise (uc) the (dx,dy,dt) offsets for glider tracking (colorfn 8) (0,0,0)=(all 8 nnb dt=-1)")
     print("v           ","toggle vertical scroll tracking mode : following top most objects and losing lowest objects in contact with 0 row")
     print("+,-         ","increase or decrease ymax or ymaxq for activity display scaled as act/(ymax+act) by a factor of 2")
