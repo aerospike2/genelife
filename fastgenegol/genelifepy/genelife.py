@@ -1359,6 +1359,17 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                             if nfrstep < 0: nfrstep = 8-1
                         print('step',framenr,"nfrstep changed to ",nfrstep)
                         # colorgrid(colorfunction,cgolg,cgrid,0,nfrstep)
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_D:
+                    print('step',framenr,"simulation continues with stashed patterns")
+                    genelife.unstash()
+                elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_E:
+                    if colorfunction in [9,10]:
+                        if sdl2.SDL_GetModState() & (sdl2.KMOD_LSHIFT|sdl2.KMOD_RSHIFT):
+                            genelife.label2stash(1)       # stash pattern cumulatively
+                            print('step',framenr,"selected pattern added to stash")
+                        else:
+                            genelife.label2stash(0)       # clear stash and add pattern
+                            print('step',framenr,"selected pattern isolated to stash")
                 elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_F:
                     print("entering key F")
                     if   sdl2.SDL_GetModState() &  (sdl2.KMOD_LSHIFT|sdl2.KMOD_RSHIFT):
@@ -1656,6 +1667,8 @@ def parhelp():
     print("1, 2        ","toggle first or second window updates off/on")
     print("b , B       ","decrement or increment the half block for trace display: in range -1,0 to nNhist*2-2=38")
     print("c , C       ","decrement or increment the playback counter to replay last up to 8 timesteps while paused (with space), colorfn 0-3,11,12 only")
+    print("d           ","continue run with stashed pattern(s) only")
+    print("e , E       ","extract current selected pattern to stash e: singly E:cumulatively")
     print("f           ","print frame rate in fps (average of last 10 frames NYI")
     print("F           ","toggle to fullscreen NYI")
     print("g           ","toggle on/off inherited coloring of connected cpts from overlapping cpts (colfn 9) or cycle first/clonal/both ancestors (6,7,11)")

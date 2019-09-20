@@ -71,9 +71,9 @@ libcd.initialize_planes.argtypes = [int_array, c_int]
 libcd.countspecies1.restype = None
 libcd.countspecies1.argtypes = [uint64_array, uint64_array, c_int]
 libcd.countspecies.restype = None
-libcd.countspecies.argtypes = None
+libcd.countspecies.argtypes = []
 libcd.countspecieshash.restype = None
-libcd.countspecieshash.argtypes = None
+libcd.countspecieshash.argtypes = []
 #libcd.print_gol.restype = None
 #libcd.print_gol.argtypes = [uint64_array, c_int, c_int]
 #libcd.printscreen.restype = None
@@ -90,10 +90,12 @@ libcd.get_curgolgstats.restype = None
 libcd.get_curgolgstats.argtypes = [uint64_array,c_int]
 libcd.get_gliderinfo.restype = None
 libcd.get_gliderinfo.argtypes = [uint64_array,c_int]
-libcd.set_stash.restype = None
-libcd.set_stash.argtypes = None
-libcd.get_stash.restype = None
-libcd.get_stash.argtypes = None
+libcd.stash.restype = None
+libcd.stash.argtypes = []
+libcd.label2stash.restype = None
+libcd.label2stash.argtypes = [c_int]
+libcd.unstash.restype = None
+libcd.unstash.argtypes = None
 libcd.get_nspecies.argtypes = None
 libcd.get_nspecies.restype = c_int
 libcd.get_nlive.argtypes = None
@@ -296,8 +298,8 @@ def get_quadnodes(quadnodes):
 def get_genes(genelist):
     return libcd.get_genes(genelist, int(len(genelist)))
 
-def get_stash():
-    return libcd.get_stash()
+def unstash():
+    return libcd.unstash()
 
 def get_nlive():
     return libcd.get_nlive()
@@ -371,8 +373,11 @@ def set_genealogycoldepth(genealogycoldepth):
 def set_ancestortype(ancestortype):
     return libcd.set_ancestortype(ancestortype)
 
-def set_stash():
-    return libcd.set_stash();
+def stash():
+    return libcd.stash();
+
+def label2stash(cumul):
+    return libcd.label2stash(cumul)
 
 def set_info_transfer_h(do_info_transfer,nbhood):
     return libcd.set_info_transfer_h(do_info_transfer,nbhood);

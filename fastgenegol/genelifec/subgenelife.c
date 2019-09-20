@@ -229,8 +229,11 @@ int rbirth = 2;                     // minimum resource number per neighborhood 
 //---------------------------------------------------------main arrays in simulation---------------------------------------------------------------------
 uint64_t *gol, *golg, *golb, *golr; // pointers to one plane of gol, golg, golb & golr arrays: live/dead, gene, cloneid (birth t,x,y), resource
 uint64_t *golgstats;                // pointer to 64 bit masks for different events during processing at one of the plane cycle locations
-uint64_t stashgol[N2];              // for stashing state and recovering with initfield = -1
-uint64_t stashgolg[N2];             // for stashing state and recovering with initfield = -1
+uint64_t stashgol[N2];              // for stashing state and recovering with initfield = -1 or for component extraction and running
+uint64_t stashgolg[N2];             // for stashing genes and recovering with initfield = -1 or for component extraction and running
+uint64_t stashgolb[N2];             // for stashing birthid and recovering with initfield = -1 or for component extraction and running
+uint64_t stashgolr[N2];             // for stashing record of displacements and recovering with initfield = -1 or for component extraction and running
+uint64_t stashgolgstats[N2];        // for stashing stats and recovering with initfield = -1 or for component extraction and running
 uint64_t golmix[N2];                // array for packing configs
 uint64_t gene0;                     // uncoupled planes background gene, non zero for selection==16,17
 uint64_t selectedgene;              // gene currently selected interactively in graphics window
@@ -334,8 +337,8 @@ int connused = 0;                   // used connection nodes
 int gcolors = 0;                    // use inherited colors to color connected components
 int conn_genetic = 1;               // 0: if gol state only used to determine connected components 1: if golg state used as well
 //............................................... optimal linear assignment t-1 to t ....................................................................
-// #include "lapjv.h"               // modified from Tomas Kazmar python interfaced implementation of Jonker-Volgenant LAPMOD algorithm, if using lapmod.c
-//                                  // arrays for matching components from one time step to the next, using Hopcroft Karp maxmatch algorithm in maxmatch.c
+// using maxmatch.c                 // arrays for matching components from one time step to the next, using Hopcroft Karp maxmatch algorithm in maxmatch.c
+// #include "lapjv.h"               // no longer using lapmod.c, modified from Tomas Kazmar python interfaced implementation of Jonker-Volgenant LAPMOD algorithm
 unsigned int iilap[NLM];            // indices of start of each variable length row in sparse cost matrix : first entry 0, last entry nclap
 unsigned int cclap[N2];             // sparse cost matrix for mapping connected components at t-1 to t (overlaps) containing nclap entries
 unsigned int recolor[NLM];          // recolor connected component based on colors of connected components and random drift
@@ -605,13 +608,14 @@ const uint64_t r1 = 0x1111111111111111ull;
 // set_nbhist           set nbhist N-block of time points for trace from GUI for use in activity and population display traces
 // set_genealogycoldepth set genealogycoldepth for colorfunction=11 display
 // set_ancestortype     set ancestortype for genealogy display and return of first (0), clonal (1) or first & clonal in 2 windows (2)
-// set_stash            stash current gol,golg in stashgol, stshgolg
+// stash                stash current gol,golg, golb, golr, golgstats in stashgol, stshgolg, stashgolb, stashgolr, stashgolgstats
+// label2stash          stash current gol,golg, golb, golr, golgstats from selected labelled component (either cumulatively or individually)
 // set_info_transfer_h  set information transfer histogram display value (0,1) from python
 // set_activityfnlut    set collection of functional activity statistics corresponding to functional aggregate of genes by non-neutral bits
 // set_colorupdate1     control update of colorgenes and regular print statements via flag colorupdate1
 // set_colorfunction2   choice of colorfunction for window 2
 //..........................................................  get to python driver  .....................................................................
-// get_stash            retrieve current gol,golg from stashed values
+// unstash              retrieve current gol,golg, golb, golr, golgstats from stashed values
 // get_log2N            get the current log2N value from C to python
 // get_curgol           get current gol array from C to python
 // get_curgolg          get current golg array from C to python
@@ -636,6 +640,7 @@ const uint64_t r1 = 0x1111111111111111ull;
 // get_genes            get all hashed genes with data structures including activity counts, extinctions etc
 // get_curgolgstats     get current golgstats array C to python
 // get_sorted_popln_act return sorted population and activities (sorted by current population numbers)
+// get_gliderinfo       get information about gliders from packed array representation (currently near end of code)
 //..........................................................  comparison functions  ....................................................................
 // cmpfunc              compare gene values as numerical unsigned numbers
 // cmpfunc1             compare gene counts in population
@@ -781,7 +786,7 @@ extern inline float mixcolor( unsigned int label, uint64_t rand) { // mix colors
     #define PI 3.14159265
     const float i2pi = 1./(2.*PI);
 
-    color = x = y = 0.0;
+    x = y = 0.0;
     conn = connlists[label];                                            // NB conn is not a label but an index in the array of possible connections
     while(conn) {
         color1= oldcomplist[connections[conn].oldlab].gcolor;           // mix colors based on aoverlap weights
@@ -1107,7 +1112,6 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
             int i=ij&Nmask; int j=ij>>(log2N+k);
             if((ancestortypec==1) && (diagnostics &diag_hash_clones)) {
                 clone=clonealogytrace[i+(j<<log2N)];
-                activity = 0;
                 if (clone == rootclone)   mask = 0x000000ff;            // black color for root
                 else {
                     if (clone == 0ull) clone = 11778L;                  // random color for clone==0
@@ -1129,7 +1133,6 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
             }
             else {
                 gene=genealogytrace[i+(j<<log2N)];
-                activity = 0;
                 if (gene == selectedgene)    mask = 0xffffffff;         // white color for selected gene
                 else if (gene == rootgene)   mask = 0x000000ff;         // black color for root
                 else if (gene == generepeat) mask = 0x3f3f3fff;         // grey color for repeated gene
@@ -1227,32 +1230,32 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
             
         }
         break;
-      case 9:                                                   // colorfunction based on unique labelling of separate components in image
+      case 9:                                                       // colorfunction based on unique labelling of separate components in image
           if (diagnostics & diag_component_labels) {
             for (ij=0; ij<NN2; ij++) labelcc[ij]=relabel[label[ij]];    // transfer labels to interactive working area
             if(xdisplay>=0 && ydisplay>=0) {
                 if ((labelxy=label[xdisplay+ydisplay*N])) {
-                    for (ij=0; ij<NN2; ij++) if (label[ij]==complist[labelxy].label) labelcc[ij]=0xffff;    // label chosen component white at its current location
+                    for (ij=0; ij<NN2; ij++) if (label[ij]==complist[labelxy].label) labelcc[ij]=0xffffffff;    // label chosen component white at its current location
                     d=complist[labelxy].log2n;
                     unsigned int conn = connlists[labelxy];
                     while(conn) {
                         for (ij=0; ij<NN2; ij++) if (oldlabel[ij]==connections[conn].oldlab) {
-                            if (labelcc[ij]==0xffff) labelcc[ij]=0xfffd; // color old connected components overlapping pink
-                            else labelcc[ij]=0xfffe;                     // color old connected components not overlapping red
+                            if (labelcc[ij]==0xffffffff) labelcc[ij]=0xfffffffd; // color old connected components overlapping pink
+                            else labelcc[ij]=0xfffffffe;                         // color old connected components not overlapping red
                         }
                         conn=connections[conn].next;
                     }
                     for (ij=0; ij<(1<<(d<<1)); ij++) labelcc[(ij&((1<<d)-1)) + (ij>>d)*N] = 0;  // initialize component drawing area to zero in top left corner
-                    if (complist[labelxy].quad) labelimage(complist[labelxy].quad, labelcc, 0xffff, 0); // extract this component and label it white
-                    else labelimage(complist[labelxy].patt, labelcc, 0xffff, 0);  // component involves patt not quad
+                    if (complist[labelxy].quad) labelimage(complist[labelxy].quad, labelcc, 0xfffffffc, 0); // extract this component and label it white
+                    else labelimage(complist[labelxy].patt, labelcc, 0xfffffffc, 0);  // component involves patt not quad
                 }
             }
      
             if (!gcolors) {
               for (ij=0; ij<NN2; ij++) {
                 if (labelcc[ij]) {
-                    // quad = (uint64_t) relabel[label[ij]];            // use gene variable simply as label for connected component (no connection with gene)
-                    quad = (uint64_t) labelcc[ij];                      // use gene variable simply as label for connected component (no connection with gene)
+                    // quad = (uint64_t) relabel[label[ij]];
+                    quad = (uint64_t) labelcc[ij];
                     mask = quad * 11400714819323198549ull;              // map label (quasi-uniformly) into larger unsigned colour space
                     mask = mask >> (64 - 32);                           // hash with optimal prime multiplicator down to 32 bits
                     mask |= 0x080808ffull;                              // ensure visible (slightly more pastel) color at risk of improbable redundancy, make alpha opaque
@@ -1264,9 +1267,10 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
                         else popcount=1;                                // should never occur, but just in case, assume novel
                         if (popcount>1) mask &= (mask&0x3f3f3fff);      // darken non novel components (currently a little too much)
                     }
-                    if (labelcc[ij] == 0xffff) mask = 0xffffffffull;    // recolor selected component white
-                    else if (labelcc[ij] == 0xfffd) mask = 0xc0c0ffffull; // recolor connected old components overlapping with selected component pink
-                    else if (labelcc[ij] == 0xfffe) mask = 0x0000ffffull; // recolor connected old components not overlapping with selected component red
+                    if (labelcc[ij] == 0xffffffff) mask = 0xffffffffull;      // recolor selected component white
+                    else if (labelcc[ij] == 0xfffffffc) mask = 0x00ffffffull; // recolor selected component against black background in corner yellow
+                    else if (labelcc[ij] == 0xfffffffd) mask = 0xc0c0ffffull; // recolor connected old components overlapping with selected component pink
+                    else if (labelcc[ij] == 0xfffffffe) mask = 0x0000ffffull; // recolor connected old components not overlapping with selected component red
                     cgolg[ij] = (int) mask;
                 }
                 else cgolg[ij] = 0;
@@ -1284,12 +1288,12 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
         for (ij=0; ij<NN2; ij++) labelcc[ij]=0;
         if(xdisplay>=0 && ydisplay>=0) {
             if ((qid=acttraceq[xdisplay+ydisplay*N])) {
-                labelimage(qid, labelcc, 0xffff, 0);                    // extract this component and label it white
+                labelimage(qid, labelcc, 0xfffffffc, 0);                    // extract this component and label it yellow
             }
         }
         for (ij=0; ij<N2; ij++) {
             quad=acttraceq[ij];
-            if(labelcc[ij]) mask = 0xffffffff;
+            if(labelcc[ij]) mask = 0x00ffffff;
             else if (quad == rootgene) mask = 0x3f3f3fff;               // grey color for background, all root genes
             else {
                 if (activity_size_colormode == 0) {
@@ -1337,8 +1341,7 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
                 gene = (ancestortypec==2) ? ggolb[ij] : ggolg[ij];    // variable gene holds either birthid (clones) or gene at ij;
                 ancestor=gene;
                 for (j=1;j<=genealogycoldepth;j++) {
-                    if((ancestortypec!=1) && (ancestor==rootgene)) break;                       // reached root, exit j loop
-                    if((ancestortypec==1) && (ancestor&rootclone)) break;                       // reached root, exit j loop
+                    if (ancestor==root) break;                       // reached root, exit j loop
                     else {
                         gene = ancestor;
                         if (ancestortypec==1) {
@@ -1376,7 +1379,7 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
         } */
         for (ij=0; ij<N2; ij++) {
             if (ggol[ij] && (diagnostics & diag_hash_genes)) {
-                gdiff = gene = ggolr[ij];                            // variable gene holds dynamical record stored in golr
+                gene = ggolr[ij];                                   // variable gene holds dynamical record stored in golr
                 golr_digest (gene, &d0, &d1, &jper, &dx, &dy);
                 if (d0 > 7) mask = 0x080808ffull;                   // dark grey color for no significant periodic match found
                 else {
@@ -2399,16 +2402,18 @@ extern inline quadnode * hash_patt16_find(const uint64_t nw, const uint64_t ne, 
                                 totsteps,nw,ne,sw,se,h,q->nw,q->ne,q->sw,q->se);
                     }
                 }
-                else {                                           // new node or pattern, save in hash table
+                else {                                          // new node or pattern, save in hash table
                     q = hash_patt16_store(h,nw,ne,sw,se);
                 }
             }
         }
-        else {                                           // new node or pattern, save in hash table
+        else {                                                  // new node or pattern, save in hash table
             q = hash_patt16_store(h,nw,ne,sw,se);
         }
-        if(nw) q8 = hash_patt8_find(nw);if(ne) q8 = hash_patt8_find(ne);   // find or store 8x8 64-bit subpatterns, updating activities and lasttime
-        if(sw) q8 = hash_patt8_find(sw);if(se) q8 = hash_patt8_find(se);   // store if new, otherwise update
+        if(nw) q8 = hash_patt8_find(nw);                        // find or store 8x8 64-bit subpatterns, updating activities and lasttime
+        if(ne) q8 = hash_patt8_find(ne);                        // store if new, otherwise update
+        if(sw) q8 = hash_patt8_find(sw);
+        if(se) q8 = hash_patt8_find(se);
         return(q);
 }
 //.......................................................................................................................................................
@@ -2525,7 +2530,7 @@ uint64_t quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {       
     }
 }
 //.......................................................................................................................................................
-int labelimage(uint64_t hashkeypatt, unsigned int labelimg[], unsigned int label, int offset) { // rebuild image from quadimage at with label
+int labelimage(uint64_t hashkeypatt, unsigned int labelimg[], unsigned int label, int offset) { // rebuild image from quadimage at offset with label
     short unsigned int patt;
     int n;
     quadnode * q;
@@ -2657,7 +2662,7 @@ extern inline int log2size(const short unsigned int golpw) {
 }
 //.......................................................................................................................................................
 extern inline void pack64neighbors(uint64_t gol[],uint64_t golp[],int log2n) {    // routine to pack 8x8 subarrays of full binary array gol into single words
-    int n = 1 << log2n;
+    int n = (1 << log2n);
     int ij,ij1,k;                                                                 // assuming golp length >= (n*n)>>2^6
     int n2 = n*n;
 
@@ -2710,7 +2715,6 @@ extern inline void compare_all_neighbors(uint64_t a[],uint64_t b[]) {  // routin
     if (last_scrolled) scrollN = N;
     else scrollN = 0;
     
-    d=0;
     for (ij=0;ij<N2;ij++) {
         ijs=(ij-scrollN)&N2mask;
         aij = a[ij];
@@ -4066,14 +4070,14 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
             nb1i = (nb1i << (gols<<2)) + (gols*k);                              // nb1i is packed list of live neighbour indices (each in range 0-7)
             nbmask |= (gols << k);
         }
-        survive = birth = 0ull;
+        birth = 0ull;
         golij=gol[ij];
         if (s) {
             s1=s-1;
             s2or3 = (s>>2) ? 0ull : (s>>1);                                     // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
             gols = s2or3 ? (golij ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;     // GoL calculation next state for non-genetic gol plane
-            rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1);  // if rulemod bit 1 is on then split into half planes with/without mod
-            rulemodij = (rulemod&0x4) ? membrane : (rulemod&0x1);               // if rulemod bit 2 then activate membrane of death overruling previous line
+            rulemodij = (rulemod&0x4) ? membrane : ((rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1)); // if rulemod bit 2 then activate membrane of death
+                                                                                // else if rulemod bit 1 is on then split into half planes with/without mod
             if(rulemodij==1) {
                 overwrite = overwritemask&(0x1ull<<s1);
                 if (selection==9) {                                             // selection == 9 : NB selection 9 does not use ncoding to determine coding length
@@ -4206,8 +4210,8 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
             s1 = s-1;
             s2or3 = (s>>2) ? 0ull : (s>>1);                                        // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
             gols = s2or3 ? (golij ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;        // GoL calculation next state for non-genetic gol plane
-            rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1);     // if rulemod bit 1 is on then split into half planes with/without mod
-            rulemodij = (rulemod&0x4) ? membrane : (rulemod&0x1);                  // if rulemod bit 2 then activate membrane of death
+            rulemodij = (rulemod&0x4) ? membrane : ((rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1)); // if rulemod bit 2 then activate membrane of death
+                                                                                   // else if rulemod bit 1 is on then split into half planes with/without mod
             if (rulemodij==1) {                // NB need to put gene calculation outside so that we can do genetic propagation with GoL rulemod off
                 overwrite = overwritemask&(0x1ull<<s1);
                 overwrite = (overwrite || !golij) ? 1ull : 0ull;
@@ -4306,8 +4310,6 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
     int nb[8], ij, i, j, jp1, jm1, ip1, im1;
     unsigned int kch=0;
     uint64_t genecode, genecode1, gols, nb1i, nbmask;
-    uint64_t newgene;
-    uint64_t statflag;
 
     canonical = repscheme & R_2_canonical_nb;                                       // set global choice of canonical rotation bit choice for selectdifftx
     survivalgene = repscheme & R_0_survivalgene ? 1ull : 0ull;                      // gene determining survival is 1: central gene 2: determined by neighbours
@@ -4330,16 +4332,15 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
             nbmask |= (gols << k);
         }
         smid = s>1 && s<7; s2 = s-2;                                                // s in mid-range for possible lut rule
-        statflag = F_livenbs & (nbmask<<16);                                        // record live neighbour pattern
-        statflag |= F_s_live & (s&0x7);                                             // requires F_s_live to be in lowest 3 bits : val 8 mapped to 0
-        newgene = survive = birth = 0ull;
+        survive = birth = 0ull;
         golij = gol[ij];
 
         if (smid) {
             s2or3 = (s>>2) ? 0ull : (s>>1);                                         // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
             gols = s2or3 ? (gol[ij] ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;       // GoL calculation next state for non-genetic gol plane
-            rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1);      // if rulemod bit 1 is on then split into half planes with/without mod
-            rulemodij = (rulemod&0x4) ? membrane : (rulemod&0x1);                   // if rulemod bit 2 then activate membrane of death
+            
+            rulemodij = (rulemod&0x4) ? membrane : ((rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1)); // if rulemod bit 2 then activate membrane of death
+                                                                                    // else if rulemod bit 1 is on then split into half planes with/without mod
             if(rulemodij==1) {
                 overwrite = s ? (overwritemask>>(s-1))&0x1ull : 0ull;               // allow birth to overwrite occupied cell = survival in GoL
                 overwrite = overwrite | (~gol[ij] & 0x1ull);                        // either central cell is empty or overwrite bit set is required for birth
@@ -4460,8 +4461,6 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
     int nb[8], ij, i, j, jp1, jm1, ip1, im1;
     unsigned int kch=0;
     uint64_t genecode, genecode1, gols, nb1i, nbmask;
-    uint64_t newgene;
-    uint64_t statflag;
 
     static int first = 1;
 
@@ -4498,16 +4497,14 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
             nbmask |= (gols << k);
         }
         slow = s<5;                                                            // s in low-range 0-4 for possible lut rule
-        statflag = F_livenbs & (nbmask<<16);                                   // record live neighbour pattern
-        statflag |= F_s_live & (s&0x7);                                        // requires F_s_live to be in lowest 3 bits : val 8 mapped to 0
-        newgene = survive = birth = 0ull;
+        survive = birth = 0ull;
         golij = gol[ij];
 
         if (slow) {
             s2or3 = (s>>2) ? 0ull : (s>>1);                                    // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
             gols = s2or3 ? (gol[ij] ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;  // GoL calculation next state for non-genetic gol plane
-            rulemodij = (rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1); // if rulemod bit 1 is on then split into half planes with/without mod
-            rulemodij = (rulemod&0x4) ? membrane : (rulemod&0x1);              // if rulemod bit 2 then activate membrane of death
+            rulemodij = (rulemod&0x4) ? membrane : ((rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1)); // if rulemod bit 2 then activate membrane of death
+                                                                               // else if rulemod bit 1 is on then split into half planes with/without mod
             if(rulemodij==1) {
                 overwrite = s ? overwritemask&(0x1ull<<(s-1)) : 0;
                 overwrite = (overwrite || !gol[ij]) ? 1ull : 0ull;
@@ -4640,7 +4637,7 @@ void genelife_update (int nsteps, int nhist, int nstat) {
         golb = planesb[curPlane];
         golr = planesr[curPlane];
         
-        if (diagnostics & diag_scrolling_trace) npop= totalpoptrace(gol);     // calculate total current population and store in scrolling trace npopulation
+        if (diagnostics & diag_scrolling_trace) npop = totalpoptrace(gol);    // calculate total current population and store in scrolling trace npopulation
         
         if ((diagnostics & diag_activities) && (diagnostics & diag_hash_genes)) {
             nspeciesgene=activitieshash();                                    // colors acttrace and sets current population arrays, need to run always for continuity
@@ -5017,9 +5014,9 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         for (ij=0; ij<N2; ij++) {
             gol[ij] = stashgol[ij];
             golg[ij] = stashgolg[ij];
-            golgstats[ij] = 0ull;
-            golb[ij] = rootclone + ij;              // might want to define stashgolb and use it here
-            golr[ij] = 0ull;
+            golb[ij] = stashgolb[ij];
+            golr[ij] = stashgolr[ij];
+            golgstats[ij] = stashgolgstats[ij];
         }
     }
 
@@ -5199,11 +5196,34 @@ void set_ancestortype(int ancestortypein) {
     else fprintf(stderr,"ancestor type %d out of range [0..2]\n",ancestortypein);
 }
 //.......................................................................................................................................................
-void set_stash(){               // stash current gol,golg
+void stash(){               // stash current gol,golg
     int ij;
     for (ij=0; ij<N2; ij++) {
         stashgol[ij] = planes[curPlane][ij];
         stashgolg[ij] = planesg[curPlane][ij];
+        stashgolb[ij] = planesb[curPlane][ij];
+        stashgolr[ij] = planesr[curPlane][ij];
+        stashgolgstats[ij] = planesgs[curPlane][ij];
+    }
+}
+//.......................................................................................................................................................
+void label2stash(int cumul) { // stash current gol,golg, golb, golr, golgstats from selected labelled component (either cumulatively or individually)
+    int ij;
+    for (ij=0; ij<N2; ij++) {
+        if (labelcc[ij]==0xffffffff) {
+            stashgol[ij] = planes[curPlane][ij];
+            stashgolg[ij] = planesg[curPlane][ij];
+            stashgolb[ij] = planesb[curPlane][ij];
+            stashgolr[ij] = planesr[curPlane][ij];
+            stashgolgstats[ij] = planesgs[curPlane][ij];
+        }
+        else if (!cumul) {
+            stashgol[ij] = 0ull;
+            stashgolg[ij] = 0ull;
+            stashgolb[ij] = 0ull;
+            stashgolr[ij] = 0ull;
+            stashgolgstats[ij] = 0ull;
+        }
     }
 }
 //.......................................................................................................................................................
@@ -5257,11 +5277,14 @@ int get_log2N() {
     return(log2N);
 }
 //.......................................................................................................................................................
-void get_stash(){               // retrieve current gol,golg from stashed values
+void unstash(){               // retrieve current gol,golg from stashed values
     int ij;
     for (ij=0; ij<N2; ij++) {
         planes[curPlane][ij] = stashgol[ij];
         planesg[curPlane][ij] = stashgolg[ij];
+        planesb[curPlane][ij] = stashgolb[ij];
+        planesr[curPlane][ij] = stashgolr[ij];
+        planesgs[curPlane][ij] = stashgolgstats[ij];
     }
 }
 //.......................................................................................................................................................
@@ -5382,7 +5405,6 @@ int get_genealogydepth() {
     
     if(ancestortype>0) fprintf(stderr,"Warning: get_genealogydepth currently only implemented for ancestortypes 0 called with %d\n",ancestortype);
     for (i=jmax=0; i<nspeciesnow; i++) {                            // calculate max depth in genealogy jmax
-        gene=genes[i];
         ancgene=geneitems[gindices[i]].firstancestor;
         for (j=1;;j++) {
             gene=ancgene;
@@ -5584,20 +5606,6 @@ int get_components(component components[],int narraysize) {
     }
     for (i=1;i<=ncomponents;i++) {
         components[i-1]=complist[i];
-        /*components[i-1].N=complist[i].N;
-        components[i-1].S=complist[i].S;
-        components[i-1].W=complist[i].W;
-        components[i-1].E=complist[i].E;
-        components[i-1].lastrc=complist[i].lastrc;
-        components[i-1].label=complist[i].label;
-        components[i-1].log2n=complist[i].log2n;
-        components[i-1].patt=complist[i].patt;
-        components[i-1].quad=complist[i].quad;
-        components[i-1].pixels=complist[i].pixels;
-        components[i-1].gcolor=complist[i].gcolor;*/
-        /* if (i<100) fprintf(stderr,"Component %d: (N,W,S,E)=(%d,%d,%d,%d), lastrc=%d, label=%d, log2n=%d, patt=%d, quad=%llx, pixels=%d\n",i,
-            complist[i].N,complist[i].W,complist[i].S,complist[i].E,complist[i].lastrc,complist[i].label,
-            complist[i].log2n,complist[i].patt,complist[i].quad,complist[i].pixels); */
     }
 
     return ncomponents;
@@ -5622,7 +5630,6 @@ int get_smallpatts(smallpatt smallpattsout[],int narraysize) {
 //.......................................................................................................................................................
 int get_quadnodes(quadnode quadnodes[],int narraysize) {
     int i;
-
     // these three calls executed through hashactivityquad if colorfunction 9 or 10
     // nallspeciesquad = hashtable_count(&quadtable);
     // quadkeys = hashtable_keys(&quadtable);
@@ -5632,29 +5639,14 @@ int get_quadnodes(quadnode quadnodes[],int narraysize) {
         fprintf(stderr,"Error in get_quadnodes : called with insufficent quadnode holding array size %d < %d\n",narraysize,nallspeciesquad);
         return -1;
     }
-
     for (i=0;i<nallspeciesquad;i++) {
         quadnodes[i]=quaditems[i];
-        /*quadnodes[i].hashkey=quaditems[i].hashkey;
-        quadnodes[i].nw=quaditems[i].nw;
-        quadnodes[i].ne=quaditems[i].ne;
-        quadnodes[i].sw=quaditems[i].sw;
-        quadnodes[i].se=quaditems[i].se;
-        quadnodes[i].isnode=quaditems[i].isnode;
-        quadnodes[i].size=quaditems[i].size;
-        quadnodes[i].activity=quaditems[i].activity;
-        quadnodes[i].pop1s=quaditems[i].pop1s;
-        quadnodes[i].firsttime=quaditems[i].firsttime;
-        quadnodes[i].lasttime=quaditems[i].lasttime;
-        quadnodes[i].topactivity=quaditems[i].topactivity;*/
     }
-
     return nallspeciesquad;
 }
 //.......................................................................................................................................................
 int get_genes(genedata genelist[],int narraysize) {
     int i;
-
     // these three calls executed already through hashactivity
     // nallspecies = hashtable_count(&genetable);
     // genotypes = hashtable_keys(&genetable);
@@ -5664,20 +5656,9 @@ int get_genes(genedata genelist[],int narraysize) {
         fprintf(stderr,"Error in get_genes : called with insufficent genedata holding array size %d < %d\n",narraysize,nallspecies);
         return -1;
     }
-
     for (i=0;i<nallspecies;i++) {
         genelist[i]=geneitems[i];          /* shallow copy OK if no pointers being copied, otherwise the structures they point to will not be copied */
-        /* genelist[i].popcount=geneitems[i].popcount;
-        genelist[i].firsttime=geneitems[i].firsttime;
-        genelist[i].lasttime=geneitems[i].lasttime;
-        genelist[i].lastextinctiontime=geneitems[i].lastextinctiontime;
-        genelist[i].activity=geneitems[i].activity;
-        genelist[i].nextinctions=geneitems[i].nextinctions;
-        genelist[i].gene=geneitems[i].gene;
-        genelist[i].firstancestor=geneitems[i].firstancestor;
-        genelist[i].recentancestor=geneitems[i].recentancestor;*/
     }
-
     return nallspecies;
 }
 //.......................................................................................................................................................
@@ -5892,9 +5873,11 @@ void tracestats(uint64_t gol[],uint64_t golg[], uint64_t golgstats[], int NN2) {
 }
 //-------------------------------------------------------------- countspecies ---------------------------------------------------------------------------
 void countspecies1(uint64_t gol[], uint64_t golg[], int N2) {     /* counts numbers of all different species using qsort first */
-    int ij, k, ngenes, ijlast, nspecies, counts[N2], nones;
-    uint64_t last, golgs[N2], fitness;
+    int ij, k, ngenes, ijlast, nspecies, counts[N2];
+    uint64_t last, golgs[N2];
     uint64_t golgsc[N2][2];
+    // int nones;
+    // uint64_t fitness;
 
     for (ij=ngenes=0; ij<N2; ij++) {
         if(gol[ij]) golgs[ngenes++] = golg[ij];                   // only count active sites
@@ -5928,7 +5911,7 @@ void countspecies1(uint64_t gol[], uint64_t golg[], int N2) {     /* counts numb
         }
         else fprintf(stderr,"countspecies popcount error, no entry in hash table\n");
     }
-
+    /*
     for (k=0; k<nspecies; k++) {
         last = golgsc[k][0];
         POPCOUNT64C(last, nones);
@@ -5942,9 +5925,9 @@ void countspecies1(uint64_t gol[], uint64_t golg[], int N2) {     /* counts numb
         else if ((selection == 2)||(selection == 3)) {                      // cyclic 4 species model
             fitness = nones&0x3;                                            // fitness is species class
         }
-
-        // fprintf(stderr,"count species %d with gene %llx has counts %llu and %d ones, fitness %llu\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
+        fprintf(stderr,"count species %d with gene %llx has counts %llu and %d ones, fitness %llu\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
     }
+    */
     //fprintf(stderr,"rulemod\trepscheme\tselection\toverwritemask\tsurvival\n");
     //fprintf(stderr,"%d\t%d\t\t%d\t\t%d\t\t%d\n",rulemod,repscheme,selection,overwritemask,survivalmask);
     //fprintf(stderr,"pmutmask\tinit1\tinitr\tncoding\tstartchoice\n");
@@ -6075,7 +6058,6 @@ int activitieshash() {  /* count activities of all currently active gene species
         memset(popln,0,sizeof(int)*nspeciesnow);
         memset(activities,0,sizeof(int)*nspeciesnow);
         memset(genefnindices,0,sizeof(int)*(1<<24));
-        genes = (uint64_t *) malloc(nspeciesnow*sizeof(uint64_t));
         for (i=0,jmax=1; i<nspeciesnow; i++) {
             k=genefnindex( genotypes[gindices[i]], sbmask, indexoff);
             j=genefnindices[k];
@@ -6406,6 +6388,7 @@ int get_genealogies(genedata genealogydat[], int narraysize) {  /* genealogies o
         
         if(narraysize < (jmax+1)*nspeciesnow){
             fprintf(stderr,"get_genealogies(): narraysize not large enough.  Must be at least %d\n",nspeciesnow*(jmax+1));
+            free(gindices);free(activities);free(popln);
             return(-1);
         }
         curgen = (uint64_t *) calloc(jmax,sizeof(uint64_t)); // current genealogy array
@@ -6458,6 +6441,7 @@ int get_genealogies(genedata genealogydat[], int narraysize) {  /* genealogies o
     if(narraysize) {                                            // if narraysize then return from routine here
         free(curgen);
         genealogydepth = jmax+1;
+        free(gindices);free(activities);free(popln);
         return(genealogydepth);
     }
                                                                 // reverse ancestries to allow comparison at same number of speciations
@@ -6643,7 +6627,6 @@ int clonealogies() {                                            // genealogies o
     return(jmax);
 }
 //-------------------------------------------------------------------------------------------------------------------------------------------------------
-
 void get_gliderinfo(uint64_t outgliderinfo[], int narraysize){               // put 7x7 pattern averaged match counts into outgliderinfo array
     uint64_t *gitmp, gene;
     int ij,k,nbhood,sum=0;
@@ -6677,6 +6660,5 @@ void get_gliderinfo(uint64_t outgliderinfo[], int narraysize){               // 
     for(d1=0;d1<narraysize;d1++) sum += gitmp[d1];
     // fprintf(stderr,"in get_gliderinfo sum is %d\n",sum);
 }
-
+//----------------------------------------------------------- end of program ----------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------------------------------------------
-

@@ -18,15 +18,14 @@ typedef char boolean;
 
 // C routines to implement one queue using an array
 // if a number of new queues must be created, need constructor and destructor code via malloc, free
-extern const int NLM;
+extern const int NLM;     // rewrite code below for NLM power of two for more efficient implementation
 int qrear = - 1;
 int qfront = - 1;
 
 extern inline void queue_push(int value)
 {
     extern int queue_array[];
-    if ((qfront == 0 && qrear == NLM-1) ||
-            (qrear == (qfront-1)%(NLM-1)))
+    if ((qfront == 0 && qrear == NLM-1) || (qrear == (qfront-1)%(NLM-1)))
     {
         printf("Queue Overflow\n");
         return;
