@@ -14,6 +14,7 @@ from ctypes import c_int16
 from ctypes import c_uint64
 from ctypes import c_uint32
 from ctypes import c_uint16
+from ctypes import c_float
 
 # input type for genelife c to python array functions
 # must be a short/long/_ unsigned int array, with single dimension that is contiguous
@@ -25,8 +26,8 @@ int_array = npct.ndpointer(dtype=np.int32, ndim=1, flags='CONTIGUOUS')
 # communicate component type for connected components if not using numpy
 # from ctypes import *
 # class COMPONENT(Structure):
-#    _fields_ = [('N',c_uint16),('S',c_uint16),('W',c_uint16),('E',c_uint16),('lastrc',c_uint16),
-#                ('label',c_uint16),('log2n',c_uint16),('patt',c_uint16),('quad',c_uint64),('pixels',c_uint32),('reserve',c_uint32)]
+#    _fields_ = [('N',c_uint16),('S',c_uint16),('W',c_uint16),('E',c_uint16),('log2n',c_uint16),('patt',c_uint16),('lastrc',c_uint16),('dummy',c_uint16),
+#                ('label',c_uint32),('pixels',c_uint32),('quad',c_uint64),('gcolor',c_float),('reserve',c_uint32)]
 
 # genedata type to retrieve hashed genes from C using numpy and ctypes
 genedtype=[('popcount',c_uint32),('firsttime',c_uint16),('recenttime',c_uint16),('lasttime',c_uint16),('lastextinctiontime',c_int16),#    1 unsigned, 3 short unsigned, 1 short signed int
@@ -34,8 +35,8 @@ genedtype=[('popcount',c_uint32),('firsttime',c_uint16),('recenttime',c_uint16),
 gene_array = npct.ndpointer(dtype=genedtype, ndim=1, flags=['CONTIGUOUS','ALIGNED'])
 
 # component type to retrieve connected components from C using numpy and ctypes
-compdtype=[('N',c_uint16),('S',c_uint16),('W',c_uint16),('E',c_uint16),('lastrc',c_uint16),
-           ('label',c_uint16),('log2n',c_uint16),('patt',c_uint16),('quad',c_uint64),('pixels',c_uint32),('reserve',c_uint32)]
+compdtype=[('N',c_uint16),('S',c_uint16),('W',c_uint16),('E',c_uint16),('log2n',c_uint16),('patt',c_uint16),('lastrc',c_uint16),('dummy',c_uint16),
+           ('label',c_uint32),('pixels',c_uint32),('quad',c_uint64),('gcolor',c_float),('reserve',c_uint32)]
 comp_array = npct.ndpointer(dtype=compdtype, ndim=1, flags=['CONTIGUOUS','ALIGNED'])
 
 # quadnode type to retrieve quadnodes from C using numpy and ctypes

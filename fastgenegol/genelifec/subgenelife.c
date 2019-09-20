@@ -285,40 +285,45 @@ int nspeciessmall,nallspeciessmall; // number of small pattern species now, and 
 int histcumlogpattsize[log2N+1];    // histogram of patterns binned on log scale according to power of two side enclosing square
 int histcumpixelssqrt[N+1];         // histogram of patterns binned on an integer sqrt scale according to number of pixels
 //------------------------------------------------ arrays for connected component labelling and tracking ------------------------------------------------
-const int NLM = N2>>2;              // maximum number of discrete components possible N2/4
-short unsigned int label[N2];       // labels for pixels in connected component labelling
-short unsigned int oldlabel[N2];    // previous time step labels for connected component labelling
-short unsigned int labelcc[N2];     // label array to reassemble and display individual components
+const int NLM = N2;                 // maximum number of discrete components possible N*N: formerly N*N/4 but needed expansion upon intro of genetic diff comp's
+const int NLC = N2<<2;              // maximum number of connections N*N*4
+unsigned int label[N2];             // labels for pixels in connected component labelling
+unsigned int oldlabel[N2];          // previous time step labels for connected component labelling
+unsigned int labelcc[N2];           // label array to reassemble and display individual components
 typedef struct equivrec {           // equivalence record
-  short unsigned int pt;            // parent of record : integer index into eqv array at lower integer location
-  short unsigned int rank;          // rank of equivalence class tree, may be used to accelerate union-find
-  short unsigned int size;          // number of cells (lattice sites) with this label in current array
-  short unsigned int overlaps;      // reserved for future use, filling record overall size to single long int (64bit)
+  unsigned int pt;                  // parent of record : integer index into eqv array at lower integer location
+  unsigned int rank;                // rank of equivalence class tree, may be used to accelerate union-find
+  unsigned int size;                // number of cells (lattice sites) with this label in current array
+  unsigned int overlaps;            // reserved for future use, filling record overall size to single long int (64bit)
 } equivrec;
 equivrec eqv[NLM];                  // equivalences between labels
 typedef struct component {          // data structure for identified connected components in gol array
     short unsigned int N,S,W,E;     // rectangular bounds of rectangle containing the component
-    short unsigned int lastrc;      // last occupied row/col used to trace components wrapping across the N-1 to 0 border
-    short unsigned int label,log2n; // label index of component, enclosing square size n=2^log2n
+    short unsigned int log2n;       // label index of component, enclosing square size n=2^log2n
     short unsigned int patt;        // for small components of size 4x4 pixels or less, the image is encoded directly in the pattern patt
-    uint64_t quad;                  // hashkey for quadtree node of subimage for component
+    short unsigned int lastrc;      // last occupied row/col used to trace components wrapping across the N-1 to 0 border
+    short unsigned int dummy;       // not used: just to maintain long word boundaries
+    unsigned int label;             // label of component
     unsigned int pixels;            // number of pixels on
-    float gcolor  ;                 // inherited drifting color hue mixed from connected comp's (structure needs whole nr of 64-bit words for ndarray python comm.)
+    uint64_t quad;                  // hashkey for quadtree node of subimage for component
+    float gcolor;                   // inherited drifting color hue mixed from connected comp's (structure needs whole nr of 64-bit words for ndarray python comm.)
+    unsigned int reserve;           // reserve position to align components on 64 bit boundary for efficiency
 } component;
 component complist[NLM];            // current array of components
 component oldcomplist[NLM];         // old (previous time step) list of components
 int ncomponents = 0;                // current number of components (= current number of labels)
 int oldncomponents = 0;             // number of components in previous time step
 typedef struct connection {         // connection of connected component at time t to another component at t-1
-    short unsigned int oldlab;      // label at time t-1
-    short unsigned int newlab;      // label at time t
+    unsigned int oldlab;            // label at time t-1
+    unsigned int newlab;            // label at time t
     unsigned int next;              // next connection index in list of backward connections for a given labelled component at time t (newlab)
     unsigned int nextf;             // next connection index in list of forward connections for a given labelled component at time t-1 (oldlab)
     unsigned int overlap;           // sum of neighboring pixels (9-nbhd) between old and new component
+    unsigned int reserve;           // unused element to preserve 64 bit alignment after shift from short unsigned int to unsigned int
     float woverlap;                 // weighted overlap out of all forward connections from old component i.e. overlap/sum(overlaps))
     float aoverlap;                 // weighted woverlap out of all backward connections from new component i.e. woverlap/sum(woverlaps))
 } connection;
-connection connections[N2];         // open memory reservoir of connection nodes to use in connection lists
+connection connections[NLC];        // open memory reservoir of connection nodes to use in connection lists
 unsigned int connlists[NLM];        // entry points for connection list corresponding to each labelled component
 unsigned int connlistsf[NLM];       // entry points for forward connection list corresponding to each old labelled component
 unsigned int connlen[NLM];          // lengths of connection lists for connected components to previous time ie from t to t-1
@@ -330,16 +335,17 @@ int gcolors = 0;                    // use inherited colors to color connected c
 int conn_genetic = 1;               // 0: if gol state only used to determine connected components 1: if golg state used as well
 //............................................... optimal linear assignment t-1 to t ....................................................................
 // #include "lapjv.h"               // modified from Tomas Kazmar python interfaced implementation of Jonker-Volgenant LAPMOD algorithm, if using lapmod.c
+//                                  // arrays for matching components from one time step to the next, using Hopcroft Karp maxmatch algorithm in maxmatch.c
 unsigned int iilap[NLM];            // indices of start of each variable length row in sparse cost matrix : first entry 0, last entry nclap
 unsigned int cclap[N2];             // sparse cost matrix for mapping connected components at t-1 to t (overlaps) containing nclap entries
 unsigned int recolor[NLM];          // recolor connected component based on colors of connected components and random drift
-short unsigned int kklap[N2];       // column indices for successive entries in cost matrix
-short unsigned int xlap[NLM];       // returned list of assignments: columns assigned to rows
-short unsigned int ylap[NLM];       // returned list of assignments: rows assigned to columns
-short unsigned int dist[NLM];       // distance along augmented paths for Hopcroft Karp matching algorithm: maxmatch
-short unsigned int relabel[NLM];    // array to relabel connected components matching to be compatible with previous step
-short unsigned int oldrelabel[NLM]; // old relabel array at previous time step
-short unsigned int queue_array[NLM];// array for queue used in Hopcroft Karp matching algorithm: maxmatch
+unsigned int kklap[N2];             // column indices for successive entries in cost matrix
+unsigned int xlap[NLM];             // returned list of assignments: columns assigned to rows
+unsigned int ylap[NLM];             // returned list of assignments: rows assigned to columns
+unsigned int dist[NLM];             // distance along augmented paths for Hopcroft Karp matching algorithm: maxmatch
+unsigned int relabel[NLM];          // array to relabel connected components matching to be compatible with previous step
+unsigned int oldrelabel[NLM];       // old relabel array at previous time step
+unsigned int queue_array[NLM];      // array for queue used in Hopcroft Karp matching algorithm: maxmatch
 int  nlap;                          // number of connected components at t-1 entering into the assignment, i.e. n for LAPMOD
 int  nclap;                         // number of edges between connected comp's t-1 to t entering into the assignment, == no. of cost matrix entries
 int  nmatched;                      // number of matched old labels in current label set
@@ -739,7 +745,7 @@ extern inline void setcolor(unsigned int *color,int n) { // for coloring by quad
     color[0] = (mycol >> 8) & 0xff;  // R
 }
 //.......................................................................................................................................................
-extern inline unsigned int labelcolor( short unsigned int label) {
+extern inline unsigned int labelcolor( unsigned int label) {
     uint64_t mask;
     unsigned int color;
     mask = (uint64_t) label;
@@ -768,7 +774,7 @@ extern inline unsigned int rgba( float hue) {                            // conv
     return ((r<<8) | (g<<16) | (b<<24) | 0xff);
 }
 //.......................................................................................................................................................
-extern inline float mixcolor( short unsigned int label,uint64_t rand) { // mix colors from overlapping components, add random drift of colour
+extern inline float mixcolor( unsigned int label, uint64_t rand) { // mix colors from overlapping components, add random drift of colour
     unsigned int conn;
     float color,color1,x1,y1,x,y;
     float eps = 0.0001*gcolors;
@@ -885,7 +891,7 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
     quadnode *q;
     uint64_t qid,ancestor,root;
     // static int numones[16]={0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4};
-    int labelimage(uint64_t hashkeypatt, short unsigned int labelimg[], short unsigned int label, int offset);
+    int labelimage(uint64_t hashkeypatt, unsigned int labelimg[], unsigned int label, int offset);
     extern inline int log2size(const short unsigned int golpw);
     void get_gliderinfo(uint64_t outgliderinfo[], int narraysize);
     // static int firstdebug = 1;
@@ -1228,7 +1234,7 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
                 if ((labelxy=label[xdisplay+ydisplay*N])) {
                     for (ij=0; ij<NN2; ij++) if (label[ij]==complist[labelxy].label) labelcc[ij]=0xffff;    // label chosen component white at its current location
                     d=complist[labelxy].log2n;
-                    short unsigned int conn = connlists[labelxy];
+                    unsigned int conn = connlists[labelxy];
                     while(conn) {
                         for (ij=0; ij<NN2; ij++) if (oldlabel[ij]==connections[conn].oldlab) {
                             if (labelcc[ij]==0xffff) labelcc[ij]=0xfffd; // color old connected components overlapping pink
@@ -2519,13 +2525,13 @@ uint64_t quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {       
     }
 }
 //.......................................................................................................................................................
-int labelimage(uint64_t hashkeypatt, short unsigned int labelimg[], short unsigned int label, int offset) { // rebuild image from quadimage at with label
+int labelimage(uint64_t hashkeypatt, unsigned int labelimg[], unsigned int label, int offset) { // rebuild image from quadimage at with label
     short unsigned int patt;
     int n;
     quadnode * q;
     // uint64_t nw,ne,sw,se;
-    extern inline void unpack16neighbors(const short unsigned golpw, short unsigned int labelimg[],const unsigned int label,const int offset);
-    extern inline void unpack64neighbors(const uint64_t golpw, short unsigned int labelimg[],const unsigned int label,const int offset);
+    extern inline void unpack16neighbors(const short unsigned golpw, unsigned int labelimg[], const unsigned int label, const int offset);
+    extern inline void unpack64neighbors(const uint64_t golpw, unsigned int labelimg[], const unsigned int label, const int offset);
     if(hashkeypatt<65536) {patt = hashkeypatt; unpack16neighbors(patt,labelimg,label,offset);}
     else if((q = (quadnode *) hashtable_find(&quadtable, hashkeypatt)) != NULL) {
         if(q->isnode) {                                     // hashed item is regular quadnode
@@ -2626,7 +2632,7 @@ extern inline short unsigned int pack16neighbors(uint64_t wgol[], int log2n) {  
     else {fprintf(stderr,"pack16neighbours called with not permitted value of log2n %d\n",log2n);return(0);}
 }
 //.......................................................................................................................................................
-extern inline void unpack16neighbors(const short unsigned golpw, short unsigned int labelimg[],const unsigned int label,const int offset){
+extern inline void unpack16neighbors(const short unsigned golpw, unsigned int labelimg[],const unsigned int label,const int offset){
     int k,ij;
     if (golpw < 2) labelimg[0] = golpw ? label : 0;
     else if (golpw < 16) {
@@ -2671,7 +2677,7 @@ extern inline void pack64neighbors(uint64_t gol[],uint64_t golp[],int log2n) {  
     }
 }
 //.......................................................................................................................................................
-extern inline void unpack64neighbors(const uint64_t golpw, short unsigned int labelimg[],const unsigned int label,const int offset){
+extern inline void unpack64neighbors(const uint64_t golpw, unsigned int labelimg[], const unsigned int label, const int offset){
     int k,ij;                                                                   // only unpacks one word
     for(k=0;k<64;k++) {                                                         // bits blocked as 4*4*4 so that 1st 16 bits are nw 4*4 block
         int k1 = k&0xf; int k2 = k>>4;
@@ -2731,17 +2737,17 @@ extern inline void packandcompare(uint64_t newgol[],uint64_t working[],uint64_t 
     }
 }
 //----------------------------------------------------------- connected component labelling -------------------------------------------------------------
-extern inline short unsigned int lab_union(equivrec eqv[], short unsigned int i, short unsigned int j) {
+extern inline unsigned int lab_union(equivrec eqv[], unsigned int i, unsigned int j) {
 // Combine two trees containing node i and j. Union by rank with halving - see https://en.wikipedia.org/wiki/Disjoint-set_data_structure
 // Return the root of union tree in equivalence relation's disjoint union-set forest
-    short unsigned int root = i;
+    unsigned int root = i;
     while (eqv[root].pt<root) {
         eqv[root].pt = eqv[eqv[root].pt].pt;       // halving algorithm to compress path on the fly
         root = eqv[root].pt;
     }
     if (i != j) {
-        short unsigned int rooti = root;
-        short unsigned int rootj;
+        unsigned int rooti = root;
+        unsigned int rootj;
         root = j;
         while (eqv[root].pt<root) {
             eqv[root].pt = eqv[eqv[root].pt].pt;   // halving algorithm to compress paths on the fly
@@ -2762,8 +2768,8 @@ extern inline short unsigned int lab_union(equivrec eqv[], short unsigned int i,
     return root;
 }
 //.......................................................................................................................................................
-extern inline short unsigned int label_cell(int ij,short unsigned int *nlabel) {
-    short unsigned int clabel,clabel1,labelij,labelijold;
+extern inline unsigned int label_cell(int ij,unsigned int *nlabel) {
+    unsigned int clabel,clabel1,labelij,labelijold;
     labelijold=label[ij];
     clabel=label[deltaxy(ij,0,-1)];                         // deltaxy takes periodic BCs into account (b in Suzuki Decision Tree, 2010)
     if(clabel) labelij=eqv[clabel].pt;         // copy b
@@ -2807,8 +2813,8 @@ extern inline short unsigned int label_cell(int ij,short unsigned int *nlabel) {
     return labelij;
 }
 //.......................................................................................................................................................
-extern inline short unsigned int label_cell_genetic(int ij,short unsigned int *nlabel,uint64_t golg[]) {
-    short unsigned int clabel0,clabel1,labelij,labelijold;
+extern inline unsigned int label_cell_genetic(int ij,unsigned int *nlabel,uint64_t golg[]) {
+    unsigned int clabel0,clabel1,labelij,labelijold;
     int ij0,ij1;
     uint64_t gene;
     
@@ -2857,9 +2863,9 @@ extern inline short unsigned int label_cell_genetic(int ij,short unsigned int *n
     return labelij;
 }
 //.......................................................................................................................................................
-void checklabels(equivrec eqv[],unsigned short int *nlabel) {
-    short unsigned int xlabel = 0;
-    short unsigned int i;
+void checklabels(equivrec eqv[],unsigned int *nlabel) {
+    unsigned int xlabel = 0;
+    unsigned int i;
     for (i = 1; i < *nlabel + 1; i++) {
         if (eqv[i].pt > i) {
             fprintf(stderr,"Error in label equivalencies at t=%d for i=%d, parent %d\n",totsteps,i,eqv[i].pt);
@@ -2869,10 +2875,10 @@ void checklabels(equivrec eqv[],unsigned short int *nlabel) {
     if (xlabel) fprintf(stderr,"Error for %d cases\n",xlabel);
 }
 //.......................................................................................................................................................
-void flattenlabels(equivrec eqv[],unsigned short int *nlabel) {
+void flattenlabels(equivrec eqv[],unsigned int *nlabel) {
 // Flatten the Union-Find tree and relabel the components.
-    short unsigned int xlabel = 1;
-    short unsigned int i;
+    unsigned int xlabel = 1;
+    unsigned int i;
     for (i = 1; i <= *nlabel; i++) {
         if (eqv[i].pt < i) {
             eqv[i].pt = eqv[eqv[i].pt].pt;
@@ -2884,19 +2890,19 @@ void flattenlabels(equivrec eqv[],unsigned short int *nlabel) {
     *nlabel = xlabel-1;
 }
 //.......................................................................................................................................................
-short unsigned int label_components(uint64_t gol[],uint64_t golg[]) {
+unsigned int label_components(uint64_t gol[],uint64_t golg[]) {
 // fast component labelling, updating global equivalence table equiv and placing labels in global array label, return number of labels
     int i,ij,sum,sumoverlap,maxoverlap,overallmaxoverlap;   //   abc   scan mask to calculate label at position e
-    short unsigned int nlabel = 0;                          //   de
-    short unsigned int oldnlabel;                           //   with lapmod need also: ret
-    short unsigned int lab,conn,connprev,connf,maxlabel;
+    unsigned int nlabel = 0;                                //   de
+    unsigned int oldnlabel;                                 //   with lapmod need also: ret
+    unsigned int lab,conn,connprev,connf,maxlabel;
     float rsumoverlap;
     int nunique,nzconnect,nremconnect;
     int dx[9]={0,-1,0,1,1,1,0,-1,-1};
     int dy[9]={0,-1,-1,-1,0,1,1,1,0};
     static int connectout = 0;                              // whether to print lists of connected component mappings t-1 t
     void testflow(void);
-    extern int maxmatch(int m, short unsigned int kk[], unsigned int ii[], short unsigned int xlap[], short unsigned int ylap[], short unsigned int dist[]);
+    extern int maxmatch(int m, unsigned int kk[], unsigned int ii[], unsigned int xlap[], unsigned int ylap[], unsigned int dist[]);
     static int first = 1;
     if(!first) {
         oldnlabel = oldncomponents = ncomponents;
@@ -2964,10 +2970,10 @@ short unsigned int label_components(uint64_t gol[],uint64_t golg[]) {
     for(i=0;i<NLM;i++) connlen[i]=0;
     for(i=0;i<NLM;i++) connlistsf[i]=0;
     for(i=0;i<NLM;i++) connlenf[i]=0;
-    for(ij=0;ij<N2;ij++) {                                  // these are the open memory reserve of connection elements to be linked, better to use memset perhaps
+    for(ij=0;ij<NLC;ij++) {                                  // these are the open memory reserve of connection elements to be linked, better to use memset perhaps
         connections[ij].next=connections[ij].nextf=0;
         connections[ij].oldlab=connections[ij].newlab=0;
-        connections[ij].overlap=0;
+        connections[ij].overlap=connections[ij].reserve=0;
     }
     connused=0;
 
@@ -2977,13 +2983,13 @@ short unsigned int label_components(uint64_t gol[],uint64_t golg[]) {
                 if((lab=oldlabel[deltaxy(ij,dx[k],dy[k])])) {
                     conn=connlists[label[ij]];
                     connprev=0;
-                    while(conn && connections[conn].oldlab<lab) {
+                    while(conn && (connections[conn].oldlab<lab)) {
                         connprev = conn;
                         conn=connections[conn].next;
                     }
                     if (conn) {                             // connections[conn].oldlab>=lab : if oldlab>lab insert & increment overlap, else just increment overlap
                         if(connections[conn].oldlab>lab) {  // insert new node
-                            if(connused>=N2) fprintf(stderr,"Error, out of connection memory\n");
+                            if(connused>=NLC) fprintf(stderr,"Error, out of connection memory, need to increase NLC in subgenelife.c\n");
                             connections[connused].oldlab=lab;
                             connections[connused].newlab=label[ij];
                             connections[connused].next=conn;
@@ -2994,7 +3000,7 @@ short unsigned int label_components(uint64_t gol[],uint64_t golg[]) {
                         else connections[conn].overlap++;
                     }
                     else {                                  // insert as last node in connection list added
-                        if(connused>=N2) fprintf(stderr,"Error, out of connection memory\n");
+                        if(connused>=NLC) fprintf(stderr,"Error, out of connection memory, need to increase NLC in subgenelife.c\n");
                         connections[connused].oldlab=lab;
                         connections[connused].newlab=label[ij];
                         connections[connused].overlap++;
@@ -3219,10 +3225,11 @@ short unsigned int label_components(uint64_t gol[],uint64_t golg[]) {
     return nlabel;
 }
 //.......................................................................................................................................................
-short unsigned int extract_components(uint64_t gol[],uint64_t golg[]) {
+unsigned int extract_components(uint64_t gol[],uint64_t golg[]) {
     int i,j,ij,ij1,log2n;
-    short unsigned int k,nside,nlabel,patt;
-    short unsigned int histside[log2N+1];
+    short unsigned int k,nside,patt;
+    unsigned int histside[log2N+1];
+    unsigned int nlabel;
     // uint64_t fullpatt;   // debugging
     int wpixels;
     uint64_t hashkey,rand;
@@ -3242,7 +3249,10 @@ short unsigned int extract_components(uint64_t gol[],uint64_t golg[]) {
     for (i=0;i<N;i++) {                                                                                 // find lateral limits of each component in horizontal scan
       for (j=0; j<N; j++) {
         ij = j*N+i;
-        if(label[ij]>nlabel) fprintf(stderr,"in extract_components step %d label %d out of bounds\n",totsteps,label[ij]);
+        if(label[ij]>nlabel) {
+            fprintf(stderr,"in extract_components step %d label %d out of bounds (%d) lateral at %d\n",totsteps,label[ij],ncomponents,ij);
+            exit(1);
+        }
         if (label[ij]) {                                                                                // if site labelled
             if (!complist[label[ij]].label) {                                                           // if label encountered for first time
                 complist[label[ij]].label=label[ij];
@@ -3270,7 +3280,10 @@ short unsigned int extract_components(uint64_t gol[],uint64_t golg[]) {
     for (j=0;j<N;j++) {                                                                                 // find vertical limits of each component
       for (i=0; i<N; i++) {
         ij = j*N+i;
-        if(label[ij]>nlabel) fprintf(stderr,"in extract_components step %d label %d out of bounds\n",totsteps,label[ij]);
+        if(label[ij]>nlabel) {
+            fprintf(stderr,"in extract_components step %d label %d out of bounds (%d) vertical at %d\n",totsteps,label[ij],ncomponents,ij);
+            exit(1);
+        }
         if (label[ij]) {                                                                                // if site labelled
             if (!complist[label[ij]].label) {                                                           // if label encountered for first time
                 complist[label[ij]].label=label[ij];

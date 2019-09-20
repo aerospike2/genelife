@@ -78,7 +78,7 @@ extern inline int queue_pop()
 // adj[u] storing adjacents of left side vertex 'u' is found from kk and ii
 // Returns true if there is an augmenting path, else returns
 // false
-boolean bfs(int m, short unsigned int kk[], unsigned int ii[], short unsigned int pairU[], short unsigned int pairV[], short unsigned int dist[])
+boolean bfs(int m, unsigned int kk[], unsigned int ii[], unsigned int pairU[], unsigned int pairV[], unsigned int dist[])
 {
     // queue<int> Q; //an integer queue
   
@@ -135,7 +135,7 @@ boolean bfs(int m, short unsigned int kk[], unsigned int ii[], short unsigned in
 }
 
 // Returns true if there is an augmenting path beginning with free vertex u
-boolean dfs(int u, short unsigned int kk[], unsigned int ii[], short unsigned int pairU[], short unsigned int pairV[], short unsigned int dist[])
+boolean dfs(int u, unsigned int kk[], unsigned int ii[], unsigned int pairU[], unsigned int pairV[], unsigned int dist[])
 {
     if (u != NIL)
     {
@@ -168,7 +168,7 @@ boolean dfs(int u, short unsigned int kk[], unsigned int ii[], short unsigned in
     return TRUE;
 }
 
-int hopcroftKarp(int m, int n, short unsigned int kk[], unsigned int ii[], short unsigned int pairU[], short unsigned int pairV[], short unsigned int dist[]) { // Returns size of maximum matching
+int hopcroftKarp(int m, int n, unsigned int kk[], unsigned int ii[], unsigned int pairU[], unsigned int pairV[], unsigned int dist[]) { // Returns size of maximum matching
     // pairU[u] stores pair of u in matching where u is a vertex on left side of Bipartite Graph.
     // If u doesn't have any pair, then pairU[u] is NIL
     // pairV[v] stores pair of v in matching. If v doesn't have any pair, then pairU[v] is NIL
@@ -192,7 +192,7 @@ int hopcroftKarp(int m, int n, short unsigned int kk[], unsigned int ii[], short
     return result;
 }
 
-int maxmatch(int m, short unsigned int kk[], unsigned int ii[], short unsigned int pairU[], short unsigned int pairV[], short unsigned int dist[])
+int maxmatch(int m, unsigned int kk[], unsigned int ii[], unsigned int pairU[], unsigned int pairV[], unsigned int dist[])
 {
     int i,n;
     for (n=i=0;i<ii[m];i++) n = kk[i] > n ? kk[i] : n;    // calculate n as maximum vertex on right
