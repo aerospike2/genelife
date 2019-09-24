@@ -90,6 +90,8 @@ libcd.get_curgolgstats.restype = None
 libcd.get_curgolgstats.argtypes = [uint64_array,c_int]
 libcd.get_gliderinfo.restype = None
 libcd.get_gliderinfo.argtypes = [uint64_array,c_int]
+libcd.get_glider_count.restype = c_int
+libcd.get_glider_count.argtypes = [uint_array,c_int]
 libcd.stash.restype = None
 libcd.stash.argtypes = []
 libcd.label2stash.restype = None
@@ -214,6 +216,9 @@ def get_curgolgstats(golgstats):
 def get_gliderinfo(gliderinfo):
     return libcd.get_gliderinfo(gliderinfo, int(len(gliderinfo)))
 
+def get_glider_count(golrstats):
+    return libcd.get_glider_count(golrstats, int(len(golrstats)))
+
 def get_nspecies():
     return libcd.get_nspecies()
 
@@ -306,9 +311,6 @@ def get_nlive():
 
 def get_shist(shist):
     return libcd.get_shist(shist)
-
-def get_glider_count():
-    return libcd.get_glider_count()
 
 def colorgenes(cgolg,colorfunction, winnr, nfrstep):
     return libcd.colorgenes( cgolg, len(cgolg), colorfunction, winnr, nfrstep)
