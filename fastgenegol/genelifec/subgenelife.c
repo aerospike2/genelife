@@ -4113,7 +4113,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                 }
                 else {                                                          // selection == 8
                     if(repscheme&R_1_nb_OR_AND)
-                        for (genecode=0ull,k=0;k<8;k++) {                       // decodes genes with fixed length encoding by OR
+                        for (genecode=0ull,k=0;k<s;k++) {                       // decodes genes with fixed length encoding by OR
                             kch = (nb1i>>(k<<2))&0x7;
                             // genecode |= ((gol[nb[kch]]&0x1ull)?golg[nb[kch]]:0ull);   // OR of live neighbours encodes birth rule & survival rule
                             genecode |= golg[nb[kch]];   // OR of live neighbours encodes birth rule & survival rule
