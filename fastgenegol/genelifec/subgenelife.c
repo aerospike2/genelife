@@ -5243,14 +5243,20 @@ void set_colorupdate1(int update1) {
 }
 //------------------------------------------------------------------- get ... ---------------------------------------------------------------------------
 // compare with colorfunction==12 code and selectone_of_s code above
-int get_glider_count(){
+int get_glider_count(uint32_t golrstats[], int NN2){
     int ij,rtn=0,d0,inc;
     unsigned int d,dmax,jper;
     int psx,psy;
     
+    if (NN2!=N2) {
+        fprintf(stderr,"error, wrong number of entries in array, need %d\n",N2);
+        return(-1);
+    }
     for (ij=0; ij<N2; ij++) {
         if (gol[ij] && (diagnostics & diag_hash_genes)) {
             golr_digest (golr[ij], &d, &dmax, &jper, &psx, &psy); // dynamical record stored in golr
+            golrstats[ij]=(d&0xf)|((dmax&0xf)<<4)|((jper&0xf)<<8)|((psx+16)<<16)|((psy+16)<<24); // export 32 bit integer with digested data about golr
+            // 0:3 d, 4:7 dmax, 8:15 jper, 16:23 psx+16 24:31 psy+16  --- quality of match d, period = 1+jper, mean displacements ((psx+16)-16)/(16-jper)
             d0 = (psx<0 ? -psx : psx) + (psy<0 ? -psy : psy);
             if (d==dmax || d>4) inc = 0;                          // threshold for periodicity match not reached
             else if (2*d0<=(15-jper))  inc = 0;                   // threshold for mean mobility not reached
