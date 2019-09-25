@@ -108,15 +108,16 @@ int parentdies = 0;                 // model variant enhancing interpretation of
 #define R_21_quadrant_surv 0x200000 /* q5 1: quarter the spatial domain with survival values for 2,3 live nbs: only in update ie for selection<8 */
 #define R_22_quadrant_over 0x400000 /* q6 1: quarter the spatial domain with overwrite values for 2,3 live nbs: only in update ie for selection<8 */
 //.................................................. LUT repscheme (selection 8-15) repscheme bits .......................................................
-#define R_0_survivalgene  0x1       /* 1: survival gene chosen from central existing gene 0: survival gene taken from neighbours as in birth */
-#define R_1_nb_OR_AND     0x2       /* 1: OR of neighbours determines genetic LUT in selection 8,10,12,14 0: AND of neighbours */
+#define R_0_nb_majority   0x1       /* 1: Majority rule (reinterprets next bit nb_OR_AND as 1: >= 0: >) 0: No majority rule (i.e. And or Or) */
+#define R_1_nb_OR_AND     0x2       /* If Majority=0 1: OR of neighbours determines genetic LUT in selection 8,10,12,14 0: AND of neighbours Otherwise 1:>= 0:>*/
 #define R_2_canonical_nb  0x4       /* 1: choose live neighbour at zero bit in canonical rotation 0: choose most difft position */
 #define R_3_parentdies    0x8       /* 1: parent is forced to die on birth 0 not. Only used for selection 8-15 */
 #define R_46_repselect    0x70      /* 0-7 choice of selection mechanism for LUT genes : 0: min 1: max 2: min 1s 3: max 1s 4: neutral 5: neutral difft 6,7: c-S-2B */
 #define R_47_repselect    0xf0      /* +8-15 choice of golr selection mechanism : 8: 9: 10: 11: 12: 13: 14: 15:  */
-#define R_11_golr_select  0x80      /* 1: choose 8-15 above 0: choose 0-7 above */
+#define R_7_golr_select   0x80      /* 1: choose 8-15 above 0: choose 0-7 above */
 #define R_810_disambig    0x700     /* 0-7 choice of different disambiguation mechanisms for symmetric canonical rotations */
-#define R_7_random_resln  0x800     /* 1: random choice amongst selected live neighbours 0: deterministic choice based on gene content and position */
+#define R_11_random_resln 0x800     /* 1: random choice amongst selected live neighbours 0: deterministic choice based on gene content and position */
+#define R_12_survivalgene  0x1000   /* 1: survival gene chosen from central existing gene 0: survival gene taken from neighbours as in birth */
 //----------------------------------------status flag bits for recording site status in golgstats array---------------------------------------------------
 const uint64_t F_s_live =      0x7ull;      // s value mod 8 (number of live neighbors) for selection 8-15  and separate bits below for selection 0 to 7
 const uint64_t F_1_live =      0x1ull;      // bit is bit0 of s for selection 8-15 or 1 if exactly 1 live neighbours for selection 0-7 : currently not set
@@ -3872,7 +3873,7 @@ extern inline void finish_update_ij(int ij,int s,uint64_t golij,uint64_t gols,ui
         statflag = F_livenbs & (nbmask<<16);                                    // record live neighbour pattern
         statflag |= F_s_live & (s&0x7);                                         // requires F_s_live to be in lowest 3 bits : val 8 mapped to 0
         if(birth) {                                                         // birth allowed by rules encoded in local genes (may still fail by selection)
-            if (repscheme & R_7_random_resln) {
+            if (repscheme & R_11_random_resln) {
                 RAND128P(randnr);                                           // inline exp so compiler recognizes auto-vec,
                 kch = ((randnr>>32)&0xffff) % s;                            // choose random in this option only
                 ancestor = newgene = golg[(nb[(nb1i>>(kch<<2))&0x7])];
@@ -4031,14 +4032,14 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
         of four bits 0-3, bit 3 encodes birth/survival as 1/0. Bits 0-2 encode the value of s (0-7, s=8 excluded).
         GOL = 0xb32 or 0x23b2b for example (up to 64 bits)
                                                                                                                 */
-    int s, s1, s2or3, k, kch;
+    int s, s1, s2or3, k, kch, nrfound_b, nrfound_s;
     unsigned int rulemodij;
     int nb[8],  ij, i, j, jp1, jm1, ip1, im1;
     uint64_t genecode, genecodeb, genecodes, gols, golij, nb1i, nbmask, found;
     uint64_t  survive, birth, overwrite, survivalgene, smask, bmask, ncodingmask, allcoding;
 
     canonical = repscheme & R_2_canonical_nb;                                   // set global choice of canonical rotation bit choice for selectdifftx
-    survivalgene = repscheme & R_0_survivalgene;                                // gene determining survival is 1: central gene 0: determined by neighbours
+    survivalgene = repscheme & R_12_survivalgene;                                // gene determining survival is 1: central gene 0: determined by neighbours
     smask = (uint64_t) survivalmask;                                            // convert to 64 bit mask for efficient usage here
     bmask = (uint64_t) birthmask;
     parentdies = (repscheme & R_3_parentdies) ? 1 : 0;
@@ -4081,30 +4082,42 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
             if(rulemodij==1) {
                 overwrite = overwritemask&(0x1ull<<s1);
                 if (selection==9) {                                             // selection == 9 : NB selection 9 does not use ncoding to determine coding length
-                    for (genecodes=genecodeb=(repscheme&R_1_nb_OR_AND)?0ull:0xffff,k=0;k<s;k++) {// decodes genes using variable position encoding: fixed length genecode from nbs variable position encoding
+                    nrfound_b = nrfound_s = 0;
+                    for (k=0;k<s;k++) {                                         // decodes genes using variable position encoding: fixed length genecode from nbs variable position encoding
                         kch = (nb1i>>(k<<2))&0x7;
                         if (!survivalgene && golij) {
-                            PATTERN4(golg[nb[kch]], (s&0x7), found);          //survival?
-                            if(repscheme&R_1_nb_OR_AND)
-                                genecodes |= found? (1ull << s1) : 0ull;
-                            else
-                                genecodes &= found? (1ull << s1) : 0ull;
+                            PATTERN4(golg[nb[kch]], (s&0x7), found);            //survival?
+                            if(found) nrfound_s ++;
                         }
                         if (overwrite || !golij) {
-                            PATTERN4(golg[nb[kch]], (s|0x8), found);          //birth?
-                            if(repscheme&R_1_nb_OR_AND)
-                                genecodeb |= found ? (1ull << (s1+8)) : 0ull;
-                            else {
-                                genecodeb &= found ? (1ull << (s1+8)) : 0ull;
-                                //if(ij==106195) fprintf(stderr,"DEBUG Genecode sel 9 at totsteps=%d ij=%d k=%d golg=%llx found=%llx genecode=%llx survivalgene=%llx\n",totsteps,ij,k,golg[nb[k]],found,genecodeb,survivalgene);
-                            }
+                            PATTERN4(golg[nb[kch]], (s|0x8), found);            //birth?
+                            if(found) nrfound_b ++;
                         }
-                        // if(ij==106195) fprintf(stderr,"DEBUG Genecode sel 9 at totsteps=%d ij=%d k=%d golg=%llx golij=%llx\n",totsteps,ij,k,golg[nb[k]],golij);
                     }
                     if (survivalgene && golij) {                                // survival determined by central gene in this case
                                 PATTERN4(golg[ij], (s&0x7), found);             // survival?
                                 genecodes =  found? 1ull << s1 : 0ull;
                     }
+                    else {
+                        if(repscheme&R_0_nb_majority) {
+                            if((repscheme&R_1_nb_OR_AND)||(s&0x1)) found = (nrfound_s >  (s>>1)) ? 1 : 0;  // > s/2
+                            else                                   found = (nrfound_s >= (s>>1)) ? 1 : 0;  // >= s/2
+                        }
+                        else {
+                            if(repscheme&R_1_nb_OR_AND) found = nrfound_s ? 1 : 0;          // OR
+                            else                        found = (nrfound_s == s) ? 1 : 0;   // AND
+                        }
+                    }
+                    genecodes = found? (1ull << s1) : 0ull;
+                    if(repscheme&R_0_nb_majority) {
+                        if((repscheme&R_1_nb_OR_AND)||(s&0x1)) found = (nrfound_b >  (s>>1)) ? 1 : 0;
+                        else                                   found = (nrfound_b >= (s>>1)) ? 1 : 0;
+                    }
+                    else {
+                        if(repscheme&R_1_nb_OR_AND) found = nrfound_b ? 1 : 0;
+                        else                        found = (nrfound_b == s) ? 1 : 0;
+                    }
+                    genecodeb = found ? (1ull << (s1+8)) : 0ull;
                     genecode=genecodes|genecodeb;
                     //if(ij==106195) fprintf(stderr,"DEBUG Genecode sel 9 at totsteps=%d ij=%d genecode=%llx\n",totsteps,ij,genecode);
                     survive = ((genecode&smask)>>s1) & 0x1ull;
@@ -4112,6 +4125,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                     if (overwrite || !golij) birth   = ((genecode&bmask)>>s1) & 0x1ull;
                 }
                 else {                                                          // selection == 8
+                    // nrfound_b = nrfound_s = 0;
                     if(repscheme&R_1_nb_OR_AND)
                         for (genecode=0ull,k=0;k<s;k++) {                       // decodes genes with fixed length encoding by OR
                             kch = (nb1i>>(k<<2))&0x7;
@@ -4161,8 +4175,8 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
     there are a nr n of partitions             1  2  3  4  5  4  3  2  1   total 25   with se the number in edge centred sites NSEW
     chosen nr of partitions for exploration    0  2  3  4  5  4  3  2  0   total 23
     if we exclude the cases s = 0,8, then there are 23 bits required to distinguish these cases
-    1. Fixed length encdoing has 1 bit per LUT entry: 23 survival bits and then 23 birth bits
-    2. Varibale length encoding uses two bytes : upper byte for s-1 and lower byte for bitmask of which se 0-3 are on
+    1. Fixed length encoding has 1 bit per LUT entry: 23 survival bits and then 23 birth bits
+    2. Variable length encoding uses two bytes : upper byte for s-1 and lower byte for bitmask of which se 0-3 are on
                                                                                                                 */
     int s, s1, se, s0, s2or3, k, kch;
     unsigned int rulemodij;
@@ -4175,7 +4189,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
     // static int first = 1;
 
     canonical = repscheme & R_2_canonical_nb;                                      // set global choice of canonical rotation bit choice for selectdifftx
-    survivalgene = repscheme & R_0_survivalgene;                                   // gene determining survival is 1: central gene 2: determined by neighbours
+    survivalgene = repscheme & R_12_survivalgene;                                   // gene determining survival is 1: central gene 2: determined by neighbours
     smask = (uint64_t) survivalmask;                                               // convert to 64 bit mask for efficient usage here
     bmask = (uint64_t) birthmask;
     parentdies = (repscheme & R_3_parentdies) ? 1 : 0;
@@ -4312,7 +4326,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
     uint64_t genecode, genecode1, gols, nb1i, nbmask;
 
     canonical = repscheme & R_2_canonical_nb;                                       // set global choice of canonical rotation bit choice for selectdifftx
-    survivalgene = repscheme & R_0_survivalgene ? 1ull : 0ull;                      // gene determining survival is 1: central gene 2: determined by neighbours
+    survivalgene = repscheme & R_12_survivalgene ? 1ull : 0ull;                      // gene determining survival is 1: central gene 2: determined by neighbours
     smask = (uint64_t) survivalmask;                                                // 32 bits of survivalmask used to limit space of rules, convert to 64 bit masks for efficient usage here
     bmask = (uint64_t) birthmask;                                                   // 32 bits of birthmask
     parentdies = (repscheme & R_3_parentdies) ? 1 : 0;
@@ -4476,7 +4490,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
     }
 
     canonical = repscheme & R_2_canonical_nb;                                  // set global choice of canonical rotation bit choice for selectdifftx
-    survivalgene = repscheme & R_0_survivalgene;                               // gene determining survival is 1: central gene 2: determined by neighbours
+    survivalgene = repscheme & R_12_survivalgene;                               // gene determining survival is 1: central gene 2: determined by neighbours
     smask = (uint64_t) survivalmask;                                           // 32 bits of survivalmask used to limit space of rules, convert to 64 bit masks for efficient usage here
     bmask = (uint64_t) birthmask;                                              // 32 bits of birthmask
     parentdies = (repscheme & R_3_parentdies) ? 1 : 0;
