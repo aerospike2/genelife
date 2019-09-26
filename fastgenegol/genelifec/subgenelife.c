@@ -934,8 +934,8 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
                 cgolg[ij] = (int) mask;
             }
             else {
-                if(rulemod & 0x4) mask = (((ij>>log2N)==((N>>1)-(initfield>>1)-1) || ((ij>>log2N)==((N>>1)-(initfield>>1)-2))) && (ij & 0x1) ? 0x00ffffffull : 0ull);
-                else mask = 0ull;
+                if(rulemod & 0x4) mask = (((ij>>log2N)==((N>>1)-(initfield>>1)-1) || ((ij>>log2N)==((N>>1)-(initfield>>1)-2))) && (ij & 0x1) ? 0x00ffffffull : 0xffull);
+                else mask = 0xffull;
                 cgolg[ij] = (int) mask;
             }
         }
@@ -988,7 +988,7 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
 
                 cgolg[ij] = (int) mask;
             }
-            else cgolg[ij] = 0;
+            else cgolg[ij] = 0xff;
         }
         break;
       case 2:                                                               // colouring by s state and central state (and pattern)
@@ -1002,7 +1002,7 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
                 mask = 0xffull + ((F_s_live&gene) << (24+5));
                 cgolg[ij] = (int) mask;
             }
-            else cgolg[ij] = 0;
+            else cgolg[ij] =0xff;
         }
         break;
       case 3:                                                               // color states report golgstats status of processing
@@ -1017,9 +1017,9 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
                 mask |= (((F_parentaldeath&gene) ? 0x80ull : 0ull) + ((F_nongolchg&gene) ? 0x40ull : 0ull) + ((F_notgolrul&gene) ? 0x20ull : 0ull))<<8;  // red
                 mask |= (((F_mutation&gene) ? 0x80ull : 0ull) + ((F_birth&gene) ? 0x40ull : 0ull) + ((F_parent&gene) ? 0x20ull : 0ull))<<16;             // green
                 mask |= ((((F_survival|F_disambig)&gene) ? 0x80ull : 0ull) + ((F_dummy&gene) ? 0x40ull : 0ull) + ((F_death&gene) ? 0x20ull : 0ull))<<24;           // blue
-                cgolg[ij] = (int) mask;
+                cgolg[ij] = (int) (mask|0xffull);
             }
-            else cgolg[ij] = 0;
+            else cgolg[ij] = 0xff;
         }
         break;
       case 4:                                                               // activities
@@ -1274,13 +1274,13 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
                     else if (labelcc[ij] == 0xfffffffe) mask = 0x0000ffffull; // recolor connected old components not overlapping with selected component red
                     cgolg[ij] = (int) mask;
                 }
-                else cgolg[ij] = 0;
+                else cgolg[ij] = 0xff;
               }
             }
             else {                                                      // with gcolors set, color according to computed inherited label colours
               for (ij=0; ij<NN2; ij++) {
                 if (label[ij]) cgolg[ij] = (int) rgba(complist[label[ij]].gcolor);
-                else cgolg[ij] = 0;
+                else cgolg[ij] = 0xff;
               }
             }
           } // diag_component_labels
@@ -1368,7 +1368,7 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
 
                 cgolg[ij] = (int) mask;
             }
-            else cgolg[ij] = 0;
+            else cgolg[ij] = 0xff;
         }
         break;
       case 12:                                                      // colouring based on periodicity of dynamic record of 16 last states in golr for live genes
@@ -1399,7 +1399,7 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
                 }
                 cgolg[ij] = (int) mask;
             }
-            else cgolg[ij] = 0;
+            else cgolg[ij] = 0xff;
         }
         break;
       default:
