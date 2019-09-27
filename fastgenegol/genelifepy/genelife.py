@@ -25,6 +25,7 @@ N2 = N*N
 Nmask = N-1
 Width = N
 Height = N
+nNhist = 20
 
 gol = np.zeros(N2,np.uint64)
 golg = np.zeros(N2,np.uint64)
@@ -36,6 +37,7 @@ nspecies = 0
 ncomponents = 0
 connlabel = np.zeros(N2,np.uint32)
 connlen = np.zeros(N2//4,np.uint32)
+nnovelcells = np.zeros(N*nNhist,np.uint32)
                                             # graphics
 cgrid = np.zeros((N,N),np.int32)
 cgridt = np.zeros((N,N),np.int32)
@@ -878,9 +880,9 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
     global mstime,framenr,framerate
     global window, surface, surfacex1, surfacex2, scalex2, caption, dispinit, update1, grect1
     global window2, surface2, surface2x1, surface2x2, caption2, dispinit2, grect, render2, update2, renderer2, factory2, image2, message2, font2, textColor2, windowID2
-    global N
+    global N,nNhist
     global gol,golg,golb,golr,golgstats
-    global connlabel,connlen,ncomponents
+    global connlabel,connlen,ncomponents,nnovelcells
     global colorfunction,colorfunction2,gcolor,nfrstep,genealogycoldepth,ancestortype
     global nspecies,ymax,ymaxq,oldymax,oldymaxq,nbhist,nNhist
     global updatesenabled
@@ -1415,9 +1417,13 @@ def run(nrun, ndisp, nskip, niter, nhist, nstat, count=True, maxsteps=100000):
                     genelife.set_activityfnlut(activityfnlut)
                     print('step',framenr,'activityfnlut =',activityfnlut)
                 elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_N:
-                    noveltyfilter=1-noveltyfilter
-                    print('step',framenr,"noveltyfilter changed to ",noveltyfilter)
-                    genelife.set_noveltyfilter()
+                    if   sdl2.SDL_GetModState() &  (sdl2.KMOD_LSHIFT|sdl2.KMOD_RSHIFT):
+                        genelife.get_nnovelcells(nnovelcells)
+                        print('step',framenr,"collected trace of nnovelcells")
+                    else:
+                        noveltyfilter=1-noveltyfilter
+                        print('step',framenr,"noveltyfilter changed to ",noveltyfilter)
+                        genelife.set_noveltyfilter()
                 elif event.key.keysym.scancode == sdl2.SDL_SCANCODE_P:
                     activity_size_colormode=(activity_size_colormode+1)%4
                     print('step',framenr,"activity_size_colormode changed to ",activity_size_colormode)
@@ -1676,18 +1682,18 @@ def parhelp():
     print("H           ","toggle horizon mode on or off: upper half of array obeys unmodified GoL rule")
     print("i           ","toggle display and calculation of info_transfer_histogram on/off")
     print("l           ","toggle activity of aggregate functional genes activityfnlut on/off")
-    print("n           ","toggle novelty filter on/off for connected component color function 9")
+    print("n , N       ","n: toggle novelty filter on/off for connected component color function 9 N: get trace of nnovecells")
     print("p           ","rotate activity_size_colormode 0,1,2,3 for (no,log2n,pixels,sqrt(pixels)) size display of activities in color function 10")
-    print("q,Q         ","incr or decr quadrant parameter choice : -1 = no quadrants, 0-4 are first 5 bit pairs of repscheme, 5,6 surv and overwrite")
+    print("q , Q       ","incr or decr quadrant parameter choice : -1 = no quadrants, 0-4 are first 5 bit pairs of repscheme, 5,6 surv and overwrite")
     print("r           ","toggle random influx domain on or off")
     print("R leftshift ","toggle intermittent feathered random influx domain on or off")
     print("R rightshift","toggle random deletion perturbation at rbackground rate on or off")
     print("alt-r       ","input background rate of perturbation for random influx")
-    print("s,S         ","save current image from window 1 (s) 2 (S) to file in image subdirectory")
+    print("s , S       ","save current image from window 1 (s) 2 (S) to file in image subdirectory")
     print("x,X y,Y t,T ","lower (lc) or raise (uc) the (dx,dy,dt) offsets for glider tracking (colorfn 8) (0,0,0)=(all 8 nnb dt=-1)")
     print("v           ","toggle vertical scroll tracking mode : following top most objects and losing lowest objects in contact with 0 row")
-    print("+,-         ","increase or decrease ymax or ymaxq for activity display scaled as act/(ymax+act) by a factor of 2")
-    print("+,-         ","increase or decrease genealogycoldepth if colorfunction==11 for gene ancestor display")
+    print("+ , -       ","increase or decrease ymax or ymaxq for activity display scaled as act/(ymax+act) by a factor of 2")
+    print("+ , -       ","increase or decrease genealogycoldepth if colorfunction==11 for gene ancestor display")
 #-----------------------------------------------------------------------------------------------------------
 
 if __name__ == '__main__':

@@ -125,11 +125,13 @@ libcd.get_acttrace.argtypes = [uint64_array,c_int]
 libcd.get_poptrace.restype = None
 libcd.get_poptrace.argtypes = [uint64_array,c_int]
 libcd.get_genealogytrace.restype = None
-libcd.get_genealogytrace.argtypes = [uint64_array,c_int]
+libcd.get_genealogytrace.argtypes = [uint64_array, c_int]
+libcd.get_nnovelcells.restype = None
+libcd.get_nnovelcells.argtypes = [uint_array, c_int]
 libcd.get_sorted_popln_act.restype = c_int
 libcd.get_sorted_popln_act.argtypes = [int_array, uint64_array, int_array, int_array]
 libcd.get_connected_comps.restype = c_int
-libcd.get_connected_comps.argtypes = [uint_array, uint_array,c_int, c_int]
+libcd.get_connected_comps.argtypes = [uint_array, uint_array, c_int, c_int]
 libcd.get_ncomponents.restype = c_int
 libcd.get_ncomponents.argtypes = None
 libcd.get_components.restype = c_int
@@ -272,6 +274,9 @@ def get_poptrace(poptrace):
 
 def get_genealogytrace(genealogytrace):
     return libcd.get_genealogytrace(genealogytrace, int(len(genealogytrace)))
+
+def get_nnovelcells(nnovelcells):
+    return libcd.get_nnovelcells(nnovelcells,int(len(nnovelcells)))
 
 def get_genealogies(genealogydat):
     return libcd.get_genealogies(genealogydat, int(len(genealogydat)))

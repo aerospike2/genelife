@@ -282,6 +282,7 @@ unsigned char acttraceqt1[N2*nNhist];// type of entry in acttraceq : 1 quad, 0 s
 uint64_t working[N2];               // working space array for calculating genealogies and doing neighbour bit packing
 int npopulation[N];                 // number of live sites (gol 1s) in last N time steps up to current population
 int npopulation1[N*nNhist];         // number of live sites (gol 1s) in first N*nNhist time steps
+unsigned int nnovelcells[N*nNhist]; // number of live sites that are part of novel components in first N*nNhist time steps
 int nspeciesgene,nallspecies;       // number of gene species in current population, and that have ever existed
 int nallclones;                     // number of clones stored in hash table
 int nspeciesquad,nallspeciesquad;   // number of quad species in current population, and that have ever existed
@@ -625,7 +626,9 @@ const uint64_t r1 = 0x1111111111111111ull;
 // get_acttrace         get current acttrace array C to python
 // get_poptrace         get current poptrace array C to python
 // get genealogytrace   get current trace of genealogies to python
+// get_nnovelcells      get N*nhist first counts of number of novel cells (live cells in novel components)
 // get_nspecies         get number of species from C to python
+// get_nlive            get number of live cells
 // get_genealogydepth   get depth of genealogies returned by get_genealogies()
 // get_genealogies      // get current population genealogies (currently near end of code)
 // get_hist             get the histogram from C to python
@@ -5046,7 +5049,10 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     }
 
     if(diagnostics & diag_longtime_trace) {
-        for (i=0;i<N*nNhist;i++) npopulation1[i]=0; // initialize longer beginning total population trace
+        for (i=0;i<N*nNhist;i++) {
+            npopulation1[i]=0; // initialize longer beginning total population trace
+            nnovelcells[i]=0;  // initialize longer beginning total novel cell count trace
+        }
         for (ij=0; ij<N2*nNhist; ij++) {
             poptrace1[ij]=rootgene;                 // initialize long population traces to root gene
             acttrace1[ij]=rootgene;                 // initialize long activity traces to root gene
@@ -5377,6 +5383,13 @@ void get_genealogytrace(uint64_t outgolg[], int NN) {
     }
 }
 //.......................................................................................................................................................
+void get_nnovelcells(unsigned int outnnovelcells[], int Nh) {
+    int i;
+    if(Nh>N*nNhist) fprintf(stderr,"error, request for too many entries in get_nnovelcells_trace: %d > %d\n",Nh,N*nNhist);
+    else
+        for (i=0; i<Nh; i++)  outnnovelcells[i] = nnovelcells[i];
+}
+//.......................................................................................................................................................
 int get_nspecies() {
     int k,nspecies,nspeciesnow;
     nspecies = hashtable_count(&genetable);
@@ -5616,6 +5629,27 @@ int get_connected_comps(unsigned int outlabel[], unsigned int outconnlen[], int 
 //.......................................................................................................................................................
 int get_ncomponents() {
     return(ncomponents);
+}
+//.......................................................................................................................................................
+int novelcells() {
+    int ij,d,popcount,n;
+    quadnode *q;
+    uint64_t quad;
+    
+    n=0;
+    if (diagnostics & diag_hash_patterns) {
+        for (ij=0; ij<N2; ij++) {
+            if (label[ij]) {
+                quad = complist[label[ij]].quad;
+                if((d=complist[label[ij]].patt)) popcount=smallpatts[d].activity; // number of times small (<= 4x4) pattern encountered previously
+                else if((q = (quadnode *) hashtable_find(&quadtable, quad)) != NULL) // if we reach here, quad should have been stored in hash table
+                    popcount=q->activity;                       // number of times large pattern encountered previously (poss. also as part of larger patt)
+                else popcount=1;                                // should never occur, but just in case, assume novel
+                if (popcount==1) n++;
+            }
+        }
+    }
+    return(n);
 }
 //.......................................................................................................................................................
 int get_components(component components[],int narraysize) {
@@ -6178,6 +6212,7 @@ int activitieshash() {  /* count activities of all currently active gene species
         traceptr=&poptrace1[N2*nchist];
         for(j=0;j<N;j++) traceptr[nrhist+j*N]=poptrace[x+j*N];
         npopulation1[totdisp]=npopulation[x];
+        nnovelcells[totdisp]=novelcells();
     }
     free(gindices);free(activities);free(genes);free(popln);
     return(nspeciesnow);
