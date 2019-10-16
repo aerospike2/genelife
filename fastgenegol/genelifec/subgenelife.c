@@ -6,7 +6,7 @@
 // First created by John McCaskill on 14.07.17. Last modified Aug 2019.
 // Copyright © 2017,2018,2019 European Center for Living Technology. All rights reserved.
 
-// This code distributed in the hope that they will be useful for research purposes, but WITHOUT ANY WARRANTY
+// This code distributed in the hope that it will be useful for research purposes, but WITHOUT ANY WARRANTY
 // and without even the implied warranty of merchantability or fitness for a particular purpose.
 //
 // Thanks to external contributions:
