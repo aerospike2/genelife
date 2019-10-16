@@ -5,7 +5,37 @@
 //
 // First created by John McCaskill on 14.07.17. Last modified Aug 2019.
 // Copyright © 2017,2018,2019 European Center for Living Technology. All rights reserved.
+
+// This code distributed in the hope that they will be useful for research purposes, but WITHOUT ANY WARRANTY
+// and without even the implied warranty of merchantability or fitness for a particular purpose.
 //
+// Thanks to external contributions:
+//
+// Sean Eron Anderson 
+// Bit Twiddling Hacks © 1997-2005 (all snippets in public domain)
+// https://graphics.stanford.edu/~seander/bithacks.html
+//
+// Mattias Gustavsson
+// hashtable.h, in:
+// https://github.com/mattiasgustavsson/libs
+// dual license, MIT / Unlicense
+// choosing Unlicense license (http://www.unlicense.org)
+//
+// Stackoverflow:
+// license: creative commons https://creativecommons.org/licenses/by-sa/3.0/
+// ----------------
+// Anthony Bourdain
+// https://stackoverflow.com/questions/27159322/rgb-values-of-the-colors-in-the-ansi-extended-colors-index-17-255
+// ----------------
+// MetallicPriest
+// https://stackoverflow.com/questions/6943493/hash-table-with-64-bit-values-as-key/33871291
+// ----------------
+//
+// Wikipedia:
+//
+// "Disjoint-set data structure" (n.d.) Retrieved Oct 16, 2019
+// https://en.wikipedia.org/wiki/Disjoint-set_data_structure
+
 
 #include <stdio.h>
 #include <stdlib.h>
