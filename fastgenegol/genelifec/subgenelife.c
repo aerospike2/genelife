@@ -1,14 +1,15 @@
 // subgenelife.c
-// Written by John S. McCaskill and Norman H. Packard
+// Xcode project fastgenegol
+//---------------------------------------------------------- copyright -------------------------------------------------------------------------
+// Written by John S. McCaskill and Norman H. Packard 2017-2019
 //
-// Project fastgenegol
-//
-// First created by John McCaskill on 14.07.17. Last modified Aug 2019.
+// First created by John McCaskill on 14.07.17. Last modified Oct 2019.
 // Copyright © 2017,2018,2019 European Center for Living Technology. All rights reserved.
-
-// This code distributed in the hope that it will be useful for research purposes, but WITHOUT ANY WARRANTY
+//
+// This code is distributed in the hope that it will be useful for research purposes, but WITHOUT ANY WARRANTY
 // and without even the implied warranty of merchantability or fitness for a particular purpose.
 //
+//------------------------------------------------------- acknowledgements ----------------------------------------------------------------------
 // Thanks to external contributions:
 //
 // Sean Eron Anderson 
@@ -23,35 +24,214 @@
 //
 // Stackoverflow:
 // license: creative commons https://creativecommons.org/licenses/by-sa/3.0/
-// ----------------
+//
 // Anthony Bourdain
 // https://stackoverflow.com/questions/27159322/rgb-values-of-the-colors-in-the-ansi-extended-colors-index-17-255
-// ----------------
+//
 // MetallicPriest
 // https://stackoverflow.com/questions/6943493/hash-table-with-64-bit-values-as-key/33871291
-// ----------------
 //
 // Wikipedia:
 //
+// "Xorshift" algorithm rewritten here as inline macro
+// https://en.wikipedia.org/wiki/Xorshift
+// Vigna, Sebastiano. "xorshift*/xorshift+ generators and the PRNG shootout". Retrieved 2014-10-25.
+// https://prng.di.unimi.it
+// "Hamming Weight" popcount4c algorithm
+// https://en.wikipedia.org/wiki/Hamming_weight
 // "Disjoint-set data structure" (n.d.) Retrieved Oct 16, 2019
 // https://en.wikipedia.org/wiki/Disjoint-set_data_structure
-
-
+// The quadtree code for storing patterns benefited from but is different from that employed in hashlife
+// https://en.wikipedia.org/wiki/Hashlife
+//
+//----------------------------------------------------- list of subroutines -----------------------------------------------------------------------------
+//......................................................    macros    ...................................................................................
+// RAND128P(val)               64-bit random number algorithm adapted from Vigna Sebastiano, see acknowledgements
+// POPCOUNT64C(x, val)         Wikipedia "Hamming Weight" popcount4c alg
+// POP4COUNT64C(x, val)        Count number of 4-bit bytes which are non zero
+// PATTERN2_32(x, pat, found)  find number of 2-bit aligned 2-bit copies of pattern pat in 32-bits of 64-bit integer x
+// PATTERN4(x, pat, found)     find number of 4-bit aligned 4-bit copies of pattern pat in 64-bit x
+// PATTERN8(x, pat, found)     find number of 8-bit aligned 8-bit copies of pattern pat in 64-bit x
+// FIRST1INDEX(v, c)           index of first one in 64-bit binary pattern
+// DELTAXY(ij,x,y)             calculate offset (x,y) from index ij into periodic 2D array of size N
+// MEMBRANE                    formula for membrane of death, optional places in array where cell death is forced
+//......................................................  fast integer processing   .....................................................................
+// integerSqrt          direct bit processing algorithm to implement integer sqrt (largest integer smaller than sqrt) : but floating point sqrt is faster
+// log2r                fast integer logarithm working only for arguments which are powers of 2 (not used but slightly faster than log2a when applicable)
+// log2lower            fast integer logarithm working for all integers : largest integer smaller than or equal to logarithm base 2 of argument
+// log2upper            fast integer logarithm working for all integers : smallest integer larger than or equal to logarithm base 2 of argument
+// sqrtupper            fast integer sqrt working for all integers : smallest integer larger than or equal to sqrt of argument
+// randprob             random event with probability determined by a 32 bit unsigned integer iprob as iprob / 2^32 using RAND128 and uint64_t
+//......................................................  color functions   .............................................................................
+// set_color            inline function to assign rainbow colors
+// label_color          map label (quasi-uniformly) into larger unsigned colour space
+// rgba                 converts hue (0..1) to rgb+alpha
+// mix_color            mix colors from overlapping components, add random drift of colour
+// delay                time delay in ms for graphics
+// printxy              terminal screen print of array on xterm
+// golr_digest          digest information in golr (displacement record), extracting min and max mismatch, period, and x,y displacement of period
+// colorgenes           colour display of genes in one of 12 colorfunction modes, including activities, pattern analysis, genealogies and glider detection
+//......................................................  selection of genes for birth  .................................................................
+// selectone_of_2       select one (or none) of two genes based on selection model parameter selection :  returns birth and newgene
+// selectone_of_s       select one (or none) of s genes based on selection model parameter selection :  returns birth and newgene
+// selectone_nbs        select one of two genes based on pattern of their live 2nd shell neighbours and their genetic encoding
+// selectdifft1         select the gene at the single active neighbour position : algorithm could be optimized
+// selectdifft2         select the right or left of two genes bunched with least number of empty genes between them
+// selectdifft3         select the unique most different (by symmetry) of three live neighbours or first one in canonical rotation
+// selectdifft4         select the most central (left) of four live neighbours or first one in canonical rotation
+// selectdifft5         select the most central (left) of five live neighbours or first one in canonical rotation
+// selectdifft6         select the most central (left) of six live neighbours or first one in canonical rotation
+// selectdifft7         select the most central (left) of seven live neighbours or first one in canonical rotation
+// selectdifft          select the most central (left) of sum live neighbours or first one in canonical rotation : calls 1 of selectdifft1-7
+// disambiguate         disambiguate the cases where the canonical rotation does not uniquely identify a pattern start point : 1 of 8 methods
+//...................................................... hash table management for genes and clones .....................................................
+// hashaddgene          add new gene to hash table, increment popln and ancestor information for genes already encountered. If mutation calls hashaddclone
+// hashdeletegene       decrements population count for gene, printing error message if not found or already zero. Calls hashdeletefromclone
+// hashgeneextinction   record gene extinctions in hash gene table, counting number of extinctions
+// hashgeneactivity     update activity of gene
+// hashaddclone         add new clone to hash table, increment popln information for existing clones
+// hashdeletefromclone  decrements population count for clone, printing error message if not found or already zero
+// hashcloneactivity    update activity of clone
+//......................................................  pattern storage and analysis  .................................................................
+// patt_hash            hash function for a pattern specified by 4 64-bit (8x8) patterns
+// newkey               assign one of free keys kept in a linked list, allocated 1024 at a time (used if hash-key already occupied with different quadtree)
+// node_hash            hash function for a node specified by 4 64-bit pointers
+// hash_patt16_store    store new pattern in small pattern table
+// hash_patt16_find     find quadtree hash for pattern (leaf of quadtree consists of 4 64bit integers defining a 16x16 pixel array)
+// hash_node_store      store new node with hashkey h and subnodes nw,ne,sw,se in hash table
+// hash_node_find       find quadtree hash for node (node is specified by its four quadrant pointers (64 bit))
+// quadimage            construct quadtree for an entire image or connected component, reporting if the image has been found previously, returning hashkey
+// labelimage           rebuild image in a chosen label array from quadimage at chosen offset with chosen label
+//......................................................  neighborhood processing  ......................................................................
+// pack012neighbors     pack all up to 2nd neighbours in single word
+// pack0123neighbors    pack all up to 3rd neighbours in single word
+// pack49neighbors      fast routine to pack all up to 1st,2nd,3rd neighbours in single word : order of bits dictated by hierarchical assembly
+// pack16neighbors      pack 4x4 blocks in single uint64_t word using 16 bits
+// unpack16neighbors    unpack 16 bit word to 4x4 block at offset in full array of labels, marking with chosen label
+// log2size             return log2 of linear size of pattern in integer power of 2 for small patterns 0-65535
+// pack64neighbors      pack 8x8 blocks in single uint64_t (long) word with 64 bits
+// unpack64neighbors    unpack 64 bit word to 8x8 block at offset in full array of labels, marking with chosen label
+// compare_neighbors    compare packed pack neighbours with one given x,y shift of arbitrary size
+// compare_all_neighbors compare packed pack neighbours with all nearest neighbour x,y shifts
+// packandcompare       pack and compare either all 1-shifted 3-neighbourhoods with t=-1 or chosen (dx,dy,dt) 3-neighbourhoods
+//......................................................  fast component labelling  ......................................................................
+// lab_union            disjoint rank union of equivalence classes returning common root
+// label_cell           label a cell (site) in the cellular automata with first pass label of connected component
+// label_cell_genetic   label a cell (site) for connected component analysis taking differences in genes into account
+// checklabels          check that the label tree consistently points to labels of lower values as we go via parents to root
+// flattenlabels        flatten label tree so that each label points to its unique root
+// label_components     do two-pass fast component labelling with 8-neighbour using Suzuki decision tree, rank union and periodic BCs, connect t-1 labels with t
+// extract_components   extract labelled components to list of subimages embedded in square of side 2^n, each stored in a quadtree hash table
+//........................................................  simulation update for different symmetries  ..................................................
+// update_23            update gol, golg, golgstats for a single synchronous time step : for selection 0-7 with fixed GoL rule departures in repscheme
+// update_lut_sum       update version for gene encoding look up table for totalistic survival and birth (disallowing 0 live neighbour entries) sel 8,9
+// update_lut_dist      update version for gene encoding look up table for survival and birth based on corner & edge sums (2*19 states disallowing s=0,1,7,8): sel 10,11
+// update_lut_canon_rot update version for gene encoding look up table for canonical rotation survival and birth (2*32 states, disallowing 0,1,7,8 entries) : sel 12,13
+// update_lut_2D_sym    update version all different configurations under the standard 2D 4-rotation and 4-reflection symmetries are distinguished: sel 14,15
+// genelife_update      master routine to call specific model update, collect statistics if required and rotate planes
+//........................................................  initialization and file IO  ...................................................................
+// initialize_planes    initialize periodic sequence of planes to record rolling time window of up to maxPlanes time points (≤8)
+// readFile             read file of gol/golg array (32x32) data
+// writeFile            write file of gol/golg array (32x32) data
+// testmacros           test macros used to accelerate processing (usually not called): FIRST1INDEX, PATTERN4, PATTERN8
+// initialize           initialize simulation parameters and arrays
+//.........................................................  set from python driver  ......................................................................
+// set_colorfunction    set color function integer from GUI for use in patterning and coloring display
+// setget_act_ymax      set activity ymax for scaling of gene activity plot
+// setget_act_ymaxq     set activity ymax for scaling of quad activity plot
+// set_selectedgene     set selected gene for highlighting from current mouse selection in graphics window
+// set_offsets          set offsets for detection of glider structures in display for color function 8
+// set_quadrant         set the pair of bits in repscheme (or survivalmask or overwritemask) used for quadrant variation 0-6
+// set_randominflux     change the randominflux activation for rbackground if nonzero or continual updating of init field with random states and genes : 2,1,0
+// set_rbackground      set the backround random live gene input rate per frame and site to rbackground/32768
+// set_repscheme_bits   set the two of the repscheme (or survivalmask or overwritemask) bits corresponding to the selected quadrant
+// set_repscheme        set repscheme from python
+// set_rulemod          set rulemod from python
+// set_surviveover      set the two masks for survival and overwrite from python (survivalmask, overwritemask)
+// set_vscrolling       set vertical scrolling to track fronts of growth in vertical upwards direction
+// set_noveltyfilter    set novelty filter for darkening already encountered components in connected component display (colorfunction 9)
+// set_activity_size_colormode set colormode by size for colorfunction 10 : 0 by ID  1 log2 enclosing square size 2 use #pixels 3 use sqrt(#pixels)
+// set_gcolors          set connected component colors as inherited colors from colliding connected components with random drift
+// set_seed             set random number seed
+// set_nbhist           set nbhist N-block of time points for trace from GUI for use in activity and population display traces
+// set_genealogycoldepth set genealogycoldepth for colorfunction=11 display
+// set_ancestortype     set ancestortype for genealogy display and return of first (0), clonal (1) or first & clonal in 2 windows (2)
+// stash                stash current gol,golg, golb, golr, golgstats in stashgol, stshgolg, stashgolb, stashgolr, stashgolgstats
+// label2stash          stash current gol,golg, golb, golr, golgstats from selected labelled component (either cumulatively or individually)
+// set_info_transfer_h  set information transfer histogram display value (0,1) from python
+// set_activityfnlut    set collection of functional activity statistics corresponding to functional aggregate of genes by non-neutral bits
+// set_colorupdate1     control update of colorgenes and regular print statements via flag colorupdate1
+// set_colorfunction2   choice of colorfunction for window 2
+//..........................................................  get to python driver  .....................................................................
+// unstash              retrieve current gol,golg, golb, golr, golgstats from stashed values
+// get_log2N            get the current log2N value from C to python
+// get_curgol           get current gol array from C to python
+// get_curgolg          get current golg array from C to python
+// get_curgolbr         get current golb and golr arrays from C to python
+// get_stats            get the traced statistics from C to python
+// get_acttrace         get current acttrace array C to python
+// get_poptrace         get current poptrace array C to python
+// get genealogytrace   get current trace of genealogies to python
+// get_nnovelcells      get N*nhist first counts of number of novel cells (live cells in novel components)
+// get_nspecies         get number of species from C to python
+// get_nlive            get number of live cells
+// get_genealogydepth   get depth of genealogies returned by get_genealogies()
+// get_genealogies      // get current population genealogies (currently near end of code)
+// get_hist             get the histogram from C to python
+// get_activities       get the current activity statistics of genes from C to python
+// get_all_activities   get all activity statistics of genes (since t=0) from C to python
+// get_quad_activities  get current activity statistics of quads (since t=0) from C to python
+// get_small_activities  get current activity statistics of smallpats (since t=0) from C to python
+// get_all_quad_activities  get all activity statistics of quads (since t=0) from C to python
+// get_all_small_activities  get all activity statistics of smallpats (since t=0) from C to python
+// get_components       get all current connected component data structures
+// get_smallpatts       get array of small pattern data structures including sizes and activities
+// get_quadnodes        get all hashed quadnodes including hashkey, sizes and activities
+// get_genes            get all hashed genes with data structures including activity counts, extinctions etc
+// get_curgolgstats     get current golgstats array C to python
+// get_sorted_popln_act return sorted population and activities (sorted by current population numbers)
+// get_gliderinfo       get information about gliders from packed array representation (currently near end of code)
+//..........................................................  comparison functions  ....................................................................
+// cmpfunc              compare gene values as numerical unsigned numbers
+// cmpfunc1             compare gene counts in population
+// cmpfunc2             compare gene values corresponding to given number index in hash table
+// cmpfunc3             compare population counts of hash stored genes
+// cmpfunc3c            compare population counts of hash stored clones
+// cmpfunc3q            compare pixel counts (pop1s) of hash stored quad patterns
+// cmpfunc3qs           compare pixel counts (pop1s) of hash stored small patterns
+// cmpfunc4             compare birth times of hash stored genes
+// cmpfunc5             compare common genealogy level gene values of hash stored genes
+// cmpfunc5c            compare common clonealogy level clone values of hash stored clones
+// cmpfunct6            compare according to ancestry in genealogytrace using activity ordering
+// cmpfunc7             compare according to ancestry in genealogytrace using population size ordering
+//..........................................................  gene and pattern analysis of dynamics .....................................................
+// countconfigs         count the configs with python specified offsets in (x,y,t)
+// tracestats           record the current stats in time trace
+// countspecies1        count genes with gene array specified as input parameters
+// countspecies         count different genes with genes specified at current time point
+// countspecieshash     count different genes in current population from record of all species that have existed
+// totalpoptrace        calculates and returns current population size and store in scrolling population trace array npopulation
+// genefnindex          calculate index based on bits masked in from survival and birth masks only
+// activitieshash       calculate array of current gene activities and update acttrace array of genes in activity plot format
+// activitieshashquad   calculate array of current quad activities and update acttraceq array of patterns in activity plot format
+// get_genealogies      calculate and retrieve or display genealogies, depending on size of array passed (0: display only, >0: retrieve only)
+// clonealogies         calculate and display clonealogies: genealogies of clones
+// get_gliderinfo       get information about gliders from packed array representation
+//-------------------------------------------------------------------------------------------------------------------------------------------------------
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <inttypes.h>
 #include <time.h>
 #include <math.h>
-
-//-----------------------------------------------------------size of array -------------------------------------------------------------------------
+//-----------------------------------------------------------size of array ------------------------------------------------------------------------------
 const int log2N = 9;                // toroidal array of side length N = 2 to the power of log2N (minimum log2N is 6 i.e. 64x64)
 const int N = 0x1 << log2N;         // only side lengths powers of 2 allowed to enable efficient implementation of periodic boundaries
 const int N2 = N*N;                 // number of sites in square-toroidal array
 const int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
 const int N2mask = N2 - 1;          // bit mask for array, used instead of modulo operation
 const uint64_t rootclone = N2;      // single bit for mask enquiries for clones with root heritage
-//--------------------------------------------------------- main parameters of model ----------------------------------------------------------------
+//--------------------------------------------------------- main parameters of model --------------------------------------------------------------------
 unsigned int rulemod = 1;           // determine whether to modify GoL rules
 int selection = 1;                  // 0-7 fitness of 2 live neighbours, 8-15 lut symmetry and encoding scheme
                                     // 0.  integer value                        1. number of ones         2. scissors-stone-well-paper: wins over left 1-1-2-2
@@ -83,9 +263,8 @@ int ncoding = 1;                    // byte 0 of python ncoding : number of codi
 int ncoding2 = 0;                   // byte 1 of python ncoding: number of coding bits per gene function for masks in connection with repscheme add2ndmask1st R_6,7
 unsigned int pmutmask;              // binary mask so that prob of choosing zero is pmut = pmutmask/2^32. If value<32 interpret as integer -log2(prob)
 //...........................................................diagnostic control..........................................................................
-const unsigned int diag_all                 = 0xffff;   // all diagnostics active
-//const unsigned int diag_all               = 0xffdb;   // all diagnostics active except clones
-unsigned int diagnostics                    = diag_all; // bit mask for diagnostics as defined by following constants
+const unsigned int diag_all                 = 0xffff;   // all diagnostics active, remove bits from this mask to run without them
+unsigned int diagnostics                    = diag_all; // bit mask for all diagnostics as defined by following constants
 const unsigned int diag_hash_genes          = 0x1;      // enable hash storage of all genes encountered in simulation
 const unsigned int diag_hash_patterns       = 0x2;      // enable hash storage of all patterns encountered in simulation
 const unsigned int diag_hash_clones         = 0x4;      // enable hash storage of all clones encountered in simulation
@@ -173,10 +352,10 @@ const uint64_t F_3g_same =     0x2000000ull;// bit is 1 if exactly 3 live nbs an
 #define ASCII_ESC         27        /* escape for printing terminal commands, such as cursor repositioning : only used in non-graphic version */
 #define IJDEBUG       105690        /* ij nr for debug printouts */
 //----------------------------------------------------------hash table implementation of python style dictionary---------------------------------------
-#define HASHTABLE_IMPLEMENTATION    // uses Mattias Gustavsson's hashtable (github) for unsigned 64 bit key dictionary
-#define HASHTABLE_U64 uint64_t      // define the hashtable 64bit unsigned int type as uint64_t
-#define HASHTABLE_U32 uint32_t      // define the hashtable 32bit unsigned int type as uint32_t
-#define HASHTABLE_SIZE_T uint64_t   // use 64 bit unsigned key type consistent with this file
+#define HASHTABLE_IMPLEMENTATION    /* uses Mattias Gustavsson's hashtable (github) for unsigned 64 bit key dictionary */
+#define HASHTABLE_U64 uint64_t      /* define the hashtable 64bit unsigned int type as uint64_t */
+#define HASHTABLE_U32 uint32_t      /* define the hashtable 32bit unsigned int type as uint32_t */
+#define HASHTABLE_SIZE_T uint64_t   /* use 64 bit unsigned key type consistent with this file */
 #include "hashtable.h"              // Gustavsson's file was modified because the 64bit to 32bit key compression code produces 0 for some values
 hashtable_t genetable;              // genetable contains the hash table for genes : the hash table keys are the 64bit genes themselves
 typedef struct genedata {           // value of keys stored for each gene encountered in simulation
@@ -202,7 +381,6 @@ int genefnindices[1<<24];           // table of activities for functional gene i
 hashtable_t quadtable;              // hash table for quad tree of spatial live state patterns
 typedef struct quadnode {           // stored quadtree binary pattern nodes for population over time (currently only for analysis not computation)
     uint64_t hashkey;               // hash table look up key for node : enables tree exploration more directly than construction from nw,ne,sw,se including collision avoidance
-//    uint64_t firstancestor;         // pattern immediately preceding the generation of this pattern
     uint64_t nw, ne, sw, se;        // constant keys to hashed quadnodes or 64-bit patterns : we terminate one level higher than Gosper & golly
     unsigned short int isnode;      // 1 if this is a node not a pattern
     unsigned short int size;        // side length of square image corresponding to quadtree pattern
@@ -212,13 +390,12 @@ typedef struct quadnode {           // stored quadtree binary pattern nodes for 
     unsigned int lasttime;          // last time node was identified : used to determine if part of current timestep
     unsigned int topactivity;       // activity of pattern as top of connected component (last field : giving size of record an even number of 64bit words)
 } quadnode;
-quadnode quadinit = {0ull,/*rootgene,*/0ull,0ull,0ull,0ull,0,0,1,0,0,0,0};
+quadnode quadinit = {0ull,0ull,0ull,0ull,0ull,0,0,1,0,0,0,0};
 uint64_t qimage;                    // key for quadimage datastructure of entire image
 int quadcollisions = 0;
 HASHTABLE_SIZE_T const* quadkeys;   // pointer to stored hash table keys (which are the quadkeys)
 quadnode* quaditems;                // list of quadnode structured items stored in hash table
 typedef struct smallpatt {          // stored binary patterns for 4*4 subarrays or smaller (16bit)
-    // unsigned short int size;        // side length of square image corresponding to pattern
     unsigned int topactivity;       // number of references to finding this pattern as top level of connected component
     unsigned int activity;          // number of references to finding this pattern
     unsigned int firsttime;         // first time pattern was identified
@@ -445,10 +622,8 @@ uint64_t planer6[N2];               // golr  6
 uint64_t planer7[N2];               // golr  7
 #endif
 //------------------------------------------------------- fast macros for pattern counting and random number generator ---------------------------------
-                                    // Wikipedia "Xorshift" rewritten here as inline macro &
-                                    // Vigna, Sebastiano. "xorshift*/xorshift+ generators and the PRNG shootout". Retrieved 2014-10-25.
 uint64_t randstate[2];              // State for xorshift pseudorandom number generation. The state must be seeded so that it is not zero
-#define RAND128P(val) {                                                       \
+#define RAND128P(val) {             /* Adapted from Wikipedia "Xorshift" rewritten here as inline macro & Vigna, Sebastiano, see acknowledgements */    \
     uint64_t x = randstate[0]; uint64_t y = randstate[1];                       \
     randstate[0] = y;    x ^= x << 23;  randstate[1] = x ^ y ^ (x >> 17) ^ (y >> 26);  \
     val = randstate[1] + y;}
@@ -537,171 +712,9 @@ const uint64_t r1 = 0x1111111111111111ull;
     }                                          /* note that Anderson's algorithm was incorrect, see also profile comparison in standalone lsb64.c */ \
 }                                              /* this macro calculates the LSB 1 (ie from the bottom) not the MSB 1 (ie from the top) that the integer log function finds. */
 //.......................................................................................................................................................
-#define membrane (((ij>>log2N)==((N>>1)-(initfield>>1)-1) || ((ij>>log2N)==((N>>1)-(initfield>>1)-2))) && (ij & 0x1) ? 2 : 1) /* formula for membrane of death */
-//----------------------------------------------------- list of subroutines -----------------------------------------------------------------------------
-//......................................................  fast integer processing   .....................................................................
-// integerSqrt          direct bit processing algorithm to implement integer sqrt (largest integer smaller than sqrt) : but floating point sqrt is faster
-// log2r                fast integer logarithm working only for arguments which are powers of 2 (not used but slightly faster than log2a when applicable)
-// log2lower            fast integer logarithm working for all integers : largest integer smaller than or equal to logarithm base 2 of argument
-// log2upper            fast integer logarithm working for all integers : smallest integer larger than or equal to logarithm base 2 of argument
-// sqrtupper            fast integer sqrt working for all integers : smallest integer larger than or equal to sqrt of argument
-// randprob             random event with probability determined by a 32 bit unsigned integer iprob as iprob / 2^32 using RAND128 and uint64_t
-//......................................................  color functions   .............................................................................
-// set_color            inline function to assign rainbow colors
-// label_color          map label (quasi-uniformly) into larger unsigned colour space
-// rgba                 converts hue (0..1) to rgb+alpha
-// mix_color            mix colors from overlapping components, add random drift of colour
-// delay                time delay in ms for graphics
-// printxy              terminal screen print of array on xterm
-// golr_digest          digest information in golr (displacement record), extracting min and max mismatch, period, and x,y displacement of period
-// colorgenes           colour display of genes in one of 12 colorfunction modes, including activities, pattern analysis, genealogies and glider detection
-//......................................................  selection of genes for birth  .................................................................
-// selectone_of_2       select one (or none) of two genes based on selection model parameter selection :  returns birth and newgene
-// selectone_of_s       select one (or none) of s genes based on selection model parameter selection :  returns birth and newgene
-// selectone_nbs        select one of two genes based on pattern of their live 2nd shell neighbours and their genetic encoding
-// selectdifft1         select the gene at the single active neighbour position : algorithm could be optimized
-// selectdifft2         select the right or left of two genes bunched with least number of empty genes between them
-// selectdifft3         select the unique most different (by symmetry) of three live neighbours or first one in canonical rotation
-// selectdifft4         select the most central (left) of four live neighbours or first one in canonical rotation
-// selectdifft5         select the most central (left) of five live neighbours or first one in canonical rotation
-// selectdifft6         select the most central (left) of six live neighbours or first one in canonical rotation
-// selectdifft7         select the most central (left) of seven live neighbours or first one in canonical rotation
-// selectdifft          select the most central (left) of sum live neighbours or first one in canonical rotation : calls 1 of selectdifft1-7
-// disambiguate         disambiguate the cases where the canonical rotation does not uniquely identify a pattern start point : 1 of 8 methods
-//...................................................... hash table management for genes and clones .....................................................
-// hashaddgene          add new gene to hash table, increment popln and ancestor information for genes already encountered. If mutation calls hashaddclone
-// hashdeletegene       decrements population count for gene, printing error message if not found or already zero. Calls hashdeletefromclone
-// hashgeneextinction   record gene extinctions in hash gene table, counting number of extinctions
-// hashgeneactivity     update activity of gene
-// hashaddclone         add new clone to hash table, increment popln information for existing clones
-// hashdeletefromclone  decrements population count for clone, printing error message if not found or already zero
-// hashcloneactivity    update activity of clone
-//......................................................  pattern storage and analysis  .................................................................
-// patt_hash            hash function for a pattern specified by 4 64-bit (8x8) patterns
-// newkey               assign one of free keys kept in a linked list, allocated 1024 at a time (used if hash-key already occupied with different quadtree)
-// node_hash            hash function for a node specified by 4 64-bit pointers
-// hash_patt16_store    store new pattern in small pattern table
-// hash_patt16_find     find quadtree hash for pattern (leaf of quadtree consists of 4 64bit integers defining a 16x16 pixel array)
-// hash_node_store      store new node with hashkey h and subnodes nw,ne,sw,se in hash table
-// hash_node_find       find quadtree hash for node (node is specified by its four quadrant pointers (64 bit))
-// quadimage            construct quadtree for an entire image or connected component, reporting if the image has been found previously, returning hashkey
-// labelimage           rebuild image in a chosen label array from quadimage at chosen offset with chosen label
-//......................................................  neighborhood processing  ......................................................................
-// pack012neighbors     pack all up to 2nd neighbours in single word
-// pack0123neighbors    pack all up to 3rd neighbours in single word
-// pack49neighbors      fast routine to pack all up to 1st,2nd,3rd neighbours in single word : order of bits dictated by hierarchical assembly
-// pack16neighbors      pack 4x4 blocks in single uint64_t word using 16 bits
-// unpack16neighbors    unpack 16 bit word to 4x4 block at offset in full array of labels, marking with chosen label
-// log2size             return log2 of linear size of pattern in integer power of 2 for small patterns 0-65535
-// pack64neighbors      pack 8x8 blocks in single uint64_t (long) word with 64 bits
-// unpack64neighbors    unpack 64 bit word to 8x8 block at offset in full array of labels, marking with chosen label
-// compare_neighbors    compare packed pack neighbours with one given x,y shift of arbitrary size
-// compare_all_neighbors compare packed pack neighbours with all nearest neighbour x,y shifts
-// packandcompare       pack and compare either all 1-shifted 3-neighbourhoods with t=-1 or chosen (dx,dy,dt) 3-neighbourhoods
-//......................................................  fast component labelling  ......................................................................
-// lab_union            disjoint rank union of equivalence classes returning common root
-// label_cell           label a cell (site) in the cellular automata with first pass label of connected component
-// label_cell_genetic   label a cell (site) for connected component analysis taking differences in genes into account
-// checklabels          check that the label tree consistently points to labels of lower values as we go via parents to root
-// flattenlabels        flatten label tree so that each label points to its unique root
-// label_components     do two-pass fast component labelling with 8-neighbour using Suzuki decision tree, rank union and periodic BCs, connect t-1 labels with t
-// extract_components   extract labelled components to list of subimages embedded in square of side 2^n, each stored in a quadtree hash table
-//........................................................  simulation update for different symmetries  ..................................................
-// update_23            update gol, golg, golgstats for a single synchronous time step : for selection 0-7 with fixed GoL rule departures in repscheme
-// update_lut_sum       update version for gene encoding look up table for totalistic survival and birth (disallowing 0 live neighbour entries) sel 8,9
-// update_lut_dist      update version for gene encoding look up table for survival and birth based on corner & edge sums (2*19 states disallowing s=0,1,7,8): sel 10,11
-// update_lut_canon_rot update version for gene encoding look up table for canonical rotation survival and birth (2*32 states, disallowing 0,1,7,8 entries) : sel 12,13
-// update_lut_2D_sym    update version all different configurations under the standard 2D 4-rotation and 4-reflection symmetries are distinguished: sel 14,15
-// genelife_update      master routine to call specific model update, collect statistics if required and rotate planes
-//........................................................  initialization and file IO  ...................................................................
-// initialize_planes    initialize periodic sequence of planes to record rolling time window of up to maxPlanes time points (≤8)
-// readFile             read file of gol/golg array (32x32) data
-// writeFile            write file of gol/golg array (32x32) data
-// testmacros           test macros used to accelerate processing (usually not called): FIRST1INDEX, PATTERN4, PATTERN8
-// initialize           initialize simulation parameters and arrays
-//.........................................................  set from python driver  ......................................................................
-// set_colorfunction    set color function integer from GUI for use in patterning and coloring display
-// setget_act_ymax      set activity ymax for scaling of gene activity plot
-// setget_act_ymaxq     set activity ymax for scaling of quad activity plot
-// set_selectedgene     set selected gene for highlighting from current mouse selection in graphics window
-// set_offsets          set offsets for detection of glider structures in display for color function 8
-// set_quadrant         set the pair of bits in repscheme (or survivalmask or overwritemask) used for quadrant variation 0-6
-// set_randominflux     change the randominflux activation for rbackground if nonzero or continual updating of init field with random states and genes : 2,1,0
-// set_rbackground      set the backround random live gene input rate per frame and site to rbackground/32768
-// set_repscheme_bits   set the two of the repscheme (or survivalmask or overwritemask) bits corresponding to the selected quadrant
-// set_repscheme        set repscheme from python
-// set_rulemod          set rulemod from python
-// set_surviveover      set the two masks for survival and overwrite from python (survivalmask, overwritemask)
-// set_vscrolling       set vertical scrolling to track fronts of growth in vertical upwards direction
-// set_noveltyfilter    set novelty filter for darkening already encountered components in connected component display (colorfunction 9)
-// set_activity_size_colormode set colormode by size for colorfunction 10 : 0 by ID  1 log2 enclosing square size 2 use #pixels 3 use sqrt(#pixels)
-// set_gcolors          set connected component colors as inherited colors from colliding connected components with random drift
-// set_seed             set random number seed
-// set_nbhist           set nbhist N-block of time points for trace from GUI for use in activity and population display traces
-// set_genealogycoldepth set genealogycoldepth for colorfunction=11 display
-// set_ancestortype     set ancestortype for genealogy display and return of first (0), clonal (1) or first & clonal in 2 windows (2)
-// stash                stash current gol,golg, golb, golr, golgstats in stashgol, stshgolg, stashgolb, stashgolr, stashgolgstats
-// label2stash          stash current gol,golg, golb, golr, golgstats from selected labelled component (either cumulatively or individually)
-// set_info_transfer_h  set information transfer histogram display value (0,1) from python
-// set_activityfnlut    set collection of functional activity statistics corresponding to functional aggregate of genes by non-neutral bits
-// set_colorupdate1     control update of colorgenes and regular print statements via flag colorupdate1
-// set_colorfunction2   choice of colorfunction for window 2
-//..........................................................  get to python driver  .....................................................................
-// unstash              retrieve current gol,golg, golb, golr, golgstats from stashed values
-// get_log2N            get the current log2N value from C to python
-// get_curgol           get current gol array from C to python
-// get_curgolg          get current golg array from C to python
-// get_curgolbr         get current golb and golr arrays from C to python
-// get_stats            get the traced statistics from C to python
-// get_acttrace         get current acttrace array C to python
-// get_poptrace         get current poptrace array C to python
-// get genealogytrace   get current trace of genealogies to python
-// get_nnovelcells      get N*nhist first counts of number of novel cells (live cells in novel components)
-// get_nspecies         get number of species from C to python
-// get_nlive            get number of live cells
-// get_genealogydepth   get depth of genealogies returned by get_genealogies()
-// get_genealogies      // get current population genealogies (currently near end of code)
-// get_hist             get the histogram from C to python
-// get_activities       get the current activity statistics of genes from C to python
-// get_all_activities   get all activity statistics of genes (since t=0) from C to python
-// get_quad_activities  get current activity statistics of quads (since t=0) from C to python
-// get_small_activities  get current activity statistics of smallpats (since t=0) from C to python
-// get_all_quad_activities  get all activity statistics of quads (since t=0) from C to python
-// get_all_small_activities  get all activity statistics of smallpats (since t=0) from C to python
-// get_components       get all current connected component data structures
-// get_smallpatts       get array of small pattern data structures including sizes and activities
-// get_quadnodes        get all hashed quadnodes including hashkey, sizes and activities
-// get_genes            get all hashed genes with data structures including activity counts, extinctions etc
-// get_curgolgstats     get current golgstats array C to python
-// get_sorted_popln_act return sorted population and activities (sorted by current population numbers)
-// get_gliderinfo       get information about gliders from packed array representation (currently near end of code)
-//..........................................................  comparison functions  ....................................................................
-// cmpfunc              compare gene values as numerical unsigned numbers
-// cmpfunc1             compare gene counts in population
-// cmpfunc2             compare gene values corresponding to given number index in hash table
-// cmpfunc3             compare population counts of hash stored genes
-// cmpfunc3c            compare population counts of hash stored clones
-// cmpfunc3q            compare pixel counts (pop1s) of hash stored quad patterns
-// cmpfunc3qs           compare pixel counts (pop1s) of hash stored small patterns
-// cmpfunc4             compare birth times of hash stored genes
-// cmpfunc5             compare common genealogy level gene values of hash stored genes
-// cmpfunc5c            compare common clonealogy level clone values of hash stored clones
-// cmpfunct6            compare according to ancestry in genealogytrace using activity ordering
-// cmpfunc7             compare according to ancestry in genealogytrace using population size ordering
-//..........................................................  gene and pattern analysis of dynamics .....................................................
-// countconfigs         count the configs with python specified offsets in (x,y,t)
-// tracestats           record the current stats in time trace
-// countspecies1        count genes with gene array specified as input parameters
-// countspecies         count different genes with genes specified at current time point
-// countspecieshash     count different genes in current population from record of all species that have existed
-// totalpoptrace        calculates and returns current population size and store in scrolling population trace array npopulation
-// genefnindex          calculate index based on bits masked in from survival and birth masks only
-// activitieshash       calculate array of current gene activities and update acttrace array of genes in activity plot format
-// activitieshashquad   calculate array of current quad activities and update acttraceq array of patterns in activity plot format
-// get_genealogies      calculate and retrieve or display genealogies, depending on size of array passed (0: display only, >0: retrieve only)
-// clonealogies         calculate and display clonealogies: genealogies of clones
-// get_gliderinfo       get information about gliders from packed array representation
-//-------------------------------------------------------------------------------------------------------------------------------------------------------
+#define DELTAXY(ij,x,y)  ((ij - (ij&Nmask) + (((ij+(x))&Nmask) + (y)*N)) & N2mask)  /* calculate offset (x,y) from index ij into periodic 2D array of size N */
+//.......................................................................................................................................................
+#define MEMBRANE (((ij>>log2N)==((N>>1)-(initfield>>1)-1) || ((ij>>log2N)==((N>>1)-(initfield>>1)-2))) && (ij & 0x1) ? 2 : 1) /* formula for membrane of death */
 //--------------------------------------------------------------- mathematical fns ----------------------------------------------------------------------
 extern inline int integerSqrt(int n) {                  // the largest integer smaller than the square root of n (n>=0)
     int shift,nShifted,result,candidateResult;
@@ -1014,8 +1027,6 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
                         default  : mask = ((d+(d<<6)+(d<<12)+(d<<18))<<8) + 0xff;
                 }
                 if(ggolgstats[ij]&F_nongolchg) mask = 0x00c0c0ff;       // color states changed by non GoL rule are shown in yellow
-
-               
                 // if(ggolgstats[ij]&F_survmut) mask = 0xff00ffff;         // color states for surviving fresh mutants (non-replicated) purple/pink
                 // else if(ggolgstats[ij]&F_notgolrul) mask = 0x00ffffff;  // color states for not GoL rule yellow
 
@@ -2445,8 +2456,8 @@ extern inline quadnode * hash_patt16_find(const uint64_t nw, const uint64_t ne, 
             q = hash_patt16_store(h,nw,ne,sw,se);
         }
         if(nw) q8 = hash_patt8_find(nw);                        // find or store 8x8 64-bit subpatterns, updating activities and lasttime
-        if(ne) q8 = hash_patt8_find(ne);                        // store if new, otherwise update
-        if(sw) q8 = hash_patt8_find(sw);
+        if(ne) q8 = hash_patt8_find(ne);                        // store if new, otherwise update.
+        if(sw) q8 = hash_patt8_find(sw);                        // note that value q8 is never used in this routine, this is intended.
         if(se) q8 = hash_patt8_find(se);
         return(q);
 }
@@ -2595,9 +2606,6 @@ int labelimage(uint64_t hashkeypatt, unsigned int labelimg[], unsigned int label
     return label;
 }
 //----------------------------------------------------------- pack012,3neighbors ------------------------------------------------------------------------
-#define deltaxy(ij,x,y)  ((ij - (ij&Nmask) + (((ij+(x))&Nmask) + (y)*N)) & N2mask)
-#define deltaxyn(ij,x,y,log2n)  ((ij - (ij&((1<<log2n)-1)) + (((ij+(x))&Nmask) + (y)*N)) & N2mask)
-//.......................................................................................................................................................
 extern inline void pack012neighbors(uint64_t gol[],uint64_t golp[]) {              // routine to pack all up to 2nd neighbours in single word
     unsigned int ij,k;
     uint64_t gs;
@@ -2608,7 +2616,7 @@ extern inline void pack012neighbors(uint64_t gol[],uint64_t golp[]) {           
 
     for (ij=0;ij<N2;ij++) {                          // copy up to 2nd neighbours to golp in upper 32-bit word
         for(k=0,gs=0ull;k<24;k++) {
-            gs=gol[deltaxy(ij,nbx[k],nby[k])];
+            gs=gol[DELTAXY(ij,nbx[k],nby[k])];
             golp[ij] |= gs<<(k+32);
         }
     }
@@ -2624,7 +2632,7 @@ extern inline void pack0123neighbors(uint64_t gol[],uint64_t golp[]) {          
 
     for (ij=0;ij<N2;ij++) {
         for(k=0,gs=0ull;k<48;k++) {
-            gs=gol[deltaxy(ij,nbx[k],nby[k])];
+            gs=gol[DELTAXY(ij,nbx[k],nby[k])];
             golp[ij] |= gs<<(k+8);                  // copy up to 2nd neighbours to golp in upper 7 bytes of word
         }
     }
@@ -2646,7 +2654,7 @@ extern inline void pack49neighbors(uint64_t gol[],uint64_t golp[], int nbhood) {
     for (ij=0;ij<N2;ij++) golp[ij] = gol[ij];                                     // copy 1 bit gol to golp
     for(k=0;k<6;k++)                                                              // hierarchical bit copy and swap
         for (ij=0;ij<N2;ij++)
-             golp[ij] |= golp[deltaxy(ij,nbx[k],nby[k])]<<(1<<k);                 // 8x8 packed arrays
+             golp[ij] |= golp[DELTAXY(ij,nbx[k],nby[k])]<<(1<<k);                 // 8x8 packed arrays
     if(nbhood == 7)                                                               // masks out 15 values in top row and left column to give 7x7 neighbourhoods
         for (ij=0;ij<N2;ij++) golp[ij] = golp[ij]&0xfac8ffccfafaffffull;          // mask removes bit numbers 16,18,24,26,32,33,36,37,48,49,50,52,53,56,58
     else if (nbhood == 5)                                                         // masks in 25 values to give 5x5 neighbourhoods
@@ -2676,14 +2684,14 @@ extern inline void unpack16neighbors(const short unsigned golpw, unsigned int la
     if (golpw < 2) labelimg[0] = golpw ? label : 0;
     else if (golpw < 16) {
         for(k=0;k<4;k++) {
-            ij = deltaxy(offset,k&0x1,k>>1);
+            ij = DELTAXY(offset,k&0x1,k>>1);
             labelimg[ij] = (golpw>>k)&0x1 ? label : 0;
         }
     }
     else {
         for(k=0;k<16;k++) {
             int k1 = k&0x1; int k2 = (k>>1)&0x1;
-            ij = deltaxy(offset,k1+(((k>>2)&0x1)<<1),k2+((k>>3)<<1));
+            ij = DELTAXY(offset,k1+(((k>>2)&0x1)<<1),k2+((k>>3)<<1));
             labelimg[ij] = (golpw>>k)&0x1 ? label : 0;
         }
     }
@@ -2720,7 +2728,7 @@ extern inline void unpack64neighbors(const uint64_t golpw, unsigned int labelimg
     int k,ij;                                                                   // only unpacks one word
     for(k=0;k<64;k++) {                                                         // bits blocked as 4*4*4 so that 1st 16 bits are nw 4*4 block
         int k1 = k&0xf; int k2 = k>>4;
-        ij = deltaxy(offset,(k1&3)+((k2&1)<<2),(k1>>2)+((k2>>1)<<2));
+        ij = DELTAXY(offset,(k1&3)+((k2&1)<<2),(k1>>2)+((k2>>1)<<2));
         labelimg[ij] = (golpw>>k)&0x1 ? label : 0;
     }
 }
@@ -2734,7 +2742,7 @@ extern inline void compare_neighbors(uint64_t a[],uint64_t b[], int dx, int dy) 
 
     for (ij=0;ij<N2;ij++) {
         ijs=(ij-scrollN)&N2mask;
-        bij=b[deltaxy(ijs,dx,dy)];
+        bij=b[DELTAXY(ijs,dx,dy)];
         a[ij] = (a[ij]|bij) ? a[ij]^bij : rootgene;
     }
 }
@@ -2753,7 +2761,7 @@ extern inline void compare_all_neighbors(uint64_t a[],uint64_t b[]) {  // routin
         ijs=(ij-scrollN)&N2mask;
         aij = a[ij];
         for (a[ij]=0ull,k=0;k<8;k++) {
-            bijk=b[deltaxy(ijs,nbx[k],nby[k])];
+            bijk=b[DELTAXY(ijs,nbx[k],nby[k])];
             POPCOUNT64C((aij^bijk),d);
             d = (aij&&bijk) ? d : 0xff;
             a[ij]|=((uint64_t) d)<<(k<<3);
@@ -2809,12 +2817,12 @@ extern inline unsigned int lab_union(equivrec eqv[], unsigned int i, unsigned in
 extern inline unsigned int label_cell(int ij,unsigned int *nlabel) {
     unsigned int clabel,clabel1,labelij,labelijold;
     labelijold=label[ij];
-    clabel=label[deltaxy(ij,0,-1)];                         // deltaxy takes periodic BCs into account (b in Suzuki Decision Tree, 2010)
+    clabel=label[DELTAXY(ij,0,-1)];                         // deltaxy takes periodic BCs into account (b in Suzuki Decision Tree, 2010)
     if(clabel) labelij=eqv[clabel].pt;         // copy b
     else {                                                  // N (=b) unlabelled
-        clabel=label[deltaxy(ij,-1,0)];                     // W (d in Suzuki DT)
+        clabel=label[DELTAXY(ij,-1,0)];                     // W (d in Suzuki DT)
         if(clabel) {
-            clabel1=label[deltaxy(ij,1,-1)];                // NE (c in Suzuki DT)
+            clabel1=label[DELTAXY(ij,1,-1)];                // NE (c in Suzuki DT)
             if(clabel1) {
                 labelij=lab_union(eqv,clabel1,clabel);      // resolve c,d
             }
@@ -2823,9 +2831,9 @@ extern inline unsigned int label_cell(int ij,unsigned int *nlabel) {
             }
         }
         else {
-            clabel=label[deltaxy(ij,1,-1)];                 // NE (c in Suzuki DT)
+            clabel=label[DELTAXY(ij,1,-1)];                 // NE (c in Suzuki DT)
             if(clabel) {
-                clabel1=label[deltaxy(ij,-1,-1)];           // NW (a in Suzuki DT)
+                clabel1=label[DELTAXY(ij,-1,-1)];           // NW (a in Suzuki DT)
                 if(clabel1) {
                     labelij=lab_union(eqv,clabel,clabel1);  // resolve c,a
                 }
@@ -2834,7 +2842,7 @@ extern inline unsigned int label_cell(int ij,unsigned int *nlabel) {
                 }
             }
             else {
-                clabel1=label[deltaxy(ij,-1,-1)];           // NW (a in Suzuki DT)
+                clabel1=label[DELTAXY(ij,-1,-1)];           // NW (a in Suzuki DT)
                 if(clabel1) {
                     labelij=eqv[clabel1].pt;   // copy a
                 }
@@ -2858,13 +2866,13 @@ extern inline unsigned int label_cell_genetic(int ij,unsigned int *nlabel,uint64
     
     labelijold=label[ij];
     gene = golg[ij];
-    clabel0=label[ij0=deltaxy(ij,0,-1)];                         // deltaxy takes periodic BCs into account (b in Suzuki Decision Tree, 2010)
+    clabel0=label[ij0=DELTAXY(ij,0,-1)];                         // deltaxy takes periodic BCs into account (b in Suzuki Decision Tree, 2010)
     if(clabel0&&(golg[ij0]==gene))
         labelij=eqv[clabel0].pt;                // copy b
     else {                                                       // N (=b) unlabelled
-        clabel0=label[ij0=deltaxy(ij,-1,0)];                     // W (d in Suzuki DT)
+        clabel0=label[ij0=DELTAXY(ij,-1,0)];                     // W (d in Suzuki DT)
         if(clabel0&&(golg[ij0]==gene)) {
-            clabel1=label[ij1=deltaxy(ij,1,-1)];                 // NE (c in Suzuki DT)
+            clabel1=label[ij1=DELTAXY(ij,1,-1)];                 // NE (c in Suzuki DT)
             if(clabel1&&(golg[ij1]==gene)) {
                 labelij=lab_union(eqv,clabel1,clabel0);          // resolve c,d
             }
@@ -2873,9 +2881,9 @@ extern inline unsigned int label_cell_genetic(int ij,unsigned int *nlabel,uint64
             }
         }
         else {
-            clabel0=label[ij0=deltaxy(ij,1,-1)];                 // NE (c in Suzuki DT)
+            clabel0=label[ij0=DELTAXY(ij,1,-1)];                 // NE (c in Suzuki DT)
             if(clabel0&&(golg[ij0]==gene)) {
-                clabel1=label[ij1=deltaxy(ij,-1,-1)];            // NW (a in Suzuki DT)
+                clabel1=label[ij1=DELTAXY(ij,-1,-1)];            // NW (a in Suzuki DT)
                 if(clabel1&&(golg[ij1]==gene)) {
                     labelij=lab_union(eqv,clabel0,clabel1);      // resolve c,a
                 }
@@ -2884,7 +2892,7 @@ extern inline unsigned int label_cell_genetic(int ij,unsigned int *nlabel,uint64
                 }
             }
             else {
-                clabel1=label[ij1=deltaxy(ij,-1,-1)];            // NW (a in Suzuki DT)
+                clabel1=label[ij1=DELTAXY(ij,-1,-1)];            // NW (a in Suzuki DT)
                 if(clabel1&&(golg[ij1]==gene)) {
                     labelij=eqv[clabel1].pt;   // copy a
                 }
@@ -3018,7 +3026,7 @@ unsigned int label_components(uint64_t gol[],uint64_t golg[]) {
     for(ij=0;ij<N2;ij++) {                                  // build up backwards connections for each label[ij] via nbs in t-1 frame, insert in increasing label nr
         if(label[ij]) {
             for(int k=0;k<9;k++) {
-                if((lab=oldlabel[deltaxy(ij,dx[k],dy[k])])) {
+                if((lab=oldlabel[DELTAXY(ij,dx[k],dy[k])])) {
                     conn=connlists[label[ij]];
                     connprev=0;
                     while(conn && (connections[conn].oldlab<lab)) {
@@ -4110,7 +4118,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
             s1=s-1;
             s2or3 = (s>>2) ? 0ull : (s>>1);                                     // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
             gols = s2or3 ? (golij ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;     // GoL calculation next state for non-genetic gol plane
-            rulemodij = (rulemod&0x4) ? membrane : ((rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1)); // if rulemod bit 2 then activate membrane of death
+            rulemodij = (rulemod&0x4) ? MEMBRANE : ((rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1)); // if rulemod bit 2 then activate membrane of death
                                                                                 // else if rulemod bit 1 is on then split into half planes with/without mod
             if(rulemodij==1) {
                 overwrite = overwritemask&(0x1ull<<s1);
@@ -4129,7 +4137,6 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                     }
                     if (survivalgene && golij) {                                // survival determined by central gene in this case
                                 PATTERN4(golg[ij], (s&0x7), found);             // survival?
-                                genecodes =  found? 1ull << s1 : 0ull;
                     }
                     else {
                         if(repscheme&R_0_nb_majority) {
@@ -4178,7 +4185,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                     if (overwrite || !golij) birth=(((genecode>>((8+s1)*ncoding)) & ncodingmask) == ncodingmask) && ((bmask>>s1)&1ull) ? 1ull : 0ull;
                 }
             }
-            else if (rulemodij==2){                                          // hard death on membrane defined above via macro "membrane"
+            else if (rulemodij==2){                                          // hard death on membrane defined above via macro "MEMBRANE"
                 survive = 0ull;
                 birth = 0ull;
             }
@@ -4257,7 +4264,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
             s1 = s-1;
             s2or3 = (s>>2) ? 0ull : (s>>1);                                        // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
             gols = s2or3 ? (golij ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;        // GoL calculation next state for non-genetic gol plane
-            rulemodij = (rulemod&0x4) ? membrane : ((rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1)); // if rulemod bit 2 then activate membrane of death
+            rulemodij = (rulemod&0x4) ? MEMBRANE : ((rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1)); // if rulemod bit 2 then activate membrane of death
                                                                                    // else if rulemod bit 1 is on then split into half planes with/without mod
             if (rulemodij==1) {                // NB need to put gene calculation outside so that we can do genetic propagation with GoL rulemod off
                 overwrite = overwritemask&(0x1ull<<s1);
@@ -4318,7 +4325,7 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
                     }
                 }
             }
-            else if (rulemodij==2){                                                 // hard death on membrane defined above via macro "membrane"
+            else if (rulemodij==2){                                                 // hard death on membrane defined above via macro "MEMBRANE"
                 survive = 0ull;
                 birth = 0ull;
             }
@@ -4386,7 +4393,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
             s2or3 = (s>>2) ? 0ull : (s>>1);                                         // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
             gols = s2or3 ? (gol[ij] ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;       // GoL calculation next state for non-genetic gol plane
             
-            rulemodij = (rulemod&0x4) ? membrane : ((rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1)); // if rulemod bit 2 then activate membrane of death
+            rulemodij = (rulemod&0x4) ? MEMBRANE : ((rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1)); // if rulemod bit 2 then activate membrane of death
                                                                                     // else if rulemod bit 1 is on then split into half planes with/without mod
             if(rulemodij==1) {
                 overwrite = s ? (overwritemask>>(s-1))&0x1ull : 0ull;               // allow birth to overwrite occupied cell = survival in GoL
@@ -4460,7 +4467,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
                     }
                 }
             }
-            else if (rulemodij==2){                                                 // hard death on membrane defined above via macro "membrane"
+            else if (rulemodij==2){                                                 // hard death on membrane defined above via macro "MEMBRANE"
                 survive = 0ull;
                 birth = 0ull;
             }
@@ -4550,7 +4557,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
         if (slow) {
             s2or3 = (s>>2) ? 0ull : (s>>1);                                    // s == 2 or s ==3 : checked by bits 2+ are zero and bit 1 is 1
             gols = s2or3 ? (gol[ij] ? 1ull : (s&1ull ? 1ull : 0ull )) : 0ull;  // GoL calculation next state for non-genetic gol plane
-            rulemodij = (rulemod&0x4) ? membrane : ((rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1)); // if rulemod bit 2 then activate membrane of death
+            rulemodij = (rulemod&0x4) ? MEMBRANE : ((rulemod&0x2) ? (ij>=(N2>>1) ? 1 : 0) : (rulemod&0x1)); // if rulemod bit 2 then activate membrane of death
                                                                                // else if rulemod bit 1 is on then split into half planes with/without mod
             if(rulemodij==1) {
                 overwrite = s ? overwritemask&(0x1ull<<(s-1)) : 0;
@@ -4622,7 +4629,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
                     }
                 }
             }
-            else if (rulemodij==2){                                             // hard death on membrane defined above via macro "membrane"
+            else if (rulemodij==2){                                             // hard death on membrane defined above via macro "MEMBRANE"
                 survive = 0ull;
                 birth = 0ull;
             }

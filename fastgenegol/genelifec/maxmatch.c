@@ -25,7 +25,7 @@ int qfront = - 1;
 extern inline void queue_push(int value)
 {
     extern int queue_array[];
-    if ((qfront == 0 && qrear == NLM-1) || (qrear == (qfront-1)%(NLM-1)))
+    if ((qfront == 0 && qrear == NLM-1) || (qrear == (qfront-1)%(NLM-1)))   // note that NLM > 1 requirement satisified since NLM=N2
     {
         printf("Queue Overflow\n");
         return;
