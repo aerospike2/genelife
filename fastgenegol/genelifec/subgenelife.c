@@ -4136,53 +4136,72 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                         }
                     }
                     if (survivalgene && golij) {                                // survival determined by central gene in this case
-                                PATTERN4(golg[ij], (s&0x7), found);             // survival?
+                            PATTERN4(golg[ij], (s&0x7), found);                 // survival?
+                            if(found) nrfound_s = s;
+                    }
+
+                    if(repscheme&R_0_nb_majority) {
+                        if((repscheme&R_1_nb_OR_AND)||(s&0x1)) found = (nrfound_s >  (s>>1)) ? 1 : 0;  // > s/2
+                        else                                   found = (nrfound_s >= (s>>1)) ? 1 : 0;  // >= s/2
                     }
                     else {
-                        if(repscheme&R_0_nb_majority) {
-                            if((repscheme&R_1_nb_OR_AND)||(s&0x1)) found = (nrfound_s >  (s>>1)) ? 1 : 0;  // > s/2
-                            else                                   found = (nrfound_s >= (s>>1)) ? 1 : 0;  // >= s/2
-                        }
-                        else {
-                            if(repscheme&R_1_nb_OR_AND) found = nrfound_s ? 1 : 0;          // OR
-                            else                        found = (nrfound_s == s) ? 1 : 0;   // AND
-                        }
+                        if(repscheme&R_1_nb_OR_AND) found = nrfound_s ? 1 : 0;          // OR
+                        else                        found = (nrfound_s == s) ? 1 : 0;   // AND
                     }
                     genecodes = found? (1ull << s1) : 0ull;
+                    
                     if(repscheme&R_0_nb_majority) {
-                        if((repscheme&R_1_nb_OR_AND)||(s&0x1)) found = (nrfound_b >  (s>>1)) ? 1 : 0;
-                        else                                   found = (nrfound_b >= (s>>1)) ? 1 : 0;
+                        if((repscheme&R_1_nb_OR_AND)||(s&0x1)) found = (nrfound_b >  (s>>1)) ? 1 : 0;   // > s/2
+                        else                                   found = (nrfound_b >= (s>>1)) ? 1 : 0;   // >= s/2
                     }
                     else {
                         if(repscheme&R_1_nb_OR_AND) found = nrfound_b ? 1 : 0;
                         else                        found = (nrfound_b == s) ? 1 : 0;
                     }
                     genecodeb = found ? (1ull << (s1+8)) : 0ull;
+                    
                     genecode=genecodes|genecodeb;
-                    //if(ij==106195) fprintf(stderr,"DEBUG Genecode sel 9 at totsteps=%d ij=%d genecode=%llx\n",totsteps,ij,genecode);
                     survive = ((genecode&smask)>>s1) & 0x1ull;
                     genecode>>=8;
                     if (overwrite || !golij) birth   = ((genecode&bmask)>>s1) & 0x1ull;
                 }
                 else {                                                          // selection == 8
-                    // nrfound_b = nrfound_s = 0;
-                    if(repscheme&R_1_nb_OR_AND)
-                        for (genecode=0ull,k=0;k<s;k++) {                       // decodes genes with fixed length encoding by OR
+                    if(repscheme&R_0_nb_majority) {                                 // MAJORITY resolution of neighbours
+                        for (nrfound_b=nrfound_s=0,k=0;k<s;k++) {                   // decodes genes with fixed length encoding length ncoding 1,2,4 bits
                             kch = (nb1i>>(k<<2))&0x7;
-                            // genecode |= ((gol[nb[kch]]&0x1ull)?golg[nb[kch]]:0ull);   // OR of live neighbours encodes birth rule & survival rule
-                            genecode |= golg[nb[kch]];   // OR of live neighbours encodes birth rule & survival rule
+                            genecode = golg[nb[kch]];
+                            nrfound_s += (!survivalgene && golij) && (((genecode>>((s-1)*ncoding)) & ncodingmask) == ncodingmask) ? 1 : 0;
+                            nrfound_b +=  (overwrite || !golij) && (((genecode>>((8+s1)*ncoding)) & ncodingmask) == ncodingmask) ? 1 : 0;
                         }
-                    else
-                        for (genecode=allcoding,k=0;k<s;k++) {                   // decodes genes with fixed length encoding by AND
-                            kch = (nb1i>>(k<<2))&0x7;
-                            // genecode &= ((gol[nb[kch]]&0x1ull)?golg[nb[kch]]:allcoding); // AND of live neighbours encodes birth rule & survival rule
-                            genecode &= golg[nb[kch]];                           // AND of live neighbours encodes birth rule & survival rule
+                        if(survivalgene) {
+                            genecode = golg[ij];
+                            nrfound_s = golij && (((genecode>>((s-1)*ncoding)) & ncodingmask) == ncodingmask) ? s : 0;
                         }
-                    if(survivalgene) genecode = (genecode&(0xffffffffull<<32)) | (golg[ij]&(8ull*ncoding-1ull));   // if central gene codetermines survival DEBUG CHECK
-                    //if(ij==106195) fprintf(stderr,"DEBUG Genecode sel 8 at totsteps=%d ij=%d genecode=%llx\n",totsteps,ij,genecode);
-                    //if(ij==106195) fprintf(stderr,"DEBUG Genecode sel 8 at totsteps=%d ij=%d genecode=%llx golg1=%llx golg2=%llx\n",totsteps,ij,genecode,golg[nb[nb1i&0x7]],golg[nb[(nb1i>>(1<<2))&0x7]]);
-                    survive=(((genecode>>((s-1)*ncoding)) & ncodingmask) == ncodingmask) && ((smask>>s1)&1ull) ? 1ull : 0ull;
-                    if (overwrite || !golij) birth=(((genecode>>((8+s1)*ncoding)) & ncodingmask) == ncodingmask) && ((bmask>>s1)&1ull) ? 1ull : 0ull;
+                
+                        if((repscheme&R_1_nb_OR_AND)||(s&0x1)) found = (nrfound_s >  (s>>1)) ? 1 : 0;  // > s/2
+                        else                                   found = (nrfound_s >= (s>>1)) ? 1 : 0;  // >= s/2
+                        survive = (smask>>s1) & (found ? 1ull : 0ull);
+                        
+                        if((repscheme&R_1_nb_OR_AND)||(s&0x1)) found = (nrfound_b >  (s>>1)) ? 1 : 0;
+                        else                                   found = (nrfound_b >= (s>>1)) ? 1 : 0;
+                        birth = (bmask>>s1) & (found ? 1ull : 0ull);
+                    }
+                    else {                                                          // this code is more efficient than above approach using AND or OR of neighbors
+                        if(repscheme&R_1_nb_OR_AND)
+                            for (genecode=0ull,k=0;k<s;k++) {                       // decodes genes with fixed length encoding by OR
+                                kch = (nb1i>>(k<<2))&0x7;
+                                genecode |= golg[nb[kch]];                          // OR of live neighbours encodes birth rule & survival rule
+                            }
+                        else {
+                            for (genecode=allcoding,k=0;k<s;k++) {                  // decodes genes with fixed length encoding by AND
+                                kch = (nb1i>>(k<<2))&0x7;
+                                genecode &= golg[nb[kch]];                          // AND of live neighbours encodes birth rule & survival rule
+                            }
+                        }
+                        if(survivalgene) genecode = (genecode&(0xffffffffull<<32)) | (golg[ij]&(8ull*ncoding-1ull));   // if central gene codetermines survival DEBUG CHECK
+                        survive=(((genecode>>((s-1)*ncoding)) & ncodingmask) == ncodingmask) && ((smask>>s1)&1ull) ? 1ull : 0ull;
+                        if (overwrite || !golij) birth=(((genecode>>((8+s1)*ncoding)) & ncodingmask) == ncodingmask) && ((bmask>>s1)&1ull) ? 1ull : 0ull;
+                    }
                 }
             }
             else if (rulemodij==2){                                          // hard death on membrane defined above via macro "MEMBRANE"
@@ -4210,18 +4229,26 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
 // update GoL for toroidal field which has side length which is a binary power of 2
 // encode without if structures for optimal vector treatment
 /*
-    configurations are distinguished by number of ones in two classes (corner,edge-centred) of the 8-bit live neighbour pattern
-    for the different s values                 0  1  2  3  4  5  6  7  8
-    there are a nr n of partitions             1  2  3  4  5  4  3  2  1   total 25   with se the number in edge centred sites NSEW
-    chosen nr of partitions for exploration    0  2  3  4  5  4  3  2  0   total 23
-    if we exclude the cases s = 0,8, then there are 23 bits required to distinguish these cases
+    Configurations are distinguished by the number of ones in two classes (corner,edge-centred) of the 8-bit live neighbour pattern
+    - for the different s values                 0  1  2  3  4  5  6  7  8
+    - there are a nr n of partitions             1  2  3  4  5  4  3  2  1   total 25   with se the number in edge centred sites N,S,E,W
+    - chosen nr of partitions for exploration    0  2  3  4  5  4  3  2  0   total 23
+    i.e. if we exclude the cases s = 0,8, then there are 23 bits required to distinguish cases of either birth (movement) or survival.
+    This results in the following two encodings of genomes: (selected by 1. selection=10 or 2. selection=11):
     1. Fixed length encoding has 1 bit per LUT entry: 23 survival bits and then 23 birth bits
-    2. Variable length encoding uses two bytes : upper byte for s-1 and lower byte for bitmask of which se 0-3 are on
-                                                                                                                */
-    int s, s1, se, s0, s2or3, k, kch;
+        B/S 1111111111111111111111100000000000000000000000      1=Birth  0=Survival
+        s   7766655554444433332221177666555544444333322211
+        se  1021032104321032102101010210321043210321021010
+    2. Variable length encoding uses two 4-bit bytes : upper byte for B/S bit and 3-bit 0<s<8 and lower byte for bitmask of which se 0-3 are on
+        The case s=4,se=4 is treated as a special case x0000001 where x is 1 for B and 0 for S. Note that s=0 is not allowed for survival or birth.
+        bit 7    6    5    4    3    2    1    0        of rule aligned with 8-bit genes in genome
+            B/S  s_2  s_1  s_0  se=3 se=2 se=1 se=0     where three bits of s are s_2,s_1,s_0
+            B/S  0    0    0    0    0    0    1        exceptional encodings for s=4,se=4 case  (not otherwise used)                */
+ 
+    int s, s1, se, s0, s2or3, k, kch, nrfound_b, nrfound_s;
     unsigned int rulemodij;
     int nb[8], ij, i, j, jp1, jm1, ip1, im1;
-    uint64_t genecode, survivenbs, birthnbs, gols, golij, nb1i, nbmask, found;
+    uint64_t genecode, gols, golij, nb1i, nbmask, found;
     uint64_t survive, birth, overwrite, survivalgene, smask, bmask, gene;
     
     static uint64_t summasks[7] = {0x3ull,0x7ull,0xfull,0x1full,0xfull,0x7ull,0x3ull};
@@ -4277,50 +4304,84 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
                     if (overwrite) birth = (bmask>>(sumoffs[s1]+se-s0))&0x1ull;     // only allowed if birth,survivalmask permits (ask this before consulting genes)
                     if (survive|birth) {                                            // complete determination of birth or survival
                         if (selection==11) {
-                            survivenbs=birthnbs=(repscheme&R_1_nb_OR_AND) ? 0ull : 1ull; // initialization for OR or AND of neighbors resp.
+                            nrfound_b = nrfound_s = 0;
                             for (k=0;k<s;k++)  {                                    // decodes genes with variable position encoding only for current s,se
                                 kch = (nb1i>>(k<<2))&0x7;
                                 gene = golg[nb[kch]] & (0xf0f0f0f0f0f0f0f0ull | (0x0101010101010101ull<<(se-s0))); // focus gene down to specific required se bit for exact matching
                                 if (!survivalgene && golij) {                 // coding is 8 bits [(b/s) (s1 2 1 0) (se subset mask 3 2 1 0)]  (exception case s==4,se==4 is x0000001)
                                     PATTERN8(gene, (s==4 && se==4) ? 0x01 : ((s<<4)|(1<<(se-s0))), found);    //survival rule found? final decision for survival
-                                    if(repscheme&R_1_nb_OR_AND)
-                                        survivenbs |= found? 1ull : 0ull;           // incl. special case codes for 5th case se==4 for s==4
-                                    else
-                                        survivenbs &= found? 1ull : 0ull;           // incl. special case codes for 5th case se==4 for s==4
+                                    if(found) nrfound_s++;
                                 }
                                 if (overwrite) {
                                     PATTERN8(gene, (s==4 && se==4) ? 0x81 :(((8|s)<<4)|(1<<(se-s0))), found); //birth rule found? final decision for birth
-                                    if(repscheme&R_1_nb_OR_AND)
-                                        birthnbs |= found? 1ull : 0ull;
-                                    else
-                                        birthnbs &= found? 1ull : 0ull;
+                                    if(found) nrfound_b++;
                                 }
-                                //if(ij==IJDEBUG) fprintf(stderr,"DEBUG Genecode sel 11 at totsteps=%d ij=%d k=%d golg=%llx golij=%llx\n",totsteps,ij,k,golg[nb[k]],golij);
                             }
                             if (survivalgene && golij) {                            // survival determined by central gene in this case
-                                    PATTERN8(golg[ij], (s==4 && se==4) ? 0x01 : ((s<<4)|(1ull<<(se-s0))), found);   // survival rule found? final decision for survival
-                                    survivenbs |= found? 1ull : 0ull;               // special case codes for 5th case se==4 for s==4
+                                gene = golg[ij] & (0xf0f0f0f0f0f0f0f0ull | (0x0101010101010101ull<<(se-s0))); // focus gene down to specific required se bit for exact matching
+                                PATTERN8(gene, (s==4 && se==4) ? 0x01 : ((s<<4)|(1ull<<(se-s0))), found);   // survival rule found? final decision for survival
+                                if(found) nrfound_s = s;
                             }
-                            birth &= birthnbs;
-                            survive &= survivenbs;
+
+                            if(repscheme&R_0_nb_majority) {
+                                if((repscheme&R_1_nb_OR_AND)||(s&0x1)) {
+                                    survive &= (nrfound_s >  (s>>1)) ? 1ull : 0ull;  // > s/2
+                                    birth   &= (nrfound_b >  (s>>1)) ? 1ull : 0ull;  // > s/2
+                                }
+                                else  {
+                                    survive &= (nrfound_s >= (s>>1)) ? 1ull : 0ull;  // >= s/2
+                                    birth   &= (nrfound_b >= (s>>1)) ? 1ull : 0ull;  // >= s/2
+                                }
+                            }
+                            else {
+                                if(repscheme&R_1_nb_OR_AND) {
+                                    survive &= (nrfound_s     ) ? 1ull : 0ull;   // OR
+                                    birth   &= (nrfound_b     ) ? 1ull : 0ull;   // OR
+                                }
+                                else  {
+                                    survive &= (nrfound_s == s) ? 1ull : 0ull;   // AND
+                                    birth   &= (nrfound_b == s) ? 1ull : 0ull;   // AND
+                                }
+                            }
                         }
                         else {                                                      // selection == 10
-                            if(repscheme & R_1_nb_OR_AND)
-                                for (genecode=0ull,k=0;k<s;k++) {                   // decodes genes with fixed length encoding by OR
+                            if(repscheme&R_0_nb_majority) {                             // MAJORITY resolution of neighbours
+                                for (nrfound_b=nrfound_s=0,k=0;k<s;k++) {               // decodes genes with fixed length encoding
                                     kch = (nb1i>>(k<<2))&0x7;
-                                    genecode |= golg[nb[kch]];                      // OR of live neighbours encodes birth rule & survival rule
+                                    genecode = golg[nb[kch]];
+                                    nrfound_s += (!survivalgene && golij) && ((genecode>>(sumoffs[s1]+(se-s0)))&0x1ull) ? 1 : 0;
+                                    nrfound_b +=  (overwrite || !golij) && ((genecode>>(32+sumoffs[s1]+(se-s0)))&0x1ull) ? 1 : 0;
                                 }
-                            else
-                                for (genecode=~0ull,k=0;k<s;k++) {                  // decodes genes with fixed length encoding by AND
-                                    kch = (nb1i>>(k<<2))&0x7;
-                                    genecode &= golg[nb[kch]];                      // AND of live neighbours encodes birth rule & survival rule
+                                
+                                if(survivalgene) {
+                                    genecode = golg[ij];
+                                    nrfound_s = golij && ((genecode>>(sumoffs[s1]+(se-s0)))&0x1ull) ? s : 0;
                                 }
-                            if(survivalgene) genecode = (genecode&(0xffffffffull<32)) | (golg[ij]&0xffffffffull);     // if central gene determines survival
-                            genecode &= (bmask << 32)|smask;                        // just to be clear, not required as now already tested above
-                            //if(ij==IJDEBUG) fprintf(stderr,"DEBUG Genecode sel 10 at totsteps=%d ij=%d genecode=%llx\n",totsteps,ij,genecode);
-                            //if(ij==IJDEBUG) fprintf(stderr,"DEBUG Genecode sel 10 at totsteps=%d ij=%d genecode=%llx golg1=%llx golg2=%llx\n",totsteps,ij,genecode,golg[nb[nb1i&0x7]],golg[nb[(nb1i>>(1<<2))&0x7]]);
-                            if (golij) survive &= (genecode>>(sumoffs[s1]+(se-s0)))&0x1ull;        // 28.7.2019 changed from |=
-                            if (overwrite) birth &= (genecode>>(32+sumoffs[s1]+(se-s0)))&0x1ull;
+                        
+                                if((repscheme&R_1_nb_OR_AND)||(s&0x1)) found = (nrfound_s >  (s>>1)) ? 1 : 0;  // > s/2
+                                else                                   found = (nrfound_s >= (s>>1)) ? 1 : 0;  // >= s/2
+                                survive &= found ? 1ull : 0ull;
+                                
+                                if((repscheme&R_1_nb_OR_AND)||(s&0x1)) found = (nrfound_b >  (s>>1)) ? 1 : 0;  // > s/2
+                                else                                   found = (nrfound_b >= (s>>1)) ? 1 : 0;  // >= s/2
+                                birth &= found ? 1ull : 0ull;
+                            }
+                            else {
+                                if(repscheme & R_1_nb_OR_AND)
+                                    for (genecode=0ull,k=0;k<s;k++) {                   // decodes genes with fixed length encoding by OR
+                                        kch = (nb1i>>(k<<2))&0x7;
+                                        genecode |= golg[nb[kch]];                      // OR of live neighbours encodes birth rule & survival rule
+                                    }
+                                else
+                                    for (genecode=~0ull,k=0;k<s;k++) {                  // decodes genes with fixed length encoding by AND
+                                        kch = (nb1i>>(k<<2))&0x7;
+                                        genecode &= golg[nb[kch]];                      // AND of live neighbours encodes birth rule & survival rule
+                                    }
+                                if(survivalgene) genecode = (genecode&(0xffffffffull<32)) | (golg[ij]&0xffffffffull);     // if central gene determines survival
+                                genecode &= (bmask << 32)|smask;                        // just to be clear, not required as now already tested above
+                                if (golij) survive &= (genecode>>(sumoffs[s1]+(se-s0)))&0x1ull;        // changed from |=
+                                if (overwrite) birth &= (genecode>>(32+sumoffs[s1]+(se-s0)))&0x1ull;
+                            }
                         }
                     }
                 }
@@ -4345,20 +4406,24 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
 //---------------------------------------------------------------- update_lut_canon_rot -----------------------------------------------------------------
 void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t golr[],uint64_t newgol[], uint64_t newgolg[], uint64_t newgolgstats[], uint64_t newgolb[],uint64_t newgolr[]) {     // selection models 12,13
 /*
-    configurations are distinguished by number of ones and the canonical rotation of the 8-bit live neighbour pattern
-    the canonical rotation is the rotation with the minimum numerical value as 8-bit number (bits are numbered clockwise from 0-7)
-    for the different s values                 0  1  2  3  4  5  6  7  8
-    there are a nr of canonical rotations      1  1  4  7 10  7  4  1  1   total 36
-    if we exclude the cases s=0,1,7,8 which can create growth artefacts, then there are 32 bits
- 
+    Configurations are distinguished by the number of ones and the canonical rotation of the 8-bit live neighbour pattern.
+    The canonical rotation is the rotation with the minimum numerical value as 8-bit number (bits are numbered clockwise from 0-7):
+    - for the different s values                 0  1  2  3  4  5  6  7  8
+    - there are a nr of canonical rotations      1  1  4  7 10  7  4  1  1   total 36
+    - if we exclude the cases s=0,1,7,8 which can create growth artefacts, then there are 32 bits
+    This results in the following two encodings of genomes: (selected by 1. selection=12 or 2. selection=13):
     1. Fixed length encoding: Survival: s=2 bits 0-3, s=3 bits 4-10, s=4 bits 11-20, s=5 bits 21-27, s=6 bits 28-31; Birth: same + 32
+        B/S  1111111111111111111111111111111100000000000000000000000000000000      1=Birth  0=Survival
+        s    6666555555544444444443333333222266665555555444444444433333332222
+        crot 3210654321098765432106543210321032106543210987654321065432103210
     2. Modular encoding: Up to 6 10-bit modules. Lower 8 bits stored in first 6*8=48 bits. Upper 2-bits stored pairwise in 12 bits 48-59.
-       Module: 1     0    >=48 ...  7     6     5     4     3     2     1     0       we abbreviate possible values of crot mod 5 as cr0-4 in this description
-               cr4   cr3            s3    s2    s1    s0    crot5 cr2   cr1   cr0     8-bit pattern matching via remapping cr0-4 to lowest 3 bits: 0->001 1->010 2->100 3->001 4->010
-                                    s3    s2    s1    s0    crot5 0/cr2 cr4/1 cr3/0   remapping of bits depending on whether crot mod 5 is >2 / <=2
-                                                                                                */
-    int s, smid, s2, s2or3, k, k1, kodd, crot, crot5, crotmod5, pat, found, nsame;
-    uint64_t survive,birth,survivenbs,birthnbs,overwrite,survivalgene,smask,bmask,rulemodij,golij;
+       bit 63  xxxxxx989898989898765432107654321076543210765432107654321076543210   bit 0
+       Module: 9     8    |  7     6     5     4     3     2     1     0       we abbreviate possible values of crot mod 5 as cr0-4 in this description
+               cr4   cr3     s3    s2    s1    s0    crot5 cr2   cr1   cr0     8-bit pattern matching via remapping cr0-4 to lowest 3 bits: 0->001 1->010 2->100 3->001 4->010
+                             s3    s2    s1    s0    crot5 0/cr2 cr4/1 cr3/0   remapping of bits depending on whether crot mod 5 is >2 / <=2
+                                                                                                                                                                                    */
+    int s, smid, s2, s2or3, k, k1, kodd, crot, crot5, crotmod5, pat, nsame, nrfound_b, nrfound_s;
+    uint64_t survive, birth, overwrite, survivalgene, smask, bmask, found, rulemodij, golij;
     static uint64_t summasks[5] = {0xfull,0x7full,0x3ffull,0x7full,0xfull};
     static int sumoffs[5] = {0,4,11,21,28};
     int nb[8], ij, i, j, jp1, jm1, ip1, im1;
@@ -4407,62 +4472,94 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
                     birth  &= (bmask>>(sumoffs[s2]+crot))&0x1ull;                   // only allowed if birth/survivemask permits (ask this before consulting genes)
                     if (survive|birth) {                                            // complete determination of birth or survival
                         if (selection==13) {                                        // modular gene encoding one of up to two 5-bit subsets of crot (e.g. for s=3,4 5+2 and 5+5 resp.)
-                            survivenbs=birthnbs=(repscheme&R_1_nb_OR_AND) ? 0ull : 1ull; // initialization for OR or AND of neighbors resp.
+                            nrfound_b = nrfound_s = 0;
                             crot5 = crot > 4 ? 1 : 0;                               // crot is in range 0-9
                             crotmod5 = crot-5*crot5;                                // the 5 bits indexed by crotmod5 are stored in two places 0-2 in 8-bit word and 3-4 in pairs bits 48+
                             pat = (s<<4)|(crot5<<3)|(0x1<<((crotmod5>2)?crotmod5-3:crotmod5));
                             genecode = 0ull;
-                            for (k=0;k<8;k++) {                                     // decodes genes with variable position encoding only for current s,crot
-                                if (gol[nb[k]]) {                                   // combine information from genes of all live neighbours
-                                    if ((~survivalgene & gol[ij]) | overwrite) {
-                                        genecode = golg[nb[k]];
-                                        if(crotmod5 > 2) for (genecode1=0ull,k1=0;k1<6;k1++) genecode1 |= ( (genecode>>(48+(k1<<1))) & (0x1ull<<(crotmod5-3)) ) << (k1<<3);
-                                        else genecode1 = genecode & (0x010101010101 << crotmod5); // prepare lookup in all 6 modules on gene : in this case crot subset bits in right place
-                                        genecode &= 0xf8f8f8f8f8f8;
-                                        genecode |= genecode1;                      // replace lowest 3 bits of 8-bit part of 10-bit modules with appropriate crot subset bits
-                                    }
-                                    if (~survivalgene & gol[ij]) {
-                                        PATTERN8(genecode, pat, found);
-                                        if(repscheme&R_1_nb_OR_AND)
-                                            survivenbs |= found? 1ull : 0ull;
-                                        else
-                                            survivenbs &= found? 1ull : 0ull;
-                                    }
-                                    if (overwrite) {
-                                        PATTERN8(genecode, (0x80|pat), found);
-                                        if(repscheme&R_1_nb_OR_AND)
-                                            birthnbs |= found? 1ull : 0ull;
-                                        else
-                                            birthnbs &= found? 1ull : 0ull;
-                                    }
+                            for (k=0;k<s;k++) {                                     // decodes genes with variable position encoding only for current s,crot
+                                if ((!survivalgene && golij) || overwrite) {       // replace lowest 3 bits of 8-bit part of 10-bit modules with appropriate crot subset bit
+                                    kch = (nb1i>>(k<<2))&0x7;
+                                    genecode = golg[nb[kch]];
+                                    if(crotmod5 > 2) for (genecode1=0ull,k1=0;k1<6;k1++) genecode1 |= ( (genecode>>(48+(k1<<1))) & (0x1ull<<(crotmod5-3)) ) << (k1<<3);
+                                    else genecode1 = genecode & (0x010101010101 << crotmod5); // prepare lookup in all 6 modules on gene : in this case crot subset bits in right place
+                                    genecode &= 0xf8f8f8f8f8f8;                    // accept upper 5 bits of lower 8-bits of all 6 coding modules
+                                    genecode |= genecode1;                         // combine with lower 3 bits assembled from relocated appropriate crot subset bit
+                                }
+                                if (!survivalgene && golij) {
+                                    PATTERN8(genecode, pat, found);
+                                    if(found) nrfound_s++;
+                                }
+                                if (overwrite) {
+                                    PATTERN8(genecode, (0x80|pat), found);
+                                    if(found) nrfound_b++;
                                 }
                             }
-                            /* fprintf(stderr,"lut_canon step %d ij %d s %d gol[ij] %llx crot %d (%d,%d) pat %x genecode %llx overwrite %llx survive %llx birth %llx\n",
-                                                     totsteps,ij,s,gol[ij],crot,crot5,crotmod5,pat,genecode,overwrite,survive,birth); */
-                            // if (overwrite && !gol[ij] && s==3) fprintf(stderr,"overwrite and golij!!!!!!!!!!!!!\n");
-                            if (survivalgene & gol[ij]) {                           // survival determined by central gene in this case
+                            if (survivalgene & golij) {                           // survival determined by central gene in this case
                                 genecode = golg[ij];
                                 if(crotmod5 > 2) for (genecode1=0ull,k1=0;k1<6;k1++) genecode1 |= ((genecode>>(48+(k1<<1)))&(0x1<<(crotmod5-3)))<<(k1<<3);
                                 else genecode1 = genecode & (0x010101010101 << crotmod5);
                                 genecode &= 0xf8f8f8f8f8f8;
                                 genecode |= genecode1;
                                 PATTERN8(genecode, pat, found);
-                                survivenbs = found? 1ull : 0ull;
+                                if(found) nrfound_s = s;
                             }
-                            birth &= birthnbs;
-                            survive &= survivenbs;
+                            
+                            if(repscheme&R_0_nb_majority) {
+                                if((repscheme&R_1_nb_OR_AND)||(s&0x1)) {
+                                    survive &= (nrfound_s >  (s>>1)) ? 1ull : 0ull;  // > s/2
+                                    birth   &= (nrfound_b >  (s>>1)) ? 1ull : 0ull;  // > s/2
+                                }
+                                else  {
+                                    survive &= (nrfound_s >= (s>>1)) ? 1ull : 0ull;  // >= s/2
+                                    birth   &= (nrfound_b >= (s>>1)) ? 1ull : 0ull;  // >= s/2
+                                }
+                            }
+                            else {
+                                if(repscheme&R_1_nb_OR_AND) {
+                                    survive &= (nrfound_s     ) ? 1ull : 0ull;   // OR
+                                    birth   &= (nrfound_b     ) ? 1ull : 0ull;   // OR
+                                }
+                                else  {
+                                    survive &= (nrfound_s == s) ? 1ull : 0ull;   // AND
+                                    birth   &= (nrfound_b == s) ? 1ull : 0ull;   // AND
+                                }
+                            }
                         }
                         else {                                                      // selection == 12
-                            if(repscheme&R_1_nb_OR_AND)
-                                for (genecode=0ull,k=0;k<8;k++)                     // decodes genes with fixed length encoding by OR
-                                    genecode |= (gol[nb[k]]?golg[nb[k]]:0ull);      // OR of live neighbours encodes birth rule & survival rule
-                            else
-                                for (genecode=~0ull,k=0;k<8;k++)                    // decodes genes with fixed length encoding by AND
-                                    genecode &= (gol[nb[k]]?golg[nb[k]]:~0ull);     // AND of live neighbours encodes birth rule & survival rule
-                            if(survivalgene) genecode = (genecode&(0xffffffffull<<32)) | (golg[ij]&0xffffffffull);     // if central gene determines survival
-                            genecode&=(bmask<<32)|smask;                            // actually no longer needed since test done above
-                            if (gol[ij]) survive &= (genecode>>(sumoffs[s2]+crot))&0x1ull;         // 28.7.2019 changed from |=
-                            if (overwrite) birth &= (genecode>>(32+sumoffs[s2]+crot))&0x1ull;
+                            if(repscheme&R_0_nb_majority) {                             // MAJORITY resolution of neighbours
+                                for (nrfound_b=nrfound_s=0,k=0;k<s;k++) {               // decodes genes with fixed length encoding
+                                    kch = (nb1i>>(k<<2))&0x7;
+                                    genecode = golg[nb[kch]];
+                                    nrfound_s += (!survivalgene && golij) && ((genecode>>(sumoffs[s2]+crot))&0x1ull) ? 1 : 0;
+                                    nrfound_b +=  (overwrite || !golij) && ((genecode>>(32+sumoffs[s2]+crot))&0x1ull) ? 1 : 0;
+                                }
+                                
+                                if(survivalgene) {
+                                    genecode = golg[ij];
+                                    nrfound_s = golij && ((genecode>>(sumoffs[s2]+crot))&0x1ull) ? s : 0;
+                                }
+                        
+                                if((repscheme&R_1_nb_OR_AND)||(s&0x1)) found = (nrfound_s >  (s>>1)) ? 1ull : 0ull;  // > s/2
+                                else                                   found = (nrfound_s >= (s>>1)) ? 1ull : 0ull;  // >= s/2
+                                survive &= found ? 1ull : 0ull;
+                                
+                                if((repscheme&R_1_nb_OR_AND)||(s&0x1)) found = (nrfound_b >  (s>>1)) ? 1ull : 0ull;  // > s/2
+                                else                                   found = (nrfound_b >= (s>>1)) ? 1ull : 0ull;  // >= s/2
+                                birth &= found ? 1ull : 0ull;
+                            }
+                            else {
+                                if(repscheme&R_1_nb_OR_AND)
+                                    for (genecode=0ull,k=0;k<8;k++)                     // decodes genes with fixed length encoding by OR
+                                        genecode |= (gol[nb[k]]?golg[nb[k]]:0ull);      // OR of live neighbours encodes birth rule & survival rule
+                                else
+                                    for (genecode=~0ull,k=0;k<8;k++)                    // decodes genes with fixed length encoding by AND
+                                        genecode &= (gol[nb[k]]?golg[nb[k]]:~0ull);     // AND of live neighbours encodes birth rule & survival rule
+                                if(survivalgene) genecode = (genecode&(0xffffffffull<<32)) | (golg[ij]&0xffffffffull);     // if central gene determines survival
+                                genecode&=(bmask<<32)|smask;                            // actually no longer needed since test done above
+                                if (gol[ij]) survive &= (genecode>>(sumoffs[s2]+crot))&0x1ull;         // changed from |=
+                                if (overwrite) birth &= (genecode>>(32+sumoffs[s2]+crot))&0x1ull;
+                            }
                         }
                     }
                 }
@@ -4486,26 +4583,31 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
 //---------------------------------------------------------------- update_lut_2Dsym ---------------------------------------------------------------------
 void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t golr[],uint64_t newgol[], uint64_t newgolg[], uint64_t newgolgstats[], uint64_t newgolb[],uint64_t newgolr[]) {     // selection models 14,15
 /*
-    all different configurations under the standard 2D 4-rotation and 4-reflection symmetries are distinguished
+    All different configurations under the standard 2D 4-rotation and 4-reflection symmetries are distinguished
     i.e. by number of ones and edge-corner differences and additional distinctions in arrangement
-    for the different s values                     0  1  2  3  4  5  6  7  8
-    there are a nr of distinct configurations      1  2  6 10 13 10  6  2  1   total 51
-    if we exclude the cases s=0,1,7,8 which can create growth artefacts, then there are still 45 bits
-    if we focus on cases s=3,4,5 there are still one too many, i.e. 33 cases, for investigation in a single integer genome
-    instead, we investigate here the most interesting lower s domain s = 0,1,2,3,4 in full detail
-    [     alternative approaches would be to:
+    - for the different s values                     0  1  2  3  4  5  6  7  8
+    - there are a nr of distinct configurations      1  2  6 10 13 10  6  2  1   total 51
+    - if we exclude the cases s=0,1,7,8 which can create growth artefacts, then there are still 45 bits
+    - if we focus on cases s=3,4,5 there are still one too many, i.e. 33 cases, for investigation in a single integer genome
+    - instead, we investigate here the most interesting lower s domain s = 0,1,2,3,4 in full detail
+ 
+    [Alternative approaches would be to:
         (i) investigate separately the configurations s=4-8 which requires 32 bits
         (ii) investigate s=2,3,5,6, excluding 4, with 32 bits for birth and survival
         (iii) code up the s=3,4,5 minus one : with the software specifying one omitted configuration
         (iv) include undifferentiated s=5 instead of 0 : 32 bits
         (v) include undifferentiated s=1,5,6 instead of 0,1  ie s=1-6 : 32 bits
-        (vi) split the s-range allowed for birth and survival: S s=1-4 B s=3-5 ie 31 bits for survival and 33 for birth]
+        (vi) split the s-range allowed for birth and survival: S s=1-4 B s=3-5 ie 31 bits for survival and 33 for birth.]
+ 
+    This results in the following two encodings of genomes: (selected by 1. selection=14 or 2. selection=15):
     1. Fixed length encoding: Survival: s=0 bit 0, s=1 bits 1,2, s=2 bits 3-8, s=3 bits 9-18, s=4 bits 19-31; Birth: same + 32
+        B/S  1111111111111111111111111111111100000000000000000000000000000000      1=Birth  0=Survival
+        s    4444444444444333333333322222211044444444444443333333333222222110
+        crot 32106543210987654321065432103210cba98765432109876543210543210100
     2. Modular encoding: Up to 5 12-bit modules. Lower 8 bits in up to 5 modules in bits 0-39, upper 4 bits in up to 5 modules in bits 40-59
-
                                                                                                                 */
-    int s, se, slow, s2or3, k, k1, kodd, coff, crot, found, coffdiv6, coffmod6, pat, nsame;
-    uint64_t survive,birth,survivenbs,birthnbs,overwrite,survivalgene,smask,bmask,rulemodij,golij;
+    int s, se, slow, s2or3, k, k1, kodd, coff, crot, coffdiv6, coffmod6, pat, nsame, nrfound_b, nrfound_s;
+    uint64_t survive, birth, overwrite, survivalgene, found, smask, bmask, rulemodij, golij;
     static uint64_t summasks[5] = {0x1ull,0x3ull,0x3full,0x3ffull,0x1fffull};  // masks for s= 0,1,2,3,4 with nr cases 1,2,6,10,13
     static int sumoffs[9] = {0,1,3,9,19,32,42,48,50};                          // cumulative offsets to start of coding region for s = 0,1,2,3,4,5,6,7,8 - only s<5 used
     static int csumoffs[9] = {0,2,4,12,26,46,60,68,2};                         // start of indexing in confoffs for crot,kodd lookup for s = 0,1,2,3,4,5,6,7,8
@@ -4576,55 +4678,91 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
                     birth  = (bmask>>(sumoffs[s]+coff))&0x1ull;                // only allowed if birth/survivemask permits (ask this before consulting genes)
                     if (survive|birth) {                                       // complete the determination of birth or survival
                         if (selection==15) {                                   // selection == 15 variable length encoding
-                            survivenbs=birthnbs=(repscheme&R_1_nb_OR_AND) ? 0ull : 1ull; // initialization for OR or AND of neighbors resp.
-                            for (k=0;k<8;k++) {                                // decodes genes with variable position encoding only for current s,crot
-                                if (gol[nb[k]]) {                              // combine information from genes of all live neighbours
-                                    if ((!survivalgene && gol[ij]) || overwrite) {
-                                        genecode = golg[nb[k]];
-                                        if(coffmod6 > 1) for (genecode1=0ull,k1=0;k1<5;k1++) genecode1 |= ( (genecode>>(40+(k1<<2)+coffmod6-2)) & 0x1ull ) << (k1<<3);
-                                        else genecode1 = (genecode >> coffmod6) & 0x0101010101; // prepare lookup in all 5 modules on gene : in this case coff subset bits in right place
-                                        genecode &= 0xfcfcfcfcfc; //
-                                        genecode |= genecode1;                 // replace lowest 2 bits of 8-bit part of 12-bit modules with appropriate coff subset bits
-                                    }
-                                    if (!survivalgene && gol[ij]) {
-                                        PATTERN8(genecode, pat, found);        //final decision for survival?  NB all 0 seq encodes survival with 0 live nbs
-                                        if(repscheme&R_1_nb_OR_AND)
-                                            survivenbs |= found? 1ull : 0ull;
-                                        else
-                                            survivenbs &= found? 1ull : 0ull;
-                                    }
-                                    if (overwrite) {
-                                        PATTERN8(genecode, (0x80|pat), found); //final decision for birth?
-                                        if(repscheme&R_1_nb_OR_AND)
-                                            birthnbs |= found? 1ull : 0ull;
-                                        else
-                                            birthnbs &= found? 1ull : 0ull;
-                                    }
+                            nrfound_b = nrfound_s = 0;
+                            for (k=0;k<s;k++) {                                // decodes genes with variable position encoding only for current s,crot
+                                if ((!survivalgene && gol[ij]) || overwrite) {
+                                    kch = (nb1i>>(k<<2))&0x7;
+                                    genecode = golg[nb[kch]];
+                                    if(coffmod6 > 1) for (genecode1=0ull,k1=0;k1<5;k1++) genecode1 |= ( (genecode>>(40+(k1<<2)+coffmod6-2)) & 0x1ull ) << (k1<<3);
+                                    else genecode1 = (genecode >> coffmod6) & 0x0101010101; // prepare lookup in all 5 modules on gene : in this case coff subset bits in right place
+                                    genecode &= 0xfcfcfcfcfc;                   // accept upper 6 bits of lower 8-bits of all 5 coding modules
+                                    genecode |= genecode1;                      // replace lowest 2 bits of 8-bit part of 12-bit modules with appropriate coff subset bits
+                                }
+                                if (!survivalgene && golij) {
+                                    PATTERN8(genecode, pat, found);
+                                    if(found) nrfound_s++;
+                                }
+                                if (overwrite) {
+                                    PATTERN8(genecode, (0x80|pat), found);
+                                    if(found) nrfound_b++;
                                 }
                             }
-                            if (survivalgene && gol[ij]) {                     // survival determined by central gene in this case
+                            
+                            if (survivalgene & golij) {                     // survival determined by central gene in this case
                                 genecode = golg[ij];
                                 if(coffmod6 > 1) for (genecode1=0ull,k1=0;k1<5;k1++) genecode1 |= ( (genecode>>(40+(k1<<2)+coffmod6-2)) & 0x1ull ) << (k1<<3);
                                 else genecode1 = (genecode >> coffmod6) & 0x0101010101; // prepare lookup in all 5 modules on gene : in this case coff subset bits in right place
                                 genecode &= 0xfcfcfcfcfc; //
                                 genecode |= genecode1;                         // replace lowest 2 bits of 8-bit part of 12-bit modules with appropriate coff subset bits
-                                PATTERN8(genecode, pat, found);                //final decision for survival?  NB all 0 seq encodes survival with 0 live nbs
-                                survivenbs = found? 1ull : 0ull;
+                                PATTERN8(genecode, pat, found);                // final decision for survival?  NB all 0 seq encodes survival with 0 live nbs
+                                if(found) nrfound_s = s;
                             }
-                            birth &= birthnbs;
-                            survive &= survivenbs;
+                            
+                            if(repscheme&R_0_nb_majority) {
+                                if((repscheme&R_1_nb_OR_AND)||(s&0x1)) {
+                                    survive &= (nrfound_s >  (s>>1)) ? 1ull : 0ull;  // > s/2
+                                    birth   &= (nrfound_b >  (s>>1)) ? 1ull : 0ull;  // > s/2
+                                }
+                                else  {
+                                    survive &= (nrfound_s >= (s>>1)) ? 1ull : 0ull;  // >= s/2
+                                    birth   &= (nrfound_b >= (s>>1)) ? 1ull : 0ull;  // >= s/2
+                                }
+                            }
+                            else {
+                                if(repscheme&R_1_nb_OR_AND) {
+                                    survive &= (nrfound_s     ) ? 1ull : 0ull;   // OR
+                                    birth   &= (nrfound_b     ) ? 1ull : 0ull;   // OR
+                                }
+                                else  {
+                                    survive &= (nrfound_s == s) ? 1ull : 0ull;   // AND
+                                    birth   &= (nrfound_b == s) ? 1ull : 0ull;   // AND
+                                }
+                            }
                         }
                         else {                                                 // selection == 14
-                            if(repscheme&R_1_nb_OR_AND)
-                                for (genecode=0ull,k=0;k<8;k++)                // decodes genes with fixed length encoding by OR
-                                    genecode |= (gol[nb[k]]?golg[nb[k]]:0ull); // OR of live neighbours encodes birth rule & survival rule
-                            else
-                                for (genecode=~0ull,k=0;k<8;k++)               // decodes genes with fixed length encoding by AND
-                                    genecode &= (gol[nb[k]]?golg[nb[k]]:~0ull);// AND of live neighbours encodes birth rule & survival rule
-                            if(survivalgene) genecode = (genecode&(0xffffffffull<<32)) | (golg[ij]&0xffffffffull); // if central gene determines survival
-                            genecode&=(bmask<<32)|smask;                       // actually no longer needed since test done above
-                            if (gol[ij]) survive &= (genecode>>(sumoffs[s]+coff))&0x1ull;        // 28.7.2019 changed from |=
-                            if (overwrite) birth &= (genecode>>(32+sumoffs[s]+coff))&0x1ull;
+                            if(repscheme&R_0_nb_majority) {                        // MAJORITY resolution of neighbours
+                                for (nrfound_b=nrfound_s=0,k=0;k<s;k++) {          // decodes genes with fixed length encoding
+                                    kch = (nb1i>>(k<<2))&0x7;
+                                    genecode = golg[nb[kch]];
+                                    nrfound_s += (!survivalgene && golij) && ((genecode>>(sumoffs[s]+coff))&0x1ull) ? 1 : 0;
+                                    nrfound_b +=  (overwrite || !golij) && ((genecode>>(32+sumoffs[s]+coff))&0x1ull) ? 1 : 0;
+                                }
+                                
+                                if(survivalgene) {
+                                    genecode = golg[ij];
+                                    nrfound_s = golij && ((genecode>>(sumoffs[s]+coff))&0x1ull) ? s : 0;
+                                }
+                        
+                                if((repscheme&R_1_nb_OR_AND)||(s&0x1)) found = (nrfound_s >  (s>>1)) ? 1 : 0;  // > s/2
+                                else                                   found = (nrfound_s >= (s>>1)) ? 1 : 0;  // >= s/2
+                                survive &= found ? 1ull : 0ull;
+                                
+                                if((repscheme&R_1_nb_OR_AND)||(s&0x1)) found = (nrfound_b >  (s>>1)) ? 1 : 0;  // > s/2
+                                else                                   found = (nrfound_b >= (s>>1)) ? 1 : 0;  // >= s/2
+                                birth &= found ? 1ull : 0ull;
+                            }
+                            else {
+                                if(repscheme&R_1_nb_OR_AND)
+                                    for (genecode=0ull,k=0;k<8;k++)                // decodes genes with fixed length encoding by OR
+                                        genecode |= (gol[nb[k]]?golg[nb[k]]:0ull); // OR of live neighbours encodes birth rule & survival rule
+                                else
+                                    for (genecode=~0ull,k=0;k<8;k++)               // decodes genes with fixed length encoding by AND
+                                        genecode &= (gol[nb[k]]?golg[nb[k]]:~0ull);// AND of live neighbours encodes birth rule & survival rule
+                                if(survivalgene) genecode = (genecode&(0xffffffffull<<32)) | (golg[ij]&0xffffffffull); // if central gene determines survival
+                                genecode&=(bmask<<32)|smask;                       // actually no longer needed since test done above
+                                if (gol[ij]) survive &= (genecode>>(sumoffs[s]+coff))&0x1ull;        // changed from |=
+                                if (overwrite) birth &= (genecode>>(32+sumoffs[s]+coff))&0x1ull;
+                            }
                         }
                     }
                 }
