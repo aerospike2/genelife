@@ -348,9 +348,6 @@ const uint64_t F_dummy =       0x8000ull;   // free: not yet used
 const uint64_t F_livenbs =     0xff0000ull; // mask for storing configuration of live neighbours : clockwise from top-left neighbour (NW) (sel 0-7 for s>1, sel 8-15 for s>0)
 const uint64_t F_2select =     0x1000000ull;// bit is 1 if the 2 live neighbour selection routine was employed : selection 0-7 only
 const uint64_t F_3g_same =     0x2000000ull;// bit is 1 if exactly 3 live nbs and all 3 have same gene : only for selection 0-7
-//................................................................ miscellaneous ......................................................................
-#define ASCII_ESC         27        /* escape for printing terminal commands, such as cursor repositioning : only used in non-graphic version */
-#define IJDEBUG       105690        /* ij nr for debug printouts */
 //----------------------------------------------------------hash table implementation of python style dictionary---------------------------------------
 #define HASHTABLE_IMPLEMENTATION    /* uses Mattias Gustavsson's hashtable (github) for unsigned 64 bit key dictionary */
 #define HASHTABLE_U64 uint64_t      /* define the hashtable 64bit unsigned int type as uint64_t */
@@ -946,7 +943,6 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
     int labelimage(uint64_t hashkeypatt, unsigned int labelimg[], unsigned int label, int offset);
     extern inline int log2size(const short unsigned int golpw);
     void get_gliderinfo(uint64_t outgliderinfo[], int narraysize);
-    // static int firstdebug = 1;
     
     if (nfrstep==0) {
         ggol  = gol;
@@ -1416,12 +1412,6 @@ void colorgenes( int cgolg[], int NN2, int colorfunction, int winnr, int nfrstep
         }
         break;
       case 12:                                                      // colouring based on periodicity of dynamic record of 16 last states in golr for live genes
-        /* if (firstdebug) {
-            golr_digest (0x1111111111111111ull, &d0, &d1, &jper, &dx, &dy);fprintf(stderr,"golr digest %llx %d %d %d %d %d\n",0x1111111111111111ull, d0, d1, jper, dx, dy);
-            golr_digest (0x1111111111111119ull, &d0, &d1, &jper, &dx, &dy);fprintf(stderr,"golr digest %llx %d %d %d %d %d\n",0x1111111111111119ull, d0, d1, jper, dx, dy);
-            golr_digest (0xaec8aec8aec8aec8ull, &d0, &d1, &jper, &dx, &dy);fprintf(stderr,"golr digest %llx %d %d %d %d %d\n",0xaec8aec8aec8aec8ull, d0, d1, jper, dx, dy);
-            firstdebug=0;
-        } */
         for (ij=0; ij<N2; ij++) {
             if (ggol[ij] && (diagnostics & diag_hash_genes)) {
                 gene = ggolr[ij];                                   // variable gene holds dynamical record stored in golr
@@ -1736,7 +1726,6 @@ extern inline int selectone_of_s(unsigned int *kch, int s, uint64_t nb1i, int nb
             *newgene = livegenes[k&0x7];               // choose first of selected set to replicate (can make positional dependent choice instead externally)
             *parentid=golb[ijanc[k&0x7]];
             *kch = kchs[k];
-            //if(ij==IJDEBUG) fprintf(stderr,"DEBUG In selectone_of_s at totsteps=%d ij=%d s=%d nbest=%d extremval=%llx bestnbmask=%llx nb1i=%llx kch=%d\n",totsteps,ij,s,nbest,extremval,bestnbmask,nb1i,*kch);
             break;
                                                        // cases 8-15 are intended for golr selection modes
         case 8:                                        // 8,9 simple optimization for period
@@ -3243,30 +3232,6 @@ unsigned int label_components(uint64_t gol[],uint64_t golg[]) {
         fprintf(stderr,"connected cpts:  %d(%d) matched(unique) & %d(%d) with no-residual(no) connections i.e. %d out of %d(%d) old(new) components\n",
                         nmatched,nunique,nremconnect,nzconnect,nmatched+nremconnect,oldnlabel,nlabel);
     }
-    
-    /* do this for lapmod not maxmatch : cclap needs to be of type cost_t not short unsigned int
-    for(i=nlap;i<=nlabel;i++) {                         // if nlabel > oldnlabel, then fill out cost matrix further with dummy nodes
-        cclap[nclap]=(cost_t) 100 * overallmaxoverlap;  // alternatively use LARGE (results in error);
-        kklap[nclap++]=i;
-        nlap++;
-        iilap[nlap]=nclap;
-    } */
-    // testflow();  // maximum flow test case
-    /*
-    fprintf(stderr,"Linear Assignment Problem cc,kk output\n");
-    for(i=0,ij=0;ij<nclap;ij++) {
-        while(iilap[i]<=ij) {
-            i++;
-            fprintf(stderr,"\n");
-        }
-        fprintf(stderr,"ij %d i %d j=kk[ij] %d cc[ij] %f ii[i] %d connlenf[i] %d\n",ij,i,kklap[ij],cclap[ij],iilap[i],connlenf[i]);
-    }
-    */
-
-
-//    fprintf(stderr,"step %d lapmod called with nlap %d (out of %d) and nclap %d and ncomponents %d and maxvalue %d\n",totsteps,nlap,oldnlabel,nclap,nlabel,overallmaxoverlap);
-//    ret=lapmod_internal(nlap,cclap,iilap,kklap,xlap,ylap,FP_DYNAMIC);
-//    fprintf(stderr,"step %d lapmod returns %d with first three entries %d %d %d\n",totsteps,ret,xlap[0],xlap[1],xlap[2]);
 
     return nlabel;
 }
@@ -3276,7 +3241,6 @@ unsigned int extract_components(uint64_t gol[],uint64_t golg[]) {
     short unsigned int k,nside,patt;
     unsigned int histside[log2N+1];
     unsigned int nlabel;
-    // uint64_t fullpatt;   // debugging
     int wpixels;
     uint64_t hashkey,rand;
     
@@ -3368,22 +3332,12 @@ unsigned int extract_components(uint64_t gol[],uint64_t golg[]) {
         if(!hashkey) {                                                                                  // components either have (quad!=NULL and patt==0) or (quad==NULL and patt!=0)
             complist[i].patt=patt;
             complist[i].quad=0ull;
-            /* DEBUGGING
-            fullpatt = (uint64_t) patt;
-            POPCOUNT64C(fullpatt, ij1);
-            if (ij1 != complist[i].pixels) {
-                fprintf(stderr,"step %d label %d ERROR in small pattern construction patt pixels : patt %x pixels %d fullpatt %llx n1s %d wpixels = %d nside %d\n",
-                                                    totsteps, i, patt, complist[i].pixels, fullpatt, ij1, wpixels, nside);
-                fprintf(stderr,"                 N S W E = (%4d %4d %4d %4d) lastrc %d\n",complist[i].N,complist[i].S,complist[i].W,complist[i].E,complist[i].lastrc);
-            }
-            */
         }
         else {
             complist[i].patt=0;
             complist[i].quad=hashkey;
         }
     }
-
     
     if(totsteps==0) {                                                                                         // initialize colors to labels for t=0
         for(i=1;i<=nlabel;i++) {
@@ -3402,15 +3356,8 @@ unsigned int extract_components(uint64_t gol[],uint64_t golg[]) {
     }
     for(i=1;i<=nlabel;i++) {
         histside[complist[i].log2n]++;
-        /* fprintf(stderr,"step %d comp %d pixels %d rect (%d,%d, %d,%d)\n",totsteps,i,complist[i].pixels,complist[i].W,complist[i].N,complist[i].E,complist[i].S);
-           if(complist[i].log2n>=8) {
-            fprintf(stderr,"step %d component %d with log2n %d N,S,W,E %d %d %d %d\n",
-                    totsteps,i,complist[i].log2n,complist[i].N,complist[i].S,complist[i].W,complist[i].E);
-            for(ij=0;ij<N2;ij++) if(label[ij]==i) label[ij]=0xffff;                                    // recolour component white for debugging
-        } */
     }
 
-    // fprintf(stderr,"step %d histogram of component log2n\n",totsteps);
     if(!(totsteps % 10) && colorupdate1 && connectedprints) {
         fprintf(stderr,"histogram log2n ");for(i=0;i<=log2N;i++) fprintf(stderr," %5d",i);fprintf(stderr,"\n");
         fprintf(stderr,"conn cmpt counts");for(i=0;i<=log2N;i++) fprintf(stderr," %5d",histside[i]);fprintf(stderr,"\n");
@@ -3924,18 +3871,16 @@ extern inline void finish_update_ij(int ij,int s,uint64_t golij,uint64_t gols,ui
                 if ((ancselectmask>>(s-1)) &0x1) {                          // use genes to select ancestor
                     nbest=selectone_of_s(&kch,s,nb1i,nb,golg,golb,golr,&birth,&newgene,&parentid,&nbmask,ij);// selection scheme depends on repscheme parameter, selection depends on genes
                     ancestor = newgene;
-                    // if(ij==IJDEBUG) fprintf(stderr,"DEBUG Difference 1 at totsteps=%d ij=%d s=%d nbest=%d birth=%llx newgene=%llx nb1i=%llx kch=%d\n",totsteps,ij,s,nbest,birth,newgene,nb1i,kch);
                 }
                 else {                                                      // use positional information to select ancestor (leave birth on)
                     nbest = s;
                     ancestor = newgene = parentid = 0ull;kch = 0;           // ancestor, newgene, parentid, kch initialized here to avoid warning below (not needed though)
-                    for (nbmask=0ull,k=0;k<s;k++) nbmask |= 0x1ull<<((nb1i>>(k<<2))&0x7);    // check whether this needed here DEBUG !!!
+                    for (nbmask=0ull,k=0;k<s;k++) nbmask |= 0x1ull<<((nb1i>>(k<<2))&0x7);    // check whether this really needed here
                     if (!(nbest>1)) {                                       // for s==1 we define newgene ancestor immediately (s==0 does not reach here)
                         kch = nb1i&0x7;
                         ancestor = newgene = golg[nb[kch]];
                         parentid = golb[nb[kch]];
                     }
-                    //if(ij==IJDEBUG) fprintf(stderr,"DEBUG Difference 2 at totsteps=%d ij=%d nbest=%d newgene=%llx nb1i=%llx kch=%d\n",totsteps,ij,nbest,newgene,nb1i,kch);
                 }
                 if(nbest>1 ) {
                     kch=selectdifft(nbest,nbmask,&crot,&kodd,&nsame);       // kch is chosen nb in range 0-7, nsame gives the number of undistinguished positions in canonical rotation
@@ -3947,8 +3892,7 @@ extern inline void finish_update_ij(int ij,int s,uint64_t golij,uint64_t gols,ui
                         ancestor = newgene = golg[nb[kch]];
                         parentid = golb[nb[kch]];
                     }
-                    //if(ij==IJDEBUG) fprintf(stderr,"DEBUG Difference 3 at totsteps=%d ij=%d nbest=%d newgene=%llx nb1i=%llx kch=%d\n",totsteps,ij,nbest,newgene,nb1i,kch);
-                }
+                 }
             }
             if (birth) {                                                    // ask again because disambiguate may turn off birth
                 statflag |= F_birth;
@@ -3973,7 +3917,6 @@ extern inline void finish_update_ij(int ij,int s,uint64_t golij,uint64_t gols,ui
                     unsigned int ij1 = nb[kch];
                     newgolgstats[ij1] = newgolgstats[ij1] | F_parent;
                 }
-                //if(ij==IJDEBUG) fprintf(stderr,"DEBUG Difference 4 at totsteps=%d ij=%d newgene=%llx nb1i=%llx kch=%d\n",totsteps,ij,newgene,nb1i,kch);
             }
         }
         if(!birth) {                                                       // need instead of else because if(birth) section may change value of birth
@@ -3995,14 +3938,12 @@ extern inline void finish_update_ij(int ij,int s,uint64_t golij,uint64_t gols,ui
                     if(diagnostics & diag_hash_genes)
                         hashdeletegene(golg[ij],golb[ij],"step %d hash delete error 2 in update, gene %llx not stored\n");
                 }
-                //if(ij==IJDEBUG) fprintf(stderr,"DEBUG Difference 5 at totsteps=%d ij=%d nb1i=%llx\n",totsteps,ij,nb1i);
             }
             else {                                                         // empty and no birth, stays empty
                 newgol[ij]  = golij;
                 newgolg[ij] = golg[ij];
                 newgolb[ij] = golb[ij];
                 newgolr[ij] = golr[ij];
-                //if(ij==IJDEBUG) fprintf(stderr,"DEBUG Difference 6 at totsteps=%d ij=%d nb1i=%llx\n",totsteps,ij,nb1i);
             }
         }
         if(newgol[ij]!=gols) {
@@ -4013,7 +3954,6 @@ extern inline void finish_update_ij(int ij,int s,uint64_t golij,uint64_t gols,ui
         if (parentdies) newgolgstats[ij] = newgolgstats[ij] | statflag;     // newgolgstats may already contain updated parenthood info F_parent
         else newgolgstats[ij] = statflag;
     
-        //if(ij==IJDEBUG) fprintf(stderr,"DEBUG First error at totsteps=%d ij=%d s=%d newgolg=%llx newgolr=%llx\n",totsteps,ij,s,newgolg[ij],newgolr[ij]);
 }
 //........................................................................................................................................................
 void extern inline finish_update(uint64_t newgol[], uint64_t newgolg[],uint64_t newgolgstats[],uint64_t newgolb[], uint64_t newgolr[], int nbshist[]) {
@@ -4090,15 +4030,6 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
     if (ncoding==4)         allcoding = 0xffffffffffffffff;                     // mask for total gene coding region
     else if (ncoding ==2)   allcoding = 0xffffffff;
     else                    allcoding = 0xffff;
-    
-    /* DEBUG if(totsteps<5 && selection==9) {
-        retrievegols(totsteps,newgol,newgolg,newgolgstats,newgolb,newgolr);     // previous simulation data placed in newgol...
-        for (ij=0; ij<N2; ij++) {
-            if(gol[ij]!=newgol[ij]) {
-                fprintf(stderr,"NEW step %d gol difference at ij = %d\n",totsteps,ij);
-            }
-        }
-    }*/
   
     for (ij=0; ij<N2; ij++) {                                                   // loop over all sites of 2D torus with side length N
         i = ij & Nmask;  j = ij >> log2N;                                       // row & column
@@ -4198,7 +4129,7 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
                                 genecode &= golg[nb[kch]];                          // AND of live neighbours encodes birth rule & survival rule
                             }
                         }
-                        if(survivalgene) genecode = (genecode&(0xffffffffull<<32)) | (golg[ij]&(8ull*ncoding-1ull));   // if central gene codetermines survival DEBUG CHECK
+                        if(survivalgene) genecode = (genecode&(0xffffffffull<<32)) | (golg[ij]&(8ull*ncoding-1ull));   // if central gene codetermines survival
                         survive=(((genecode>>((s-1)*ncoding)) & ncodingmask) == ncodingmask) && ((smask>>s1)&1ull) ? 1ull : 0ull;
                         if (overwrite || !golij) birth=(((genecode>>((8+s1)*ncoding)) & ncodingmask) == ncodingmask) && ((bmask>>s1)&1ull) ? 1ull : 0ull;
                     }
@@ -4218,11 +4149,6 @@ void update_lut_sum(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint6
     }  // end for ij
 
     finish_update(newgol, newgolg, newgolgstats, newgolb, newgolr, nbshist);
-    
-    /* if(totsteps<5 && selection == 8) {
-        savegols(totsteps,gol,golg,golgstats,golb,golr);
-    } */
-
 }
 //---------------------------------------------------------------- update_lut_dist ----------------------------------------------------------------------
 void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t golr[],uint64_t newgol[], uint64_t newgolg[], uint64_t newgolgstats[], uint64_t newgolb[],uint64_t newgolr[]) {     // selection models 10,11
@@ -4261,15 +4187,6 @@ void update_lut_dist(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint
     bmask = (uint64_t) birthmask;
     parentdies = (repscheme & R_3_parentdies) ? 1 : 0;
     if(parentdies) for (ij=0; ij<N2; ij++) newgolgstats[ij] = 0ull;                // need to update statistics of neighbours with parenting information, so init required
-
-    /* if(totsteps<5) {
-        retrievegols(totsteps,newgol,newgolg,newgolgstats,newgolb,newgolr);     // previous simulation data placed in newgol...
-        for (ij=0; ij<N2; ij++) {
-            if(gol[ij]!=newgol[ij]) {
-                if(first) {fprintf(stderr,"DEBUG NEW step %d gol difference at ij = %d this gol %llx file gol %llx\n",totsteps,ij,gol[ij],newgol[ij]);first=0;}
-            }
-        }
-    } */
     
     for (ij=0; ij<N2; ij++) {                                                      // loop over all sites of 2D torus with side length N
         i = ij & Nmask;  j = ij >> log2N;                                          // row & column
@@ -5071,7 +4988,7 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
     switch (selection) {                                                         // initialize starting genes depending on selection model, encoding and symmetry
         case 0:  for (k=0;k<4;k++) { startgenes[k] = 0xf0f0f0f0f0f0f0f0; startgenes[k+4] = 0x0f0f0f0f0f0f0f0f;} break;
         case 1:  for (k=0;k<8;k++)   startgenes[k] = ((0x1ull<<k*3)-1ull)<<20;break;
-        case 2:  for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | 0x606ull;break; // to DEBUG 2-8 difference otehrwise same as case 3:
+        case 2:  for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | 0x606ull;break;
         case 3:  for (k=0;k<8;k++)   startgenes[k] =(((0x1ull<<20)-1ull)<<20)+((0x1ull<<k)-0x1ull);break;
         case 4:  for (k=0;k<8;k++)  {g = 0xff0ull; startgenes[k] = k<4 ? g+1 : ~((g<<16));} break;
         case 5:  for (k=0;k<8;k++)  {g = 0xf0ull + k; startgenes[k] = k<4 ? g : (~g)|(0xfull<<16);} break;
@@ -6170,13 +6087,11 @@ void countspecies() {                                                       // c
 void countspecieshash() {  /* counts numbers of all different species using qsort first */
     int k, *golgs, nspecies, nspeciesnow, nones;
     uint64_t last;
-//    static int debugcnt = 0;
 
     nspecies = hashtable_count(&genetable);
     genotypes = hashtable_keys(&genetable);
     geneitems = (genedata*) hashtable_items( &genetable );
 
-//    fprintf(stderr,"Debug cnt %d in countspecieshash\n",debugcnt++);
     golgs = (int *) malloc(nspecies*sizeof(int));
     for (k=0; k<nspecies; k++) golgs[k] = k;  // initialize sorted genotype array to same order as hash table
 
