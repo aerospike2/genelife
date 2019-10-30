@@ -8,11 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		0DD73C052150EF8700F3FF92 /* dispgenelife.c in Sources */ = {isa = PBXBuildFile; fileRef = 5206B80F21507E0B00394209 /* dispgenelife.c */; };
-		5206B822215088E300394209 /* actgenelife.c in Sources */ = {isa = PBXBuildFile; fileRef = 5206B81121507E2200394209 /* actgenelife.c */; };
 		523F7F772312D8470090DFCA /* subgenelife.c in Sources */ = {isa = PBXBuildFile; fileRef = 529A8B6D21EE297800A316DB /* subgenelife.c */; };
 		529A8B8321F7200800A316DB /* maxmatch.c in Sources */ = {isa = PBXBuildFile; fileRef = 529A8B7E21F64D2A00A316DB /* maxmatch.c */; };
 		529A8B8421F7200A00A316DB /* maxmatch.c in Sources */ = {isa = PBXBuildFile; fileRef = 529A8B7E21F64D2A00A316DB /* maxmatch.c */; };
-		529A8B8521F7200C00A316DB /* maxmatch.c in Sources */ = {isa = PBXBuildFile; fileRef = 529A8B7E21F64D2A00A316DB /* maxmatch.c */; };
 		52A14B3F2177387E000E2ED4 /* hashtable.h in Headers */ = {isa = PBXBuildFile; fileRef = 52A14B3E2177387E000E2ED4 /* hashtable.h */; };
 /* End PBXBuildFile section */
 
@@ -23,13 +21,6 @@
 			proxyType = 1;
 			remoteGlobalIDString = 521C1455214DDE9400E17A8F;
 			remoteInfo = dispgenelife;
-		};
-		5206B820215088B600394209 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 525EB7A11F18DCE4004078F1 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 521C1463214DDF0400E17A8F;
-			remoteInfo = actgenelife;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -43,24 +34,11 @@
 			);
 			runOnlyForDeploymentPostprocessing = 1;
 		};
-		521C1462214DDF0400E17A8F /* CopyFiles */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = /usr/share/man/man1;
-			dstSubfolderSpec = 0;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 1;
-		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		5206B80F21507E0B00394209 /* dispgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = dispgenelife.c; path = genelifec/dispgenelife.c; sourceTree = SOURCE_ROOT; };
-		5206B81121507E2200394209 /* actgenelife.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = actgenelife.c; path = genelifec/actgenelife.c; sourceTree = SOURCE_ROOT; };
-		5206B81321507EF500394209 /* display.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; name = display.py; path = genelifepy/display.py; sourceTree = SOURCE_ROOT; };
-		5206B81421507F2E00394209 /* activity.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; name = activity.py; path = genelifepy/activity.py; sourceTree = SOURCE_ROOT; };
 		521C1456214DDE9400E17A8F /* dispgenelife */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = dispgenelife; sourceTree = BUILT_PRODUCTS_DIR; };
-		521C1464214DDF0400E17A8F /* actgenelife */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = actgenelife; sourceTree = BUILT_PRODUCTS_DIR; };
 		521FDCEC1F287DEE00F08FFB /* genelife_c_interface.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = genelife_c_interface.py; path = genelifepy/genelife_c_interface.py; sourceTree = SOURCE_ROOT; };
 		52416DB61F27771500721D17 /* libgenelife.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libgenelife.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		528F919F1F33303E008DD596 /* libdispatch.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libdispatch.tbd; path = usr/lib/system/introspection/libdispatch.tbd; sourceTree = SDKROOT; };
@@ -81,13 +59,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		521C1461214DDF0400E17A8F /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		52416DB31F27771500721D17 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -101,8 +72,6 @@
 		5206B8162150815C00394209 /* genelifepy */ = {
 			isa = PBXGroup;
 			children = (
-				5206B81421507F2E00394209 /* activity.py */,
-				5206B81321507EF500394209 /* display.py */,
 				521FDCEC1F287DEE00F08FFB /* genelife_c_interface.py */,
 				52ADC4832244044900F9B46A /* genelife.py */,
 			);
@@ -112,7 +81,6 @@
 		5206B818215081EB00394209 /* genelifec */ = {
 			isa = PBXGroup;
 			children = (
-				5206B81121507E2200394209 /* actgenelife.c */,
 				5206B80F21507E0B00394209 /* dispgenelife.c */,
 				52A14B3E2177387E000E2ED4 /* hashtable.h */,
 				529A8B7E21F64D2A00A316DB /* maxmatch.c */,
@@ -136,7 +104,6 @@
 			children = (
 				52416DB61F27771500721D17 /* libgenelife.dylib */,
 				521C1456214DDE9400E17A8F /* dispgenelife */,
-				521C1464214DDF0400E17A8F /* actgenelife */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -183,23 +150,6 @@
 			productReference = 521C1456214DDE9400E17A8F /* dispgenelife */;
 			productType = "com.apple.product-type.tool";
 		};
-		521C1463214DDF0400E17A8F /* actgenelife */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 521C1468214DDF0400E17A8F /* Build configuration list for PBXNativeTarget "actgenelife" */;
-			buildPhases = (
-				521C1460214DDF0400E17A8F /* Sources */,
-				521C1461214DDF0400E17A8F /* Frameworks */,
-				521C1462214DDF0400E17A8F /* CopyFiles */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = actgenelife;
-			productName = actgenelife;
-			productReference = 521C1464214DDF0400E17A8F /* actgenelife */;
-			productType = "com.apple.product-type.tool";
-		};
 		52416DB51F27771500721D17 /* genelife */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 52416DB71F27771500721D17 /* Build configuration list for PBXNativeTarget "genelife" */;
@@ -211,7 +161,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				5206B821215088B600394209 /* PBXTargetDependency */,
 				5206B81F215088B100394209 /* PBXTargetDependency */,
 			);
 			name = genelife;
@@ -229,10 +178,6 @@
 				ORGANIZATIONNAME = ECLT;
 				TargetAttributes = {
 					521C1455214DDE9400E17A8F = {
-						CreatedOnToolsVersion = 9.4.1;
-						ProvisioningStyle = Automatic;
-					};
-					521C1463214DDF0400E17A8F = {
 						CreatedOnToolsVersion = 9.4.1;
 						ProvisioningStyle = Automatic;
 					};
@@ -257,7 +202,6 @@
 			targets = (
 				52416DB51F27771500721D17 /* genelife */,
 				521C1455214DDE9400E17A8F /* dispgenelife */,
-				521C1463214DDF0400E17A8F /* actgenelife */,
 			);
 		};
 /* End PBXProject section */
@@ -269,15 +213,6 @@
 			files = (
 				0DD73C052150EF8700F3FF92 /* dispgenelife.c in Sources */,
 				529A8B8421F7200A00A316DB /* maxmatch.c in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		521C1460214DDF0400E17A8F /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				5206B822215088E300394209 /* actgenelife.c in Sources */,
-				529A8B8521F7200C00A316DB /* maxmatch.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -297,11 +232,6 @@
 			isa = PBXTargetDependency;
 			target = 521C1455214DDE9400E17A8F /* dispgenelife */;
 			targetProxy = 5206B81E215088B100394209 /* PBXContainerItemProxy */;
-		};
-		5206B821215088B600394209 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 521C1463214DDF0400E17A8F /* actgenelife */;
-			targetProxy = 5206B820215088B600394209 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -330,34 +260,6 @@
 				COPY_PHASE_STRIP = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_OPTIMIZATION_LEVEL = 3;
-				MACOSX_DEPLOYMENT_TARGET = 10.12;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-			};
-			name = Release;
-		};
-		521C1469214DDF0400E17A8F /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
-				CLANG_ENABLE_OBJC_WEAK = YES;
-				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CODE_SIGN_STYLE = Automatic;
-				COPY_PHASE_STRIP = NO;
-				GCC_C_LANGUAGE_STANDARD = gnu11;
-				MACOSX_DEPLOYMENT_TARGET = 10.12;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-			};
-			name = Debug;
-		};
-		521C146A214DDF0400E17A8F /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
-				CLANG_ENABLE_OBJC_WEAK = YES;
-				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CODE_SIGN_STYLE = Automatic;
-				COPY_PHASE_STRIP = NO;
-				GCC_C_LANGUAGE_STANDARD = gnu11;
 				MACOSX_DEPLOYMENT_TARGET = 10.12;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -512,15 +414,6 @@
 			buildConfigurations = (
 				521C145B214DDE9400E17A8F /* Debug */,
 				521C145C214DDE9400E17A8F /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		521C1468214DDF0400E17A8F /* Build configuration list for PBXNativeTarget "actgenelife" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				521C1469214DDF0400E17A8F /* Debug */,
-				521C146A214DDF0400E17A8F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

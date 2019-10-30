@@ -18,20 +18,15 @@
 
 int main (int argc, char *argv[]) {
     int	 i,k;
-    uint64_t *gol, *golg;
 
-    int myoffs[27] = {0,0,0,
-		  -1, 0, 0,
-		  -1, 1, 0,
-		  0, 1, 0,
-		  1, 1, 0,
-		  1, 0, 0,
-		  1, -1, 0,
-		  0, -1, 0,
-		  -1, -1, 0};
-    int runparams[7];
-    int simparams[5];
-    int nrunparams=7; int nsimparams=5;
+    int offsets[24] = {0,0,0, 0,0,-1, 0,0,-2, 0,0,-3, 0,0,-4, 0,0,-5, 0,0,-7};  // offsets used here primarily just to specify the use of 8-plane memory
+    int noffsets = 24;
+    
+    int runparams[10];
+    int simparams[6];
+    int nrunparams=10;
+    int nsimparams=6;
+    
     int nsteps = 10;	      // total number of steps to simulate GoL
     int ndisp  = 200;	      // display GoL ndisp steps
     int nskip = 1000;	      // skip this many
@@ -46,19 +41,24 @@ int main (int argc, char *argv[]) {
         }
     }
 
-    Noff = 9;
+
     runparams[0] = 1;        // 0,1 rulemod
-    runparams[1] = 3;        // 0-0x4f repscheme 
-    runparams[2] = 1;        // 0-8 selection
-    runparams[3] = 0;        // NY updated
-    runparams[4] = 0;        // NY updated
-    runparams[5] = 0;        // colorfunction 0 or 1
+    runparams[1] = 3;        // repscheme
+    runparams[2] = 1;        // 0-15 selection
+    runparams[3] = 0xff;     // overwritemask
+    runparams[4] = 0x0;      // survivalmask
+    runparams[5] = 0;        // colorfunction 0 to 12, only used in python graphics
     runparams[6] = 0;        // fileinit 0 or 1, if >1 then size of random init array
+    runparams[7] = 0xf;      // birthmask
+    runparams[8] = 0xff;     // ancselectmask
+    runparams[9] = 0;        // colorfunction 2nd window, 0 to 12, only used in python graphics
+    
     simparams[0] = 0;        // nlog2pmut: gene mutation probability
     simparams[1] = 16384;    // initial1density: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
     simparams[2] = 32768;    // initialrdensity: 32768 makes all genomes active 16384 makes half active, etc.
-    simparams[3] = 0;        // NY updated
-    simparams[4] = 0;        // NY updated
+    simparams[3] = 0;        // ncodingin: number of coding bits for selection symmetry 8,9 only
+    simparams[4] = 0;        // startgenechoice (8 for random choice between all 8 possible)
+    simparams[5] = 1234567;  // ranseed initialization
     
     if (argc>1) runparams[0] = atoi(argv[1]); // if present update rulemod from command line
     if (argc>2) runparams[1] = atoi(argv[2]); // if present update repscheme from command line
@@ -81,12 +81,12 @@ int main (int argc, char *argv[]) {
          simparams[0],simparams[1],simparams[2],simparams[3],simparams[4]);
     fprintf(stderr,"ndisp\tnskip\n");
     fprintf(stderr,"%d\t\t%d\n",ndisp,nskip);
-    initialize_planes(myoffs,Noff);
+    initialize_planes(offsets,noffsets);
     initialize(runparams,nrunparams,simparams,nsimparams);
     for (i=0; i<nsteps; i++) {                  /* nsteps */
 	    for(k=0; k< ndisp; k++){
-	        gol = planes[curPlane];
-	        golg = planesg[curPlane];
+	        //gol = planes[curPlane];
+	        //golg = planesg[curPlane];
 	        printxy(gol,golg);
 	        genelife_update(1,0,0);
 	    }
