@@ -68,7 +68,8 @@
 // rgba                 converts hue (0..1) to rgb+alpha
 // mix_color            mix colors from overlapping components, add random drift of colour
 // delay                time delay in ms for graphics
-// printxy              terminal screen print of array on xterm
+// printxy              simple terminal print of array
+// printscreen          terminal screen print of array on xterm, moving cursor with esc codes */
 // golr_digest          digest information in golr (displacement record), extracting min and max mismatch, period, and x,y displacement of period
 // colorgenes           colour display of genes in one of 12 colorfunction modes, including activities, pattern analysis, genealogies and glider detection
 //......................................................  selection of genes for birth  .................................................................
@@ -225,7 +226,7 @@
 #include <time.h>
 #include <math.h>
 //-----------------------------------------------------------size of array ------------------------------------------------------------------------------
-const int log2N = 9;                // toroidal array of side length N = 2 to the power of log2N (minimum log2N is 6 i.e. 64x64)
+const int log2N = 7;                // toroidal array of side length N = 2 to the power of log2N (minimum log2N is 6 i.e. 64x64)
 const int N = 0x1 << log2N;         // only side lengths powers of 2 allowed to enable efficient implementation of periodic boundaries
 const int N2 = N*N;                 // number of sites in square-toroidal array
 const int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
@@ -872,6 +873,23 @@ void printxy (uint64_t gol[],uint64_t golg[]) {                         // print
       }
     }
     printf("\n");
+}
+//.......................................................................................................................................................
+void printscreen (uint64_t gol[], uint64_t golg[]) {   /* print basic genelife on xterm, moving cursor with esc codes */
+//  The simulation uses the terminal text output as a colour display for the GoL.
+//  In order to fit N=128 GoL display on cinema display, use terminal preferences to change font spacings column 1.3 and line 0.65 at 12 pt
+//  In order to fit N=128 GoL display on smaller displays, use terminal preferences to change font spacings column 1.0 and line 0.5 at 10 pt
+//  To allow escape codes to move cursor, in terminal profiles select "Allow Vt100 application keypad mode"
+    int    ij, col;
+    // https://stackoverflow.com/questions/27159322/rgb-values-of-the-colors-in-the-ansi-extended-colors-index-17-255
+    printf("\e[38;5;255;48;5;238m");
+    for (ij=0; ij<N2; ij++) {
+        col = 32+((golg[ij]>>57)&0x7f);
+        printf ("\e[38;5;%dm%c", col, gol[ij] ? '*' : ' ');
+        if ((ij % N) == N -1) printf ("\n");
+    }
+    printf("\e[38;5;238;48;5;255m");
+    fflush(stdout);
 }
 //.......................................................................................................................................................
 extern inline void golr_digest (uint64_t golr, unsigned int *mismatchmin, unsigned int *mismatchmax, unsigned int *period, int *pershx, int *pershy) {

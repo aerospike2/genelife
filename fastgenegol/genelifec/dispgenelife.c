@@ -1,18 +1,24 @@
-// NP 15 Sept 2018:
-// including subgenelife.c for low level update routines.
-// note 6 params available on command line
-// run "actgenelife -h" to see a list of them
-
-// From:
-//  fastgol.c
-//  fastggenegol
+// "dispgenelife.c"
+//  project "fastgenegol"
 //
-//  Created by John McCaskill on 14.07.17.
+//  Created by John McCaskill and Norman Packard 2017-2019.
 //  Copyright © 2017 European Center for Living Technology. All rights reserved.
 //
+//  including subgenelife.c for low level update routines
+//  primitive screen graphics in this C calling program (N<=7): for more advanced graphics see python interface
+//  note that params are available on command line
+//  run "dispgenelife -h" to see a list of them
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <time.h>
 
-#include "subgenelife.c"
+#define ASCII_ESC 27                // escape for printing terminal commands, such as cursor repositioning
+
+#include "subgenelife.c"            // set N to 7 for direct screen output in C, significantly larger values possible with python graphics
+                                    // see printscreen routine for terminal setup necessary to see direct C output with C calling program
+                                    // note that this program was written to run with extended graphical analysis tools from a python notebook
 
 #include <unistd.h>
 
@@ -28,7 +34,7 @@ int main (int argc, char *argv[]) {
     int nsimparams=6;
     
     int nsteps = 10;	      // total number of steps to simulate GoL
-    int ndisp  = 200;	      // display GoL ndisp steps
+    int ndisp  = 1000;	      // display GoL ndisp steps
     int nskip = 1000;	      // skip this many
 
     int opt;
@@ -40,24 +46,24 @@ int main (int argc, char *argv[]) {
             exit(EXIT_FAILURE);
         }
     }
-
-
+   
+    colorupdate1 = 0;        // do not update color function display or print intermediate results
     runparams[0] = 1;        // 0,1 rulemod
-    runparams[1] = 3;        // repscheme
-    runparams[2] = 1;        // 0-15 selection
-    runparams[3] = 0xff;     // overwritemask
+    runparams[1] = 0x170;    // repscheme
+    runparams[2] = 8;        // 0-15 selection
+    runparams[3] = 0x6;      // overwritemask
     runparams[4] = 0x0;      // survivalmask
     runparams[5] = 0;        // colorfunction 0 to 12, only used in python graphics
     runparams[6] = 0;        // fileinit 0 or 1, if >1 then size of random init array
-    runparams[7] = 0xf;      // birthmask
+    runparams[7] = 0x6;      // birthmask
     runparams[8] = 0xff;     // ancselectmask
     runparams[9] = 0;        // colorfunction 2nd window, 0 to 12, only used in python graphics
     
-    simparams[0] = 0;        // nlog2pmut: gene mutation probability
-    simparams[1] = 16384;    // initial1density: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
-    simparams[2] = 32768;    // initialrdensity: 32768 makes all genomes active 16384 makes half active, etc.
-    simparams[3] = 0;        // ncodingin: number of coding bits for selection symmetry 8,9 only
-    simparams[4] = 0;        // startgenechoice (8 for random choice between all 8 possible)
+    simparams[0] = 8;        // nlog2pmut: gene mutation probability
+    simparams[1] = 8192;     // initial1density: nearest to half of guaranteed C rand max value 32767 = 2**15 - 1
+    simparams[2] = 0;        // initialrdensity: 32768 makes all genomes active 16384 makes half active, etc.
+    simparams[3] = 1;        // ncodingin: number of coding bits for selection symmetry 8 only 1,2,3 (0 = max i.e. 3)
+    simparams[4] = 8;        // startgenechoice (8 for random choice between all 8 possible)
     simparams[5] = 1234567;  // ranseed initialization
     
     if (argc>1) runparams[0] = atoi(argv[1]); // if present update rulemod from command line
@@ -85,10 +91,10 @@ int main (int argc, char *argv[]) {
     initialize(runparams,nrunparams,simparams,nsimparams);
     for (i=0; i<nsteps; i++) {                  /* nsteps */
 	    for(k=0; k< ndisp; k++){
-	        //gol = planes[curPlane];
-	        //golg = planesg[curPlane];
-	        printxy(gol,golg);
+            // printxy(gol,golg); // simple character output
+	        printscreen(gol,golg);  // colour xterm output moving cursor with esc codes
 	        genelife_update(1,0,0);
+            usleep(20000);
 	    }
 	    fprintf(stderr,"finished step %d.\n",i);
 	    genelife_update(nskip,0,0);
