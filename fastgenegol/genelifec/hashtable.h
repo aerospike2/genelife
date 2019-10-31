@@ -1,3 +1,13 @@
+//
+// "hashtable.h"
+// project genelife
+//
+// by Mattias Gustavsson
+// Lines marked with JSMcCaskill, were modified by John McCaskill for use in the genelife project
+// In some cases these present general improvements to performance of the original code
+// The changes concern eliminating rare zero hash keys and cntrolling expansion of the table
+// The changes are subject to the second copyright notice at the end of the file
+//
 /*
 ------------------------------------------------------------------------------
           Licensing information can be found at the end of the file.
@@ -9,6 +19,7 @@ Do this:
     #define HASHTABLE_IMPLEMENTATION
 before you include this file in *one* C/C++ file to create the implementation.
 */
+
 
 #ifndef hashtable_h
 #define hashtable_h
@@ -764,3 +775,14 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ------------------------------------------------------------------------------
 */
+//--------------------------------------------- additional copyright ---------------------------------------------------------------------------
+//
+// Modifications in this file marked by JSMcCaskill were written by John S. McCaskill 2017-2019
+//
+// First created by John McCaskill on 14.07.2017. Last modified Oct 2019.
+// Copyright © 2017,2018,2019 European Center for Living Technology. All rights reserved.
+//
+// These modifications are distributed in the hope that they will be useful for research purposes, but WITHOUT ANY WARRANTY
+// and without even the implied warranty of merchantability or fitness for a particular purpose.
+//
+//----------------------------------------------------------------------------------------------------------------------------------------------

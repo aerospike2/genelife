@@ -1,9 +1,10 @@
-// subgenelife.c
-// Xcode project fastgenegol
+//
+// "subgenelife.c"
+// project genelife
 //---------------------------------------------------------- copyright -------------------------------------------------------------------------
 // Written by John S. McCaskill and Norman H. Packard 2017-2019
 //
-// First created by John McCaskill on 14.07.17. Last modified Oct 2019.
+// First created by John McCaskill on 14.07.2017. Last modified Oct 2019.
 // Copyright © 2017,2018,2019 European Center for Living Technology. All rights reserved.
 //
 // This code is distributed in the hope that it will be useful for research purposes, but WITHOUT ANY WARRANTY
@@ -226,7 +227,7 @@
 #include <time.h>
 #include <math.h>
 //-----------------------------------------------------------size of array ------------------------------------------------------------------------------
-const int log2N = 7;                // toroidal array of side length N = 2 to the power of log2N (minimum log2N is 6 i.e. 64x64)
+const int log2N = 9;                // toroidal array of side length N = 2 to the power of log2N (minimum log2N is 6 i.e. 64x64)
 const int N = 0x1 << log2N;         // only side lengths powers of 2 allowed to enable efficient implementation of periodic boundaries
 const int N2 = N*N;                 // number of sites in square-toroidal array
 const int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation

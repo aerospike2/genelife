@@ -1,26 +1,32 @@
-// "dispgenelife.c"
-//  project "fastgenegol"
 //
-//  Created by John McCaskill and Norman Packard 2017-2019.
-//  Copyright © 2017 European Center for Living Technology. All rights reserved.
+// "genelife_nopython_main.c"
+//  project genelife
 //
-//  including subgenelife.c for low level update routines
-//  primitive screen graphics in this C calling program (N<=7): for more advanced graphics see python interface
-//  note that params are available on command line
-//  run "dispgenelife -h" to see a list of them
-
+//---------------------------------------------------------- copyright -------------------------------------------------------------------------
+// Written by John S. McCaskill and Norman H. Packard 2017-2019
+//
+// First created by John McCaskill on 14.07.2017. Last modified Oct 2019.
+// Copyright © 2017,2018,2019 European Center for Living Technology. All rights reserved.
+//
+// This code is distributed in the hope that it will be useful for research purposes, but WITHOUT ANY WARRANTY
+// and without even the implied warranty of merchantability or fitness for a particular purpose.
+//----------------------------------------------------------------------------------------------------------------------------------------------
+//
+// Includes subgenelife.c for low level update routines
+//  - primitive screen graphics in this C calling program (N<=7): for more advanced graphics see python interface
+//  - note that paramaters are available on command line
+//  - run "genelife_nopython -h" to see a list of them
+//----------------------------------------------------------------------------------------------------------------------------------------------
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <time.h>
-
-#define ASCII_ESC 27                // escape for printing terminal commands, such as cursor repositioning
+#include <unistd.h>
 
 #include "subgenelife.c"            // set N to 7 for direct screen output in C, significantly larger values possible with python graphics
                                     // see printscreen routine for terminal setup necessary to see direct C output with C calling program
                                     // note that this program was written to run with extended graphical analysis tools from a python notebook
-
-#include <unistd.h>
+#define ASCII_ESC 27                // escape for printing terminal commands, such as cursor repositioning
 
 int main (int argc, char *argv[]) {
     int	 i,k;

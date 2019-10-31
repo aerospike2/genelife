@@ -1,13 +1,17 @@
 //
-//  maxmatch.c
-//  fastgenegol
-//
+//  "maxmatch.c"
+//  project genelife
+//---------------------------------------------------------- copyright -------------------------------------------------------------------------
 //  Created by John McCaskill on 21/01/2019.
 //  Copyright © 2019 ECLT. All rights reserved.
+//  Adaptation and translation of code obtained from:
 //  https://www.geeksforgeeks.org/hopcroft-karp-algorithm-for-maximum-matching-set-2-implementation/
 //  C++ implementation of Hopcroft Karp algorithm for maximum matching
-//  adapted to handle sparse matrix as in LAPMOD
-
+//  The code was also adapted to handle sparse matrices as in LAPMOD. See original link above for any further copyright information.
+//
+// This code is distributed in the hope that it will be useful for research purposes, but WITHOUT ANY WARRANTY
+// and without even the implied warranty of merchantability or fitness for a particular purpose.
+//----------------------------------------------------------------------------------------------------------------------------------------------
 #include <stdio.h>
 
 #define NIL 0
