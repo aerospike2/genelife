@@ -13,6 +13,7 @@
 // and without even the implied warranty of merchantability or fitness for a particular purpose.
 //----------------------------------------------------------------------------------------------------------------------------------------------
 #include <stdio.h>
+#include "genelife_size.h"
 
 #define NIL 0
 #define INF 0xffff   /* INT_MAX 0x7fffffff*/
@@ -22,7 +23,7 @@ typedef char boolean;
 
 // C routines to implement one queue using an array
 // if a number of new queues must be created, need constructor and destructor code via malloc, free
-extern const int NLM;     // rewrite code below for NLM power of two for more efficient implementation
+// extern const int NLM;     // rewrite code below for NLM power of two for more efficient implementation
 int qrear = - 1;
 int qfront = - 1;
 

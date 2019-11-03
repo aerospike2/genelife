@@ -1,11 +1,11 @@
-//
+ //
 // "subgenelife.c"
 // project genelife
 //---------------------------------------------------------- copyright -------------------------------------------------------------------------
 // Written by John S. McCaskill and Norman H. Packard 2017-2019
 //
 // First created by John McCaskill on 14.07.2017. Last modified Oct 2019.
-// Copyright © 2017,2018,2019 European Center for Living Technology. All rights reserved.
+// Copyright 2017,2018,2019 European Center for Living Technology. All rights reserved.
 //
 // This code is distributed in the hope that it will be useful for research purposes, but WITHOUT ANY WARRANTY
 // and without even the implied warranty of merchantability or fitness for a particular purpose.
@@ -226,12 +226,13 @@
 #include <inttypes.h>
 #include <time.h>
 #include <math.h>
+#include "genelife_size.h"
 //-----------------------------------------------------------size of array ------------------------------------------------------------------------------
-const int log2N = 9;                // toroidal array of side length N = 2 to the power of log2N (minimum log2N is 6 i.e. 64x64)
-const int N = 0x1 << log2N;         // only side lengths powers of 2 allowed to enable efficient implementation of periodic boundaries
-const int N2 = N*N;                 // number of sites in square-toroidal array
-const int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
-const int N2mask = N2 - 1;          // bit mask for array, used instead of modulo operation
+/* enum {log2N = 9,                	// toroidal array of side length N = 2 to the power of log2N (minimum log2N is 6 i.e. 64x64)
+  	  N = 0x1 << log2N,         	// only side lengths powers of 2 allowed to enable efficient implementation of periodic boundaries
+ 	  N2 = N*N,                 	// number of sites in square-toroidal array
+ 	  Nmask = N - 1,            	// bit mask for side length, used instead of modulo operation
+ 	  N2mask = N2 - 1};          	// bit mask for array, used instead of modulo operation   (this code now in genelife_size.h) */
 const uint64_t rootclone = N2;      // single bit for mask enquiries for clones with root heritage
 //--------------------------------------------------------- main parameters of model --------------------------------------------------------------------
 unsigned int rulemod = 1;           // determine whether to modify GoL rules
@@ -478,26 +479,30 @@ uint64_t acttrace[N2];              // scrolled trace of last N time points of a
 uint64_t acttraceq[N2];             // scrolled trace of last N time points of activity of N most frequent quad patterns
 unsigned char acttraceqt[N2];       // type of entry in acttraceq : 1 quad, 0 smallpatt (<65536) i.e. corresponding to isnode
 uint64_t genealogytrace[N2];        // image trace of genealogies for N most frequently populated genes
-uint64_t clonealogytrace[N2];       // image trace of clonealogies for N most frequently populated clones
-const int nNhist = 20;              // maximum number of older blocks for trace
+uint64_t clonealogytrace[N2];       // image trace of clonealogies for N most frequently populated clones          
 int nbhist=-1;                      // current block for trace
-uint64_t poptrace1[N2*nNhist];      // trace of first N*nNhist time points of population of N most frequent genes
-uint64_t acttrace1[N2*nNhist];      // trace of first N*nNhist time points of activity of N most frequent genes
-uint64_t acttraceq1[N2*nNhist];     // trace of first N*nNhist time points of activity of N most frequent quad patterns
-unsigned char acttraceqt1[N2*nNhist];// type of entry in acttraceq : 1 quad, 0 smallpatt (<65536) i.e. corresponding to isnode
+enum {nNhist = 20,					// maximum number of older blocks for trace
+	  N2h = N2*nNhist,
+      Nh = N*nNhist,
+  	  log2N1 = log2N+1,
+  	  N1 = N+1};
+uint64_t poptrace1[N2h];      		// trace of first N*nNhist time points of population of N most frequent genes
+uint64_t acttrace1[N2h];      		// trace of first N*nNhist time points of activity of N most frequent genes
+uint64_t acttraceq1[N2h];     		// trace of first N*nNhist time points of activity of N most frequent quad patterns
+unsigned char acttraceqt1[N2h];		// type of entry in acttraceq : 1 quad, 0 smallpatt (<65536) i.e. corresponding to isnode
 uint64_t working[N2];               // working space array for calculating genealogies and doing neighbour bit packing
 int npopulation[N];                 // number of live sites (gol 1s) in last N time steps up to current population
-int npopulation1[N*nNhist];         // number of live sites (gol 1s) in first N*nNhist time steps
-unsigned int nnovelcells[N*nNhist]; // number of live sites that are part of novel components in first N*nNhist time steps
+int npopulation1[Nh];         		// number of live sites (gol 1s) in first N*nNhist time steps
+unsigned int nnovelcells[Nh]; 		// number of live sites that are part of novel components in first N*nNhist time steps
 int nspeciesgene,nallspecies;       // number of gene species in current population, and that have ever existed
 int nallclones;                     // number of clones stored in hash table
 int nspeciesquad,nallspeciesquad;   // number of quad species in current population, and that have ever existed
 int nspeciessmall,nallspeciessmall; // number of small pattern species now, and that have ever existed
-int histcumlogpattsize[log2N+1];    // histogram of patterns binned on log scale according to power of two side enclosing square
-int histcumpixelssqrt[N+1];         // histogram of patterns binned on an integer sqrt scale according to number of pixels
+int histcumlogpattsize[log2N1];     // histogram of patterns binned on log scale according to power of two side enclosing square
+int histcumpixelssqrt[N1];          // histogram of patterns binned on an integer sqrt scale according to number of pixels
 //------------------------------------------------ arrays for connected component labelling and tracking ------------------------------------------------
-const int NLM = N2;                 // maximum number of discrete components possible N*N: formerly N*N/4 but needed expansion upon intro of genetic diff comp's
-const int NLC = N2<<2;              // maximum number of connections N*N*4
+// enum { NLM = N2};                // maximum number of discrete components possible N*N: formerly N*N/4 but needed expansion upon intro of genetic diff comp's
+enum { NLC = N2<<2};                // maximum number of connections N*N*4
 unsigned int label[N2];             // labels for pixels in connected component labelling
 unsigned int oldlabel[N2];          // previous time step labels for connected component labelling
 unsigned int labelcc[N2];           // label array to reassemble and display individual components
@@ -2392,8 +2397,10 @@ extern inline quadnode * hash_patt8_find(const uint64_t patt) {
             q = hash_patt8_store(h,patt);
         }
         nw = patt & 0xffff;ne = (patt>>16) & 0xffff;sw = (patt>>32) & 0xffff; se = (patt>>48) & 0xffff;
-        if(nw) hash_patt4_find(nw);if(ne) hash_patt4_find(ne);   // find or store 8x8 64-bit subpatterns, updating activities and lasttime
-        if(sw) hash_patt4_find(sw);if(se) hash_patt4_find(se);   // store if new, otherwise update
+        if(nw) hash_patt4_find(nw);   // find or store 8x8 64-bit subpatterns, updating activities and lasttime
+        if(ne) hash_patt4_find(ne);   // store if new, otherwise update
+        if(sw) hash_patt4_find(sw);
+        if(se) hash_patt4_find(se);
         return(q);
 }
 //.......................................................................................................................................................
@@ -2425,7 +2432,7 @@ extern inline quadnode * hash_patt16_store(const uint64_t h, const uint64_t nw, 
 }
 //.......................................................................................................................................................
 extern inline quadnode * hash_patt16_find(const uint64_t nw, const uint64_t ne, const uint64_t sw, const uint64_t se) {
-        quadnode *q,*q8;
+        quadnode *q;
         uint64_t h,nnw,nne,nsw,nse;
         const uint64_t randomizer = 11400714819323198549ull;
 
@@ -2463,10 +2470,10 @@ extern inline quadnode * hash_patt16_find(const uint64_t nw, const uint64_t ne, 
         else {                                                  // new node or pattern, save in hash table
             q = hash_patt16_store(h,nw,ne,sw,se);
         }
-        if(nw) q8 = hash_patt8_find(nw);                        // find or store 8x8 64-bit subpatterns, updating activities and lasttime
-        if(ne) q8 = hash_patt8_find(ne);                        // store if new, otherwise update.
-        if(sw) q8 = hash_patt8_find(sw);                        // note that value q8 is never used in this routine, this is intended.
-        if(se) q8 = hash_patt8_find(se);
+        if(nw) (void) hash_patt8_find(nw);                        // find or store 8x8 64-bit subpatterns, updating activities and lasttime
+        if(ne) (void) hash_patt8_find(ne);                        // store if new, otherwise update.
+        if(sw) (void) hash_patt8_find(sw);
+        if(se) (void) hash_patt8_find(se);
         return(q);
 }
 //.......................................................................................................................................................
@@ -4517,7 +4524,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
     finish_update(newgol, newgolg, newgolgstats, newgolb, newgolr, nbshist);
 }
 //---------------------------------------------------------------- update_lut_2Dsym ---------------------------------------------------------------------
-void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[], uint64_t golr[], uint64_t newgol[], uint64_t newgolg[], uint64_t newgolgstats[], uint64_t newgolb[], uint64_t newgolr[]) {     // selection models 14,15
+void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t golr[],uint64_t newgol[], uint64_t newgolg[], uint64_t newgolgstats[], uint64_t newgolb[],uint64_t newgolr[]) {     // selection models 14,15
 /*
     All different configurations under the standard 2D 4-rotation and 4-reflection symmetries are distinguished
     i.e. by number of ones and edge-corner differences and additional distinctions in arrangement
@@ -4549,7 +4556,6 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
     static int csumoffs[9] = {0,2,4,12,26,46,60,68,2};                         // start of indexing in confoffs for crot,kodd lookup for s = 0,1,2,3,4,5,6,7,8
     static unsigned char confoffs[2+2+8+14+20+14+8+2+2] = {0,0, 0,0, 0,0,1,2,3,3,4,5, 0,1,2,3,3,2,4,5,6,7,4,5,8,9, 0,0,1,2,3,4,1,2,5,6,7,8,9,9,10,10,8,7,11,12,
                                         0,1,2,3,3,2,4,5,6,7,4,5,8,9, 0,0,1,2,3,3,4,5, 0,0, 0,0}; // look up for crot*2+kodd to gene bit offset
-
     int nb[8], ij, i, j, jp1, jm1, ip1, im1;
     unsigned int kch=0;
     uint64_t genecode, genecode1, gols, nb1i, nbmask;
@@ -4568,6 +4574,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
         }
     }
 */
+
     canonical = repscheme & R_2_canonical_nb;                                  // set global choice of canonical rotation bit choice for selectdifftx
     survivalgene = repscheme & R_12_survivalgene;                               // gene determining survival is 1: central gene 2: determined by neighbours
     smask = (uint64_t) survivalmask;                                           // 32 bits of survivalmask used to limit space of rules, convert to 64 bit masks for efficient usage here
@@ -4724,7 +4731,7 @@ void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], ui
 void genelife_update (int nsteps, int nhist, int nstat) {
     /* update GoL and gene arrays for toroidal field which has side length which is a binary power of 2 */
     /* encode as much as possible without if structures (use ? : instead) in update routines for optimal vector treatment */
-    int k,t,npop;
+    int k,t;
     uint64_t *newgol, *newgolg, *newgolgstats, *newgolb, *newgolr;
     genedata *genedatap = NULL;
     int totalpoptrace(uint64_t gol[]);                                        // calculate total current population and store in scrolling trace npopulation
@@ -4766,7 +4773,7 @@ void genelife_update (int nsteps, int nhist, int nstat) {
         golb = planesb[curPlane];
         golr = planesr[curPlane];
         
-        if (diagnostics & diag_scrolling_trace) npop = totalpoptrace(gol);    // calculate total current population and store in scrolling trace npopulation
+        if (diagnostics & diag_scrolling_trace) totalpoptrace(gol);    // calculate total current population and store in scrolling trace npopulation
         
         if ((diagnostics & diag_activities) && (diagnostics & diag_hash_genes)) {
             nspeciesgene=activitieshash();                                    // colors acttrace and sets current population arrays, need to run always for continuity
@@ -5018,28 +5025,36 @@ void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams
         case 8:  if (((repscheme>>4)&0x7)==7)
                       genegol[selection-8] = (codingmask<<((8+3-1)*ncoding))|(codingmask<<((8+2-1)*ncoding))|(codingmask<<((2-1)*ncoding))|(codingmask<<((3-1)*ncoding));
                  else genegol[selection-8] = (codingmask<<((8+3-1)*ncoding))|(codingmask<<((2-1)*ncoding))|(codingmask<<((3-1)*ncoding));
-                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;    // put up to 3 extra bits at top to ensure all nr 1s values occupied
+                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];          // put up to 3 extra bits at top to ensure all nr 1s values occupied
+                 break;
         case 9:  if (((repscheme>>4)&0x7)==7) genegol[selection-8] = 0xba32ull;                             // extended rule for scissors-paper-stone-well gliders
                  else                         genegol[selection-8] = 0xb32ull;                              //GoL rule for survival in totalistic LUT case, variable length encoding
-                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;    // put up to 3 extra bits at top to ensure all nr 1s values occupied
+                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];          // put up to 3 extra bits at top to ensure all nr 1s values occupied
+                 break;
         case 10: if (((repscheme>>4)&0x7)==7) genegol[selection-8] = (0x7ull<<2)|(0xfull<<5)|(0x7ull<<34)|(0xfull<<37); //GoL rule for S23 B23 in corner/edge dist LUT case, fixed length encoding
                  else                         genegol[selection-8] = (0x7ull<<2)|(0xfull<<5)|(0xfull<<37);  //GoL rule for S23 B3 in corner/edge dist LUT case, fixed length encoding
-                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;
+                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];
+                 break;
         case 11: if (((repscheme>>4)&0x7)==7) genegol[selection-8] = 0xbfa73f27ull;                         //GoL rule for S23 B23 in corner/edge dist LUT case, variable length encoding
                  else                         genegol[selection-8] = 0xbf3f27ull;                           //GoL rule for S23 B3 in corner/edge dist LUT case, variable length encoding
-                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;
+                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];
+                 break;
         case 12: if (((repscheme>>4)&0x7)==7) genegol[selection-8] = 0xfull|(0x7full<<4)|(0xfull<<32)|(0x7full<<36); //GoL rule for S23 B23 in canonical rotation case, fixed length encoding
                  else                         genegol[selection-8] = 0xfull|(0x7full<<4)|(0x7full<<36);     //GoL rule for 2,3 s and 3 b in canonical rotation case:  4,7,10,7,4 configs s=2,3,4,5,6
-                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;
+                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];
+                 break;
         case 13: if (((repscheme>>4)&0x7)==7) genegol[selection-8] = 0x04cda7bbb73b3727;                    //GoL rule for S23 B23 with modular encoding for canonical rotation case
                  else                         genegol[selection-8] = 0x00cd00bbb73b3727;                    //GoL rule for S23 B3 with modular encoding for canon rot'n case: 4,7,10,7,4 configs s=2,3,4,5,6
-                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;
+                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];
+                 break;
         case 14: if (((repscheme>>4)&0x7)==7) genegol[selection-8] = (0x3full<<3)|(0x3ffull<<9)|(0x3full<<(32+3))|(0x3ffull<<(32+9)); //GoL rule for S23 B23 for 2D_sym case, fixed length encoding
                  else                         genegol[selection-8] = (0x3full<<3)|(0x3ffull<<9)|(0x3ffull<<(32+9)); //GoL rule for S23 B3 for 2D_sym case with 1,2,6,10,13 configs for s=0,1,2,3,4
-                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;
+                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];
+                 break;
         case 15: if (((repscheme>>4)&0x7)==7) genegol[selection-8] = 0x03ffffb7b3a33323;                    //GoL rule for S2(all)3(1st 6) B23 with modular encoding for 2D_sym case (NB smask 0 anyway)
                  else                         genegol[selection-8] = 0x03f3ffb7b3373323;                    //GoL rule for S23 B3 with modular encoding for 2D_sym case for s=0,1,2,3,4
-                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];break;
+                 for (k=0;k<8;k++)   startgenes[k] = ((0x7ull>>(k&3))<<61) | genegol[selection-8];
+                 break;
 
         default: for (k=0;k<8;k++) startgenes[k]=(0x1ull<<(4+k*8))-1ull;
     }
@@ -6207,7 +6222,7 @@ int activitieshash() {  /* count activities of all currently active gene species
     gindices = (int *) malloc(nspeciesnow*sizeof(int));
 
     for (i=j=0; i<nspecies; i++) {
-        /*if(geneitems[i].popcount) {
+        /* if(geneitems[i].popcount) {
             gindices[j]=i;                                           // if col is 0 then the array gindices must be passed with sufficient length
             j++;
         }*/
@@ -6362,7 +6377,7 @@ int activitieshashx(int gindices[], uint64_t genes[], int popln[], int activitie
 int activitieshashquad() {  /* count activities of all currently active quad images of connected components */
     int i, j, ij, ij1, x, nspecies, nspeciesnow, popcnt0, popcnt1;
     int *qindices,*popln,*activities;
-    int qsindices[65536]; // ,qsallindices[65536];
+    int qsindices[65536]; //,qsallindices[65536];
     quadnode *q;
     double act;
     uint64_t *qids;                                                   // 64 bit ids for components used for colouring and ID
