@@ -227,11 +227,13 @@
 #include <time.h>
 #include <math.h>
 //-----------------------------------------------------------size of array ------------------------------------------------------------------------------
-const int log2N = 9;                // toroidal array of side length N = 2 to the power of log2N (minimum log2N is 6 i.e. 64x64)
+/* const int log2N = 7;                // toroidal array of side length N = 2 to the power of log2N (minimum log2N is 6 i.e. 64x64)
 const int N = 0x1 << log2N;         // only side lengths powers of 2 allowed to enable efficient implementation of periodic boundaries
 const int N2 = N*N;                 // number of sites in square-toroidal array
 const int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
 const int N2mask = N2 - 1;          // bit mask for array, used instead of modulo operation
+const int NLM = N2;  */
+#include "genelife_size.h"
 const uint64_t rootclone = N2;      // single bit for mask enquiries for clones with root heritage
 //--------------------------------------------------------- main parameters of model --------------------------------------------------------------------
 unsigned int rulemod = 1;           // determine whether to modify GoL rules
@@ -496,8 +498,8 @@ int nspeciessmall,nallspeciessmall; // number of small pattern species now, and 
 int histcumlogpattsize[log2N+1];    // histogram of patterns binned on log scale according to power of two side enclosing square
 int histcumpixelssqrt[N+1];         // histogram of patterns binned on an integer sqrt scale according to number of pixels
 //------------------------------------------------ arrays for connected component labelling and tracking ------------------------------------------------
-const int NLM = N2;                 // maximum number of discrete components possible N*N: formerly N*N/4 but needed expansion upon intro of genetic diff comp's
-const int NLC = N2<<2;              // maximum number of connections N*N*4
+// enum { NLM = N2};                // maximum number of discrete components possible N*N, now defined in genelife_size.h
+// enum { NLC = N2<<2};             // maximum number of connections N*N*4
 unsigned int label[N2];             // labels for pixels in connected component labelling
 unsigned int oldlabel[N2];          // previous time step labels for connected component labelling
 unsigned int labelcc[N2];           // label array to reassemble and display individual components
@@ -5536,8 +5538,7 @@ int get_genealogydepth() {
     gindices = (int *) malloc(nspecies*sizeof(int));
     for (i=j=0; i<nspecies; i++) {
         if(geneitems[i].popcount) {
-            gindices[j]=i;
-            j++;
+            gindices[j++]=i;
         }
         else gindices[nspeciesnow+i-j]=i;
     }
@@ -6207,12 +6208,10 @@ int activitieshash() {  /* count activities of all currently active gene species
     gindices = (int *) malloc(nspeciesnow*sizeof(int));
 
     for (i=j=0; i<nspecies; i++) {
-        /*if(geneitems[i].popcount) {
-            gindices[j]=i;                                           // if col is 0 then the array gindices must be passed with sufficient length
-            j++;
-        }*/
-        gindices[j]=(geneitems[i].popcount) ? i : gindices[j--];   // if col is 0 then the array gindices must be passed with sufficient length
-        j++;
+        if(geneitems[i].popcount) {
+            gindices[j++]=i;                                           // if col is 0 then the array gindices must be passed with sufficient length
+        }
+        // gindices[j++] = (geneitems[i].popcount) ? i : gindices[j--];   // if col is 0 then the array gindices must be passed with sufficient length
     }
 
     if(activityfnlut) {
@@ -6508,8 +6507,7 @@ int get_genealogies(genedata genealogydat[], int narraysize) {  /* genealogies o
     gindices = (int *) malloc(nspecies*sizeof(int));
     for (i=j=0; i<nspecies; i++) {
         if(geneitems[i].popcount) {
-            gindices[j]=i;
-            j++;
+            gindices[j++]=i;
         }
         else gindices[nspeciesnow+i-j]=i;
     }
@@ -6689,8 +6687,7 @@ int clonealogies() {                                            // genealogies o
     gindices = (int *) malloc(nclones*sizeof(int));
     for (i=j=0; i<nclones; i++) {
         if(cloneitems[i].popln) {
-            gindices[j]=i;
-            j++;
+            gindices[j++]=i;
         }
         else gindices[nclonesnow+i-j]=i;
     }

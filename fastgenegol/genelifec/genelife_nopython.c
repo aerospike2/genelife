@@ -102,8 +102,7 @@ int main (int argc, char *argv[]) {
 	        genelife_update(1,0,0);
             usleep(20000);
 	    }
-	    fprintf(stderr,"finished step %d.\n",i);
 	    genelife_update(nskip,0,0);
-	    fprintf(stderr,"step %d\n",i);
+	    fprintf(stderr,"finished step %d\n",i);
     }
 }

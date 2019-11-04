@@ -1,5 +1,5 @@
- //
-// "subgenelife.c"
+//
+// "subgenelife.h"
 // project genelife
 //---------------------------------------------------------- copyright -------------------------------------------------------------------------
 // Written by John S. McCaskill and Norman H. Packard 2017-2019
@@ -228,11 +228,12 @@
 #include <math.h>
 #include "genelife_size.h"
 //-----------------------------------------------------------size of array ------------------------------------------------------------------------------
-/* enum {log2N = 9,                	// toroidal array of side length N = 2 to the power of log2N (minimum log2N is 6 i.e. 64x64)
-  	  N = 0x1 << log2N,         	// only side lengths powers of 2 allowed to enable efficient implementation of periodic boundaries
- 	  N2 = N*N,                 	// number of sites in square-toroidal array
- 	  Nmask = N - 1,            	// bit mask for side length, used instead of modulo operation
- 	  N2mask = N2 - 1};          	// bit mask for array, used instead of modulo operation   (this code now in genelife_size.h) */
+/* const int log2N = 7;                // toroidal array of side length N = 2 to the power of log2N (minimum log2N is 6 i.e. 64x64)
+const int N = 0x1 << log2N;         // only side lengths powers of 2 allowed to enable efficient implementation of periodic boundaries
+const int N2 = N*N;                 // number of sites in square-toroidal array
+const int Nmask = N - 1;            // bit mask for side length, used instead of modulo operation
+const int N2mask = N2 - 1;          // bit mask for array, used instead of modulo operation
+const int NLM = N2;                 // maximum number of discrete components possible N*N */
 const uint64_t rootclone = N2;      // single bit for mask enquiries for clones with root heritage
 //--------------------------------------------------------- main parameters of model --------------------------------------------------------------------
 unsigned int rulemod = 1;           // determine whether to modify GoL rules
@@ -501,8 +502,8 @@ int nspeciessmall,nallspeciessmall; // number of small pattern species now, and 
 int histcumlogpattsize[log2N1];     // histogram of patterns binned on log scale according to power of two side enclosing square
 int histcumpixelssqrt[N1];          // histogram of patterns binned on an integer sqrt scale according to number of pixels
 //------------------------------------------------ arrays for connected component labelling and tracking ------------------------------------------------
-// enum { NLM = N2};                // maximum number of discrete components possible N*N: formerly N*N/4 but needed expansion upon intro of genetic diff comp's
-enum { NLC = N2<<2};                // maximum number of connections N*N*4
+// enum { NLM = N2};                // maximum number of discrete components possible N*N
+// enum { NLC = N2<<2};             // maximum number of connections N*N*4
 unsigned int label[N2];             // labels for pixels in connected component labelling
 unsigned int oldlabel[N2];          // previous time step labels for connected component labelling
 unsigned int labelcc[N2];           // label array to reassemble and display individual components
@@ -4524,7 +4525,7 @@ void update_lut_canon_rot(uint64_t gol[], uint64_t golg[], uint64_t golgstats[],
     finish_update(newgol, newgolg, newgolgstats, newgolb, newgolr, nbshist);
 }
 //---------------------------------------------------------------- update_lut_2Dsym ---------------------------------------------------------------------
-void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[],uint64_t golr[],uint64_t newgol[], uint64_t newgolg[], uint64_t newgolgstats[], uint64_t newgolb[],uint64_t newgolr[]) {     // selection models 14,15
+void update_lut_2D_sym(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t golb[], uint64_t golr[], uint64_t newgol[], uint64_t newgolg[], uint64_t newgolgstats[], uint64_t newgolb[], uint64_t newgolr[]) {     // selection models 14,15
 /*
     All different configurations under the standard 2D 4-rotation and 4-reflection symmetries are distinguished
     i.e. by number of ones and edge-corner differences and additional distinctions in arrangement
@@ -5551,8 +5552,7 @@ int get_genealogydepth() {
     gindices = (int *) malloc(nspecies*sizeof(int));
     for (i=j=0; i<nspecies; i++) {
         if(geneitems[i].popcount) {
-            gindices[j]=i;
-            j++;
+            gindices[j++]=i;
         }
         else gindices[nspeciesnow+i-j]=i;
     }
@@ -6222,12 +6222,9 @@ int activitieshash() {  /* count activities of all currently active gene species
     gindices = (int *) malloc(nspeciesnow*sizeof(int));
 
     for (i=j=0; i<nspecies; i++) {
-        /* if(geneitems[i].popcount) {
-            gindices[j]=i;                                           // if col is 0 then the array gindices must be passed with sufficient length
-            j++;
-        }*/
-        gindices[j]=(geneitems[i].popcount) ? i : gindices[j--];   // if col is 0 then the array gindices must be passed with sufficient length
-        j++;
+        if(geneitems[i].popcount) {
+            gindices[j++]=i;                                           // if col is 0 then the array gindices must be passed with sufficient length
+        }
     }
 
     if(activityfnlut) {
@@ -6377,7 +6374,7 @@ int activitieshashx(int gindices[], uint64_t genes[], int popln[], int activitie
 int activitieshashquad() {  /* count activities of all currently active quad images of connected components */
     int i, j, ij, ij1, x, nspecies, nspeciesnow, popcnt0, popcnt1;
     int *qindices,*popln,*activities;
-    int qsindices[65536]; //,qsallindices[65536];
+    int qsindices[65536]; // ,qsallindices[65536];
     quadnode *q;
     double act;
     uint64_t *qids;                                                   // 64 bit ids for components used for colouring and ID

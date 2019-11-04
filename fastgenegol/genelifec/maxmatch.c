@@ -14,6 +14,7 @@
 //----------------------------------------------------------------------------------------------------------------------------------------------
 #include <stdio.h>
 #include "genelife_size.h"
+// extern const int NLM;
 
 #define NIL 0
 #define INF 0xffff   /* INT_MAX 0x7fffffff*/
