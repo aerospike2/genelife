@@ -14,6 +14,7 @@
 //----------------------------------------------------------------------------------------------------------------------------------------------
 #include <stdio.h>
 #include "genelife_size.h"
+#define INLINE
 // extern const int NLM;
 
 #define NIL 0
@@ -28,7 +29,7 @@ typedef char boolean;
 int qrear = - 1;
 int qfront = - 1;
 
-extern inline void queue_push(int value)
+extern INLINE void queue_push(int value)
 {
     extern int queue_array[];
     if ((qfront == 0 && qrear == NLM-1) || (qrear == (qfront-1)%(NLM-1)))   // note that NLM > 1 requirement satisified since NLM=N2
@@ -56,7 +57,7 @@ extern inline void queue_push(int value)
     }
 }
 
-extern inline int queue_pop()
+extern INLINE int queue_pop()
 {
     extern int queue_array[];
     if (qfront == - 1 || qfront > qrear) {

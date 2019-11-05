@@ -17,13 +17,9 @@
 //  - note that paramaters are available on command line
 //  - run "genelife_nopython -h" to see a list of them
 //----------------------------------------------------------------------------------------------------------------------------------------------
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <time.h>
-#include <unistd.h>
 
-#include "subgenelife.h"            // set N to 7 for direct screen output in C, significantly larger values possible with python graphics
+#include <unistd.h>
+#include "genelife.h"               // set N to 7 for direct screen output in C, significantly larger values possible with python graphics
                                     // see printscreen routine for terminal setup necessary to see direct C output with C calling program
                                     // note that this program was written to run with extended graphical analysis tools from a python notebook
 #define ASCII_ESC 27                // escape for printing terminal commands, such as cursor repositioning
@@ -43,6 +39,10 @@ int main (int argc, char *argv[]) {
     int ndisp  = 1000;	      // display GoL ndisp steps
     int nskip = 1000;	      // skip this many
 
+    void initialize_planes(int offs[],  int Noffsets);
+    void initialize(int runparams[], int nrunparams, int simparams[], int nsimparams);
+    void genelife_update (int nsteps, int nhist, int nstat);
+    
     int opt;
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
