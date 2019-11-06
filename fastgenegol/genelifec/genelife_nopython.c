@@ -2,17 +2,34 @@
 // "genelife_nopython_main.c"
 //  project genelife
 //
-//---------------------------------------------------------- copyright -------------------------------------------------------------------------
-// Written by John S. McCaskill and Norman H. Packard 2017-2019
+//---------------------------------------------------------- copyright ----------------------------------------------------------------------------------
+//  Written by John S. McCaskill and Norman H. Packard 2017-2019
+//  First created by John McCaskill on 14.07.2017. Last modified Nov 2019.
 //
-// First created by John McCaskill on 14.07.2017. Last modified Oct 2019.
-// Copyright © 2017,2018,2019 European Center for Living Technology. All rights reserved.
+/*  MIT License
+    Copyright (c) 2017,2018,2019 John S. McCaskill and Norman H. Packard
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy of
+    this software and associated documentation files (the "Software"), to deal in
+    the Software without restriction, including without limitation the rights to
+    use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+    of the Software, and to permit persons to whom the Software is furnished to do
+    so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+*/
+//-------------------------------------------------------------------------------------------------------------------------------------------------------
 //
-// This code is distributed in the hope that it will be useful for research purposes, but WITHOUT ANY WARRANTY
-// and without even the implied warranty of merchantability or fitness for a particular purpose.
-//----------------------------------------------------------------------------------------------------------------------------------------------
-//
-// Includes subgenelife.c for low level update routines
+// Includes genelife.h for global constants, variables, arrays and prototypes
 //  - primitive screen graphics in this C calling program (N<=7): for more advanced graphics see python interface
 //  - note that paramaters are available on command line
 //  - run "genelife_nopython -h" to see a list of them

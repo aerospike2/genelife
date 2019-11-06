@@ -3,6 +3,7 @@
 // project genelife
 //
 // by Mattias Gustavsson
+//
 // Lines marked with JSMcCaskill, were modified by John McCaskill for use in the genelife project
 // In some cases these present general improvements to performance of the original code
 // The changes concern eliminating rare zero hash keys and cntrolling expansion of the table

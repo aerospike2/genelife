@@ -3,14 +3,65 @@
 //  project genelife
 //
 // declaration of global constants and variables
-//---------------------------------------------------------- copyright --------------------------------------------------------------------------------
-// Written by John S. McCaskill and Norman H. Packard 2017-2019
+//---------------------------------------------------------- copyright ----------------------------------------------------------------------------------
+//  Written by John S. McCaskill and Norman H. Packard 2017-2019
+//  First created by John McCaskill on 14.07.2017. Last modified Nov 2019.
 //
-// First created by John McCaskill on 14.07.2017. Last modified Oct 2019.
-// Copyright 2017,2018,2019 European Center for Living Technology. All rights reserved.
+/*  MIT License
+    Copyright (c) 2017,2018,2019 John S. McCaskill and Norman H. Packard
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy of
+    this software and associated documentation files (the "Software"), to deal in
+    the Software without restriction, including without limitation the rights to
+    use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+    of the Software, and to permit persons to whom the Software is furnished to do
+    so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+*/
+//------------------------------------------------------- acknowledgements ------------------------------------------------------------------------------
+// Thanks to external contributions:
 //
-// This code is distributed in the hope that it will be useful for research purposes, but WITHOUT ANY WARRANTY
-// and without even the implied warranty of merchantability or fitness for a particular purpose.
+// Sean Eron Anderson
+// Bit Twiddling Hacks © 1997-2005 (all snippets in public domain)
+// https://graphics.stanford.edu/~seander/bithacks.html
+//
+// Mattias Gustavsson
+// hashtable.h, in:
+// https://github.com/mattiasgustavsson/libs
+// dual license, MIT / Unlicense
+// choosing Unlicense license (http://www.unlicense.org)
+//
+// Stackoverflow:
+// license: creative commons https://creativecommons.org/licenses/by-sa/3.0/
+//
+// Anthony Bourdain
+// https://stackoverflow.com/questions/27159322/rgb-values-of-the-colors-in-the-ansi-extended-colors-index-17-255
+//
+// MetallicPriest
+// https://stackoverflow.com/questions/6943493/hash-table-with-64-bit-values-as-key/33871291
+//
+// Wikipedia:
+//
+// "Xorshift" algorithm rewritten here as inline macro
+// https://en.wikipedia.org/wiki/Xorshift
+// Vigna, Sebastiano. "xorshift*/xorshift+ generators and the PRNG shootout". Retrieved 2014-10-25.
+// https://prng.di.unimi.it
+// "Hamming Weight" popcount4c algorithm
+// https://en.wikipedia.org/wiki/Hamming_weight
+// "Disjoint-set data structure" (n.d.) Retrieved Oct 16, 2019
+// https://en.wikipedia.org/wiki/Disjoint-set_data_structure
+// The quadtree code for storing patterns benefited from but is different from that employed in hashlife
+// https://en.wikipedia.org/wiki/Hashlife
 //------------------------------------------------------------------------------------------------------------------------------------------------------
 #ifndef genelife_h
 #define genelife_h
@@ -32,6 +83,7 @@
 #include <inttypes.h>
 #include <time.h>
 #include <math.h>
+#include <string.h>
 
 #include "genelife_size.h"              // definition of model size via log2N and derived parameters N,N2,NLM,NLC,Nmask,N2mask: N is length of array side
 //--------------------------------------------------------- main parameters of model --------------------------------------------------------------------
@@ -608,5 +660,6 @@ extern INLINE uint64_t disambiguate(unsigned int *kchx, uint64_t nb1i, int nb[],
 // ....................................................... spatial_control.c ..............................................................................
 extern void v_scroll(uint64_t newgol[],uint64_t newgolg[],uint64_t newgolb[],uint64_t newgolr[]);
 extern void random_influx(uint64_t newgol[],uint64_t newgolg[],uint64_t newgolb[],uint64_t newgolr[]);
+//............................................ many other routines not called externally from C, see separate files .......................................
 //---------------------------------------------------------------------------------------------------------------------------------------------------------
 #endif /* genelife_h */
