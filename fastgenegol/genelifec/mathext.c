@@ -31,6 +31,8 @@
 //-------------------------------------------------------------------------------------------------------------------------------------------------------
 #include <stdio.h>
 #include <math.h>
+#include <stdint.h>
+#include <inttypes.h>
 #define INLINE
 //
 // integerSqrt          direct bit processing algorithm to implement integer sqrt (largest integer smaller than sqrt) : but floating point sqrt is faster
