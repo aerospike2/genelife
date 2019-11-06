@@ -15,6 +15,30 @@
 //
 #include "genelife.h"
 //
+// set_colorfunction    set color function integer from GUI for use in patterning and coloring display
+// setget_act_ymax      set activity ymax for scaling of gene activity plot
+// setget_act_ymaxq     set activity ymax for scaling of quad activity plot
+// set_selectedgene     set selected gene for highlighting from current mouse selection in graphics window
+// set_offsets          set offsets for detection of glider structures in display for color function 8
+// set_quadrant         set the pair of bits in repscheme (or survivalmask or overwritemask) used for quadrant variation 0-6
+// set_randominflux     change the randominflux activation for rbackground if nonzero or continual updating of init field with random states and genes : 2,1,0
+// set_rbackground      set the backround random live gene input rate per frame and site to rbackground/32768
+// set_repscheme_bits   set the two of the repscheme (or survivalmask or overwritemask) bits corresponding to the selected quadrant
+// set_repscheme        set repscheme from python
+// set_rulemod          set rulemod from python
+// set_surviveover      set the two masks for survival and overwrite from python (survivalmask, overwritemask)
+// set_vscrolling       set vertical scrolling to track fronts of growth in vertical upwards direction
+// set_noveltyfilter    set novelty filter for darkening already encountered components in connected component display (colorfunction 9)
+// set_activity_size_colormode set colormode by size for colorfunction 10 : 0 by ID  1 log2 enclosing square size 2 use #pixels 3 use sqrt(#pixels)
+// set_gcolors          set connected component colors as inherited colors from colliding connected components with random drift
+// set_seed             set random number seed
+// set_nbhist           set nbhist N-block of time points for trace from GUI for use in activity and population display traces
+// set_genealogycoldepth set genealogycoldepth for colorfunction=11 display
+// set_ancestortype     set ancestortype for genealogy display and return of first (0), clonal (1) or first & clonal in 2 windows (2)
+// set_info_transfer_h  set information transfer histogram display value (0,1) from python
+// set_activityfnlut    set collection of functional activity statistics corresponding to functional aggregate of genes by non-neutral bits
+// set_colorupdate1     control update of colorgenes and regular print statements via flag colorupdate1
+// set_colorfunction2   choice of colorfunction for window 2
 //-------------------------------------------------------------------- set ...--------------------------------------------------------------------------
 void set_colorfunction(int colorfunctionin) {
     if((colorfunctionin>12) || (colorfunctionin<0)) fprintf(stderr,"error colorfunction value passed %d out of range\n",colorfunctionin);

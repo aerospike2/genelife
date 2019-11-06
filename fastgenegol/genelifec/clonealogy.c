@@ -15,6 +15,7 @@
 //
 #include "genelife.h"
 //
+// clonealogies         calculate and display clonealogies: genealogies of clones
 //--------------------------------------------------------------- clonealogies --------------------------------------------------------------------------
 int clonealogies() {                                            // genealogies of all clones
     int j, jmax, i, ij, nclones, nclonesnow, birthstep;

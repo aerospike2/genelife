@@ -16,6 +16,11 @@
 #include "genelife.h"
 //
 //---------------------------------------------------------------- save and retrieve gol... data --------------------------------------------------------
+// stash                stash current gol,golg, golb, golr, golgstats in stashgol, stshgolg, stashgolb, stashgolr, stashgolgstats
+// label2stash          stash current gol,golg, golb, golr, golgstats from selected labelled component (either cumulatively or individually)
+// unstash              retrieve current gol,golg, golb, golr, golgstats from stashed values
+// savegols             save current arrays to file
+// retrievegols         retrieve arrays to current from file
 //.......................................................................................................................................................
 void stash(){               // stash current gol,golg
     int ij;

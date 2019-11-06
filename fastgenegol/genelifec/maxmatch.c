@@ -15,7 +15,13 @@
 #include <stdio.h>
 #include "genelife_size.h"
 #define INLINE
-// extern const int NLM;
+//
+// queue_push           implements one queue using an array, push
+// queue_pop            implements one queue using an array, push
+// bfs                  returns true if there is an augmenting path in graph represented in sparse matrix form using cclap,kklap and iilap
+// hopcroftKarp         returns size of maximum matching using Hopcroft Karp algorithm
+// maxmatch             preprocesses array to identify max vertex on right and then calls hopcroftKarp to get max match
+//----------------------------------------------------------------------------------------------------------------------------------------------
 
 #define NIL 0
 #define INF 0xffff   /* INT_MAX 0x7fffffff*/

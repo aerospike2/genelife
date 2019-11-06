@@ -15,6 +15,8 @@
 //
 #include "genelife.h"
 //
+// activitieshash       calculate array of current gene activities and update acttrace array of genes in activity plot format
+// activitieshashquad   calculate array of current quad activities and update acttraceq array of patterns in activity plot format
 //------------------------------------------------------------ activitieshash ---------------------------------------------------------------------------
 extern INLINE unsigned int genefnindex( uint64_t gene, uint64_t mask, int indexoff[]) {
     int k,d;

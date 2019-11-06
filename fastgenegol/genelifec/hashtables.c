@@ -15,6 +15,31 @@
 //
 #include "genelife.h"
 //
+//...................................................... hash table management for genes and clones .....................................................
+// hashaddgene          add new gene to hash table, increment popln and ancestor information for genes already encountered. If mutation calls hashaddclone
+// hashdeletegene       decrements population count for gene, printing error message if not found or already zero. Calls hashdeletefromclone
+// hashgeneextinction   record gene extinctions in hash gene table, counting number of extinctions
+// hashgeneactivity     update activity of gene
+// hashaddclone         add new clone to hash table, increment popln information for existing clones
+// hashdeletefromclone  decrements population count for clone, printing error message if not found or already zero
+// hashcloneactivity    update activity of clone
+//......................................................  pattern storage and analysis future ..........................................................
+// rotate16             rotate bits in 4x4 pattern for 90 deg clockwise rotation
+// rotate64             rotate bits in 8x8 pattern for 90 deg clockwise rotation
+// rotate4x64           rotate bits in 16x16 pattern for 90 deg clockwise rotation
+// rotatequad           rotate bits in quad pattern for 90 deg clockwise rotation
+//...................................................... hash table pattern storage and analysis current ...............................................
+// hash_patt8_store     8x8 bit pattern store
+// hash_patt4_find      4x4 bit pattern lookup
+// hash_patt8_find      8x8 bit pattern lookup
+// patt_hash            hash function for a pattern specified by 4 64-bit (8x8) patterns
+// node_hash            hash function for a node specified by 4 64-bit pointers
+// hash_patt16_store    store new pattern in small pattern table
+// hash_patt16_find     find quadtree hash for pattern (leaf of quadtree consists of 4 64bit integers defining a 16x16 pixel array)
+// hash_node_store      store new node with hashkey h and subnodes nw,ne,sw,se in hash table
+// hash_node_find       find quadtree hash for node (node is specified by its four quadrant pointers (64 bit))
+// quadimage            construct quadtree for an entire image or connected component, reporting if the image has been found previously, returning hashkey
+// labelimage           rebuild image in a chosen label array from quadimage at chosen offset with chosen label
 //------------------------------------------------------------ hash gene inline fns ---------------------------------------------------------------------
 extern INLINE void hashaddgene(int ij,uint64_t gene,uint64_t ancestor,uint64_t *golb,uint64_t parentid,uint64_t mutation) {
     genedata gdata;
@@ -140,21 +165,7 @@ extern INLINE void rotatequad(uint64_t *nw, uint64_t *ne, uint64_t *sw, uint64_t
 // NYI 1. hash_node(*nw,*ne,*sw,*se) 2. lookup hash entry of hash & check id 3. if patt then call rotate4x64 else do 4 calls to rotatequad with subnodes
 }
 //.......................................................................................................................................................
-extern INLINE uint64_t patt_hash(const uint64_t a, const uint64_t b, const uint64_t c, const uint64_t d) {
-                                                        // this hash function works much better than that used in golly for example
-    uint64_t a1,b1,c1,d1,r;
-    a1 = a^0x7f0e1d2c3b4a5968ull;
-    b1 = b^0xf0e1d2c3b4a59687ull;
-    c1 = c^0xba9876543210fedcull;
-    d1 = d^0x456789abcdef0123ull;
-    r =  (a1>>13)+(b1>>23)+(c1>>29)+(d1>>31);
-    r += ((d1<<16)+(c1<<8)+(b1<<4)+(a1<<2)) + (a1+b1+c1+d1);
-    r += (r >> 11);
-    // r=r*11400714819323198549ull;
-    return r ;
-}
-//.......................................................................................................................................................
-extern INLINE quadnode * hash_patt8_store(const uint64_t h, const uint64_t patt) {
+extern INLINE quadnode * hash_patt8_store(const uint64_t h, const uint64_t patt) { //8x8 bit pattern store
     int nr1;
     quadinit.hashkey = h;
     quadinit.isnode=0;
@@ -171,7 +182,7 @@ extern INLINE quadnode * hash_patt8_store(const uint64_t h, const uint64_t patt)
     return (quadnode *) hashtable_find(&quadtable, h);
 }
 //.......................................................................................................................................................
-extern INLINE void hash_patt4_find(const short unsigned int patt) {
+extern INLINE void hash_patt4_find(const short unsigned int patt) {  // 4x4 bit pattern lookup
 
     if(smallpatts[patt].activity) {                                         // pattern found
         smallpatts[patt].activity++;
@@ -185,7 +196,7 @@ extern INLINE void hash_patt4_find(const short unsigned int patt) {
     }
 }
 //.......................................................................................................................................................
-extern INLINE quadnode * hash_patt8_find(const uint64_t patt) {
+extern INLINE quadnode * hash_patt8_find(const uint64_t patt) {  // 8x8 bit pattern lookup
         quadnode *q;
         uint64_t h,npatt;
         short unsigned int nw,ne,sw,se;
@@ -225,6 +236,20 @@ extern INLINE quadnode * hash_patt8_find(const uint64_t patt) {
         if(sw) hash_patt4_find(sw);
         if(se) hash_patt4_find(se);
         return(q);
+}
+//.......................................................................................................................................................
+extern INLINE uint64_t patt_hash(const uint64_t a, const uint64_t b, const uint64_t c, const uint64_t d) {
+                                                        // this hash function seems to work much better than that used in Golly for example
+    uint64_t a1,b1,c1,d1,r;
+    a1 = a^0x7f0e1d2c3b4a5968ull;
+    b1 = b^0xf0e1d2c3b4a59687ull;
+    c1 = c^0xba9876543210fedcull;
+    d1 = d^0x456789abcdef0123ull;
+    r =  (a1>>13)+(b1>>23)+(c1>>29)+(d1>>31);
+    r += ((d1<<16)+(c1<<8)+(b1<<4)+(a1<<2)) + (a1+b1+c1+d1);
+    r += (r >> 11);
+    // r=r*11400714819323198549ull;
+    return r ;
 }
 //.......................................................................................................................................................
 extern INLINE uint64_t node_hash(const uint64_t a, const uint64_t b, const uint64_t c, const uint64_t d) {

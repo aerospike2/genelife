@@ -85,6 +85,7 @@
 // selectdifft6         select the most central (left) of six live neighbours or first one in canonical rotation
 // selectdifft7         select the most central (left) of seven live neighbours or first one in canonical rotation
 // selectdifft          select the most central (left) of sum live neighbours or first one in canonical rotation : calls 1 of selectdifft1-7
+// analyze_nbs          analyze neighbour states, calculating s and packed set of live indices
 // disambiguate         disambiguate the cases where the canonical rotation does not uniquely identify a pattern start point : 1 of 8 methods
 //...................................................... hash table management for genes and clones .....................................................
 // hashaddgene          add new gene to hash table, increment popln and ancestor information for genes already encountered. If mutation calls hashaddclone
@@ -94,9 +95,16 @@
 // hashaddclone         add new clone to hash table, increment popln information for existing clones
 // hashdeletefromclone  decrements population count for clone, printing error message if not found or already zero
 // hashcloneactivity    update activity of clone
-//......................................................  pattern storage and analysis  .................................................................
+//......................................................  pattern storage and analysis future ..........................................................
+// rotate16             rotate bits in 4x4 pattern for 90 deg clockwise rotation
+// rotate64             rotate bits in 8x8 pattern for 90 deg clockwise rotation
+// rotate4x64           rotate bits in 16x16 pattern for 90 deg clockwise rotation
+// rotatequad           rotate bits in quad pattern for 90 deg clockwise rotation
+//...................................................... hash table pattern storage and analysis current ...............................................
+// hash_patt8_store     8x8 bit pattern store
+// hash_patt4_find      4x4 bit pattern lookup
+// hash_patt8_find      8x8 bit pattern lookup
 // patt_hash            hash function for a pattern specified by 4 64-bit (8x8) patterns
-// newkey               assign one of free keys kept in a linked list, allocated 1024 at a time (used if hash-key already occupied with different quadtree)
 // node_hash            hash function for a node specified by 4 64-bit pointers
 // hash_patt16_store    store new pattern in small pattern table
 // hash_patt16_find     find quadtree hash for pattern (leaf of quadtree consists of 4 64bit integers defining a 16x16 pixel array)
@@ -116,6 +124,7 @@
 // compare_neighbors    compare packed pack neighbours with one given x,y shift of arbitrary size
 // compare_all_neighbors compare packed pack neighbours with all nearest neighbour x,y shifts
 // packandcompare       pack and compare either all 1-shifted 3-neighbourhoods with t=-1 or chosen (dx,dy,dt) 3-neighbourhoods
+// golr_digest          digest information in golr (displacement record), extracting min and max mismatch, period, and x,y displacement of period
 //......................................................  fast component labelling  ......................................................................
 // lab_union            disjoint rank union of equivalence classes returning common root
 // label_cell           label a cell (site) in the cellular automata with first pass label of connected component
@@ -124,6 +133,12 @@
 // flattenlabels        flatten label tree so that each label points to its unique root
 // label_components     do two-pass fast component labelling with 8-neighbour using Suzuki decision tree, rank union and periodic BCs, connect t-1 labels with t
 // extract_components   extract labelled components to list of subimages embedded in square of side 2^n, each stored in a quadtree hash table
+//...................................................... mapping of connected components .................................................................
+// queue_push           implements one queue using an array, push
+// queue_pop            implements one queue using an array, push
+// bfs                  returns true if there is an augmenting path in graph represented in sparse matrix form using cclap,kklap and iilap
+// hopcroftKarp         returns size of maximum matching using Hopcroft Karp algorithm
+// maxmatch             preprocesses array to identify max vertex on right and then calls hopcroftKarp to get max match: only routine called from genelife
 //........................................................  simulation update for different symmetries  ..................................................
 // update_23            update gol, golg, golgstats for a single synchronous time step : for selection 0-7 with fixed GoL rule departures in repscheme
 // update_lut_sum       update version for gene encoding look up table for totalistic survival and birth (disallowing 0 live neighbour entries) sel 8,9
@@ -137,6 +152,15 @@
 // writeFile            write file of gol/golg array (32x32) data
 // testmacros           test macros used to accelerate processing (usually not called): FIRST1INDEX, PATTERN4, PATTERN8
 // initialize           initialize simulation parameters and arrays
+//............................................................ spatial control ............................................................................
+// vscroll              vertical scroll of array in addition to dynamics with wrapping block at top/bottom barrier
+// random_influx        random influx of live genes in initialization containing square, in continuous or intermittent modes, with optiional boundary feathering
+//......................................................... stash array state .............................................................................
+// savegols             save current arrays to file
+// retrievegols         retrieve arrays to current from file
+// stash                stash current gol,golg, golb, golr, golgstats in stashgol, stshgolg, stashgolb, stashgolr, stashgolgstats
+// unstash              retrieve current gol,golg, golb, golr, golgstats from stashed values
+// label2stash          stash current gol,golg, golb, golr, golgstats from selected labelled component (either cumulatively or individually)
 //.........................................................  set from python driver  ......................................................................
 // set_colorfunction    set color function integer from GUI for use in patterning and coloring display
 // setget_act_ymax      set activity ymax for scaling of gene activity plot
@@ -158,14 +182,11 @@
 // set_nbhist           set nbhist N-block of time points for trace from GUI for use in activity and population display traces
 // set_genealogycoldepth set genealogycoldepth for colorfunction=11 display
 // set_ancestortype     set ancestortype for genealogy display and return of first (0), clonal (1) or first & clonal in 2 windows (2)
-// stash                stash current gol,golg, golb, golr, golgstats in stashgol, stshgolg, stashgolb, stashgolr, stashgolgstats
-// label2stash          stash current gol,golg, golb, golr, golgstats from selected labelled component (either cumulatively or individually)
 // set_info_transfer_h  set information transfer histogram display value (0,1) from python
 // set_activityfnlut    set collection of functional activity statistics corresponding to functional aggregate of genes by non-neutral bits
 // set_colorupdate1     control update of colorgenes and regular print statements via flag colorupdate1
 // set_colorfunction2   choice of colorfunction for window 2
 //..........................................................  get to python driver  .....................................................................
-// unstash              retrieve current gol,golg, golb, golr, golgstats from stashed values
 // get_log2N            get the current log2N value from C to python
 // get_curgol           get current gol array from C to python
 // get_curgolg          get current golg array from C to python
@@ -192,7 +213,7 @@
 // get_genes            get all hashed genes with data structures including activity counts, extinctions etc
 // get_curgolgstats     get current golgstats array C to python
 // get_sorted_popln_act return sorted population and activities (sorted by current population numbers)
-// get_gliderinfo       get information about gliders from packed array representation (currently near end of code)
+// get_gliderinfo       get information about gliders from packed array representation
 //..........................................................  comparison functions  ....................................................................
 // cmpfunc              compare gene values as numerical unsigned numbers
 // cmpfunc1             compare gene counts in population
@@ -214,11 +235,12 @@
 // countspecieshash     count different genes in current population from record of all species that have existed
 // totalpoptrace        calculates and returns current population size and store in scrolling population trace array npopulation
 // genefnindex          calculate index based on bits masked in from survival and birth masks only
+//..........................................................  activity analysis of dynamics ..............................................................
 // activitieshash       calculate array of current gene activities and update acttrace array of genes in activity plot format
 // activitieshashquad   calculate array of current quad activities and update acttraceq array of patterns in activity plot format
+//..........................................................  genealogy and clonal analysis of dynamics ..................................................
 // get_genealogies      calculate and retrieve or display genealogies, depending on size of array passed (0: display only, >0: retrieve only)
 // clonealogies         calculate and display clonealogies: genealogies of clones
-// get_gliderinfo       get information about gliders from packed array representation
 //-------------------------------------------------------------------------------------------------------------------------------------------------------
 #define OEX                             /* this is main file where global variables and constants are allocated, so no extern statement */
 #include "genelife.h"

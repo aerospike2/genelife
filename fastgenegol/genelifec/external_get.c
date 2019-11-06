@@ -15,6 +15,33 @@
 //
 #include "genelife.h"
 //
+// get_log2N            get the current log2N value from C to python
+// get_curgol           get current gol array from C to python
+// get_curgolg          get current golg array from C to python
+// get_curgolbr         get current golb and golr arrays from C to python
+// get_stats            get the traced statistics from C to python
+// get_acttrace         get current acttrace array C to python
+// get_poptrace         get current poptrace array C to python
+// get genealogytrace   get current trace of genealogies to python
+// get_nnovelcells      get N*nhist first counts of number of novel cells (live cells in novel components)
+// get_nspecies         get number of species from C to python
+// get_nlive            get number of live cells
+// get_genealogydepth   get depth of genealogies returned by get_genealogies()
+// get_genealogies      get genealogies: not in this file, but in genealogy.c
+// get_hist             get the histogram from C to python
+// get_activities       get the current activity statistics of genes from C to python
+// get_all_activities   get all activity statistics of genes (since t=0) from C to python
+// get_quad_activities  get current activity statistics of quads (since t=0) from C to python
+// get_small_activities  get current activity statistics of smallpats (since t=0) from C to python
+// get_all_quad_activities  get all activity statistics of quads (since t=0) from C to python
+// get_all_small_activities  get all activity statistics of smallpats (since t=0) from C to python
+// get_components       get all current connected component data structures
+// get_smallpatts       get array of small pattern data structures including sizes and activities
+// get_quadnodes        get all hashed quadnodes including hashkey, sizes and activities
+// get_genes            get all hashed genes with data structures including activity counts, extinctions etc
+// get_curgolgstats     get current golgstats array C to python
+// get_sorted_popln_act return sorted population and activities (sorted by current population numbers)
+// get_gliderinfo       get information about gliders from packed array representation
 //------------------------------------------------------------------- get ... ---------------------------------------------------------------------------
 // compare with colorfunction==12 code and selectone_of_s code above
 int get_glider_count(uint32_t golrstats[], int NN2){

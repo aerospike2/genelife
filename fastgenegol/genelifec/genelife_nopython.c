@@ -19,6 +19,7 @@
 //----------------------------------------------------------------------------------------------------------------------------------------------
 
 #include <unistd.h>
+#define OEX
 #include "genelife.h"               // set N to 7 for direct screen output in C, significantly larger values possible with python graphics
                                     // see printscreen routine for terminal setup necessary to see direct C output with C calling program
                                     // note that this program was written to run with extended graphical analysis tools from a python notebook
@@ -98,7 +99,7 @@ int main (int argc, char *argv[]) {
     for (i=0; i<nsteps; i++) {                  /* nsteps */
 	    for(k=0; k< ndisp; k++){
             // printxy(gol,golg); // simple character output
-	        // printscreen(gol,golg);  // colour xterm output moving cursor with esc codes
+	        printscreen(gol,golg);  // colour xterm output moving cursor with esc codes
 	        genelife_update(1,0,0);
             usleep(20000);
 	    }

@@ -15,6 +15,7 @@
 //
 #include "genelife.h"
 //
+// get_genealogies      calculate and retrieve or display genealogies, depending on size of array passed (0: display only, >0: retrieve only)
 //--------------------------------------------------------------- genealogies ---------------------------------------------------------------------------
 int get_genealogies(genedata genealogydat[], int narraysize) {  /* genealogies of all currently active species */
     int j, jmax, i, ij, k, nspecies, nspeciesnow;

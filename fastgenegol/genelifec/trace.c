@@ -15,6 +15,13 @@
 //
 #include "genelife.h"
 //
+// countconfigs         count the configs with python specified offsets in (x,y,t)
+// tracestats           record the current stats in time trace
+// countspecies1        count genes with gene array specified as input parameters
+// countspecies         count different genes with genes specified at current time point
+// countspecieshash     count different genes in current population from record of all species that have existed
+// totalpoptrace        calculates and returns current population size and store in scrolling population trace array npopulation
+// genefnindex          calculate index based on bits masked in from survival and birth masks only
 //----------------------------------------------------------------- trace and stats routines -----------------------------------------------------------
 void countconfigs() {        // count translated configs specified by offset array
     // for non zero nb patterns we count if the same pattern occurs at the central site and its offset address in space time

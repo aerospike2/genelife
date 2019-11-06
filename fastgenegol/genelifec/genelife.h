@@ -17,7 +17,8 @@
 
 #ifndef OEX
 #define OEX extern
-#define INIT(x,...) x
+#define NOHASH
+#define INIT(x,...) x /* __VA_ARGS__ */
 #else
 #define OEX
 #define INIT(x,...) x = __VA_ARGS__
@@ -152,7 +153,9 @@ OEX int INIT(parentdies,0);             // model variant enhancing interpretatio
 #define diag_info_transfer_hist 0x800   /* enable collection of glider information transfer histogram in 8 directions  N E S W NE SE SW NW */
 OEX unsigned int INIT(diagnostics,diag_all);// bit mask for all diagnostics as defined by following constants
 //----------------------------------------------------------hash table implementation of python style dictionary---------------------------------------
+#ifndef NOHASH
 #define HASHTABLE_IMPLEMENTATION        /* uses Mattias Gustavsson's hashtable (github) for unsigned 64 bit key dictionary */
+#endif
 #define HASHTABLE_U64 uint64_t          /* define the hashtable 64bit unsigned int type as uint64_t */
 #define HASHTABLE_U32 uint32_t          /* define the hashtable 32bit unsigned int type as uint32_t */
 #define HASHTABLE_SIZE_T uint64_t       /* use 64 bit unsigned key type consistent with this file */
@@ -556,10 +559,10 @@ extern INLINE uint16_t rotate16(uint16_t patt);
 extern INLINE uint64_t rotate64(uint64_t patt);
 extern INLINE void rotate4x64(uint64_t *nw, uint64_t *ne, uint64_t *sw, uint64_t *se);
 extern INLINE void rotatequad(uint64_t *nw, uint64_t *ne, uint64_t *sw, uint64_t *se);
-extern INLINE uint64_t patt_hash(const uint64_t a, const uint64_t b, const uint64_t c, const uint64_t d);
 extern INLINE quadnode * hash_patt8_store(const uint64_t h, const uint64_t patt);
 extern INLINE void hash_patt4_find(const short unsigned int patt);
 extern INLINE quadnode * hash_patt8_find(const uint64_t patt);
+extern INLINE uint64_t patt_hash(const uint64_t a, const uint64_t b, const uint64_t c, const uint64_t d);
 extern INLINE uint64_t node_hash(const uint64_t a, const uint64_t b, const uint64_t c, const uint64_t d);
 extern INLINE quadnode * hash_patt16_store(const uint64_t h, const uint64_t nw, const uint64_t ne, const uint64_t sw, const uint64_t se);
 extern INLINE quadnode * hash_patt16_find(const uint64_t nw, const uint64_t ne, const uint64_t sw, const uint64_t se);
@@ -576,6 +579,8 @@ extern void flattenlabels(equivrec eqv[],unsigned int *nlabel);
 extern unsigned int label_components(uint64_t gol[],uint64_t golg[]);
 extern unsigned int extract_components(uint64_t gol[],uint64_t golg[]);
 extern int novelcells(void);
+//...................................................... mapping of connected components .................................................................
+int maxmatch(int m, unsigned int kk[], unsigned int ii[], unsigned int pairU[], unsigned int pairV[], unsigned int dist[]);
 // ......................................................... display.c ....................................................................................
 extern INLINE void setcolor(unsigned int *color,int n);
 extern INLINE unsigned int labelcolor( unsigned int label);

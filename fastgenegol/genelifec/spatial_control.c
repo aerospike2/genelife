@@ -15,6 +15,9 @@
 //
 #include "genelife.h"
 //
+//
+// vscroll              vertical scroll of array in addition to dynamics with wrapping block at top/bottom barrier
+// random_influx        random influx of live genes in initialization containing square, in continuous or intermittent modes, with optiional boundary feathering
 //----------------------------------------------------------------- spatial control --------------------------------------------------------------------
 void v_scroll(uint64_t newgol[],uint64_t newgolg[],uint64_t newgolb[],uint64_t newgolr[]) {
     int ij,scroll_needed;

@@ -15,6 +15,18 @@
 //
 #include "genelife.h"
 //
+// pack012neighbors     pack all up to 2nd neighbours in single word
+// pack0123neighbors    pack all up to 3rd neighbours in single word
+// pack49neighbors      fast routine to pack all up to 1st,2nd,3rd neighbours in single word : order of bits dictated by hierarchical assembly
+// pack16neighbors      pack 4x4 blocks in single uint64_t word using 16 bits
+// unpack16neighbors    unpack 16 bit word to 4x4 block at offset in full array of labels, marking with chosen label
+// log2size             return log2 of linear size of pattern in integer power of 2 for small patterns 0-65535
+// pack64neighbors      pack 8x8 blocks in single uint64_t (long) word with 64 bits
+// unpack64neighbors    unpack 64 bit word to 8x8 block at offset in full array of labels, marking with chosen label
+// compare_neighbors    compare packed pack neighbours with one given x,y shift of arbitrary size
+// compare_all_neighbors compare packed pack neighbours with all nearest neighbour x,y shifts
+// packandcompare       pack and compare either all 1-shifted 3-neighbourhoods with t=-1 or chosen (dx,dy,dt) 3-neighbourhoods
+// golr_digest          digest information in golr (displacement record), extracting min and max mismatch, period, and x,y displacement of period
 //----------------------------------------------------------- pack012,3neighbors ------------------------------------------------------------------------
 extern INLINE void pack012neighbors(uint64_t gol[],uint64_t golp[]) {              // routine to pack all up to 2nd neighbours in single word
     unsigned int ij,k;

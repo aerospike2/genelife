@@ -14,6 +14,19 @@
 //
 #include "genelife.h"
 //
+// selectone_of_2       select one (or none) of two genes based on selection model parameter selection :  returns birth and newgene
+// selectone_of_s       select one (or none) of s genes based on selection model parameter selection :  returns birth and newgene
+// selectone_nbs        select one of two genes based on pattern of their live 2nd shell neighbours and their genetic encoding
+// selectdifft1         select the gene at the single active neighbour position : algorithm could be optimized
+// selectdifft2         select the right or left of two genes bunched with least number of empty genes between them
+// selectdifft3         select the unique most different (by symmetry) of three live neighbours or first one in canonical rotation
+// selectdifft4         select the most central (left) of four live neighbours or first one in canonical rotation
+// selectdifft5         select the most central (left) of five live neighbours or first one in canonical rotation
+// selectdifft6         select the most central (left) of six live neighbours or first one in canonical rotation
+// selectdifft7         select the most central (left) of seven live neighbours or first one in canonical rotation
+// selectdifft          select the most central (left) of sum live neighbours or first one in canonical rotation : calls 1 of selectdifft1-7
+// analyze_nbs          analyze neighbour states, calculating s and packed set of live indices
+// disambiguate         disambiguate the cases where the canonical rotation does not uniquely identify a pattern start point : 1 of 8 methods
 //------------------------------------------------------------- selectone -------------------------------------------------------------------------------
 extern INLINE void selectone_of_2(int s, uint64_t nb2i, int nb[], uint64_t golg[], uint64_t golb[],uint64_t * birth, uint64_t *newgene, uint64_t *parentid, unsigned int *kch) {
 // birth is returned 1 if ancestors satisfy selection condition. Selection of which of two genes to copy is newgene. Non-random result.

@@ -15,6 +15,18 @@
 //
 #include "genelife.h"
 //
+// cmpfunc              compare gene values as numerical unsigned numbers
+// cmpfunc1             compare gene counts in population
+// cmpfunc2             compare gene values corresponding to given number index in hash table
+// cmpfunc3             compare population counts of hash stored genes
+// cmpfunc3c            compare population counts of hash stored clones
+// cmpfunc3q            compare pixel counts (pop1s) of hash stored quad patterns
+// cmpfunc3qs           compare pixel counts (pop1s) of hash stored small patterns
+// cmpfunc4             compare birth times of hash stored genes
+// cmpfunc5             compare common genealogy level gene values of hash stored genes
+// cmpfunc5c            compare common clonealogy level clone values of hash stored clones
+// cmpfunct6            compare according to ancestry in genealogytrace using activity ordering
+// cmpfunc7             compare according to ancestry in genealogytrace using population size ordering
 //-------------------------------------------------------------- comparison fns -------------------------------------------------------------------------
 int cmpfunc (const void * pa, const void * pb) {
    // return ( *(int*)pa - *(int*)pb );

@@ -15,6 +15,13 @@
 #include <stdio.h>
 #include <math.h>
 #define INLINE
+//
+// integerSqrt          direct bit processing algorithm to implement integer sqrt (largest integer smaller than sqrt) : but floating point sqrt is faster
+// log2r                fast integer logarithm working only for arguments which are powers of 2 (not used but slightly faster than log2a when applicable)
+// log2lower            fast integer logarithm working for all integers : largest integer smaller than or equal to logarithm base 2 of argument
+// log2upper            fast integer logarithm working for all integers : smallest integer larger than or equal to logarithm base 2 of argument
+// sqrtupper            fast integer sqrt working for all integers : smallest integer larger than or equal to sqrt of argument
+// randprob             random event with probability determined by a 32 bit unsigned integer iprob as iprob / 2^32 using RAND128 and uint64_t
 //--------------------------------------------------------------- mathematical fns ----------------------------------------------------------------------
 extern INLINE int integerSqrt(int n) {                  // the largest integer smaller than the square root of n (n>=0)
     int shift,nShifted,result,candidateResult;

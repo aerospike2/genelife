@@ -13,6 +13,14 @@
 //
 #include "genelife.h"
 //
+// set_color            function to assign rainbow colors
+// label_color          map label (quasi-uniformly) into larger unsigned colour space
+// rgba                 converts hue (0..1) to rgb+alpha
+// mix_color            mix colors from overlapping components, add random drift of colour
+// delay                time delay in ms for graphics
+// printxy              simple terminal print of array
+// printscreen          terminal screen print of array on xterm, moving cursor with esc codes */
+// colorgenes           colour display of genes in one of 12 colorfunction modes, including activities, pattern analysis, genealogies and glider detection
 //--------------------------------------------------------------- colorgenes ----------------------------------------------------------------------------
 extern INLINE void setcolor(unsigned int *color,int n) { // for coloring by quad size...
     // rainbow colors from running from fields::tim.colors(11) in R by Tim Hoar : assuming log2N <= 10 (limited by display size)

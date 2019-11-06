@@ -15,6 +15,11 @@
 //
 #include "genelife.h"
 //
+// initialize_planes    initialize periodic sequence of planes to record rolling time window of up to maxPlanes time points (≤8)
+// readFile             read file of gol/golg array (32x32) data
+// writeFile            write file of gol/golg array (32x32) data
+// testmacros           test macros used to accelerate processing (usually not called): FIRST1INDEX, PATTERN4, PATTERN8
+// initialize           initialize simulation parameters and arrays
 //----------------------------------------------------------------- initialize_planes -------------------------------------------------------------------
 void initialize_planes(int offs[],  int Noffsets) {
     int i,j,idx;

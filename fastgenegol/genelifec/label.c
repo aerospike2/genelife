@@ -1,5 +1,5 @@
 //
-//  labelling.c
+//  label.c
 //  project genelife
 //
 //  connected component labelling and mapping between time steps
@@ -15,6 +15,13 @@
 //
 #include "genelife.h"
 //
+// lab_union            disjoint rank union of equivalence classes returning common root
+// label_cell           label a cell (site) in the cellular automata with first pass label of connected component
+// label_cell_genetic   label a cell (site) for connected component analysis taking differences in genes into account
+// checklabels          check that the label tree consistently points to labels of lower values as we go via parents to root
+// flattenlabels        flatten label tree so that each label points to its unique root
+// label_components     do two-pass fast component labelling with 8-neighbour using Suzuki decision tree, rank union and periodic BCs, connect t-1 labels with t
+// extract_components   extract labelled components to list of subimages embedded in square of side 2^n, each stored in a quadtree hash table
 //----------------------------------------------------------- connected component labelling ------------------------------------------------------------
 extern INLINE unsigned int lab_union(equivrec eqv[], unsigned int i, unsigned int j) {
 // Combine two trees containing node i and j. Union by rank with halving - see https://en.wikipedia.org/wiki/Disjoint-set_data_structure
