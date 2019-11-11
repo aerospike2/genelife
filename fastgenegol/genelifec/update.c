@@ -230,7 +230,7 @@ void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t g
                 }
                 if(diagnostics & diag_hash_genes) {
                     if(gol[ij]) {                                               // central old gene present: overwritten
-                        hashdeletegene(golg[ij],golb[ij],"step %d hash delete error 1 in update, gene %llx not stored\n");
+                        hashdeletegene(golg[ij],golb[ij],"step %d hash delete error 1 in update, gene %"PRIx64" not stored\n");
                     }
                     hashaddgene(ij,newgene,ancestor,newgolb+ij,parentid,statflag & F_mutation);
                 }
@@ -258,7 +258,7 @@ void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t g
                 else {
                     if(diagnostics & diag_hash_genes) {
                         if(gol[ij]) {                                       // death : need to update hash table
-                            hashdeletegene(golg[ij],golb[ij],"step %d hash delete error 2 in update, gene %llx not stored\n");
+                            hashdeletegene(golg[ij],golb[ij],"step %d hash delete error 2 in update, gene %"PRIx64" not stored\n");
                         }
                     }
                     newgol[ij]  = 0ull;                                     // new game of life cell value dead
@@ -272,7 +272,7 @@ void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t g
         else {                                                              // else not birth or survival, 0 values for gol and gene
             if(diagnostics & diag_hash_genes) {
                 if(gol[ij]) {                                               // death : need to update hash table
-                    hashdeletegene(golg[ij],golb[ij],"step %d hash delete error 3 in update, gene %llx not stored\n");
+                    hashdeletegene(golg[ij],golb[ij],"step %d hash delete error 3 in update, gene %"PRIx64" not stored\n");
                 }
             }
             newgol[ij]  = 0ull;                                             // new game of life cell value
@@ -301,7 +301,7 @@ void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t g
                 newgolb[ij] = 0ull;
                 newgolr[ij] = 0ull;
                 if(diagnostics & diag_hash_genes)
-                    hashdeletegene(golg[ij],golb[ij],"step %d hash delete error 2 in update, gene %llx not stored\n");
+                    hashdeletegene(golg[ij],golb[ij],"step %d hash delete error 2 in update, gene %"PRIx64" not stored\n");
                 newgolgstats[ij] |= F_parentaldeath;
             }
         }
@@ -313,9 +313,9 @@ void update_23(uint64_t gol[], uint64_t golg[], uint64_t golgstats[], uint64_t g
     if(diagnostics & diag_component_labels) ncomponents=extract_components(newgol,newgolg);
 
     for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
-        if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error %d in update at step %d, gene %llx not stored\n");
-        if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");
-        if(newgolb[ij]) hashcloneactivity(newgolb[ij],"hash activity storage error in update, clone %llx not stored\n");
+        if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error %d in update at step %d, gene %"PRIx64" not stored\n");
+        if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %"PRIx64" not stored\n");
+        if(newgolb[ij]) hashcloneactivity(newgolb[ij],"hash activity storage error in update, clone %"PRIx64" not stored\n");
     }
     // if(diagnostics & diag_hash_patterns) qimage = quadimage(newgol,&patt,log2N); // quadtree hash of entire image
 }
@@ -380,7 +380,7 @@ extern INLINE void finish_update_ij(int ij,int s,uint64_t golij,uint64_t gols,ui
                 newgolg[ij] =  newgene;                                     // if birth then newgene
                 newgolr[ij] = (golr[nb[kch]]<<4) | kch | 0x8ull;            // register ancestor offset index in record_of_dynamics_gene golr along with 0x8 for birth event
                 if(diagnostics & diag_hash_genes) {
-                    if(golij) hashdeletegene(golg[ij],golb[ij],"step %d hash delete error 1 in update_lut_sum, gene %llx not stored\n");
+                    if(golij) hashdeletegene(golg[ij],golb[ij],"step %d hash delete error 1 in update_lut_sum, gene %"PRIx64" not stored\n");
                     hashaddgene(ij,newgene,ancestor,newgolb+ij,parentid,statflag & F_mutation);
                 }
                 if (parentdies) {
@@ -406,7 +406,7 @@ extern INLINE void finish_update_ij(int ij,int s,uint64_t golij,uint64_t gols,ui
                     newgolb[ij] = 0ull;
                     newgolr[ij] = 0ull;
                     if(diagnostics & diag_hash_genes)
-                        hashdeletegene(golg[ij],golb[ij],"step %d hash delete error 2 in update, gene %llx not stored\n");
+                        hashdeletegene(golg[ij],golb[ij],"step %d hash delete error 2 in update, gene %"PRIx64" not stored\n");
                 }
             }
             else {                                                         // empty and no birth, stays empty
@@ -438,7 +438,7 @@ extern INLINE void finish_update(uint64_t newgol[], uint64_t newgolg[],uint64_t 
                 newgolb[ij] = 0ull;
                 newgolr[ij] = 0ull;
                 if(diagnostics & diag_hash_genes)
-                    hashdeletegene(golg[ij],golb[ij],"step %d hash delete error 2 in update, gene %llx not stored\n");
+                    hashdeletegene(golg[ij],golb[ij],"step %d hash delete error 2 in update, gene %"PRIx64" not stored\n");
                 newgolgstats[ij] |= F_parentaldeath;
             }
         }
@@ -457,8 +457,8 @@ extern INLINE void finish_update(uint64_t newgol[], uint64_t newgolg[],uint64_t 
     if(diagnostics & diag_component_labels) ncomponents=extract_components(newgol,newgolg);
     if(diagnostics & diag_hash_genes) {
         for (ij=0; ij<N2; ij++) {       // complete missing hash table records of extinction and activities
-            if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error %d in update at step %d, gene %llx not stored\n");     // [**gol**]
-            if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %llx not stored\n");   // [**gol**]
+            if(gol[ij]) hashgeneextinction(golg[ij],"hash extinction storage error %d in update at step %d, gene %"PRIx64" not stored\n");     // [**gol**]
+            if(newgol[ij]) hashgeneactivity(newgolg[ij],"hash activity storage error in update, gene %"PRIx64" not stored\n");   // [**gol**]
         }
     }
     // if(diagnostics & diag_hash_patterns) qimage = quadimage(newgol,&patt,log2N); // quadtree hash of entire image

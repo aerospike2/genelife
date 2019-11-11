@@ -144,7 +144,7 @@ void testmacros() {
     g=1ull;                                                              // test of FIRST1INDEX
     for(j=0;j<10;j++) {
         FIRST1INDEX(g,k);
-        fprintf(stderr,"test of first1index cnt %d val %llx index %d\n",j,g,k);
+        fprintf(stderr,"test of first1index cnt %d val %"PRIx64" index %d\n",j,g,k);
         g*=42;
     }
 
@@ -153,7 +153,7 @@ void testmacros() {
         int found;
         for(j=0;j<16;j++) {
             PATTERN4(g,j,found);
-            fprintf(stderr,"test of pattern4 pat %x val %llx found? %d\n",j,g,found);
+            fprintf(stderr,"test of pattern4 pat %x val %"PRIx64" found? %d\n",j,g,found);
         }
         g*=42;
     }
@@ -163,7 +163,7 @@ void testmacros() {
         int found;
         for(j=0;j<64;j++) {
             PATTERN8(g,j,found);
-            fprintf(stderr,"test of pattern8 pat %x val %llx found? %d\n",j,g,found);
+            fprintf(stderr,"test of pattern8 pat %x val %"PRIx64" found? %d\n",j,g,found);
         }
         g*=42;
     }

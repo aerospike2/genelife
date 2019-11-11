@@ -516,7 +516,7 @@ extern INLINE unsigned int selectdifft2(uint64_t nbmask, int *crot, int *kodd) {
         case 0x11ull : k = 4; *crot = 3; break;                // 00010001           |...|  |..3|  |0..|   <-
         default  : {                                           //                           |...|  |...|
                                                                //                                  |..4|
-            fprintf(stderr,"Error in canonical rotation for two live neighbours nbmaskrm = %llx for mask %llx\n",nbmaskrm,nbmask); k = 0;
+            fprintf(stderr,"Error in canonical rotation for two live neighbours nbmaskrm = %"PRIx64" for mask %"PRIx64"\n",nbmaskrm,nbmask); k = 0;
         } //default case
     } //switch
 
@@ -546,7 +546,7 @@ extern INLINE unsigned int selectdifft3(uint64_t nbmask, int *crot, int *kodd) {
         case 0x25ull : k = 5; *crot = 6; break;                // 00100101                                |..4|  |..3|  |0.2|  <-
         default  : {                                           //                                                |..4|  |...|
                                                                //                                                       |.5.|
-            fprintf(stderr,"Error in canonical rotation for three live neighbours nbmaskrm = %llx for mask %llx\n",nbmaskrm,nbmask); k = 0;
+            fprintf(stderr,"Error in canonical rotation for three live neighbours nbmaskrm = %"PRIx64" for mask %"PRIx64"\n",nbmaskrm,nbmask); k = 0;
         } //default case
     } //switch
     if (canonical) return(kmin);                               // replication of live neigbour in bit 0 of canonical rotation
@@ -579,7 +579,7 @@ extern INLINE unsigned int selectdifft4(uint64_t nbmask, int *crot, int *kodd) {
         case 0x55ull : k = 2; *crot = 9; break;                // 01010101                                                     |.54|  |...|  |0.2|  <-
         default  : {                                           //                                                                     |.54|  |...|
                                                                //                                                                            |6.4|
-            fprintf(stderr,"Error in canonical rotation for four live neighbours nbmaskrm = %llx for mask %llx\n",nbmaskrm,nbmask); k = 0;
+            fprintf(stderr,"Error in canonical rotation for four live neighbours nbmaskrm = %"PRIx64" for mask %"PRIx64"\n",nbmaskrm,nbmask); k = 0;
         } //default case
     } //switch
     if (canonical) return(kmin);                               // replication of live neigbour in bit 0 of canonical rotation
@@ -608,7 +608,7 @@ extern INLINE unsigned int selectdifft5(uint64_t nbmask, int *crot, int *kodd) {
         case 0x5bull : k = 3; *crot = 6; break;                // 01011011                                |6.4|  |...|  |01.|  <-
         default  : {                                           //                                                |.54|  |..3|
                                                                //                                                       |6.4|
-            fprintf(stderr,"Error in canonical rotation for five live neighbours nbmaskrm = %llx for mask %llx\n",nbmaskrm,nbmask); k = 0;
+            fprintf(stderr,"Error in canonical rotation for five live neighbours nbmaskrm = %"PRIx64" for mask %"PRIx64"\n",nbmaskrm,nbmask); k = 0;
         } //default case
     } //switch
     if (canonical) return(kmin);                               // replication of live neigbour in bit 0 of canonical rotation
@@ -635,7 +635,7 @@ extern INLINE unsigned int selectdifft6(uint64_t nbmask, int *crot, int *kodd) {
         case 0x77ull : k = 4; *crot = 3; break;                // 01110111           |6.4|  |..3|  |012|   <-
         default  : {                                           //                           |65.|  |...|
                                                                //                                  |654|
-            fprintf(stderr,"Error in canonical rotation for six live neighbours nbmaskrm = %llx for mask %llx\n",nbmaskrm,nbmask); k = 0;
+            fprintf(stderr,"Error in canonical rotation for six live neighbours nbmaskrm = %"PRIx64" for mask %"PRIx64"\n",nbmaskrm,nbmask); k = 0;
         } //default case
     } //switch
     if (canonical) return(kmin);                               // replication of live neigbour in bit 0 of canonical rotation

@@ -83,7 +83,7 @@ int setget_act_ymaxq(int actymaxq) {                  // sets ymax for activitie
 //.......................................................................................................................................................
 void set_selectedgene(uint64_t gene) {
     selectedgene=gene;
-    fprintf(stderr,"selected gene set to %llx\n",selectedgene);
+    fprintf(stderr,"selected gene set to %"PRIx64"\n",selectedgene);
 }
 //.......................................................................................................................................................
 void set_offsets(int dx,int dy,int dt) {

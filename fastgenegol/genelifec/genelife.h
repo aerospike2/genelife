@@ -80,6 +80,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 #include <time.h>
 #include <math.h>
@@ -225,7 +226,8 @@ typedef struct genedata {               // value of keys stored for each gene en
     uint64_t gene;                      // stored gene : note that two difft 64-bit genes may be stored at same location, so need check
     uint64_t firstancestor;             // this is initialized to a special gene seq (rootgene) not likely ever to occur for starting genes
 } genedata;
-OEX const uint64_t INIT(rootgene,0xfedcba9876543210);// initial special gene as root for genealogies
+#define rootgene 0xfedcba9876543210     /* initial special gene as root for genealogies */
+// OEX const uint64_t INIT(rootgene,0xfedcba9876543210);// initial special gene as root for genealogies
 OEX const uint64_t INIT(generepeat,0x0123456789abcdef);// special gene sequence to denote repeated genes found in genealogy
 OEX genedata INIT(ginitdata,{1,0,0,0,-1,0,0,0,0ull,rootgene});// initialization data structure for gene data
 OEX genedata *genedataptr;              // pointer to a genedata instance
@@ -324,7 +326,8 @@ OEX int INIT(info_transfer_h,0);        // whether to display histogram on glide
 OEX int INIT(it_nbhood,7);              // size of neighborhood for collecting glider characterization histogram : default 7x7 nbhood
 OEX uint64_t gliderinfo[408];           // histogram of counts for glider detection by match quality in eight directions N E S W NE SE SW NW
 //------------------------------------------------ arrays for time tracing, activity and genealogies ----------------------------------------------------
-OEX const int INIT(startarraysize,1024);// starting array size (used when initializing second run)
+#define startarraysize 1024             /* starting array size (used when initializing second run) */
+// OEX const int INIT(startarraysize,1024);// starting array size (used when initializing second run)
 OEX int INIT(arraysize,startarraysize); // size of trace array (grows dynamically)
 OEX int INIT(*livesites,NULL);          // dynamic array pointer for statistics of number of live sites over time
 OEX int INIT(*genestats,NULL);          // dynamic array pointer for statistics of number of 4 genotype classes over time

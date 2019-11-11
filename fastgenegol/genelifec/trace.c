@@ -159,7 +159,7 @@ void countspecies1(uint64_t gol[], uint64_t golg[], int N2) {     /* counts numb
     for (k=1; k<nspecies; k++) {                            // check consistency of hash table data, assuming empty site gene is most frequent
         if((genedataptr = (genedata *) hashtable_find(&genetable, golgsc[k][0])) != NULL) {
                     if(genedataptr->popcount != golgsc[k][1])
-                        fprintf(stderr,"popcount %llu <> %d hash error at k = %d\n",golgsc[k][1],genedataptr->popcount,k);
+                        fprintf(stderr,"popcount %"PRIu64" <> %d hash error at k = %d\n",golgsc[k][1],genedataptr->popcount,k);
         }
         else fprintf(stderr,"countspecies popcount error, no entry in hash table\n");
     }
@@ -177,7 +177,7 @@ void countspecies1(uint64_t gol[], uint64_t golg[], int N2) {     /* counts numb
         else if ((selection == 2)||(selection == 3)) {                      // cyclic 4 species model
             fitness = nones&0x3;                                            // fitness is species class
         }
-        fprintf(stderr,"count species %d with gene %llx has counts %llu and %d ones, fitness %llu\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
+        fprintf(stderr,"count species %d with gene %"PRIx64" has counts %"PRIu64" and %d ones, fitness %"PRIu64"\n",k, golgsc[k][0],golgsc[k][1],nones,fitness);
     }
     */
     //fprintf(stderr,"rulemod\trepscheme\tselection\toverwritemask\tsurvival\n");
@@ -205,21 +205,21 @@ void countspecieshash() {  /* counts numbers of all different species using qsor
     // qsort(golgs, nspecies, sizeof(int), cmpfunc2);                       // sort in increasing gene order
     qsort(golgs, nspecies, sizeof(int), cmpfunc3);                          // sort in decreasing count order
 
-    // for (k=0; k<nspecies; k++) fprintf(stderr,"in countspecieshash genotype %d is %llx\n", k, genotypes[k]);
+    // for (k=0; k<nspecies; k++) fprintf(stderr,"in countspecieshash genotype %d is %"PRIx64"\n", k, genotypes[k]);
     for (k=0,nspeciesnow=0; k<nspecies; k++) {
         last = genotypes[golgs[k]];
         POPCOUNT64C(last, nones);
 
         if((genedataptr = (genedata *) hashtable_find(&genetable, last)) != NULL) {
             if(genedataptr->popcount) {
-                fprintf(stderr,"count species %7d with gene %16llx has counts %7d and %3d ones\n",k,last,
+                fprintf(stderr,"count species %7d with gene %16"PRIx64" has counts %7d and %3d ones\n",k,last,
                     genedataptr->popcount,nones);
                 nspeciesnow++;
             }
         }
         else {
             fprintf(stderr,"countspecieshash popcount error, no entry in hash table\n");
-            fprintf(stderr,"count species %d with gene %llx has counts ?? and %d ones\n",k,last,
+            fprintf(stderr,"count species %d with gene %"PRIx64" has counts ?? and %d ones\n",k,last,
                     nones);
         }
     }

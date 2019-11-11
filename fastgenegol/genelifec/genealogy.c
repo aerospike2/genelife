@@ -191,7 +191,7 @@ int get_genealogies(genedata genealogydat[], int narraysize) {  /* genealogies o
                     if((genedataptr = (genedata *) hashtable_find(&genetable, nextgene)) != NULL) {
                         birthstep = (unsigned int) genedataptr->firsttime;
                     }
-                    else fprintf(stderr,"ancestor %llx not found at (%d,%d) in genealogies during birthstep extraction\n",nextgene,ij&Nmask,ij>>log2N);
+                    else fprintf(stderr,"ancestor %"PRIx64" not found at (%d,%d) in genealogies during birthstep extraction\n",nextgene,ij&Nmask,ij>>log2N);
                 }
             }
             else birthstep=totsteps;

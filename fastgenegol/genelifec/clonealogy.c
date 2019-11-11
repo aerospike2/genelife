@@ -131,7 +131,7 @@ int clonealogies() {                                            // genealogies o
                 if(nextclone&rootclone) birthstep=totsteps;
                 else {
                     if((clonedataptr = (clonedata *) hashtable_find(&clonetable, nextclone)) != NULL) birthstep = (unsigned int) (clonedataptr->birthid>>32);
-                    else fprintf(stderr,"ancestor %llx not found at (%d,%d) in clonealogies during birthstep extraction\n",nextclone,ij&Nmask,ij>>log2N);
+                    else fprintf(stderr,"ancestor %"PRIx64" not found at (%d,%d) in clonealogies during birthstep extraction\n",nextclone,ij&Nmask,ij>>log2N);
                 }
             }
             else birthstep=totsteps;

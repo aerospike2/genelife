@@ -79,7 +79,7 @@ extern INLINE void hashaddgene(int ij,uint64_t gene,uint64_t ancestor,uint64_t *
     }
     if(ancestor != rootgene) {
         if((genedataptr = (genedata *) hashtable_find(&genetable, ancestor)) == NULL) {
-            fprintf(stderr,"error in hashaddgene step %d ij %d, the ancestor %llx of gene %llx to be stored is not stored (mutation %llx)\n",totsteps,ij,ancestor,gene,mutation);
+            fprintf(stderr,"error in hashaddgene step %d ij %d, the ancestor %"PRIx64" of gene %"PRIx64" to be stored is not stored (mutation %"PRIx64")\n",totsteps,ij,ancestor,gene,mutation);
         }
     }
     if(diagnostics & diag_hash_clones) {
@@ -93,8 +93,8 @@ extern INLINE void hashaddgene(int ij,uint64_t gene,uint64_t ancestor,uint64_t *
             *golb = parentid;
             if((clonedataptr = (clonedata *) hashtable_find(&clonetable, parentid)) != NULL) clonedataptr->popln++;
             else {
-                fprintf(stderr,"step %d error in hashclone update, %llx clone not saved\n",totsteps,parentid);
-                fprintf(stderr,"ij %llx rootclone %d tstep %lld\n",parentid&N2mask,(parentid&rootclone)?1:0,parentid>>32);
+                fprintf(stderr,"step %d error in hashclone update, %"PRIx64" clone not saved\n",totsteps,parentid);
+                fprintf(stderr,"ij %"PRIx64" rootclone %d tstep %"PRId64"\n",parentid&N2mask,(parentid&rootclone)?1:0,parentid>>32);
             }
         }
     }
@@ -104,7 +104,7 @@ extern INLINE void hashdeletegene(uint64_t gene,uint64_t birthid,const char erro
     extern INLINE void hashdeletefromclone(uint64_t birthid);
     
     if((genedataptr = (genedata *) hashtable_find(&genetable, gene)) != NULL) {genedataptr->popcount--;}
-    else fprintf(stderr,errorformat,totsteps,gene);     // errorformat must contain %d and %llx format codes in this order
+    else fprintf(stderr,errorformat,totsteps,gene);     // errorformat must contain %d and %"PRIx64" format codes in this order
     
     if(diagnostics & diag_hash_clones) hashdeletefromclone(birthid);
 }
@@ -128,7 +128,7 @@ extern INLINE void hashaddclone(uint64_t birthid, uint64_t parentid, uint64_t ge
     clonedata cdata;
 
     if((clonedataptr = (clonedata *) hashtable_find(&clonetable, birthid)) != NULL) {
-        fprintf(stderr,"error in hashaddclone, %llx already present\n",birthid);
+        fprintf(stderr,"error in hashaddclone, %"PRIx64" already present\n",birthid);
     }
     else {
         cdata=cinitdata;
@@ -145,7 +145,7 @@ extern INLINE void hashdeletefromclone(uint64_t birthid) {
         else fprintf(stderr,"error in deleting individual from clone: popln already zero\n");
         // if (!clonedataptr->popln) hashtable_remove( &clonetable, birthid );
     }
-    else fprintf(stderr,"error deleting from clone with birthid %llx at time %d : not found in hash table\n",birthid,totsteps);
+    else fprintf(stderr,"error deleting from clone with birthid %"PRIx64" at time %d : not found in hash table\n",birthid,totsteps);
 }
 //.......................................................................................................................................................
 extern INLINE void hashcloneactivity(uint64_t birthid, const char errorformat[]) {
@@ -235,7 +235,7 @@ extern INLINE quadnode * hash_patt8_find(const uint64_t patt) {  // 8x8 bit patt
                     }
                     else {                                      // collision in hash table at 8-leaf level
                         quadcollisions++;
-                        fprintf(stderr,"at %d quadhash 2ndary 8-pattern collision %llx hash %llx collides with %llx %llx %llx %llx\n",
+                        fprintf(stderr,"at %d quadhash 2ndary 8-pattern collision %"PRIx64" hash %"PRIx64" collides with %"PRIx64" %"PRIx64" %"PRIx64" %"PRIx64"\n",
                                 totsteps,patt,h,q->nw,q->ne,q->sw,q->se);
                     }
                 }
@@ -309,7 +309,7 @@ extern INLINE quadnode * hash_patt16_find(const uint64_t nw, const uint64_t ne, 
             }
             else {                                      // collision in hash table at leaf level
                 // quadcollisions++;
-                // fprintf(stderr,"at %d quadhash pattern collision %llx %llx %llx %llx hash %llx collides %llx %llx %llx %llx\n",
+                // fprintf(stderr,"at %d quadhash pattern collision %"PRIx64" %"PRIx64" %"PRIx64" %"PRIx64" hash %"PRIx64" collides %"PRIx64" %"PRIx64" %"PRIx64" %"PRIx64"\n",
                 //    totsteps,nw,ne,sw,se,h,q->nw.patt,q->ne.patt,q->sw.patt,q->se.patt);
                 nnw=nw*randomizer;
                 nne=ne*randomizer;
@@ -323,7 +323,7 @@ extern INLINE quadnode * hash_patt16_find(const uint64_t nw, const uint64_t ne, 
                     }
                     else {                                      // collision in hash table at leaf level
                         quadcollisions++;
-                        fprintf(stderr,"at %d quadhash 2ndary pattern collision %llx %llx %llx %llx hash %llx collides %llx %llx %llx %llx\n",
+                        fprintf(stderr,"at %d quadhash 2ndary pattern collision %"PRIx64" %"PRIx64" %"PRIx64" %"PRIx64" hash %"PRIx64" collides %"PRIx64" %"PRIx64" %"PRIx64" %"PRIx64"\n",
                                 totsteps,nw,ne,sw,se,h,q->nw,q->ne,q->sw,q->se);
                     }
                 }
@@ -396,7 +396,7 @@ extern INLINE quadnode * hash_node_find(const uint64_t nw, const uint64_t ne, co
                     }
                     else {                                      // collision in hash table at leaf level
                         quadcollisions++;
-                        fprintf(stderr,"at %d quadhash node 2ndary collision %llx %llx %llx %llx hash %llx collides %llx %llx %llx %llx\n", totsteps,
+                        fprintf(stderr,"at %d quadhash node 2ndary collision %"PRIx64" %"PRIx64" %"PRIx64" %"PRIx64" hash %"PRIx64" collides %"PRIx64" %"PRIx64" %"PRIx64" %"PRIx64"\n", totsteps,
                                  nw, ne, sw, se, h, q->nw, q->ne,  q->sw, q->se);  // simple recording for now, later do further chaining or whatever
                     }
                 }
@@ -435,7 +435,7 @@ uint64_t quadimage(uint64_t gol[], short unsigned int *patt, int log2n) {       
     else  {                                                                         // n >= 16
         pack64neighbors(gol,golp,log2n);                                            // 8x8 blocks of gol pixels packed into single 64bit words in golp
         n3=n>>3;                                                                    // n3=n/8 is number of such 8x8 blocks along each side of square : n3 is at least 2 here (n>=16)
-        // for(ij=0;ij<n3*n3;ij++) { if (ij%8 == 0) fprintf(stderr,"\n step %d ij %d",totsteps,ij);fprintf(stderr," %llx ",golp[ij]);} fprintf(stderr,"\n");
+        // for(ij=0;ij<n3*n3;ij++) { if (ij%8 == 0) fprintf(stderr,"\n step %d ij %d",totsteps,ij);fprintf(stderr," %"PRIx64" ",golp[ij]);} fprintf(stderr,"\n");
         quadtable.expansion_frozen = 1;                                             // freeze quad hash table against expansion ( to ensure valid pointers during array ops)
         for (ij=ij1=0;ij<n3*n3;ij+=2,ij1++) {                                       //  hash all 16x16 patterns (2x2 of golp words) found as leaves of the quadtree
             golq[ij1]=hash_patt16_find(golp[ij],golp[ij+1],golp[(ij+n3)],golp[(ij+n3)+1]); // hash_patt16_find(nw,ne,sw,se) adds quad leaf entry if pattern not found

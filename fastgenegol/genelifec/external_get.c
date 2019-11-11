@@ -313,7 +313,7 @@ int get_activities(uint64_t actgenes[], int activities[], int narraysize) {
                 nlivegenes++;
             }
         }
-        else fprintf(stderr,"get_activities error, no entry for gene %llx in hash table\n", genotypes[k]);
+        else fprintf(stderr,"get_activities error, no entry for gene %"PRIx64" in hash table\n", genotypes[k]);
     }
     if (nlivegenes > narraysize) fprintf(stderr,"Error: array size %d to small to hold live activities %d, increase it\n",narraysize,nlivegenes);
 
@@ -338,7 +338,7 @@ int get_all_activities(uint64_t genes[], int activities[], int narraysize) {
             genes[k] = genotypes[k];
             activities[k] = genedataptr->activity;
         }
-        else fprintf(stderr,"get_all_activities error, no entry for gene %llx in hash table\n", genotypes[k]);
+        else fprintf(stderr,"get_all_activities error, no entry for gene %"PRIx64" in hash table\n", genotypes[k]);
     }
     return nspecies;
 }
@@ -357,7 +357,7 @@ int get_quad_activities(uint64_t quads[], int activities[], int narraysize) {
             if(q->lasttime == totsteps) // test for currently live
                 livecnt++;
         } else {
-            fprintf(stderr,"get_quad_activities error, no entry for quad %llx in hash table\n", quadkeys[k]);
+            fprintf(stderr,"get_quad_activities error, no entry for quad %"PRIx64" in hash table\n", quadkeys[k]);
         }
     // fprintf(stderr,"The number of different species that have ever existed is %d\n",nspecies);
     if (livecnt > narraysize) {
@@ -372,7 +372,7 @@ int get_quad_activities(uint64_t quads[], int activities[], int narraysize) {
                 activities[k] = q->activity;
             }
         }
-        else fprintf(stderr,"get_quad_activities error, no entry for quad %llx in hash table\n", quadkeys[k]);
+        else fprintf(stderr,"get_quad_activities error, no entry for quad %"PRIx64" in hash table\n", quadkeys[k]);
     }
     return nspecies;
 }
@@ -396,7 +396,7 @@ int get_all_quad_activities(uint64_t quads[], int activities[], int narraysize) 
             quads[k] = quadkeys[k];
             activities[k] = q->activity;
         }
-        else fprintf(stderr,"get_quad_activities error, no entry for quad %llx in hash table\n", quadkeys[k]);
+        else fprintf(stderr,"get_quad_activities error, no entry for quad %"PRIx64" in hash table\n", quadkeys[k]);
     }
     return nspecies;
 }

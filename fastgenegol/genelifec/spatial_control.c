@@ -52,7 +52,7 @@ void v_scroll(uint64_t newgol[],uint64_t newgolg[],uint64_t newgolb[],uint64_t n
         if(newgol[ij]) {
             newgol[ij]=0ull;
             if(diagnostics & diag_hash_genes)
-                hashdeletegene(newgolg[ij],newgolb[ij],"error in v_scroll hashdeletegene call for step %d with gene %llx\n");
+                hashdeletegene(newgolg[ij],newgolb[ij],"error in v_scroll hashdeletegene call for step %d with gene %"PRIx64"\n");
             newgolg[ij]=gene0;
             newgolb[ij]=0ull;
             newgolr[ij]=0ull;
@@ -71,7 +71,7 @@ void v_scroll(uint64_t newgol[],uint64_t newgolg[],uint64_t newgolb[],uint64_t n
         if(newgol[ij]) {
             newgol[ij]=0ull;
             if(diagnostics & diag_hash_genes)
-                hashdeletegene(newgolg[ij],newgolb[ij],"error in v_scroll hashdeletegene call for step %d with gene %llx\n");
+                hashdeletegene(newgolg[ij],newgolb[ij],"error in v_scroll hashdeletegene call for step %d with gene %"PRIx64"\n");
             newgolg[ij]=gene0;
             newgolb[ij]=0ull;
             newgolr[ij]=0ull;
@@ -81,7 +81,7 @@ void v_scroll(uint64_t newgol[],uint64_t newgolg[],uint64_t newgolb[],uint64_t n
         if(newgol[ij]) {
             newgol[ij]=0ull;
             if(diagnostics & diag_hash_genes)
-                hashdeletegene(newgolg[ij],newgolb[ij],"error in v_scroll hashdeletegene call for step %d with gene %llx\n");
+                hashdeletegene(newgolg[ij],newgolb[ij],"error in v_scroll hashdeletegene call for step %d with gene %"PRIx64"\n");
             newgolg[ij]=gene0;
             newgolb[ij]=0ull;
             newgolr[ij]=0ull;
@@ -129,7 +129,7 @@ void random_influx(uint64_t newgol[],uint64_t newgolg[],uint64_t newgolb[],uint6
                 if((rand()&rmask) < rbackground) {              // random event
                     if (newgol[ij]) {                           // if live cell, delete gene
                         newgol[ij]=0ull;
-                        if(diagnostics & diag_hash_genes) hashdeletegene(newgolg[ij],newgolb[ij],"error in randominflux=3 hashdeletegene call for step %d with gene %llx\n");
+                        if(diagnostics & diag_hash_genes) hashdeletegene(newgolg[ij],newgolb[ij],"error in randominflux=3 hashdeletegene call for step %d with gene %"PRIx64"\n");
                         newgolg[ij]=gene0;
                         newgolb[ij]=0ull;
                         newgolr[ij]=0ull;
@@ -159,7 +159,7 @@ void random_influx(uint64_t newgol[],uint64_t newgolg[],uint64_t newgolb[],uint6
                         // compute s done
                         if(s>1){
                             newgol[ij]=0ull;
-                            if(diagnostics & diag_hash_genes) hashdeletegene(newgolg[ij],newgolb[ij],"error in randominflux=4 hashdeletegene call for step %d with gene %llx\n");
+                            if(diagnostics & diag_hash_genes) hashdeletegene(newgolg[ij],newgolb[ij],"error in randominflux=4 hashdeletegene call for step %d with gene %"PRIx64"\n");
                             newgolg[ij]=gene0;
                             newgolb[ij]=0ull;
                             newgolr[ij]=0ull;
