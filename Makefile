@@ -13,7 +13,6 @@ OS_LDFLAG :=
 OS_NAME := $(shell uname -s)
 ifeq ($(OS_NAME),Linux)
 	LDLIBS := $(TARGET_LIB).so
-	OS_LDFLAG = dynamiclib
 endif
 ifeq ($(OS_NAME),Darwin)
 	LDLIBS := $(TARGET_LIB).dylib
