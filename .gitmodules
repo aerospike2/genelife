@@ -1,4 +1,0 @@
-[submodule "fastgenegol/genelifepy/daptics-api"]
-	path = genelifepy_/daptics-api
-	url = git@github.com:ProtoLife/daptics-api.git
-	branch = master
