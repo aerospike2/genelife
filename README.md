@@ -19,7 +19,9 @@ analysis tools provided.
 Further details are available in the publication by the authors:
 
 John S. McCaskill, Norman H. Packard (2019) "Analysing Emergent Dynamics of Evolving Computation in 2D Cellular Automata"
-Lect. Notes in Comp. Sci 11934 3-40. (Open Access) https://link.springer.com/content/pdf/10.1007%2F978-3-030-34500-6_1.pdf
+Lect. Notes in Comp. Sci 11934 3-40. (Open Access)
+Online version:  https://doi.org/10.1007/978-3-030-34500-6_1
+Print version:   https://link.springer.com/content/pdf/10.1007%2F978-3-030-34500-6_1.pdf
 
 Presented as invited talk at:
 TPNC: International Conference on Theory and Practice of Natural Computing
