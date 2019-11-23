@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0D6098722388DB5D00AA2CF5 /* libgenelife.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 52416DB61F27771500721D17 /* libgenelife.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		5263546123894F9B007B90CC /* libgenelife.dylib.dSYM in CopyFiles */ = {isa = PBXBuildFile; fileRef = 5263546023894F9B007B90CC /* libgenelife.dylib.dSYM */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		5267E35E23717D9600AB7328 /* mathext.c in Sources */ = {isa = PBXBuildFile; fileRef = 5267E35D23717D9600AB7328 /* mathext.c */; };
 		5267E35F23717D9600AB7328 /* mathext.c in Sources */ = {isa = PBXBuildFile; fileRef = 5267E35D23717D9600AB7328 /* mathext.c */; };
 		5267E36123717EE100AB7328 /* display.c in Sources */ = {isa = PBXBuildFile; fileRef = 5267E36023717EE100AB7328 /* display.c */; };
@@ -57,13 +57,13 @@
 /* Begin PBXCopyFilesBuildPhase section */
 		0D6098712388DB4100AA2CF5 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 12;
-			dstPath = /Users/n/Projects/genelife_private_merge/genelife.xcodeproj;
+			buildActionMask = 8;
+			dstPath = "$(SRCROOT)/genelifepy";
 			dstSubfolderSpec = 0;
 			files = (
-				0D6098722388DB5D00AA2CF5 /* libgenelife.dylib in CopyFiles */,
+				5263546123894F9B007B90CC /* libgenelife.dylib.dSYM in CopyFiles */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
+			runOnlyForDeploymentPostprocessing = 1;
 		};
 		521C1454214DDE9400E17A8F /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
@@ -80,6 +80,8 @@
 		521C1456214DDE9400E17A8F /* genelife_xterm */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = genelife_xterm; sourceTree = BUILT_PRODUCTS_DIR; };
 		521FDCEC1F287DEE00F08FFB /* genelife_c_interface.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; name = genelife_c_interface.py; path = genelifepy/genelife_c_interface.py; sourceTree = SOURCE_ROOT; };
 		52416DB61F27771500721D17 /* libgenelife.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libgenelife.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
+		5263545E23894F7F007B90CC /* libgenelife.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libgenelife.dylib; path = Build/Products/Release/libgenelife.dylib; sourceTree = "<group>"; };
+		5263546023894F9B007B90CC /* libgenelife.dylib.dSYM */ = {isa = PBXFileReference; lastKnownFileType = wrapper.dsym; name = libgenelife.dylib.dSYM; path = Build/Products/Release/libgenelife.dylib.dSYM; sourceTree = "<group>"; };
 		5267E35C23716DF700AB7328 /* genelife.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = genelife.h; sourceTree = "<group>"; };
 		5267E35D23717D9600AB7328 /* mathext.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = mathext.c; sourceTree = "<group>"; };
 		5267E36023717EE100AB7328 /* display.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = display.c; sourceTree = "<group>"; };
@@ -169,6 +171,8 @@
 		525EB7A01F18DCE4004078F1 = {
 			isa = PBXGroup;
 			children = (
+				5263546023894F9B007B90CC /* libgenelife.dylib.dSYM */,
+				5263545E23894F7F007B90CC /* libgenelife.dylib */,
 				5206B818215081EB00394209 /* genelifec */,
 				5206B8162150815C00394209 /* genelifepy */,
 				525EB7AA1F18DCE4004078F1 /* Products */,
@@ -393,12 +397,17 @@
 			buildSettings = {
 				CLANG_UNDEFINED_BEHAVIOR_SANITIZER_INTEGER = NO;
 				CLANG_USE_OPTIMIZATION_PROFILE = NO;
+				DEPLOYMENT_LOCATION = YES;
+				DEPLOYMENT_POSTPROCESSING = YES;
+				DSTROOT = /;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				EXECUTABLE_PREFIX = lib;
 				GCC_GENERATE_TEST_COVERAGE_FILES = NO;
 				GENERATE_PROFILING_CODE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.13;
+				INSTALL_PATH = "$(SRCROOT)/genelifepy";
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -408,6 +417,9 @@
 			buildSettings = {
 				CLANG_UNDEFINED_BEHAVIOR_SANITIZER_INTEGER = NO;
 				CLANG_USE_OPTIMIZATION_PROFILE = NO;
+				DEPLOYMENT_LOCATION = YES;
+				DEPLOYMENT_POSTPROCESSING = YES;
+				DSTROOT = /;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				EXECUTABLE_PREFIX = lib;
@@ -415,8 +427,8 @@
 				GCC_OPTIMIZATION_LEVEL = fast;
 				GCC_UNROLL_LOOPS = YES;
 				GENERATE_PROFILING_CODE = YES;
-				"INSTALL_PATH[sdk=*]" = /usr/local/lib;
-				MACOSX_DEPLOYMENT_TARGET = 10.13;
+				INSTALL_PATH = "$(SRCROOT)/genelifepy";
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -454,7 +466,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_IDENTITY = "-";
-				COPY_PHASE_STRIP = YES;
+				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -474,8 +486,9 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 10.14;
 				MTL_ENABLE_DEBUG_INFO = YES;
-				ONLY_ACTIVE_ARCH = NO;
+				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
+				STRIP_INSTALLED_PRODUCT = NO;
 				SUPPORTED_PLATFORMS = macosx;
 			};
 			name = Debug;
@@ -512,7 +525,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_IDENTITY = "-";
-				COPY_PHASE_STRIP = YES;
+				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -528,6 +541,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
+				STRIP_INSTALLED_PRODUCT = NO;
 				SUPPORTED_PLATFORMS = macosx;
 			};
 			name = Release;
