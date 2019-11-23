@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0D6098722388DB5D00AA2CF5 /* libgenelife.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 52416DB61F27771500721D17 /* libgenelife.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		5267E35E23717D9600AB7328 /* mathext.c in Sources */ = {isa = PBXBuildFile; fileRef = 5267E35D23717D9600AB7328 /* mathext.c */; };
 		5267E35F23717D9600AB7328 /* mathext.c in Sources */ = {isa = PBXBuildFile; fileRef = 5267E35D23717D9600AB7328 /* mathext.c */; };
 		5267E36123717EE100AB7328 /* display.c in Sources */ = {isa = PBXBuildFile; fileRef = 5267E36023717EE100AB7328 /* display.c */; };
@@ -54,6 +55,16 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		0D6098712388DB4100AA2CF5 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 12;
+			dstPath = /Users/n/Projects/genelife_private_merge/genelife.xcodeproj;
+			dstSubfolderSpec = 0;
+			files = (
+				0D6098722388DB5D00AA2CF5 /* libgenelife.dylib in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		521C1454214DDE9400E17A8F /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -235,6 +246,7 @@
 				52416DB21F27771500721D17 /* Sources */,
 				52416DB31F27771500721D17 /* Frameworks */,
 				52416DB41F27771500721D17 /* Headers */,
+				0D6098712388DB4100AA2CF5 /* CopyFiles */,
 			);
 			buildRules = (
 			);

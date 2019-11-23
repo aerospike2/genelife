@@ -1,6 +1,4 @@
 
-<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML"></script>
-
 # genelife
 
 Genetic extension to Conway's Game of Life
@@ -30,32 +28,38 @@ Theory and Practice of Natural Computing
 Editors:  Carlos Martín-Vide, Geoffrey PondMiguel, A. Vega-Rodríguez
 
 ## Quick introduction to compiling and running the code.
+
 The main version is designed to run from a Jupyter notebook using a python3 and PySDL2 GUI as well as a C library.
+
+Requirements:
+-   Python packages numpy, matplotlib, sdl2 (from `pip install PySDL2`)
+-   For SDL2: In addition to PySDL2 (pip install) and the SDL2 library, the library SDL2TTF for true type fonts is employed
+(see https://www.libsdl.org/projects/SDL_ttf/).
+-   The jupyter notebook interface (see https://jupyter.org/install.html).
+-   In addition to Jupyter, the notebook extensions nbextensions are used for convenient table of contents and initialization cells; see https://jupyter-contrib-nbextensions.readthedocs.io/en/latest/install.html.
+
 We suggest that users copy the genelife.ipynb and experiment with the program in their own copy.
--	In addition to Jupyter, the notebook extensions nbextensions are used for convenient table of contents and initialization cells:
-	see https://jupyter-contrib-nbextensions.readthedocs.io/en/latest/install.html.
--   For SDL2: In addition to PySDL2 (pip install) and the SDL2 library, the library SDL2TTF for true type fonts is employed.
 
 
-The C library is compiled on unix simply by typing make, and this also works on OSX (with some differences in the optimization
-options compared with the Xcode build). The source code for the C library is contained in the directory genelifec.
-In addition to the main h file there is a short h file genelife_size.h that specifies the lattice size and related constants.
-The lattice size can be changed from within the Jupyter notebook genelife.ipynb by changing N in and executing the second cell to launch compilation.
-Apart from the help information provided in the notebook, help is obtained by typing h in the graphics window after starting a run,
-and both the python and C files have extensive documentation on available functions. There are two custom python files for genelife, the main GUI interface genelife.py and the python-C interface file genelife_c_interface.py.
+The C library is compiled on unix simply by typing make, and this also works on OSX (with some differences in the optimization options compared with the Xcode build). The source code for the C library is contained in the directory genelifec. In addition to the main h file there is a short h file genelife_size.h that specifies the lattice size and related constants.  The lattice size can be changed from within the Jupyter notebook genelife.ipynb by changing N in and executing the second cell to launch compilation.  Apart from the help information provided in the notebook, help is obtained by typing h in the graphics window after starting a run, and both the python and C files have extensive documentation on available functions. There are two custom python files for genelife, the main GUI interface genelife.py and the python-C interface file genelife_c_interface.py.
 
-The code has been tested on Mac OSX versions up to Mojave (10.14.6) compiled using Xcode 11.2.1 (supplied)
-and on linux (e.g. Ubuntu) compiled with make.
+The code has been tested on Mac OSX versions up to Mojave (10.14.6) compiled using Xcode 11.2.1 (Xcode project is `genelife.xcodeproj`) and on linux (e.g. Ubuntu, CentOS) compiled with make.
 
 ## Standalone C-only version using xterm graphics (with restricted functionality)
+
 For those who do not have access to python and SDL2, a much more limited standalone terminal application (using only C) has also
 been provided, via the single main C file in the genelifecx directory. The Xcode project file will also make this program for OSX. 
 On linux, execute the following line to build
+```
 	make -f Makefile_xterm
-On most xterm terminals (256 colors) it makes sense to:
-(i)  Reduce the lattice size N to 128 (set log2N to 7)
+```
+This produces an executable `build/genelife_xterm` that may be run at the command line.
+
+On most xterm terminals (256 colors), before running, it makes sense to:
+(i)  Reduce the lattice size N to 128 (set log2N to 7 in `genelifec/genelife_size.h` before making)
 (ii) In the terminal preferences choose a small font (e.g. 10 pt) 
      and adjust the line and character spacing to 0.5 and 1 for square output.
-The main C file runs one example for a certain number of steps, and may be edited to run different options.
+     
+The main C file (`genelifecx/genelife_nopython.c`) runs one example for a certain number of steps, and may be edited to run different options.
 However, most of the graphical analysis and program options are only available comfortably from the python-SDL2 GUI above.
 
