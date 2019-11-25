@@ -82,10 +82,14 @@ except:
     try:
         libcd = npct.load_library("libgenelife", "..")
     except:
-        libcd = npct.load_library("libgenelife", "../..")
-
-
-
+        try:
+            libcd = npct.load_library("libgenelife", "../..")
+        except:
+            try:
+                libcd = npct.load_library("libgenelife", "./genelifepy")
+            except:
+                print("Error: genelife library not found at . , .. , ../.. or ./genelifepy")
+            
 # setup the return types and argument types
 libcd.get_log2N.restype = c_int
 libcd.get_log2N.argtypes = []
